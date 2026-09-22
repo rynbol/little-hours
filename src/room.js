@@ -21,7 +21,7 @@ import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstr
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 import '@babylonjs/core/Culling/ray.js';
 import '@babylonjs/core/Rendering/outlineRenderer.js';
-import { createFurniture, createRoundedBox, createMobileCompanion, disposeFurnitureAssets } from './furniture.js';
+import { createFurniture, createRoundedBox, createContactShadow, createMobileCompanion, disposeFurnitureAssets } from './furniture.js';
 import { createCompanionRoutine } from './companion.js';
 import { createArchitecture, styleFurniture } from './architecture.js';
 import { getFurniture } from './catalog.js';
@@ -139,8 +139,11 @@ export function createRoom(container, options = {}) {
   sun.shadowMinZ = 0.5; sun.shadowMaxZ = 35; sun.autoUpdateExtends = false;
   sun.orthoLeft = -10; sun.orthoRight = 10; sun.orthoTop = 10; sun.orthoBottom = -10;
   // The 20-unit ortho span (24 with Babylon's padding) at 1024 texels needs
-  // enough depth bias to keep Poisson samples from shadowing the floor itself.
-  const shadow = new ShadowGenerator(1024, sun); shadow.usePoissonSampling = true; shadow.bias = 0.002; shadow.normalBias = 0.02; shadow.darkness = 0.24;
+  // enough depth bias to keep filtered samples from shadowing the floor itself.
+  // Hardware PCF gives smooth edges instead of Poisson grain; Babylon falls
+  // back to Poisson sampling on WebGL1.
+  const shadow = new ShadowGenerator(1024, sun); shadow.usePercentageCloserFiltering = true; shadow.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+  shadow.bias = 0.002; shadow.normalBias = 0.02; shadow.darkness = 0.24;
   shadow.getShadowMap().refreshRate = 0;
   const windowGlow = new PointLight('window-lamplight', new Vector3(-2.7, 2.7, -3.3), scene); windowGlow.diffuse = color('#ffc178'); windowGlow.intensity = 1.0; windowGlow.range = 6;
   const hearthGlow = new PointLight('hearth-lamplight', new Vector3(3.25, 1.0, -2.9), scene); hearthGlow.diffuse = color('#ffa555'); hearthGlow.intensity = 1.0; hearthGlow.range = 6;
@@ -418,6 +421,88 @@ export function createRoom(container, options = {}) {
   shootingStar.metadata = { castShadow: false, effect: 'window-shooting-star', delaySeconds: 3, periodSeconds: 14, durationSeconds: 1.6 }; shootingStar.setEnabled(false);
   const windowEffects = new TransformNode('window-atmosphere', scene); windowEffects.parent = world;
   for (const mesh of [rain, skyStars, shootingStar]) mesh.parent = windowEffects;
+  // Where the floor meets both walls, a band of ambient shade settles the room
+  // into its corners. Every shell shares these wall lines and floor height.
+  const floorShadeMaterial = new StandardMaterial('floor-contact-shade', scene);
+  floorShadeMaterial.disableLighting = true; floorShadeMaterial.diffuseColor = Color3.White(); floorShadeMaterial.specularColor = Color3.Black();
+  floorShadeMaterial.backFaceCulling = false; floorShadeMaterial.disableDepthWrite = true;
+  function wallShade(name, alongX) {
+    const rows = [[-0.35, 0.30], [0.22, 0.30], [0.55, 0.12], [1.15, 0]], positions = [], colors = [], indices = [];
+    rows.forEach(([distance, alpha], row) => {
+      for (const end of alongX ? [-6.0, 5.95] : [-4.7, 4.55]) {
+        const across = (alongX ? -4.35 : -5.68) + distance;
+        positions.push(alongX ? end : across, 0, alongX ? across : end); colors.push(0.10, 0.065, 0.04, alpha);
+      }
+      if (row) indices.push(row * 2 - 2, row * 2, row * 2 - 1, row * 2 - 1, row * 2, row * 2 + 1);
+    });
+    const data = new VertexData(); Object.assign(data, { positions, colors, indices, normals: positions.map((_, i) => i % 3 === 1 ? 1 : 0) });
+    const mesh = new Mesh(name, scene); data.applyToMesh(mesh); mesh.material = floorShadeMaterial; mesh.hasVertexAlpha = true;
+    mesh.parent = world; mesh.position.y = 0.232; mesh.isPickable = false; mesh.receiveShadows = false; mesh.metadata = { castShadow: false, effect: 'contact-shadow' };
+  }
+  wallShade('back-wall-shade', true); wallShade('side-wall-shade', false);
+  const catShade = createContactShadow('miso-contact-shadow', 0.95, 0.5, scene, { soft: 0.32, strength: 0.34 });
+  catShade.parent = cat; catShade.position.set(-0.02, 0.006, 0.06);
+  // Each piece gets baked ambient shade under it. The cached sun map cannot
+  // darken floor that the walls already shade, so without it pieces float.
+  // Once per type, every surface below knee height is projected onto a floor
+  // grid (lower surfaces occlude more), then blurred: a sofa base leaves a deep
+  // pool, a desk's open legs only a faint trace.
+  const contactShadeData = new Map(), shadePoint = new Vector3();
+  function bakeContactShade(object, type) {
+    const kneeHeight = 0.9, cell = 0.1, margin = 0.45, strength = 0.62, points = [], triangles = [];
+    const inverse = object.computeWorldMatrix(true).clone().invert();
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const mesh of object.getChildMeshes()) {
+      const positions = !mesh.metadata?.effect && mesh.getVerticesData('position'), indices = mesh.getIndices(); if (!positions || !indices) continue;
+      const matrix = mesh.computeWorldMatrix(true).multiply(inverse), first = points.length / 3;
+      for (let i = 0; i < positions.length; i += 3) { Vector3.TransformCoordinatesFromFloatsToRef(positions[i], positions[i + 1], positions[i + 2], matrix, shadePoint); points.push(shadePoint.x, shadePoint.y, shadePoint.z); }
+      for (let i = 0; i < indices.length; i += 3) {
+        const a = (first + indices[i]) * 3, b = (first + indices[i + 1]) * 3, c = (first + indices[i + 2]) * 3, low = Math.min(points[a + 1], points[b + 1], points[c + 1]);
+        if (low >= kneeHeight) continue;
+        triangles.push(a, b, c, 1 - Math.max(0, low) / kneeHeight);
+        for (const p of [a, b, c]) { minX = Math.min(minX, points[p]); maxX = Math.max(maxX, points[p]); minZ = Math.min(minZ, points[p + 2]); maxZ = Math.max(maxZ, points[p + 2]); }
+      }
+    }
+    const [width, depth] = getFurniture(type).footprint;
+    minX = Math.max(minX, -width / 2) - margin; maxX = Math.min(maxX, width / 2) + margin; minZ = Math.max(minZ, -depth / 2) - margin; maxZ = Math.min(maxZ, depth / 2) + margin;
+    const nx = Math.ceil((maxX - minX) / cell) + 1, nz = Math.ceil((maxZ - minZ) / cell) + 1, cover = new Float32Array(nx * nz);
+    const mark = (i, j, weight) => { if (i >= 0 && j >= 0 && i < nx && j < nz) cover[j * nx + i] = Math.max(cover[j * nx + i], weight); };
+    for (let t = 0; t < triangles.length; t += 4) {
+      const [a, b, c, weight] = [triangles[t], triangles[t + 1], triangles[t + 2], triangles[t + 3]];
+      const ax = (points[a] - minX) / cell, az = (points[a + 2] - minZ) / cell, bx = (points[b] - minX) / cell, bz = (points[b + 2] - minZ) / cell, cx = (points[c] - minX) / cell, cz = (points[c + 2] - minZ) / cell;
+      mark(Math.round((ax + bx + cx) / 3), Math.round((az + bz + cz) / 3), weight); // Thin legs fall between grid points.
+      const area = (bx - ax) * (cz - az) - (bz - az) * (cx - ax); if (Math.abs(area) < 1e-6) continue;
+      for (let j = Math.ceil(Math.min(az, bz, cz)); j <= Math.max(az, bz, cz); j++) for (let i = Math.ceil(Math.min(ax, bx, cx)); i <= Math.max(ax, bx, cx); i++) {
+        const u = ((bx - i) * (cz - j) - (bz - j) * (cx - i)) / area, v = ((cx - i) * (az - j) - (cz - j) * (ax - i)) / area;
+        if (u >= 0 && v >= 0 && u + v <= 1) mark(i, j, weight);
+      }
+    }
+    // Two separable box blurs approximate a soft Gaussian falloff.
+    const blurred = new Float32Array(cover.length), radius = 2;
+    for (let pass = 0; pass < 2; pass++) for (const [stepI, stepJ] of [[1, 0], [0, 1]]) {
+      const source = pass || stepJ ? blurred.slice() : cover;
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+        let sum = 0; for (let k = -radius; k <= radius; k++) { const x = i + k * stepI, z = j + k * stepJ; if (x >= 0 && z >= 0 && x < nx && z < nz) sum += source[z * nx + x]; }
+        blurred[j * nx + i] = sum / (radius * 2 + 1);
+      }
+    }
+    const positions = [], colors = [], indices = [];
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { positions.push(minX + i * cell, 0, minZ + j * cell); colors.push(0.10, 0.065, 0.04, Math.min(1, blurred[j * nx + i] * 1.25) * strength); }
+    for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+      if (colors[a * 4 + 3] + colors[b * 4 + 3] + colors[c * 4 + 3] + colors[d * 4 + 3] > 0.004) indices.push(a, c, b, b, c, d);
+    }
+    const data = new VertexData(); Object.assign(data, { positions, colors, indices, normals: positions.map((_, i) => i % 3 === 1 ? 1 : 0) });
+    return data;
+  }
+  function groundPiece(object, type) {
+    if (!contactShadeData.has(type)) contactShadeData.set(type, bakeContactShade(object, type));
+    const shade = new Mesh('contact-shadow', scene); contactShadeData.get(type).applyToMesh(shade);
+    shade.material = floorShadeMaterial; shade.hasVertexAlpha = true; shade.isPickable = false; shade.receiveShadows = false;
+    shade.metadata = { castShadow: false, effect: 'contact-shadow' }; shade.parent = object;
+    // Above the thickest stacked rug, so pieces standing on rugs stay grounded.
+    shade.position.y = 0.08;
+  }
   let architecture = null, architectureStyle = 'retreat';
   const furnitureRoot = new TransformNode('placed-furniture', scene), placedObjects = new Map(), settlingPieces = new Map(), animatedObjects = [];
   const decorVisible = { plants: true, lights: true, rug: true };
@@ -511,6 +596,7 @@ export function createRoom(container, options = {}) {
       if (object && object.metadata.furnitureType !== item.type) { settlingPieces.delete(item.id); object.dispose(false, false); placedObjects.delete(item.id); object = null; }
       if (!object) {
         object = createFurniture(item.type, scene); styleFurniture(object, architectureStyle); object.parent = furnitureRoot;
+        if (getFurniture(item.type).category !== 'Rugs') groundPiece(object, item.type);
         object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type;
         object.getChildMeshes().forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = !mesh.metadata?.effect; });
         placedObjects.set(item.id, object);

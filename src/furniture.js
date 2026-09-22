@@ -52,6 +52,36 @@ export function createRoundedBox(name, size, radius, scene) {
   }
   const result = new Mesh(name, scene); data.applyToMesh(result); return result;
 }
+// A soft pool of ambient shade: an even core that fades out over `soft` world
+// units in two steps, so small and large shapes share one physical falloff.
+// Vertex alpha only; it never casts, receives shadows or takes picks.
+export function createContactShadow(name, width, depth, scene, { soft = 0.45, strength = 0.42 } = {}) {
+  const cache = cacheFor(scene);
+  if (!cache.materials.has('contact-shadow')) {
+    const shade = new StandardMaterial('furniture-contact-shadow', scene);
+    shade.disableLighting = true; shade.diffuseColor = Color3.White(); shade.specularColor = Color3.Black();
+    shade.backFaceCulling = false; shade.disableDepthWrite = true;
+    cache.materials.set('contact-shadow', shade);
+  }
+  const hx = Math.max(0.01, width / 2), hz = Math.max(0.01, depth / 2), steps = 5, tone = [0.10, 0.065, 0.04];
+  const rings = [[0, strength], [soft * 0.35, strength * 0.45], [soft, 0]], perRing = 4 * (steps + 1);
+  const positions = [0, 0, 0], colors = [...tone, strength], indices = [];
+  for (const [offset, alpha] of rings) for (let corner = 0; corner < 4; corner++) for (let step = 0; step <= steps; step++) {
+    const angle = (corner + step / steps) * Math.PI / 2;
+    positions.push((corner === 0 || corner === 3 ? hx : -hx) + Math.cos(angle) * offset, 0, (corner < 2 ? hz : -hz) + Math.sin(angle) * offset);
+    colors.push(...tone, alpha);
+  }
+  for (let j = 0; j < perRing; j++) indices.push(0, 1 + j, 1 + (j + 1) % perRing);
+  for (let ring = 0; ring < rings.length - 1; ring++) for (let j = 0; j < perRing; j++) {
+    const a = 1 + ring * perRing + j, b = 1 + ring * perRing + (j + 1) % perRing;
+    indices.push(a, a + perRing, b, b, a + perRing, b + perRing);
+  }
+  const data = new VertexData(); Object.assign(data, { positions, indices, colors, normals: positions.map((_, i) => i % 3 === 1 ? 1 : 0) });
+  const result = new Mesh(name, scene); data.applyToMesh(result);
+  result.material = cache.materials.get('contact-shadow'); result.hasVertexAlpha = true;
+  result.isPickable = false; result.receiveShadows = false; result.metadata = { castShadow: false, effect: 'contact-shadow' };
+  return result;
+}
 function material(scene, color, extra = {}) {
   const cache = cacheFor(scene), key = `${color}:${JSON.stringify(extra)}`;
   if (!cache.materials.has(key)) {
@@ -953,9 +983,9 @@ export function createMobileCompanion(scene) {
   }) }, scene);
   sleepLetters.parent = root; sleepLetters.billboardMode = Mesh.BILLBOARDMODE_ALL; sleepLetters.color = Color3.FromHexString('#eadac3'); sleepLetters.setEnabled(false);
   root.getChildMeshes().forEach(part => { part.isPickable = false; part.receiveShadows = false; part.metadata = { ...part.metadata, castShadow: false, companion: true }; });
-  const contact = CreateCylinder('companion-contact-shadow', { diameter: .65, height: .004, tessellation: 16 }, scene);
-  const contactMaterial = new StandardMaterial('companion-contact-shadow', scene); contactMaterial.diffuseColor = new Color3(.14, .10, .08); contactMaterial.emissiveColor = new Color3(.14, .10, .08); contactMaterial.disableLighting = true; contactMaterial.alpha = .16;
-  contact.material = contactMaterial; contact.isPickable = false; contact.metadata = { castShadow: false, companion: true }; contact.position.y = .245;
+  // The same soft pool as the furniture, raised above the thickest rug.
+  const contact = createContactShadow('companion-contact-shadow', .26, .26, scene, { soft: .30, strength: .36 });
+  contact.metadata = { ...contact.metadata, companion: true }; contact.position.y = .30;
   const direction = new Vector3(), radial = new Vector3(), rotated = new Vector3(), normal = new Vector3(), rotation = new Quaternion();
   const torsoPoint = (x, y, z, hip, lean, roll, out) => {
     const ry = x * Math.sin(roll) + y * Math.cos(roll);

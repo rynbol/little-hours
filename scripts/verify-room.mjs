@@ -292,7 +292,8 @@ try {
   }
   room.setLayout(dragLayout); room.selectItem(null);
   const dragNode = scene.transformNodes.find(node => node.metadata?.itemId === dragPlant.id);
-  const plantMeshes = dragNode.getChildMeshes(), originalMaterials = plantMeshes.map(mesh => mesh.material);
+  // The baked floor shade travels with the piece but is never outlined or picked.
+  const plantMeshes = dragNode.getChildMeshes().filter(mesh => mesh.metadata?.effect !== 'contact-shadow'), originalMaterials = plantMeshes.map(mesh => mesh.material);
   canvas.emit('pointermove', pointerAt(2, .45, 0)); advance(2);
   assert.equal(diagnostics().hoveredId, dragPlant.id);
   assert.ok(plantMeshes.every(mesh => mesh.renderOutline), 'outline covers pot and animated foliage');
