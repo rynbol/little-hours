@@ -23,7 +23,10 @@ class Canvas extends Surface {
   getAttribute(k) { return this.attributes.get(k) ?? null; }
   getRootNode() { return doc; }
   getContext() { return context; }
-  setPointerCapture() {} releasePointerCapture() {} focus() {}
+  capturedPointer = null;
+  setPointerCapture(id) { this.capturedPointer = id; }
+  releasePointerCapture(id) { if (this.capturedPointer === id) this.capturedPointer = null; }
+  focus() {}
   remove() { this.removed = true; }
   getBoundingClientRect() { return { left: 0, top: 0, width: this.clientWidth, height: this.clientHeight, right: this.clientWidth, bottom: this.clientHeight }; }
 }
@@ -44,7 +47,7 @@ globalThis.ResizeObserver = class {
 const { createRoom } = await import('../src/room.js');
 let engine;
 const container = { clientWidth: 800, clientHeight: 600, appendChild(canvas) { this.canvas = canvas; } };
-const changes = [], notices = [], stats = [];
+const changes = [], notices = [], stats = [], dragStates = [];
 const room = createRoom(container, {
   engineFactory(canvas) {
     engine = new NullEngine({ renderWidth: 800, renderHeight: 600, textureSize: 512, deterministicLockstep: true, lockstepMaxSteps: 1 });
@@ -57,6 +60,8 @@ const room = createRoom(container, {
   onLayoutChange: value => changes.push(structuredClone(value)),
   onNotice: value => notices.push(value),
   onStats: value => stats.push(value),
+  isCollectionDrop: (x, y) => x >= 0 && x <= canvas.clientWidth && y > canvas.clientHeight && y < canvas.clientHeight + 200,
+  onDragState: value => dragStates.push(value),
 });
 const canvas = container.canvas;
 const particleNames = ['floating-fireflies', 'window-drifting-stars'];
@@ -271,6 +276,95 @@ try {
   assert.equal(diagnostics().layout.items.length, 2, 'a pointer click on occupied floor must not place furniture');
   room.cancelPlacement(); assert.equal(diagnostics().placement, null);
   console.log('PASS editing: pointer placement/picking, collision rejection, move/rotate/remove, last desk guard and cancellation.');
+  const layoutBeforeDragChecks = structuredClone(diagnostics().layout);
+  const dragPlant = { id: 'drag-plant', type: 'plant', x: 2, z: 0, rotation: 0 };
+  const dragLayout = { presetId: null, items: [desk, dragPlant], activeDeskId: desk.id };
+  function pointerAt(x, y, z) {
+    advance(2); scene.render();
+    const pixel = Vector3.Project(new Vector3(x, y, z), Matrix.Identity(), scene.getTransformMatrix(), { x: 0, y: 0, width: canvas.clientWidth, height: canvas.clientHeight });
+    return { clientX: pixel.x, clientY: pixel.y, pointerId: 7, pointerType: 'mouse', button: 0 };
+  }
+  function beginPlantDrag(x = 3, z = 0) {
+    const source = pointerAt(2, .45, 0), target = pointerAt(x, .45, z);
+    canvas.emit('pointerdown', source); canvas.emit('pointermove', target); advance(2);
+    assert.equal(diagnostics().dragging?.id, dragPlant.id);
+    return target;
+  }
+  room.setLayout(dragLayout); room.selectItem(null);
+  const dragNode = scene.transformNodes.find(node => node.metadata?.itemId === dragPlant.id);
+  const plantMeshes = dragNode.getChildMeshes(), originalMaterials = plantMeshes.map(mesh => mesh.material);
+  canvas.emit('pointermove', pointerAt(2, .45, 0)); advance(2);
+  assert.equal(diagnostics().hoveredId, dragPlant.id);
+  assert.ok(plantMeshes.every(mesh => mesh.renderOutline), 'outline covers pot and animated foliage');
+  assert.ok(scene.meshes.filter(mesh => mesh.renderOutline).every(mesh => plantMeshes.includes(mesh)), 'only hovered furniture is outlined');
+  canvas.emit('pointerleave'); assert.equal(diagnostics().hoveredId, null);
+  assert.ok(plantMeshes.every(mesh => !mesh.renderOutline));
+  const originalDragLayout = JSON.stringify(diagnostics().layout), writesBeforeDrag = changes.length;
+  const movedPointer = beginPlantDrag();
+  assert.equal(canvas.capturedPointer, 7, 'capture keeps the gesture alive outside the canvas');
+  assert.equal(canvas.style.touchAction, 'none', 'touch drags do not scroll the page');
+  assert.equal(dragNode.position.x, 3);
+  assert.equal(JSON.stringify(diagnostics().layout), originalDragLayout, 'preview never edits the saved layout');
+  assert.equal(changes.length, writesBeforeDrag, 'no persistence while dragging');
+  assert.ok(plantMeshes.every(mesh => !scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList.includes(mesh)), 'moving furniture leaves the cached shadow map');
+  const meshCountDuringDrag = scene.meshes.length, materialCountDuringDrag = scene.materials.length;
+  hoverPicks = 0; scene.pickWithRay = function (...args) { hoverPicks++; return nativePick.apply(this, args); };
+  for (let i = 0; i < 30; i++) { canvas.emit('pointermove', movedPointer); advance(); }
+  scene.pickWithRay = nativePick;
+  assert.equal(hoverPicks, 0, 'dragging uses floor math, without mesh raycasts');
+  assert.equal(scene.meshes.length, meshCountDuringDrag); assert.equal(scene.materials.length, materialCountDuringDrag);
+  assert.deepEqual(plantMeshes.map(mesh => mesh.material), originalMaterials, 'outline and preview leave shared materials untouched');
+  canvas.emit('pointerup', movedPointer);
+  assert.equal(diagnostics().layout.items.find(item => item.id === dragPlant.id).x, 3);
+  assert.equal(changes.length, writesBeforeDrag + 1, 'a complete drag is exactly one undoable edit');
+  assert.equal(canvas.capturedPointer, null); assert.equal(diagnostics().dragging, null);
+  room.setLayout(dragLayout);
+  const invalidPointer = beginPlantDrag(desk.x, desk.z);
+  assert.equal(diagnostics().dragging.valid, false);
+  canvas.emit('pointerup', invalidPointer);
+  assert.equal(JSON.stringify(diagnostics().layout), originalDragLayout, 'occupied drops snap back');
+  assert.equal(dragNode.position.x, 2); assert.equal(dragNode.position.z, 0);
+  const trayPointer = { clientX: 80, clientY: canvas.clientHeight + 50, pointerId: 7, pointerType: 'mouse' };
+  beginPlantDrag(); canvas.emit('pointermove', trayPointer); advance(2);
+  assert.equal(dragStates.at(-1).overCollection, true);
+  assert.ok(plantMeshes.every(mesh => mesh.visibility === .13 && !mesh.renderOutline), 'return preview fades without transparent GPU outlines');
+  room.cancelDrag(); assert.equal(dragStates.at(-1), null);
+  assert.ok(plantMeshes.every(mesh => mesh.visibility === 1)); assert.equal(dragNode.position.x, 2);
+  assert.ok(plantMeshes.filter(mesh => !mesh.metadata?.effect).every(mesh => scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList.includes(mesh)), 'cancel restores cached shadow casters');
+  for (const cancelEvent of ['pointercancel', 'lostpointercapture', 'blur']) {
+    beginPlantDrag(); (cancelEvent === 'blur' ? win : canvas).emit(cancelEvent, { pointerId: 7 });
+    assert.equal(diagnostics().dragging, null); assert.equal(dragNode.position.x, 2);
+  }
+  beginPlantDrag(); room.rotateSelection();
+  assert.equal(diagnostics().dragging.candidate.rotation, 1);
+  canvas.emit('pointerup', { ...movedPointer, clientX: -20 });
+  assert.equal(dragNode.rotation.y, 0, 'out-of-canvas drops also restore preview rotation');
+  motion.matches = true; motion.emit('change', { matches: true }); advance(3);
+  const touchSource = { ...pointerAt(2, .45, 0), pointerType: 'touch' };
+  canvas.emit('pointerdown', touchSource); canvas.emit('pointermove', { ...movedPointer, pointerType: 'touch' }); advance(2);
+  assert.equal(dragNode.position.x, 3, 'touch dragging remains responsive with reduced motion');
+  canvas.emit('pointercancel', { pointerId: 99 });
+  assert.equal(diagnostics().dragging.id, dragPlant.id, 'another touch cannot cancel the active drag');
+  room.cancelDrag(); advance(4); assert.equal(frames.size, 0, 'cancel returns reduced motion to idle');
+  motion.matches = false; motion.emit('change', { matches: false });
+  beginPlantDrag(); room.setLayout(dragLayout); assert.equal(diagnostics().dragging, null);
+  beginPlantDrag(); doc.hidden = true; doc.emit('visibilitychange');
+  assert.equal(diagnostics().dragging, null); assert.equal(frames.size, 0);
+  doc.hidden = false; doc.emit('visibilitychange');
+  beginPlantDrag(); room.setEditMode(false); assert.equal(diagnostics().dragging, null);
+  assert.equal(canvas.style.touchAction, 'pan-y'); assert.ok(plantMeshes.every(mesh => !mesh.renderOutline));
+  room.setEditMode(true);
+  beginPlantDrag(); canvas.emit('pointerup', trayPointer);
+  assert.equal(diagnostics().layout.items.length, 1); assert.equal(dragStates.at(-1), null);
+  assert.equal(changes.length, writesBeforeDrag + 2, 'cancelled drags do not overwrite Undo');
+  const deskPointer = pointerAt(desk.x, 1.8, desk.z);
+  canvas.emit('pointerdown', deskPointer); canvas.emit('pointermove', trayPointer); advance(2);
+  assert.equal(diagnostics().dragging?.id, desk.id); assert.equal(dragStates.at(-1).removable, false);
+  canvas.emit('pointerup', trayPointer);
+  assert.equal(diagnostics().layout.items.length, 1, 'last study desk cannot be returned');
+  assert.equal(changes.length, writesBeforeDrag + 2);
+  room.setLayout(layoutBeforeDragChecks); room.selectItem(null);
+  console.log('PASS drag editor: hover outlines, captured gestures, one-save drops, invalid snapback, faded returns, last desk guard, cancellation and no per-frame meshes/materials/picks.');
   const torso = scene.getTransformNodeByName('miso-breathing'), catHead = scene.getTransformNodeByName('miso-head'), catTail = scene.getTransformNodeByName('miso-tail'), catTailTip = scene.getTransformNodeByName('miso-tail-tip'), catPaw = scene.getMeshByName('miso-resting-paw'), heart = scene.getTransformNodeByName('pet-heart');
   const headPosition = catHead.getAbsolutePosition().asArray(), pawPosition = catPaw.getAbsolutePosition().asArray(), tailPosition = catTail.getAbsolutePosition().asArray();
   let smallestBreath = Infinity, largestBreath = -Infinity;
@@ -344,7 +438,7 @@ try {
   console.log('PASS adaptive quality: intentional idle keeps resolution; visible stalls remain in frame metrics.');
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);
-  room.dispose(); assert.equal(frames.size, 0); assert.equal(motion.listenerCount, 0); assert.equal(doc.listenerCount, 0); assert.equal(canvas.listenerCount, 0);
+  room.dispose(); assert.equal(frames.size, 0); assert.equal(motion.listenerCount, 0); assert.equal(doc.listenerCount, 0); assert.equal(canvas.listenerCount, 0); assert.equal(win.listenerCount, 0);
   assert.ok(observer.disconnected && canvas.removed && scene.isDisposed);
   console.log('PASS lifecycle: hidden suspension; scene, frames, observers and listeners disposed.');
   console.log('Babylon room checks passed. GPU appearance and native gestures require browser checks.');

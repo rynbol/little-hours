@@ -20,6 +20,7 @@ import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
 import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstrumentation.js';
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 import '@babylonjs/core/Culling/ray.js';
+import '@babylonjs/core/Rendering/outlineRenderer.js';
 import { createFurniture, createRoundedBox, disposeFurnitureAssets } from './furniture.js';
 import { getFurniture } from './catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, MAX_ITEMS } from './layout.js';
@@ -415,6 +416,9 @@ export function createRoom(container, options = {}) {
   const furnitureRoot = new TransformNode('placed-furniture', scene), placedObjects = new Map(), settlingPieces = new Map(), animatedObjects = [];
   const decorVisible = { plants: true, lights: true, rug: true };
   let layout = createLayout(), selectedId = null, editing = false, placement = null, ghost = null, marker = null, lastPlacementState = '';
+  let hoveredId = null, drag = null, outlineKey = '';
+  const outlinedMeshes = [];
+  const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782');
   const ghostMaterial = new StandardMaterial('placement-preview', scene); ghostMaterial.diffuseColor = color('#85ac80'); ghostMaterial.emissiveColor = color('#42653f'); ghostMaterial.alpha = 0.43; ghostMaterial.disableLighting = true;
   let theme = 'dusk', focused = false, petStart = -Infinity, disposed = false, readyReported = false;
   let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true;
@@ -426,6 +430,7 @@ export function createRoom(container, options = {}) {
   const snap = value => Math.round(value * 4) / 4;
   const copyLayout = () => ({ ...layout, items: layout.items.map(item => ({ ...item })) });
   const isDesk = item => item && Boolean(placedObjects.get(item.id)?.metadata.study);
+  const isFurnitureSurface = mesh => !mesh.metadata?.effect || ['leaf-sway', 'record-spin'].includes(mesh.metadata.effect);
   function requestRender(shadows = false) {
     if (disposed) return;
     needsRender = true;
@@ -433,12 +438,35 @@ export function createRoom(container, options = {}) {
     if (visible && !frame) frame = requestAnimationFrame(tick);
   }
   function refreshShadows() {
-    shadow.getShadowMap().renderList = scene.meshes.filter(mesh => mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && mesh !== rain && mesh !== marker && !mesh.isDescendantOf(heart) && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
+    shadow.getShadowMap().renderList = scene.meshes.filter(mesh => mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && (!drag?.active || itemAncestor(mesh)?.metadata.itemId !== drag.id) && mesh !== rain && mesh !== marker && !mesh.isDescendantOf(heart) && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
     for (const mesh of glowingMeshes) bloom.removeIncludedOnlyMesh(mesh); glowingMeshes.clear();
     for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && mesh.metadata?.effect !== 'tea-steam' && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
     bloom.mainTexture.renderList = [...glowingMeshes];
     requestRender(true);
   }
+  function updateOutline() {
+    const id = editing && !placement ? drag?.id || hoveredId || selectedId : null;
+    const key = `${id}:${Boolean(drag?.overCollection && drag.removable)}:${drag?.valid}:${hoveredId === id}`;
+    if (key === outlineKey) return;
+    for (const mesh of outlinedMeshes) if (!mesh.isDisposed()) mesh.renderOutline = false;
+    outlinedMeshes.length = 0; outlineKey = key;
+    const object = placedObjects.get(id);
+    // The disappearing preview uses a dashed drawing in the collection instead
+    // of outlining transparent meshes (which would require another stencil pass).
+    if (object && !(drag?.overCollection && drag.removable)) {
+      for (const mesh of object.getChildMeshes()) {
+        if (!mesh.isEnabled() || !isFurnitureSurface(mesh) || (object.metadata.avatar && mesh.isDescendantOf(object.metadata.avatar))) continue;
+        mesh.outlineColor = drag && !drag.valid ? invalidOutline : hoveredId === id ? hoverOutline : selectedOutline;
+        mesh.outlineWidth = 0.04; mesh.renderOutline = true; outlinedMeshes.push(mesh);
+      }
+    }
+    requestRender();
+  }
+  function hoverItem(id) {
+    if (hoveredId === id) return;
+    hoveredId = id; updateOutline();
+  }
+  function canRemove(item) { return !isDesk(item) || layout.items.filter(isDesk).length > 1; }
   function updateMarker() {
     marker?.dispose(); marker = null;
     const item = layout.items.find(candidate => candidate.id === selectedId);
@@ -458,7 +486,7 @@ export function createRoom(container, options = {}) {
       if (!object) {
         object = createFurniture(item.type, scene); object.parent = furnitureRoot;
         object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type;
-        object.getChildMeshes().forEach(mesh => { mesh.isPickable = !mesh.metadata?.effect; mesh.receiveShadows = !mesh.metadata?.effect; });
+        object.getChildMeshes().forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = !mesh.metadata?.effect; });
         placedObjects.set(item.id, object);
         if (settleNew && !reducedMotion) { object.scaling.setAll(0.92); settlingPieces.set(item.id, { object, start: performance.now() }); }
       }
@@ -474,21 +502,22 @@ export function createRoom(container, options = {}) {
     if (desk) { const offset = Vector3.TransformCoordinates(new Vector3(0.85, 2.08, -0.35), Matrix.RotationY(desk.rotation * Math.PI / 2)); windowGlow.position.set(desk.x + offset.x, offset.y, desk.z + offset.z); }
     const fireplace = layout.items.find(item => item.type === 'fireplace'); hearthGlow.setEnabled(Boolean(fireplace));
     if (fireplace) { const offset = Vector3.TransformCoordinates(new Vector3(0, 1.0, 0.70), Matrix.RotationY(fireplace.rotation * Math.PI / 2)); hearthGlow.position.set(fireplace.x + offset.x, offset.y, fireplace.z + offset.z); }
-    updateMarker(); refreshShadows();
+    if (hoveredId && !ids.has(hoveredId)) hoveredId = null;
+    outlineKey = ''; updateOutline(); updateMarker(); refreshShadows();
   }
   function setLayout(next) {
-    layout = normalizeLayout(next); syncFurniture();
+    cancelDrag(); layout = normalizeLayout(next); syncFurniture();
     if (selectedId) options.onSelectionChange?.({ ...layout.items.find(item => item.id === selectedId) });
     if (placement) updatePlacement(placement.x, placement.z);
   }
   function commitLayout() { syncFurniture(true); options.onLayoutChange?.(copyLayout()); }
   function selectItem(id) {
-    selectedId = layout.items.some(item => item.id === id) ? id : null; updateMarker();
+    selectedId = layout.items.some(item => item.id === id) ? id : null; updateMarker(); updateOutline();
     const item = layout.items.find(candidate => candidate.id === selectedId); options.onSelectionChange?.(item ? { ...item } : null); requestRender();
   }
   function cancelPlacement() {
     placement = null; if (ghost) { ghost.dispose(false, false); ghost = null; }
-    if (lastPlacementState) options.onPlacementState?.(null); lastPlacementState = ''; updateMarker(); requestRender();
+    if (lastPlacementState) options.onPlacementState?.(null); lastPlacementState = ''; updateMarker(); updateOutline(); requestRender();
   }
   function updatePlacement(x, z) {
     if (!placement) return;
@@ -503,13 +532,15 @@ export function createRoom(container, options = {}) {
   function beginPlacement(type) {
     if (!getFurniture(type)) return false;
     if (layout.items.length >= MAX_ITEMS) { options.onNotice?.(`This room has space for ${MAX_ITEMS} pieces. Remove a piece first.`); return false; }
-    cancelPlacement(); selectItem(null); setEditMode(true);
+    cancelDrag(); hoverItem(null); cancelPlacement(); selectItem(null); setEditMode(true);
     ghost = createFurniture(type, scene); ghost.getChildMeshes().forEach(mesh => { mesh.material = ghostMaterial; mesh.isPickable = false; mesh.receiveShadows = false; });
     ghost.metadata.avatar?.setEnabled(false);
     placement = { id: `piece-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, type, x: 0, z: 0, rotation: 0 };
+    updateOutline();
     const free = findFreePosition(layout.items, type); updatePlacement(free?.x ?? 0, free?.z ?? 0); return true;
   }
   function moveSelection(dx, dz) {
+    if (drag) return;
     if (placement) { updatePlacement(placement.x + dx, placement.z + dz); return; }
     const item = layout.items.find(candidate => candidate.id === selectedId); if (!item) return;
     const candidate = { ...item, x: snap(item.x + dx), z: snap(item.z + dz) }, verdict = validatePlacement(layout.items, candidate);
@@ -517,6 +548,7 @@ export function createRoom(container, options = {}) {
     Object.assign(item, candidate); commitLayout(); selectItem(item.id);
   }
   function rotateSelection() {
+    if (drag) { drag.rotation = (drag.rotation + 1) % 4; updateDrag(pendingPointer); return; }
     if (placement) { placement.rotation = (placement.rotation + 1) % 4; updatePlacement(placement.x, placement.z); return; }
     const item = layout.items.find(candidate => candidate.id === selectedId); if (!item) return;
     const candidate = { ...item, rotation: (item.rotation + 1) % 4 }, verdict = validatePlacement(layout.items, candidate);
@@ -524,20 +556,22 @@ export function createRoom(container, options = {}) {
     Object.assign(item, candidate); commitLayout(); selectItem(item.id);
   }
   function removeSelection() {
+    cancelDrag();
     const item = layout.items.find(candidate => candidate.id === selectedId); if (!item) return;
-    if (isDesk(item) && layout.items.filter(isDesk).length === 1) { options.onNotice?.('Keep one study desk so your companion has a place to focus.'); return; }
+    if (!canRemove(item)) { options.onNotice?.('Keep one study desk so your companion has a place to focus.'); return; }
     layout.items = layout.items.filter(candidate => candidate.id !== selectedId);
     if (layout.activeDeskId === selectedId) layout.activeDeskId = layout.items.find(isDesk)?.id || null;
     selectItem(null); commitLayout();
   }
-  function setActiveDesk(id) { if (!isDesk(layout.items.find(item => item.id === id))) return; layout.activeDeskId = id; commitLayout(); }
+  function setActiveDesk(id) { if (!isDesk(layout.items.find(item => item.id === id))) return; cancelDrag(); layout.activeDeskId = id; commitLayout(); }
   function setEditMode(value) {
+    cancelDrag(); hoverItem(null);
     const wasEditing = editing; editing = Boolean(value);
     if (!options.engineFactory && wasEditing !== editing) { if (editing) camera.detachControl(); else camera.attachControl(canvas, false); }
     camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0;
-    canvas.style.touchAction = 'pan-y'; canvas.style.cursor = editing ? 'crosshair' : 'grab';
-    canvas.setAttribute('aria-label', editing ? 'Room design canvas. Select furniture, then click clear floor to move it. Catalog pieces preview before placement.' : 'Your cozy miniature study room. Drag to look around; click the sleeping cat to pet it.');
-    if (!editing) { cancelPlacement(); selectItem(null); } updateMarker(); requestRender();
+    canvas.style.touchAction = editing ? 'none' : 'pan-y'; canvas.style.cursor = editing ? 'crosshair' : 'grab';
+    canvas.setAttribute('aria-label', editing ? 'Room design canvas. Hover to outline furniture. Drag a piece to move it, or drop it over the bottom collection to return it. Escape cancels a drag.' : 'Your cozy miniature study room. Drag to look around; click the sleeping cat to pet it.');
+    if (!editing) { cancelPlacement(); selectItem(null); } updateMarker(); updateOutline(); requestRender();
   }
   function setTheme(name) {
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
@@ -578,10 +612,89 @@ export function createRoom(container, options = {}) {
   function floorPosition(ray) { const distance = (0.22 - ray.origin.y) / ray.direction.y; if (!Number.isFinite(distance) || distance < 0) return null; floorHit.copyFrom(ray.direction).scaleInPlace(distance).addInPlace(ray.origin); return floorHit; }
   let downPosition = null, hasPendingPointer = false;
   const pendingPointer = { clientX: 0, clientY: 0, pointerType: 'mouse' };
-  const onPointerDown = event => { downPosition = { x: event.clientX, y: event.clientY }; requestRender(); };
+  function releasePointer(id) {
+    if (id == null) return;
+    try { canvas.releasePointerCapture(id); } catch { /* A cancelled pointer may already be released. */ }
+  }
+  function cancelDrag() {
+    const wasDragging = Boolean(drag), pointerId = downPosition?.pointerId;
+    if (drag) {
+      drag.object.position.copyFrom(drag.originalPosition); drag.object.rotation.y = drag.original.rotation * Math.PI / 2;
+      for (const [mesh, visibility] of drag.visibility) if (!mesh.isDisposed()) mesh.visibility = visibility;
+    }
+    drag = null; downPosition = null; hasPendingPointer = false; releasePointer(pointerId);
+    if (wasDragging) {
+      options.onDragState?.(null); updateMarker(); outlineKey = ''; updateOutline(); refreshShadows();
+    }
+    canvas.style.cursor = editing ? 'crosshair' : 'grab';
+    return wasDragging;
+  }
+  function startDrag() {
+    const item = layout.items.find(item => item.id === downPosition?.itemId), object = placedObjects.get(item?.id);
+    if (!item || !object || !downPosition.floor) return;
+    settlingPieces.delete(item.id); object.scaling.setAll(1);
+    drag = { active: true, id: item.id, original: { ...item }, candidate: { ...item }, object,
+      originalPosition: object.position.clone(), rotation: item.rotation,
+      offsetX: downPosition.floor.x - item.x, offsetZ: downPosition.floor.z - item.z,
+      visibility: object.getChildMeshes().map(mesh => [mesh, mesh.visibility]),
+      removable: canRemove(item), overCollection: false, valid: true, reason: '' };
+    hoveredId = null; selectItem(item.id); refreshShadows();
+  }
+  function updateDrag(event) {
+    if (!drag) return;
+    const overCollection = Boolean(options.isCollectionDrop?.(event.clientX, event.clientY));
+    drag.overCollection = overCollection;
+    if (overCollection) {
+      drag.valid = drag.removable;
+      drag.reason = drag.removable ? '' : 'Keep one study desk so your companion has a place to focus.';
+    } else {
+      const rect = canvas.getBoundingClientRect();
+      const inside = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+      const floor = inside ? floorPosition(castPointer(event)) : null;
+      if (floor) {
+        drag.candidate = { ...drag.original, x: snap(floor.x - drag.offsetX), z: snap(floor.z - drag.offsetZ), rotation: drag.rotation };
+        const verdict = validatePlacement(layout.items, drag.candidate); drag.valid = verdict.valid; drag.reason = verdict.reason || '';
+        drag.object.position.x = drag.candidate.x; drag.object.position.z = drag.candidate.z;
+        drag.object.rotation.y = drag.rotation * Math.PI / 2;
+      } else { drag.valid = false; drag.reason = 'Drop inside the room, or return this piece to the collection.'; }
+    }
+    for (const [mesh, visibility] of drag.visibility) mesh.visibility = overCollection && drag.removable ? visibility * 0.13 : visibility;
+    if (marker) {
+      marker.setEnabled(!overCollection); marker.position.set(drag.candidate.x, 0.30, drag.candidate.z);
+      marker.rotation.y = drag.rotation * Math.PI / 2; marker.color = drag.valid ? selectedOutline : invalidOutline;
+    }
+    canvas.style.cursor = overCollection ? drag.removable ? 'alias' : 'not-allowed' : drag.valid ? 'grabbing' : 'not-allowed';
+    updateOutline();
+    options.onDragState?.({ id: drag.id, type: drag.original.type, overCollection, removable: drag.removable, valid: drag.valid, reason: drag.reason, clientX: event.clientX, clientY: event.clientY });
+    requestRender();
+  }
+  function finishDrag(event) {
+    updateDrag(event);
+    const completed = drag;
+    cancelDrag();
+    if (completed.overCollection && completed.removable) { removeSelection(); options.onNotice?.(`${getFurniture(completed.original.type).name} returned to the collection. Undo brings it back.`); }
+    else if (completed.valid && !completed.overCollection) {
+      const item = layout.items.find(item => item.id === completed.id);
+      if (item && (item.x !== completed.candidate.x || item.z !== completed.candidate.z || item.rotation !== completed.candidate.rotation)) {
+        Object.assign(item, completed.candidate); commitLayout(); selectItem(item.id);
+      }
+    } else options.onNotice?.(completed.reason || 'That spot is occupied. Your piece is back where it started.');
+  }
+  const onPointerDown = event => {
+    if (event.isPrimary === false || (event.button != null && event.button !== 0) || downPosition) return;
+    const ray = editing && !placement ? castPointer(event) : null, floor = ray && floorPosition(ray);
+    downPosition = { x: event.clientX, y: event.clientY, pointerId: event.pointerId,
+      itemId: ray ? hitItem(ray) : null, floor: floor ? { x: floor.x, z: floor.z } : null };
+    if (editing && event.pointerId != null) canvas.setPointerCapture(event.pointerId);
+    requestRender();
+  };
   const onPointerUp = event => {
+    if (!downPosition || (event.pointerId != null && downPosition.pointerId != null && event.pointerId !== downPosition.pointerId)) return;
     hasPendingPointer = false;
-    const clicked = downPosition && Math.hypot(event.clientX - downPosition.x, event.clientY - downPosition.y) < 7; downPosition = null; requestRender(); if (!clicked) return;
+    const clicked = Math.hypot(event.clientX - downPosition.x, event.clientY - downPosition.y) < 7;
+    if (editing && downPosition.itemId && !clicked && !drag) startDrag();
+    if (drag) { finishDrag(event); return; }
+    const pointerId = downPosition.pointerId; downPosition = null; releasePointer(pointerId); requestRender(); if (!clicked) return;
     const ray = castPointer(event);
     if (!editing) { if (scene.pickWithRay(ray, mesh => mesh.metadata?.cat)?.hit) pet(); return; }
     const floor = floorPosition(ray);
@@ -594,25 +707,37 @@ export function createRoom(container, options = {}) {
     if (id && !(selectedId && getFurniture(hit?.type)?.category === 'Rugs' && selectedId !== id)) { selectItem(id); return; }
     if (selectedId && floor) { const item = layout.items.find(candidate => candidate.id === selectedId); moveSelection(snap(floor.x) - item.x, snap(floor.z) - item.z); } else selectItem(null);
   };
-  const onPointerCancel = () => { hasPendingPointer = false; downPosition = null; canvas.style.cursor = editing ? 'crosshair' : 'grab'; };
+  const onPointerCancel = event => {
+    if (event?.pointerId != null && downPosition?.pointerId != null && event.pointerId !== downPosition.pointerId) return;
+    cancelDrag(); hoverItem(null);
+  };
+  const onPointerLeave = () => { if (!downPosition) { hasPendingPointer = false; hoverItem(null); } };
   const onPointerMove = event => {
+    if (downPosition && event.pointerId != null && downPosition.pointerId != null && event.pointerId !== downPosition.pointerId) return;
     if (!editing && downPosition) { canvas.style.cursor = 'grabbing'; requestRender(); return; }
     pendingPointer.clientX = event.clientX; pendingPointer.clientY = event.clientY; pendingPointer.pointerType = event.pointerType; hasPendingPointer = true;
-    // Reuse the existing render callback so high-rate pointer devices cannot
-    // cause more than one expensive hover pick per displayed frame.
+    // One closest-object pick per rendered frame; drag motion only intersects
+    // the floor. Pointer capture keeps the same gesture alive over the tray.
     if (visible && !frame) frame = requestAnimationFrame(tick);
   };
   function processPendingPointer() {
     if (!hasPendingPointer) return;
     hasPendingPointer = false;
+    if (editing && downPosition?.itemId && !drag && Math.hypot(pendingPointer.clientX - downPosition.x, pendingPointer.clientY - downPosition.y) >= 7) startDrag();
+    if (drag) { updateDrag(pendingPointer); return; }
     const ray = castPointer(pendingPointer);
     if (editing && placement) {
       const floor = floorPosition(ray); if (floor) updatePlacement(floor.x, floor.z);
       canvas.style.cursor = 'crosshair'; return;
     }
-    if (pendingPointer.pointerType === 'mouse') canvas.style.cursor = editing ? hitItem(ray, true) ? 'pointer' : 'crosshair' : scene.pickWithRay(ray, mesh => mesh.metadata?.cat, true)?.hit ? 'pointer' : 'grab';
+    if (pendingPointer.pointerType === 'mouse' || pendingPointer.pointerType === 'pen') {
+      if (editing) { const id = hitItem(ray); hoverItem(id); canvas.style.cursor = id ? 'grab' : 'crosshair'; }
+      else canvas.style.cursor = scene.pickWithRay(ray, mesh => mesh.metadata?.cat, true)?.hit ? 'pointer' : 'grab';
+    }
   }
   canvas.addEventListener('pointerdown', onPointerDown); canvas.addEventListener('pointerup', onPointerUp); canvas.addEventListener('pointercancel', onPointerCancel); canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerleave', onPointerLeave); canvas.addEventListener('lostpointercapture', onPointerCancel);
+  window.addEventListener('blur', onPointerCancel);
 
   const roomCorners = []; for (const x of [-6.19, 6.19]) for (const y of [-0.32, 6.02]) for (const z of [-4.78, 4.78]) roomCorners.push(new Vector3(x, y, z));
   const projectedCorner = new Vector3(); let canvasAspect = 1, fitAlpha = NaN, fitBeta = NaN;
@@ -726,16 +851,16 @@ export function createRoom(container, options = {}) {
     if (!reducedMotion || !scene.isReady() || downPosition || Math.abs(camera.inertialAlphaOffset) + Math.abs(camera.inertialBetaOffset) > 0.0001 || now - petStart < 1650) if (!frame) frame = requestAnimationFrame(tick);
   }
   const onMotionChange = event => { reducedMotion = event.matches; requestRender(); }; motionQuery.addEventListener('change', onMotionChange);
-  const onVisibility = () => { visible = !document.hidden; if (visible) { lastFrame = 0; lastRenderedAt = 0; statsStart = 0; sampleFrames = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0; requestRender(); } else { cancelAnimationFrame(frame); frame = 0; } };
+  const onVisibility = () => { visible = !document.hidden; if (visible) { lastFrame = 0; lastRenderedAt = 0; statsStart = 0; sampleFrames = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0; requestRender(); } else { cancelDrag(); hoverItem(null); cancelAnimationFrame(frame); frame = 0; } };
   document.addEventListener('visibilitychange', onVisibility);
   requestRender();
 
   return {
-    setTheme, setLayout, setEditMode, selectItem, beginPlacement, cancelPlacement, rotateSelection, removeSelection, moveSelection, setActiveDesk, setQuality,
+    setTheme, setLayout, setEditMode, selectItem, beginPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setQuality,
     setFocused(value) { focused = Boolean(value); requestRender(); }, pet,
-    setDecor(key, value) { if (!(key in decorVisible)) return; decorVisible[key] = Boolean(value); decor[key]?.setEnabled(Boolean(value)); syncFurniture(); },
+    setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); decor[key]?.setEnabled(Boolean(value)); syncFurniture(); },
     resetView() { camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio }; },
-    dispose() { if (disposed) return; disposed = true; cancelAnimationFrame(frame); observer.disconnect(); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); settlingPieces.clear(); animatedObjects.length = 0; instrumentation.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    diagnostics() { return { scene, engine, camera, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    dispose() { if (disposed) return; cancelDrag(); disposed = true; cancelAnimationFrame(frame); observer.disconnect(); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; instrumentation.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

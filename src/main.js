@@ -50,6 +50,8 @@ let quality = 'auto';
 let performanceStats = null;
 let focusCollapsed = false;
 let lastSessionRender = '';
+let draggedItemId = null;
+let dragHint = '';
 const listeners = new AbortController();
 
 document.querySelector('#app').innerHTML = `
@@ -84,6 +86,7 @@ document.querySelector('#app').innerHTML = `
           <div class="selection-inspector" id="selection-inspector" aria-live="polite"></div>
           <div id="collection-content"></div>
           <p class="collection-footnote">The whole collection is yours. Pick a piece, then a spot in your room.</p>
+          <div class="collection-return-target" id="collection-return-target" aria-hidden="true"><span>${icon('build')}</span><strong id="return-label">Return to your collection</strong><small id="return-detail">Drop here to put this piece away · Undo brings it back</small></div>
         </section>
       </section>
       <aside class="focus-card" id="focus-card" aria-labelledby="focus-title">
@@ -100,6 +103,7 @@ document.querySelector('#app').innerHTML = `
     </main>
     <footer class="app-footer"><span>A softer place to spend your hours.</span><span>Your room is saved as you go <span aria-hidden="true">✧</span></span></footer>
   </div>
+  <div id="drag-return-preview" class="drag-return-preview" aria-hidden="true" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>`;
 
 const $ = (selector) => document.querySelector(selector);
@@ -177,6 +181,12 @@ try {
     },
     onSelectionChange(item) { selectedItem = item; renderInspector(); },
     onPlacementState(next) { placement = next; renderInspector(); updateCatalogSelection(); },
+    isCollectionDrop(x, y) {
+      if (!editMode) return false;
+      const rect = $('#builder-panel').getBoundingClientRect();
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    },
+    onDragState: renderDragState,
     onNotice: toast,
     onStats(stats) { performanceStats = stats; renderPerformance(); },
   });
@@ -274,9 +284,10 @@ function setEditMode(enabled) {
   $('#builder-panel').hidden = !enabled;
   syncFocusDock();
   $('#decorate-button').setAttribute('aria-pressed', enabled);
+  $('#decorate-button').setAttribute('aria-label', enabled ? 'Done decorating' : 'Decorate');
   $('#decorate-button span').textContent = enabled ? 'Done decorating' : 'Decorate';
   $('#room-canvas').setAttribute('aria-label', enabled
-    ? 'Room decorator. Pick furniture from the collection, then click a clear spot on the floor. Select a placed piece to move or rotate it.'
+    ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Escape cancels.'
     : 'Interactive 3D cutaway study room. Drag to turn the room, or click the ginger cat.');
   currentPanel = null;
   renderPanel();
@@ -373,7 +384,7 @@ function renderCollection() {
   const rememberedFocus = rememberControlFocus(content);
   $('.collection-footnote').textContent = collectionTab === 'presets'
     ? 'Start with a little inspiration, then make every corner your own.'
-    : 'The whole collection is yours. Pick a piece, then a spot in your room.';
+    : 'Pick a piece to add it. Drag furniture back here to put it away.';
   if (collectionTab === 'presets') {
     content.innerHTML = `<div class="preset-grid">${PRESETS.map((preset, index) => `<article class="preset-card preset-${index}"><div class="preset-art" aria-hidden="true"><span class="preset-window"></span><span class="preset-desk"></span><span class="preset-plant"></span><span class="preset-rug"></span></div><div><h3>${preset.name}</h3><p>${preset.description}</p></div><button class="quiet-button" data-preset="${preset.id}">Apply design ${icon('arrow')}</button></article>`).join('')}</div><p class="preset-note">A fresh arrangement of furniture. Your focus session stays with you, and Undo brings your room back.</p>`;
     content.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => {
@@ -400,15 +411,36 @@ function renderCollection() {
 }
 
 function revealRoomForPlacement() {
-  if (window.matchMedia('(min-width: 1000px)').matches) return;
   const stage = $('#stage');
   const rect = stage.getBoundingClientRect();
-  if (rect.top >= 12 && rect.bottom <= window.innerHeight - 120) return;
+  if (rect.top >= 12 && rect.bottom <= $('#builder-panel').getBoundingClientRect().top) return;
   stage.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
 }
 
 function updateCatalogSelection() {
   document.querySelectorAll('[data-furniture]').forEach(button => button.setAttribute('aria-pressed', button.dataset.furniture === placement?.type));
+}
+
+function renderDragState(drag) {
+  const preview = $('#drag-return-preview');
+  document.body.classList.toggle('is-dragging-furniture', Boolean(drag));
+  document.body.classList.toggle('is-over-collection', Boolean(drag?.overCollection));
+  document.body.classList.toggle('return-blocked', Boolean(drag && !drag.removable));
+  preview.hidden = !drag?.overCollection || !drag.removable;
+  if (!drag) {
+    draggedItemId = null; dragHint = ''; renderInspector();
+    return;
+  }
+  if (draggedItemId !== drag.id) {
+    draggedItemId = drag.id;
+    preview.innerHTML = furnitureArt(drag.type);
+    $('#return-label').textContent = drag.removable ? 'Return to your collection' : 'Every room needs a study spot';
+    $('#return-detail').textContent = drag.removable ? 'Release here to put this piece away · Undo brings it back' : 'Add another desk before putting this one away';
+  }
+  if (drag.overCollection) preview.style.transform = `translate3d(${drag.clientX - 44}px, ${drag.clientY - 76}px, 0)`;
+  const hint = drag.overCollection ? (drag.removable ? 'Release to put it away · Undo brings it back' : drag.reason)
+    : drag.valid ? 'Release to place · R to rotate · Esc to cancel' : `${drag.reason} · Esc to cancel`;
+  if (hint !== dragHint) { dragHint = hint; $('#room-hint').textContent = hint; }
 }
 
 function renderInspector() {
@@ -421,16 +453,16 @@ function renderInspector() {
     return;
   }
   const rememberedFocus = rememberControlFocus(inspector);
-  $('#room-hint').textContent = pending ? `Click the floor to place ${pending.name.toLowerCase()}` : selected ? 'Click a clear floor spot to move · R to rotate' : 'Pick a piece below, or select one in the room';
+  $('#room-hint').textContent = pending ? `Click the floor to place ${pending.name.toLowerCase()}` : selected ? 'Drag to move · Drop over the collection to put away' : 'Hover to discover · Drag a piece to make it yours';
   if (!pending && !selected) {
-    inspector.innerHTML = `<div class="selection-copy">${icon('build')}<span><strong>A room that feels like you</strong><small>Select a piece in the room to move it. Choose furniture below to add something new.</small></span></div>`;
+    inspector.innerHTML = `<div class="selection-copy">${icon('build')}<span><strong>A room that feels like you</strong><small>Drag furniture around your room, or back here to put it away. Pick a piece below to add something new.</small></span></div>`;
     restoreControlFocus(inspector, rememberedFocus);
     return;
   }
   const item = pending || selected;
   const currentDesk = selectedItem?.id === state.layout.activeDeskId;
-  const hint = pending ? (placement.valid === false && placement.reason ? placement.reason : 'Move over the floor to find a spot. Click to place.') : 'Click the floor to move, or use the arrow buttons.';
-  inspector.innerHTML = `<div class="selection-copy">${icon(pending ? 'plus' : 'build')}<span><strong>${pending ? 'Placing ' : ''}${item.name}${!pending && currentDesk ? '<span class="active-desk-tag">Study spot</span>' : ''}</strong><small>${hint}</small></span></div><div class="selection-actions"><button class="small-button" id="rotate-item" aria-label="Rotate ${item.name}">${icon('rotate')}<span>Rotate</span></button>${!pending ? `<div class="nudge-buttons" aria-label="Move selected furniture"><button data-nudge="0,-0.25" aria-label="Move toward back wall">↑</button><button data-nudge="-0.25,0" aria-label="Move left">←</button><button data-nudge="0.25,0" aria-label="Move right">→</button><button data-nudge="0,0.25" aria-label="Move toward front">↓</button></div>${item.category === 'Study' ? `<button class="small-button study-here" id="study-here" ${currentDesk ? 'disabled' : ''}>${icon('check')}<span>${currentDesk ? 'Studying here' : 'Study here'}</span></button>` : ''}<button class="small-button remove-item" id="remove-item" aria-label="Remove ${item.name}">${icon('trash')}</button>` : ''}<button class="small-button" id="cancel-item" aria-label="${pending ? 'Cancel placement' : 'Deselect furniture'}">${icon('close')}</button></div>`;
+  const hint = pending ? (placement.valid === false && placement.reason ? placement.reason : 'Move over the floor to find a spot. Click to place.') : 'Drag to move or put away. Arrow buttons work too.';
+  inspector.innerHTML = `<div class="selection-copy">${icon(pending ? 'plus' : 'build')}<span><strong>${pending ? 'Placing ' : ''}${item.name}${!pending && currentDesk ? '<span class="active-desk-tag">Study spot</span>' : ''}</strong><small>${hint}</small></span></div><div class="selection-actions"><button class="small-button" id="rotate-item" aria-label="Rotate ${item.name}">${icon('rotate')}<span>Rotate</span></button>${!pending ? `<div class="nudge-buttons" aria-label="Move selected furniture"><button data-nudge="0,-0.25" aria-label="Move toward back wall">↑</button><button data-nudge="-0.25,0" aria-label="Move left">←</button><button data-nudge="0.25,0" aria-label="Move right">→</button><button data-nudge="0,0.25" aria-label="Move toward front">↓</button></div>${item.category === 'Study' ? `<button class="small-button study-here" id="study-here" aria-label="${currentDesk ? 'Studying here' : 'Study here'}" ${currentDesk ? 'disabled' : ''}>${icon('check')}<span>${currentDesk ? 'Studying here' : 'Study here'}</span></button>` : ''}<button class="small-button remove-item" id="remove-item" aria-label="Remove ${item.name}">${icon('trash')}</button>` : ''}<button class="small-button" id="cancel-item" aria-label="${pending ? 'Cancel placement' : 'Deselect furniture'}">${icon('close')}</button></div>`;
   $('#rotate-item').addEventListener('click', () => room?.rotateSelection?.());
   $('#remove-item')?.addEventListener('click', () => room?.removeSelection?.());
   $('#study-here')?.addEventListener('click', () => room?.setActiveDesk?.(selectedItem.id));
@@ -481,6 +513,7 @@ document.querySelectorAll('[data-panel]').forEach(button => button.addEventListe
   renderPanel();
 }));
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && room?.cancelDrag?.()) { event.preventDefault(); return; }
   if (event.key === 'Escape' && currentPanel) { closePanel(); return; }
   if (!editMode || event.target.closest('input, textarea, select, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey) return;
   const steps = { ArrowLeft: [-.25, 0], ArrowRight: [.25, 0], ArrowUp: [0, -.25], ArrowDown: [0, .25] };

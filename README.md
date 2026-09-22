@@ -17,7 +17,8 @@ The development server binds to `127.0.0.1`. Open the local URL Vite prints. Run
 
 - A spacious orthographic fantasy retreat with an arched forest window, deep timber floors, climbing greenery, candles, lanterns, layered rugs and a resident cat.
 - **Decorate** opens a collection of fifteen original JavaScript-modeled pieces, including study stations, a glowing fireplace, a cushioned daybed, moonleaf trees, lanterns, patterned rugs, bookshelves and smaller comforts.
-- Choose an item, move over the floor and click a valid spot to place it. Select a placed object to move, rotate or remove it. `R` rotates, arrow keys nudge, and `Escape` cancels.
+- **Decorate** keeps the collection in a bottom tray. Hover furniture to highlight its outline, then drag it to a new spot. Drag it over the collection to see a faded piece and dashed return preview; release to put it away. **Undo** restores the last move or removal. Invalid drops and `Escape` return the piece to where it started.
+- Choose a collection item, move over the floor and click a valid spot to add it. Click-to-select/move and the inspector buttons also work. `R` rotates (including during a drag), arrow keys nudge, and `Escape` cancels. The last study desk stays in the room.
 - Solid furniture stays inside the room and cannot overlap other solid furniture or the cat's resting spot. Rugs can sit underneath furniture.
 - Three expansive, editable room designs: **Ember library**, **Moonlit greenhouse**, and **Writer’s loft**. **Undo** restores the preceding arrangement.
 - Select a desk and choose **Study here** to move your avatar's study spot. The last study station cannot be removed.

@@ -118,3 +118,16 @@ The runtime harness verifies light contrast/direction, night-only stars, rain vi
 
 
 The production preview kept the saved Daylight selection after reload, synchronized the header and Atmosphere choices, and fit the new control at 320 pixels without horizontal overflow. A warm native-window Daylight sample reported 60 fps, 17.3 ms frame-interval p95, 2.1 ms CPU-render p95, 124 draw calls, and 1.50 render pixel ratio. The scene remains the user's Writer’s loft arrangement; these are single-device observations. The complete checkpoint passes 34 unit tests, fourteen runtime groups, and the production build.
+
+
+## Furniture outlines and drag-to-return
+
+Decorate mode keeps the collection in a fixed bottom tray. Hovering picks the nearest furniture surface and outlines one object at a time, including animated plant leaves and turntable discs. Smoke, flames and the seated avatar do not acquire outlines. Babylon’s outline renderer uses the existing opaque meshes; selection never changes shared furniture materials or allocates a second model.
+
+Pointer capture keeps a drag active between the canvas and tray. Preview transforms follow the snapped floor intersection while the saved layout remains unchanged. Releasing over a valid floor spot creates one undoable edit. Invalid drops, Escape, pointer cancellation, lost capture, window blur, hidden tabs, external layout updates and leaving Decorate restore the original transform and visibility. The last study station cannot be returned. Over the tray, the furniture fades and a dashed SVG drawing follows the pointer; release returns it to the collection, with Undo available.
+
+High-frequency pointer events coalesce once per rendered frame. Drag updates use floor math without further mesh raycasts, mesh creation or material creation. The moving piece is excluded from the cached shadow map until the gesture ends, avoiding stale self-shadows without rendering shadows every frame. Reduced motion still responds to user drags and returns to idle afterward. Touch input suppresses page scrolling only while decorating; physical-device touch testing remains outstanding.
+
+Verification adds real scene-graph and pointer-event checks for outlines, shared materials, preview isolation, a single save per drop, invalid position/rotation restoration, return fading, shadow restoration, cancellation, the last desk, reduced motion and secondary-touch isolation. All 34 unit tests, fifteen runtime groups and the production build pass. The production browser separately verified moving a plant, invalid-drop restoration, returning it to the tray, the dashed preview during the native gesture, and Undo. The saved Writer’s loft arrangement was restored after testing. Responsive checks cover 320-, 390-, 966- and 1280-pixel viewport widths.
+
+With the study desk outlined in Writer’s loft, the final warm native-window sample (966 × 1044, Daylight, Adaptive) reported 60 fps, 17.8 ms frame-interval p95, 2.5 ms CPU-render p95, 131 draw calls and a 1.50 render pixel ratio. No production-page console errors were captured. This is one browser/device measurement, not a universal FPS guarantee. The main JavaScript chunk is about 324 KB gzipped plus lazy shader chunks; the existing Vite chunk-size advisory remains.
