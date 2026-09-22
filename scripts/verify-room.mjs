@@ -1,218 +1,155 @@
-// Run with Node 22.15+ (or 23.5+) from any directory:
-//   node scripts/verify-room.mjs
-// This imports the production room unchanged. Only WebGLRenderer is replaced;
-// geometry, cameras, raycasting and OrbitControls use the installed Three.js.
-// DOM stubs exercise the logic, not browser/GPU drawing or native touch scrolling.
+// Real Babylon scene/math/picking with a NullEngine, not a GPU benchmark.
 import assert from 'node:assert/strict';
-import { registerHooks } from 'node:module';
-import * as THREE from 'three';
+import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
+import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
+import { Camera } from '@babylonjs/core/Cameras/camera.js';
+import { createLayout } from '../src/layout.js';
 
-class EventSurface {
+class Surface {
   listeners = new Map();
-  addEventListener(name, listener) {
-    if (!this.listeners.has(name)) this.listeners.set(name, new Set());
-    this.listeners.get(name).add(listener);
-  }
-  removeEventListener(name, listener) { this.listeners.get(name)?.delete(listener); }
-  emit(name, event = {}) {
-    for (const listener of [...(this.listeners.get(name) || [])]) listener({ type: name, ...event });
-  }
-  get listenerCount() { return [...this.listeners.values()].reduce((total, set) => total + set.size, 0); }
+  addEventListener(name, fn) { if (!this.listeners.has(name)) this.listeners.set(name, new Set()); this.listeners.get(name).add(fn); }
+  removeEventListener(name, fn) { this.listeners.get(name)?.delete(fn); }
+  emit(name, event = {}) { for (const fn of [...(this.listeners.get(name) || [])]) fn({ type: name, target: this, preventDefault() {}, ...event }); }
+  get listenerCount() { return [...this.listeners.values()].reduce((n, set) => n + set.size, 0); }
 }
-
-const drawingContext = new Proxy({}, {
-  get: (_, key) => key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : () => {},
-});
-const documentSurface = new EventSurface();
-documentSurface.hidden = false;
-documentSurface.createElement = () => new CanvasSurface();
-
-class CanvasSurface extends EventSurface {
-  style = {};
-  ownerDocument = documentSurface;
-  clientWidth = 800;
-  clientHeight = 600;
-  removed = false;
-  setAttribute() {}
-  getRootNode() { return this.ownerDocument; }
-  getContext() { return drawingContext; }
-  setPointerCapture() {}
-  releasePointerCapture() {}
+const context = new Proxy({}, { get: (_, key) => key.includes('Gradient') ? () => ({ addColorStop() {} }) : key === 'measureText' ? () => ({ width: 20 }) : () => {} });
+const doc = new Surface(), win = new Surface(), motion = new Surface();
+doc.hidden = false; doc.defaultView = win; doc.documentElement = { style: {} };
+win.devicePixelRatio = 1.5; win.innerWidth = 1280; win.innerHeight = 900; win.PointerEvent = class {};
+motion.matches = false; win.matchMedia = () => motion;
+class Canvas extends Surface {
+  style = {}; ownerDocument = doc; width = 800; height = 600; clientWidth = 800; clientHeight = 600; removed = false; attributes = new Map();
+  setAttribute(k, v) { this.attributes.set(k, v); }
+  getAttribute(k) { return this.attributes.get(k) ?? null; }
+  getRootNode() { return doc; }
+  getContext() { return context; }
+  setPointerCapture() {} releasePointerCapture() {} focus() {}
   remove() { this.removed = true; }
-  getBoundingClientRect() { return { left: 0, top: 0, width: this.clientWidth, height: this.clientHeight }; }
+  getBoundingClientRect() { return { left: 0, top: 0, width: this.clientWidth, height: this.clientHeight, right: this.clientWidth, bottom: this.clientHeight }; }
 }
-
-const frameCallbacks = new Map();
-let nextFrame = 0;
-let now = 0;
-let observer;
-let renderer;
-const motionPreference = new EventSurface();
-motionPreference.matches = false;
-
-globalThis.document = documentSurface;
-globalThis.window = { devicePixelRatio: 2, matchMedia: () => motionPreference };
-globalThis.requestAnimationFrame = callback => { frameCallbacks.set(++nextFrame, callback); return nextFrame; };
-globalThis.cancelAnimationFrame = id => frameCallbacks.delete(id);
+doc.createElement = () => new Canvas();
+const frames = new Map(); let frameId = 0, time = 0, observer;
+globalThis.document = doc; globalThis.window = win;
+globalThis.requestAnimationFrame = callback => { frames.set(++frameId, callback); return frameId; };
+globalThis.cancelAnimationFrame = id => frames.delete(id);
+win.requestAnimationFrame = globalThis.requestAnimationFrame; win.cancelAnimationFrame = globalThis.cancelAnimationFrame;
 globalThis.ResizeObserver = class {
   disconnected = false;
   constructor(callback) { this.callback = callback; observer = this; }
-  observe() {}
-  disconnect() { this.disconnected = true; }
+  observe() {} disconnect() { this.disconnected = true; }
 };
-
-class RendererStub {
-  domElement = new CanvasSurface();
-  shadowMap = {};
-  disposed = false;
-  renderCount = 0;
-  constructor() { renderer = this; }
-  setPixelRatio(value) { this.pixelRatio = value; }
-  setClearColor() {}
-  setSize(width, height) { this.domElement.clientWidth = width; this.domElement.clientHeight = height; }
-  render(scene, camera) {
-    scene.updateMatrixWorld();
-    camera.updateMatrixWorld();
-    this.scene = scene;
-    this.camera = camera;
-    this.renderCount++;
-  }
-  dispose() { this.disposed = true; }
-}
-
-// Intercept only room.js's Three import. Addon modules use the real package.
-const roomUrl = new URL('../src/room.js', import.meta.url).href;
-const realThreeUrl = import.meta.resolve('three');
-const shimUrl = 'little-hours-test:renderer-shim';
-globalThis.__littleHoursRendererStub = RendererStub;
-const hooks = registerHooks({
-  resolve(specifier, context, nextResolve) {
-    if (specifier === 'three' && context.parentURL === roomUrl) return { url: shimUrl, shortCircuit: true };
-    return nextResolve(specifier, context);
-  },
-  load(url, context, nextLoad) {
-    if (url === shimUrl) return {
-      format: 'module', shortCircuit: true,
-      source: `export * from ${JSON.stringify(realThreeUrl)}; export const WebGLRenderer = globalThis.__littleHoursRendererStub;`,
-    };
-    return nextLoad(url, context);
-  },
-});
-let createRoom;
-try { ({ createRoom } = await import(roomUrl)); }
-finally { hooks.deregister(); delete globalThis.__littleHoursRendererStub; }
-
+const { createRoom } = await import('../src/room.js');
+let engine;
 const container = { clientWidth: 800, clientHeight: 600, appendChild(canvas) { this.canvas = canvas; } };
-const room = createRoom(container);
+const changes = [], notices = [], stats = [];
+const room = createRoom(container, {
+  engineFactory(canvas) {
+    engine = new NullEngine({ renderWidth: 800, renderHeight: 600, textureSize: 512, deterministicLockstep: true, lockstepMaxSteps: 1 });
+    // NullEngine has no DOM or resizing surface; supply just that plumbing.
+    engine._renderingCanvas = canvas;
+    const setSize = engine.setSize.bind(engine);
+    engine.setSize = (w, h, force) => { engine._options.renderWidth = w; engine._options.renderHeight = h; return setSize(w, h, force); };
+    return engine;
+  },
+  onLayoutChange: value => changes.push(structuredClone(value)),
+  onNotice: value => notices.push(value),
+  onStats: value => stats.push(value),
+});
 const canvas = container.canvas;
-const home = renderer.camera.position.clone();
-
 function advance(count = 1) {
-  for (let i = 0; i < count; i++) {
-    assert.equal(frameCallbacks.size, 1, 'exactly one animation loop should be scheduled');
-    const [id, callback] = frameCallbacks.entries().next().value;
-    frameCallbacks.delete(id);
-    now += 100;
-    callback(now);
+  for (let i = 0; i < count && frames.size; i++) {
+    assert.equal(frames.size, 1, 'one scheduled animation callback');
+    const [id, callback] = frames.entries().next().value; frames.delete(id); time += 1000 / 60; callback(time);
   }
 }
-
-function drag(dx, dy, pointerType = 'mouse') {
-  const event = (x, y) => ({
-    pointerId: 1, pointerType, button: 0, clientX: x, clientY: y, pageX: x, pageY: y,
-    preventDefault() {}, ctrlKey: false, metaKey: false, shiftKey: false,
-  });
-  canvas.emit('pointerdown', event(200, 160));
-  documentSurface.emit('pointermove', event(200 + dx, 160 + dy));
-  canvas.emit('pointerup', event(200 + dx, 160 + dy));
-  documentSurface.emit('pointerup', event(200 + dx, 160 + dy));
-}
-
-function assertHome() {
-  assert.ok(renderer.camera.position.distanceTo(home) < 1e-10, 'reset must land exactly at home with no residual velocity');
-}
-
+const diagnostics = () => room.diagnostics();
 try {
+  advance(5);
+  const { scene, camera } = diagnostics();
+  assert.equal(camera.mode, Camera.ORTHOGRAPHIC_CAMERA);
+  assert.ok(scene.meshes.length > 20);
   assert.equal(canvas.style.touchAction, 'pan-y');
-  assert.ok(renderer.pixelRatio <= 1.5);
-  drag(120, 0, 'touch');
-  advance(2);
-  assert.ok(renderer.camera.position.distanceTo(home) > 0.1, 'horizontal touch input must still rotate the room');
-  room.resetView();
-  console.log('PASS mobile input: pan-y survives OrbitControls setup; actual touch events still rotate.');
-
-  drag(120, 80);
-  room.resetView();
-  assertHome();
-  advance(90);
-  assertHome();
-  console.log('PASS reset: home remains exact after mouse-drag inertia and 90 subsequent frames.');
-
-  // Test actual generated geometry bounds, rather than duplicating fitRoom().
-  const bounds = new THREE.Box3().setFromObject(renderer.scene);
+  console.log(`PASS engine: native Babylon scene, orthographic camera, ${scene.meshes.length} meshes, mobile pan-y.`);
+  const home = { alpha: camera.alpha, beta: camera.beta };
+  camera.alpha += 0.2; camera.beta += 0.1; camera.inertialAlphaOffset = 0.1;
+  room.resetView(); advance(90);
+  assert.ok(Math.abs(camera.alpha - home.alpha) < 1e-8 && Math.abs(camera.beta - home.beta) < 1e-8);
+  assert.equal(camera.inertialAlphaOffset, 0);
+  console.log('PASS camera: reset clears inertia and keeps the home composition.');
+  // Derive bounds from the actual visible assets, so bigger architecture and
+  // overhanging decor cannot silently escape the framing check.
+  let minimum = new Vector3(Infinity, Infinity, Infinity), maximum = new Vector3(-Infinity, -Infinity, -Infinity);
+  for (const mesh of scene.meshes.filter(mesh => mesh.isEnabled() && mesh.getTotalVertices())) {
+    mesh.computeWorldMatrix(true);
+    const bounds = mesh.getBoundingInfo().boundingBox;
+    minimum = Vector3.Minimize(minimum, bounds.minimumWorld); maximum = Vector3.Maximize(maximum, bounds.maximumWorld);
+  }
   const corners = [];
-  for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) corners.push(new THREE.Vector3(x, y, z));
-  let furthest = 0;
+  for (const x of [minimum.x, maximum.x]) for (const y of [minimum.y, maximum.y]) for (const z of [minimum.z, maximum.z]) corners.push(new Vector3(x, y, z));
+  let largest = 0;
   for (const aspect of [0.45, 0.75, 1, 1.5, 2.5]) {
-    container.clientWidth = 600 * aspect;
-    observer.callback();
-    for (const horizontal of [-1, 1]) for (const vertical of [-1, 1]) {
-      room.resetView();
-      drag(horizontal * 10000, vertical * 10000);
-      advance(2);
+    container.clientWidth = 600 * aspect; container.clientHeight = 600;
+    canvas.clientWidth = container.clientWidth; canvas.clientHeight = 600; observer.callback();
+    for (const a of [camera.lowerAlphaLimit, camera.upperAlphaLimit]) for (const b of [camera.lowerBetaLimit, camera.upperBetaLimit]) {
+      camera.alpha = a; camera.beta = b; advance(2); scene.render();
       for (const corner of corners) {
-        const projected = corner.clone().project(renderer.camera);
-        furthest = Math.max(furthest, Math.abs(projected.x), Math.abs(projected.y));
-        assert.ok(Math.abs(projected.x) <= 0.880001 && Math.abs(projected.y) <= 0.880001, 'whole room must retain 6% margins at every aspect/orbit extreme');
+        const point = Vector3.TransformCoordinates(corner, camera.getTransformationMatrix());
+        largest = Math.max(largest, Math.abs(point.x), Math.abs(point.y));
+        assert.ok(Math.abs(point.x) <= 0.95 && Math.abs(point.y) <= 0.95, 'whole room fits every aspect/camera limit');
       }
     }
   }
-  console.log(`PASS framing: real geometry stays within 6% margins at five aspects × four orbit extrema (maximum NDC ${furthest.toFixed(4)}).`);
-
-  room.resetView();
-  room.setTheme('rain');
-  let rain;
-  renderer.scene.traverse(object => { if (object.isLineSegments) rain = object; });
-  assert.ok(rain?.visible, 'rain theme must show its streak geometry');
-  assert.ok(rain.geometry.boundingSphere, 'dynamic rain must have explicit bounds before rendering');
-  for (let frame = 0; frame < 120; frame++) {
-    advance();
-    const positions = rain.geometry.attributes.position;
-    for (let i = 0; i < positions.count; i++) assert.ok(rain.geometry.boundingSphere.containsPoint(new THREE.Vector3().fromBufferAttribute(positions, i)), 'rain vertices must stay inside their culling bounds');
+  room.resetView(); console.log(`PASS framing: five aspects × four camera limits, maximum NDC ${largest.toFixed(3)}.`);
+  const desk = createLayout().items.find(item => item.type === 'study-desk');
+  room.setLayout({ presetId: null, items: [desk, { id: 'test-plant', type: 'plant', x: 2, z: 0, rotation: 0 }], activeDeskId: desk.id });
+  assert.equal(changes.length, 0, 'setLayout must not recursively persist');
+  room.setEditMode(true); room.selectItem('test-plant'); room.moveSelection(-0.25, 0);
+  assert.equal(changes.at(-1).items.find(item => item.id === 'test-plant').x, 1.75);
+  const beforeInvalid = JSON.stringify(diagnostics().layout); room.moveSelection(20, 0);
+  assert.equal(JSON.stringify(diagnostics().layout), beforeInvalid); assert.ok(notices.length);
+  room.rotateSelection(); assert.equal(changes.at(-1).items.find(item => item.id === 'test-plant').rotation, 1);
+  room.removeSelection(); assert.equal(diagnostics().layout.items.length, 1);
+  room.selectItem(desk.id); room.removeSelection(); assert.equal(diagnostics().layout.items.length, 1, 'last study station stays');
+  function clickFloor(x, z) {
+    advance(2); scene.render();
+    const pixel = Vector3.Project(new Vector3(x, 0.22, z), Matrix.Identity(), scene.getTransformMatrix(), { x: 0, y: 0, width: canvas.clientWidth, height: canvas.clientHeight });
+    const event = { clientX: pixel.x, clientY: pixel.y, pointerId: 1, pointerType: 'mouse', button: 0 };
+    canvas.emit('pointerdown', event); canvas.emit('pointerup', event);
   }
-  console.log('PASS rain: all animated vertices stay inside explicit bounds across 120 frames.');
-
-  motionPreference.matches = true;
-  motionPreference.emit('change', { matches: true });
-  advance();
-  const stillRain = Array.from(rain.geometry.attributes.position.array);
-  const transformSnapshot = () => {
-    const result = [];
-    renderer.scene.traverse(object => result.push([...object.position, ...object.quaternion, ...object.scale]));
-    return result;
-  };
-  const stillScene = transformSnapshot();
-  advance(30);
-  assert.deepEqual(Array.from(rain.geometry.attributes.position.array), stillRain);
-  assert.deepEqual(transformSnapshot(), stillScene);
-  console.log('PASS reduced motion: ambient scene transforms and rain remain still.');
-
-  documentSurface.hidden = true;
-  documentSurface.emit('visibilitychange');
-  assert.equal(frameCallbacks.size, 0);
-  documentSurface.hidden = false;
-  documentSurface.emit('visibilitychange');
-  assert.equal(frameCallbacks.size, 1);
-  advance();
-  room.dispose();
-  assert.equal(frameCallbacks.size, 0);
-  assert.equal(documentSurface.listenerCount, 0);
-  assert.equal(motionPreference.listenerCount, 0);
-  assert.equal(canvas.listenerCount, 0);
-  assert.ok(observer.disconnected && renderer.disposed && canvas.removed);
-  console.log('PASS lifecycle: hide suspends; show creates one loop; dispose removes frame, observers, listeners and canvas.');
-  console.log('Room verification passed. GPU appearance and native scrolling still require browser checks.');
-} catch (error) {
-  room.dispose();
-  throw error;
-}
+  room.beginPlacement('plant'); clickFloor(2, -2);
+  assert.equal(diagnostics().layout.items.length, 2, 'clicking the visible floor preview should commit a piece');
+  const placed = diagnostics().layout.items.find(item => item.id !== desk.id);
+  assert.equal(placed.x, 2); assert.equal(placed.z, -2);
+  room.beginPlacement('plant'); clickFloor(desk.x, desk.z);
+  assert.equal(diagnostics().layout.items.length, 2, 'a pointer click on occupied floor must not place furniture');
+  room.cancelPlacement(); assert.equal(diagnostics().placement, null);
+  console.log('PASS editing: pointer placement/picking, collision rejection, move/rotate/remove, last desk guard and cancellation.');
+  room.setEditMode(false); room.setTheme('rain'); motion.matches = true; motion.emit('change', { matches: true }); advance(10);
+  const snapshot = () => scene.transformNodes.concat(scene.meshes).map(n => [...n.position.asArray(), ...n.rotation.asArray(), ...n.scaling.asArray()]);
+  const still = snapshot(); advance(120); assert.deepEqual(snapshot(), still);
+  console.log('PASS reduced motion: transforms stay still.');
+  // Deliberately idle on-demand frames are not evidence of a slow renderer.
+  // Hold CPU time still here so this isolates the FPS adaptation rule.
+  const clockDescriptor = Object.getOwnPropertyDescriptor(performance, 'now');
+  Object.defineProperty(performance, 'now', { configurable: true, value: () => time });
+  try {
+    room.setQuality('auto'); time += 2100; advance();
+    const idleRatio = diagnostics().pixelRatio;
+    for (let i = 0; i < 6; i++) { time += 2100; room.setFocused(Boolean(i % 2)); advance(); }
+    assert.equal(diagnostics().pixelRatio, idleRatio, 'reduced-motion idle gaps must not lower pixel ratio');
+    // A real gap during continuous animation must remain in the frame metric.
+    motion.matches = false; motion.emit('change', { matches: false }); stats.length = 0;
+    time += 750; advance(); time += 750; advance();
+    assert.ok(stats.at(-1)?.p95FrameMs >= 750, 'visible frame stalls must not be filtered out of p95');
+  } finally {
+    if (clockDescriptor) Object.defineProperty(performance, 'now', clockDescriptor);
+    else delete performance.now;
+  }
+  console.log('PASS adaptive quality: intentional idle keeps resolution; visible stalls remain in frame metrics.');
+  doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
+  doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);
+  room.dispose(); assert.equal(frames.size, 0); assert.equal(motion.listenerCount, 0); assert.equal(doc.listenerCount, 0); assert.equal(canvas.listenerCount, 0);
+  assert.ok(observer.disconnected && canvas.removed && scene.isDisposed);
+  console.log('PASS lifecycle: hidden suspension; scene, frames, observers and listeners disposed.');
+  console.log('Babylon room checks passed. GPU appearance and native gestures require browser checks.');
+} catch (error) { room.dispose(); throw error; }

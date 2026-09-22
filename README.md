@@ -1,6 +1,6 @@
 # Little Hours
 
-A browser-first prototype of a cozy, whole-room study diorama. Working title only.
+A browser-first cozy room-decorating study game, built with Babylon.js and procedural JavaScript furniture. Working title only.
 
 ## Run
 
@@ -13,18 +13,26 @@ npm run dev
 
 The development server binds to `127.0.0.1`. Open the local URL Vite prints. Run `npm run build` to create the production bundle in `dist/`, then `npm run preview` to preview it locally.
 
-## Current prototype
+## Play and decorate
 
-- Original procedural 3D cutaway room, constrained orbit and responsive framing.
-- Three atmosphere presets, plants / rug / fairy-light visibility, pet interaction.
-- 25 / 50 / 90-minute focus sessions, pause, resume and reset.
-- Wall-clock timer deadlines so background-tab throttling does not change elapsed time.
-- Browser-local task, room preferences, active timer and completed-session history.
-- User-activated synthesized rain audio with volume control.
+- A spacious orthographic fantasy retreat with an arched forest window, deep timber floors, climbing greenery, candles, lanterns, layered rugs and a resident cat.
+- **Decorate** opens a collection of fifteen original JavaScript-modeled pieces, including study stations, a glowing fireplace, a cushioned daybed, moonleaf trees, lanterns, patterned rugs, bookshelves and smaller comforts.
+- Choose an item, move over the floor and click a valid spot to place it. Select a placed object to move, rotate or remove it. `R` rotates, arrow keys nudge, and `Escape` cancels.
+- Solid furniture stays inside the room and cannot overlap other solid furniture or the cat's resting spot. Rugs can sit underneath furniture.
+- Three expansive, editable room designs: **Ember library**, **Moonlit greenhouse**, and **Writer’s loft**. **Undo** restores the preceding arrangement.
+- Select a desk and choose **Study here** to move your avatar's study spot. The last study station cannot be removed.
+- 25 / 50 / 90-minute focus sessions, pause/resume/reset, local saves, task text and completed-session history.
+- Three atmosphere presets, fairy lights, pet interaction, and user-activated synthesized rain audio.
 - Mini view demonstrates a smaller room **inside this page**.
-- Reduced-motion support, capped rendering rate and hidden-tab rendering suspension.
+- An optional Performance panel shows measured frame cadence, CPU submission, drawing cost and quality controls.
 
-This is an early interaction and art-direction prototype, not a complete launched product. It has no accounts, cross-device sync, freeform furniture editor, multiplayer, native always-on-top window, notch integration or coding-agent integration. No competitor code, models or music are included. Room geometry and canvas textures are generated locally. Google Fonts is the only external presentation request; local fallback fonts work without it.
+Everything is available in the prototype collection; there are no purchases. This is an early playable prototype with no accounts, cross-device sync, multiplayer, native always-on-top window, notch integration or coding-agent integration. No competitor code, models or music are included. The furniture, room geometry and decorative details are authored in JavaScript; no generated raster furniture assets or Blender files are required. Google Fonts is the only external presentation request; fallback fonts work without it.
+
+## Engine and art
+
+[Babylon.js](https://www.babylonjs.com/games/) provides the game engine, scene, orthographic camera, picking and rendering. Furniture models live in `src/furniture.js`, the collection in `src/catalog.js`, and room placement/presets in `src/layout.js`. The runtime reuses geometry and materials and batches static geometry to limit drawing work.
+
+See [engine and performance notes](docs/engine-and-performance.md) for the baseline, measurement definitions and validation limits. A frame-rate measurement on one machine is not a guarantee across every browser or device.
 
 ## Product research
 
@@ -40,25 +48,16 @@ npm run verify:room
 npm run build
 ```
 
-`npm test` runs **11 Node regression tests** for elapsed wall time, pause/resume and formatting; pause/reset at expiry; stale-tab edits and single completion accounting; next-day restoration; malformed saved state and null history entries; and continued use when browser storage writes fail. The tests exercise the production session and state-store helpers.
+`npm test` covers wall-clock sessions, expiry accounting, storage failure, cross-tab edits, saved-layout migration, placement rules, presets and procedural furniture bounds.
 
-`npm run verify:room` runs **six room harness checks**:
-
-1. Touch-action configuration and horizontal touch rotation.
-2. Exact camera reset after drag inertia.
-3. Whole-room framing at five aspect ratios and four orbit extremes.
-4. Animated rain staying inside its culling bounds.
-5. Still scene transforms and rain under reduced motion.
-6. Hidden-tab suspension, single-loop resumption and complete disposal.
-
-The harness imports the actual `src/room.js` and uses the installed Three.js geometry, camera math, raycasting and OrbitControls. It substitutes `WebGLRenderer` and browser DOM surfaces, so **real GPU rendering and native touch scrolling require separate browser checks**. Check those along with themes, decoration, pet interaction, mini view, audio, timer controls, refresh restoration and keyboard use in the running app.
+`npm run verify:room` imports the production runtime into Babylon's **NullEngine**. It exercises the real scene graph, camera math, editor operations, reduced motion and lifecycle cleanup without a GPU. Browser checks separately cover appearance, frame rate, placement/picking, themes, pet interaction, mini view, audio, timer controls, refresh restoration and keyboard use. Native touch scrolling still needs physical-device testing.
 
 [GitHub Actions](.github/workflows/ci.yml) runs dependency installation, both test commands and the production build on pushes and pull requests using Node.js 24.
 
 ## Proposed next milestones
 
-1. Refine room art with the user; make camera composition and interaction satisfying at desktop and mobile sizes.
-2. Introduce deliberate customization: several curated room layouts, furniture slots and saveable palettes before a general scene editor.
+1. Refine the furniture art and room game with the user; validate the placement flow at desktop and mobile sizes.
+2. Expand the deliberate furniture collection, room shapes and palettes; validate a focus-earned progression loop before adding an economy.
 3. Validate repeat use with a small pilot. Measure time to first focus session, repeat completed sessions, and observed memory/frame/battery performance.
-4. Add a native Mac companion using the same room and session state. A small room window and pet/timer beside the notch need native implementation and device testing.
+4. Add an expandable native Mac notch companion using the same room, pet and focus state. Show which invited friends are studying and let the companion expand into a view of their rooms. This needs native implementation and device testing.
 5. Add private invite-only study visits with visible presence, synchronized optional timers, and explicit leave/block controls. Broader public discovery can follow proven demand.

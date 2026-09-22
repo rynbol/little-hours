@@ -1,0 +1,559 @@
+import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
+import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
+import { CreateBox, CreateSegmentedBoxVertexData } from '@babylonjs/core/Meshes/Builders/boxBuilder.js';
+import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder.js';
+import { CreateCylinder } from '@babylonjs/core/Meshes/Builders/cylinderBuilder.js';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
+import { Vector3, Quaternion } from '@babylonjs/core/Maths/math.vector.js';
+import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+import { getFurniture } from './catalog.js';
+
+// Hand-built forms, real joinery, small deliberate details. No downloaded models,
+// generated pictures or texture files: even the notebook and screen are geometry.
+// Every cache belongs to one Babylon Scene; instances share geometry and materials.
+const sceneCaches = new WeakMap();
+function cacheFor(scene) {
+  if (!sceneCaches.has(scene)) {
+    sceneCaches.set(scene, { templates: new Map(), materials: new Map(), batches: new Map() });
+    scene.onDisposeObservable.addOnce(() => sceneCaches.delete(scene));
+  }
+  return sceneCaches.get(scene);
+}
+const C = {
+  wood: '#aa7954', edge: '#bc9169', darkWood: '#73533d', cream: '#e7dec7',
+  sage: '#83968a', sageLight: '#a0afa0', linen: '#dfd1b2', brass: '#bf9762',
+  terracotta: '#bd8469', leaf: '#809362', darkLeaf: '#617853', dark: '#50564c',
+  ink: '#697361', paper: '#f2ead5', tan: '#caa26c', skin: '#d6ad87',
+};
+const bookColors = ['#788e84', '#bb8066', '#d5b77c', '#a4ac8e', '#829da3', '#c7a696'];
+
+// A three-segment bevel keeps broad faces crisp and corners intentionally faceted.
+// The helper is shared with the room architecture so its visual language matches.
+export function createRoundedBox(name, size, radius, scene) {
+  const r = Math.max(0, Math.min(radius, Math.min(...size) * 0.44));
+  if (r < 0.001) return CreateBox(name, { width: size[0], height: size[1], depth: size[2] }, scene);
+  const data = CreateSegmentedBoxVertexData({ width: size[0], height: size[1], depth: size[2], segments: 3 });
+  for (let i = 0; i < data.positions.length; i += 3) {
+    const point = [0, 0, 0], center = [0, 0, 0];
+    for (let axis = 0; axis < 3; axis++) {
+      const half = size[axis] / 2, value = data.positions[i + axis];
+      point[axis] = Math.sign(value) * (Math.abs(value) > half * 0.8 ? half : half - r);
+      center[axis] = Math.max(-half + r, Math.min(half - r, point[axis]));
+    }
+    const normal = new Vector3(point[0] - center[0], point[1] - center[1], point[2] - center[2]).normalize();
+    for (let axis = 0; axis < 3; axis++) {
+      const n = [normal.x, normal.y, normal.z][axis];
+      data.positions[i + axis] = center[axis] + n * r;
+      data.normals[i + axis] = n;
+    }
+  }
+  const result = new Mesh(name, scene); data.applyToMesh(result); return result;
+}
+function material(scene, color, extra = {}) {
+  const cache = cacheFor(scene), key = `${color}:${JSON.stringify(extra)}`;
+  if (!cache.materials.has(key)) {
+    const result = new StandardMaterial(`furniture-${key}`, scene);
+    result.diffuseColor = Color3.FromHexString(color);
+    result.specularColor = new Color3(extra.metalness ? 0.32 : 0.045, extra.metalness ? 0.27 : 0.045, extra.metalness ? 0.18 : 0.045);
+    result.specularPower = extra.metalness ? 48 : 20;
+    result.emissiveColor = extra.emissive ? Color3.FromHexString(extra.emissive).scale(extra.emissiveIntensity ?? 1) : Color3.Black();
+    result.metadata = { batchKey: JSON.stringify({ metal: Boolean(extra.metalness), emissive: extra.emissive || null, intensity: extra.emissiveIntensity || 0 }) };
+    cache.materials.set(key, result);
+  }
+  return cache.materials.get(key);
+}
+function mesh(parent, shape, color, position, extra) {
+  shape.material = material(parent.getScene(), color, extra);
+  shape.position.set(...position); shape.parent = parent;
+  shape.receiveShadows = true; shape.isPickable = true; return shape;
+}
+function box(parent, size, position, color, radius = 0.025) {
+  return mesh(parent, createRoundedBox('joinery', size, Math.min(radius, 0.055), parent.getScene()), color, position);
+}
+function sphere(parent, size, position, color) {
+  const result = mesh(parent, CreateSphere('soft-form', { diameter: 2, segments: 6 }, parent.getScene()), color, position);
+  result.scaling.set(...size); return result;
+}
+function cylinder(parent, top, bottom, height, position, color, extra = {}) {
+  return mesh(parent, CreateCylinder('turned-form', { diameterTop: top * 2, diameterBottom: bottom * 2, height, tessellation: 12 }, parent.getScene()), color, position, extra);
+}
+function rod(parent, a, b, radius, color, extra = {}) {
+  const start = new Vector3(...a), end = new Vector3(...b), delta = end.subtract(start);
+  const result = mesh(parent, CreateCylinder('stem', { diameter: radius * 2, height: delta.length(), tessellation: 8 }, parent.getScene()), color, start.add(end).scale(0.5).asArray(), extra);
+  result.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), delta.normalize(), new Quaternion());
+  return result;
+}
+function torus(parent, radius, tube, position, color, arc = Math.PI * 2) {
+  const positions = [], normals = [], indices = [], rings = 20, sides = 6;
+  for (let i = 0; i <= rings; i++) {
+    const u = i / rings * arc;
+    for (let j = 0; j <= sides; j++) {
+      const v = j / sides * Math.PI * 2;
+      positions.push((radius + tube * Math.cos(v)) * Math.cos(u), (radius + tube * Math.cos(v)) * Math.sin(u), tube * Math.sin(v));
+      normals.push(Math.cos(v) * Math.cos(u), Math.cos(v) * Math.sin(u), Math.sin(v));
+      if (i < rings && j < sides) { const a = i * (sides + 1) + j, b = a + sides + 1; indices.push(a, a + 1, b, a + 1, b + 1, b); }
+    }
+  }
+  const data = new VertexData(); Object.assign(data, { positions, normals, indices });
+  const result = new Mesh('piping', parent.getScene()); data.applyToMesh(result);
+  return mesh(parent, result, color, position);
+}
+function group(parent, position = [0, 0, 0]) {
+  const result = new TransformNode('detail-group', parent.getScene());
+  result.position.set(...position); result.parent = parent; return result;
+}
+
+// Bake transforms and colors into shared geometry. Every matte painted or wooden
+// part uses the same material, so a colorful shelf still costs one draw call.
+function batch(source) {
+  const scene = source.getScene(), cache = cacheFor(scene), buckets = new Map();
+  for (const part of source.getChildMeshes()) {
+    const mat = part.material, key = mat.metadata.batchKey;
+    if (!cache.batches.has(key)) {
+      const result = new StandardMaterial(`furniture-batch-${key}`, scene);
+      result.diffuseColor = Color3.White(); result.specularColor = mat.specularColor.clone();
+      result.specularPower = mat.specularPower; result.emissiveColor = mat.emissiveColor.clone();
+      cache.batches.set(key, result);
+    }
+    part.computeWorldMatrix(true);
+    const data = VertexData.ExtractFromMesh(part, true, true);
+    data.transform(part.getWorldMatrix());
+    data.uvs = undefined; data.uvs2 = undefined;
+    const color = mat.diffuseColor;
+    data.colors = [];
+    for (let i = 0; i < data.positions.length; i += 3) data.colors.push(color.r, color.g, color.b, 1);
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(data);
+  }
+  const result = new TransformNode('furniture-batch', scene);
+  for (const [key, parts] of buckets) {
+    const data = parts[0]; if (parts.length > 1) data.merge(parts.slice(1), true);
+    const object = new Mesh('handmade-details', scene); data.applyToMesh(object);
+    object.material = cache.batches.get(key); object.parent = result;
+    object.useVertexColors = true; object.hasVertexAlpha = false;
+    object.receiveShadows = true; object.isPickable = true;
+  }
+  source.dispose(false, false); return result;
+}
+function mug(parent, x, y, z, scale = 1) {
+  const cup = group(parent, [x, y, z]); cup.scaling.setAll(scale);
+  cylinder(cup, 0.105, 0.082, 0.19, [0, 0.095, 0], C.cream);
+  cylinder(cup, 0.087, 0.087, 0.006, [0, 0.193, 0], '#74543b');
+  const handle = torus(cup, 0.067, 0.021, [0.111, 0.105, 0], C.cream); handle.rotation.y = 0.1;
+}
+function book(parent, width, height, depth, x, y, z, color, angle = 0) {
+  const bookGroup = group(parent, [x, y, z]); bookGroup.rotation.y = angle;
+  box(bookGroup, [width, height, depth], [0, 0, 0], color, 0.006);
+  box(bookGroup, [width - 0.045, height * 0.55, 0.012], [0, 0, depth / 2 + 0.002], C.paper, 0.002);
+}
+function deskLamp(parent, x, y, z) {
+  const lamp = group(parent, [x, y, z]);
+  const brass = { metalness: 0.45, roughness: 0.38 };
+  cylinder(lamp, 0.16, 0.19, 0.055, [0, 0.03, 0], C.brass, brass);
+  rod(lamp, [0, 0.055, 0], [0, 0.53, 0], 0.021, C.brass, brass);
+  rod(lamp, [0, 0.53, 0], [-0.14, 0.65, 0], 0.021, C.brass, brass);
+  cylinder(lamp, 0.10, 0.24, 0.21, [-0.14, 0.63, 0], '#c99858');
+  cylinder(lamp, 0.205, 0.205, 0.013, [-0.14, 0.52, 0], '#f4dba1', { emissive: '#ffbd61', emissiveIntensity: 0.38 });
+}
+function laptop(parent) {
+  const laptopGroup = group(parent, [0, 1.29, -0.43]);
+  box(laptopGroup, [0.97, 0.045, 0.62], [0, 0, 0], '#777f72', 0.025);
+  box(laptopGroup, [0.68, 0.008, 0.23], [0, 0.028, -0.06], '#485047', 0.012);
+  box(laptopGroup, [0.25, 0.007, 0.12], [0, 0.028, 0.19], '#a9ae9e', 0.012);
+  const screen = group(laptopGroup, [0, 0.027, -0.26]); screen.rotation.x = -0.12;
+  box(screen, [0.97, 0.62, 0.045], [0, 0.3, 0], '#777f72', 0.026);
+  box(screen, [0.86, 0.51, 0.009], [0, 0.3, 0.028], '#ced8bd', 0.005);
+  box(screen, [0.20, 0.45, 0.009], [-0.29, 0.3, 0.034], '#b0c0a2', 0.004);
+  box(screen, [0.52, 0.41, 0.01], [0.12, 0.3, 0.04], '#eee9d3', 0.009);
+  box(screen, [0.28, 0.017, 0.008], [0.05, 0.445, 0.049], '#829477', 0.001);
+  for (let i = 0; i < 6; i++) box(screen, [i === 5 ? 0.21 : 0.40, 0.009, 0.008], [i === 5 ? 0.025 : 0.12, 0.39 - i * 0.042, 0.049], '#b9c4ab', 0.001);
+  for (let i = 0; i < 4; i++) box(screen, [0.12 - i * 0.012, 0.01, 0.008], [-0.29, 0.44 - i * 0.045, 0.046], '#829477', 0.001);
+}
+function notebook(parent) {
+  const notebookGroup = group(parent, [0, 1.293, -0.34]); notebookGroup.rotation.y = -0.10;
+  box(notebookGroup, [0.9, 0.035, 0.63], [0, 0, 0], '#789286', 0.018);
+  box(notebookGroup, [0.85, 0.016, 0.58], [0, 0.023, 0], C.paper, 0.008);
+  box(notebookGroup, [0.012, 0.012, 0.57], [0, 0.034, 0], '#b2a88b', 0.002);
+  for (let side = -1; side <= 1; side += 2) {
+    for (let i = 0; i < 5; i++) box(notebookGroup, [0.29, 0.004, 0.007], [side * 0.22, 0.034, -0.16 + i * 0.062], '#b7bea4', 0.001);
+  }
+  rod(notebookGroup, [0.31, 0.054, -0.05], [0.37, 0.054, 0.24], 0.012, '#b98754');
+}
+function studyStation(parent, writing) {
+  const width = writing ? 2.5 : 3;
+  const timber = writing ? '#d8ccb1' : C.wood;
+  box(parent, [width, 0.14, 1.10], [0, 1.18, -0.47], timber, 0.06);
+  [-1, 1].forEach(side => {
+    for (const z of [-0.89, -0.05]) rod(parent, [side * (width / 2 - 0.16), 0.012, z], [side * (width / 2 - 0.20), 1.12, z], 0.055, writing ? C.edge : C.darkWood);
+  });
+  box(parent, [writing ? 0.64 : 0.75, 0.24, 0.84], [-width / 2 + 0.50, 0.99, -0.45], timber, 0.025);
+  box(parent, [writing ? 0.54 : 0.64, 0.17, 0.037], [-width / 2 + 0.50, 0.99, -0.01], writing ? '#c3b597' : C.edge, 0.013);
+  box(parent, [0.18, 0.025, 0.025], [-width / 2 + 0.50, 1.0, 0.02], C.brass, 0.006);
+  const chair = group(parent, [0, 0, 0.52]);
+  const cloth = writing ? '#b98770' : C.sage;
+  box(chair, [0.88, 0.16, 0.83], [0, 0.63, 0], cloth, 0.085);
+  box(chair, [0.86, 0.62, 0.14], [0, 0.97, 0.36], cloth, 0.066);
+  for (const x of [-0.32, 0.32]) for (const z of [-0.28, 0.28]) rod(chair, [x * 1.14, 0.012, z * 1.18], [x, 0.58, z], 0.044, C.darkWood);
+  for (const x of [-0.42, 0.42]) {
+    rod(chair, [x, 0.62, 0.20], [x, 0.96, 0.20], 0.03, C.darkWood);
+    box(chair, [0.10, 0.07, 0.5], [x, 0.98, 0], C.wood, 0.02);
+  }
+  if (writing) {
+    notebook(parent);
+    cylinder(parent, 0.10, 0.085, 0.19, [-0.91, 1.36, -0.75], C.terracotta);
+    for (let i = 0; i < 4; i++) rod(parent, [-0.95 + i * 0.025, 1.35, -0.75], [-0.96 + i * 0.03, 1.61 - (i % 2) * 0.05, -0.74], 0.008, [C.wood, C.sage, C.tan, C.dark][i]);
+    deskLamp(parent, 0.91, 1.26, -0.76);
+    mug(parent, 0.72, 1.26, -0.06, 0.9);
+    book(parent, 0.38, 0.055, 0.30, -0.83, 1.285, -0.12, bookColors[1], 0.15);
+  } else {
+    laptop(parent); deskLamp(parent, 1.10, 1.26, -0.69); mug(parent, 0.83, 1.26, -0.13);
+    for (let i = 0; i < 3; i++) book(parent, 0.48 - i * 0.02, 0.065, 0.35, -1.02, 1.29 + i * 0.068, -0.70, bookColors[i], i === 1 ? 0.13 : -0.045);
+    box(parent, [0.42, 0.015, 0.3], [-0.77, 1.265, -0.08], C.paper, 0.008);
+    rod(parent, [-0.9, 1.281, -0.14], [-0.64, 1.281, -0.02], 0.01, C.darkWood);
+  }
+}
+
+function bookcase(parent) {
+  box(parent, [1.77, 3.16, 0.065], [0, 1.65, -0.23], '#64483b', 0.01);
+  for (const x of [-0.88, 0.88]) {
+    box(parent, [0.11, 3.35, 0.54], [x, 1.675, 0], '#936c4e', 0.02);
+    box(parent, [0.025, 3.17, 0.019], [x, 1.68, 0.285], '#c29c68', 0.006);
+  }
+  for (const y of [0.08, 0.82, 1.58, 2.36, 3.29]) box(parent, [1.85, 0.10, 0.59], [0, y, 0], '#936c4e', 0.023);
+  box(parent, [1.88, 0.12, 0.61], [0, 3.36, 0], '#73533f', 0.025);
+  box(parent, [1.68, 0.025, 0.025], [0, 3.385, 0.305], '#c6a16b', 0.007);
+  for (let level = 0; level < 4; level++) {
+    for (let i = 0; i < (level === 1 ? 4 : 7); i++) {
+      const h = 0.34 + ((i * 7 + level * 3) % 5) * 0.041;
+      const x = -0.71 + i * 0.16, bottom = [0.13, 0.87, 1.63, 2.41][level];
+      box(parent, [0.13, h, 0.31], [x, bottom + h / 2, 0.07], bookColors[(i + level) % bookColors.length], 0.006);
+      box(parent, [0.088, 0.013, 0.006], [x, bottom + h * 0.78, 0.228], C.paper, 0.002);
+    }
+  }
+  cylinder(parent, 0.14, 0.18, 0.23, [0.43, 0.985, 0.07], '#d4b897');
+  cylinder(parent, 0.075, 0.12, 0.18, [0.43, 1.185, 0.07], '#d4b897');
+  box(parent, [0.43, 0.23, 0.39], [0.60, 0.245, 0.05], '#b8a17d', 0.024);
+  for (let i = 0; i < 4; i++) box(parent, [0.42, 0.012, 0.005], [0.60, 0.17 + i * 0.046, 0.25], '#d4bd94', 0.002);
+  book(parent, 0.4, 0.05, 0.28, 0.53, 1.66, 0.06, bookColors[2]);
+}
+function loungeChair(parent) {
+  box(parent, [1.54, 0.32, 1.40], [0, 0.36, -0.03], C.sage, 0.14);
+  box(parent, [1.45, 0.94, 0.29], [0, 0.91, -0.53], C.sage, 0.13);
+  for (const x of [-0.68, 0.68]) box(parent, [0.27, 0.55, 1.28], [x, 0.70, 0.0], C.sage, 0.11);
+  box(parent, [1.02, 0.22, 0.95], [0, 0.61, 0.09], C.sageLight, 0.09);
+  for (const x of [-0.56, 0.56]) for (const z of [-0.45, 0.44]) cylinder(parent, 0.045, 0.058, 0.22, [x, 0.11, z], C.darkWood);
+  const cushion = box(parent, [0.53, 0.49, 0.18], [0.17, 0.93, -0.28], '#d8b477', 0.085);
+  cushion.rotation.z = -0.13; cushion.rotation.x = -0.20;
+  box(parent, [0.38, 0.041, 1.1], [-0.39, 0.742, 0.20], C.linen, 0.017);
+  box(parent, [0.38, 0.47, 0.045], [-0.39, 0.49, 0.755], C.linen, 0.019);
+  for (let i = 0; i < 6; i++) rod(parent, [-0.54 + i * 0.06, 0.26, 0.763], [-0.54 + i * 0.06, 0.20, 0.77], 0.008, C.paper);
+}
+function sideTable(parent) {
+  cylinder(parent, 0.39, 0.39, 0.10, [0, 0.66, 0], C.wood);
+  cylinder(parent, 0.06, 0.095, 0.55, [0, 0.315, 0], C.darkWood);
+  cylinder(parent, 0.25, 0.27, 0.05, [0, 0.025, 0], C.darkWood);
+  book(parent, 0.35, 0.055, 0.27, -0.08, 0.735, -0.05, bookColors[1], 0.15);
+  mug(parent, 0.18, 0.71, 0.07, 0.62);
+}
+function floorLamp(parent) {
+  const brass = { metalness: 0.4, roughness: 0.4 };
+  cylinder(parent, 0.28, 0.31, 0.055, [0, 0.03, 0], C.brass, brass);
+  rod(parent, [0, 0.05, 0], [0, 1.80, 0], 0.026, C.brass, brass);
+  cylinder(parent, 0.22, 0.34, 0.45, [0, 1.9, 0], '#e2d2ab');
+  cylinder(parent, 0.31, 0.31, 0.012, [0, 1.674, 0], '#f8dfa5', { emissive: '#ffcc77', emissiveIntensity: 0.30 });
+  for (let i = 0; i < 20; i++) {
+    const angle = i * Math.PI / 10;
+    rod(parent, [Math.cos(angle) * 0.337, 1.677, Math.sin(angle) * 0.337], [Math.cos(angle) * 0.218, 2.125, Math.sin(angle) * 0.218], 0.007, '#c9b78f');
+  }
+  sphere(parent, [0.035, 0.055, 0.035], [0, 2.165, 0], C.brass);
+  rod(parent, [0.13, 1.75, 0.02], [0.13, 1.47, 0.02], 0.006, C.brass, brass);
+  sphere(parent, [0.02, 0.03, 0.02], [0.13, 1.46, 0.02], C.brass);
+}
+function plant(parent) {
+  cylinder(parent, 0.23, 0.16, 0.36, [0, 0.18, 0], C.terracotta);
+  cylinder(parent, 0.245, 0.245, 0.055, [0, 0.36, 0], C.terracotta);
+  cylinder(parent, 0.211, 0.211, 0.013, [0, 0.392, 0], C.darkWood);
+  for (let i = 0; i < 7; i++) {
+    const angle = i * 2.4, h = 0.73 + (i % 3) * 0.16;
+    const x = Math.cos(angle) * 0.20, z = Math.sin(angle) * 0.20;
+    rod(parent, [0, 0.39, 0], [x, h, z], 0.012, C.darkLeaf);
+    const leaf = sphere(parent, [0.115, 0.255, 0.035], [x * 1.25, h + 0.07, z * 1.25], i % 2 ? C.leaf : '#95a576');
+    leaf.rotation.set(0.34, -angle, -0.50);
+    rod(parent, [x * 1.25, h - 0.06, z * 1.25 + 0.03], [x * 1.25 + 0.08, h + 0.18, z * 1.25 + 0.02], 0.005, '#acb889');
+  }
+}
+function rug(parent) {
+  box(parent, [3.24, 0.03, 2.20], [0, 0.016, 0], '#bca982', 0.08);
+  box(parent, [3.08, 0.01, 2.03], [0, 0.035, 0], '#e1d4b3', 0.055);
+  box(parent, [2.83, 0.006, 1.77], [0, 0.043, 0], '#c8b28c', 0.04);
+  box(parent, [2.70, 0.005, 1.64], [0, 0.049, 0], '#ddcdac', 0.035);
+  for (const side of [-1, 1]) for (let i = 0; i < 22; i++) rod(parent, [side * 1.60, 0.022, -0.96 + i * 0.091], [side * 1.74, 0.022, -0.96 + i * 0.091], 0.009, '#d6c49d');
+  for (const z of [-0.52, 0.52]) for (let i = 0; i < 5; i++) {
+    const diamond = box(parent, [0.083, 0.004, 0.083], [-0.68 + i * 0.34, 0.054, z], '#baa47d', 0.006); diamond.rotation.y = Math.PI / 4;
+  }
+}
+function ottoman(parent) {
+  cylinder(parent, 0.44, 0.45, 0.06, [0, 0.03, 0], C.darkWood);
+  cylinder(parent, 0.485, 0.505, 0.38, [0, 0.22, 0], '#b3956d');
+  cylinder(parent, 0.49, 0.49, 0.11, [0, 0.455, 0], '#c7ad85');
+  const seam = torus(parent, 0.489, 0.012, [0, 0.407, 0], '#dfc8a2'); seam.rotation.x = Math.PI / 2;
+  for (let i = 0; i < 8; i++) {
+    const angle = i * Math.PI / 4;
+    rod(parent, [Math.cos(angle) * 0.499, 0.06, Math.sin(angle) * 0.499], [Math.cos(angle) * 0.486, 0.394, Math.sin(angle) * 0.486], 0.004, '#cfb78e');
+  }
+}
+function cabinet(parent) {
+  for (const x of [-0.68, 0.68]) for (const z of [-0.22, 0.22]) rod(parent, [x * 1.05, 0.012, z], [x, 0.19, z], 0.038, C.darkWood);
+  box(parent, [1.72, 0.64, 0.65], [0, 0.49, 0], C.wood, 0.035);
+  box(parent, [1.77, 0.08, 0.68], [0, 0.85, 0], C.edge, 0.03);
+  for (const x of [-0.415, 0.415]) {
+    box(parent, [0.78, 0.5, 0.04], [x, 0.49, 0.345], '#c29b71', 0.012);
+    box(parent, [0.025, 0.16, 0.025], [x + (x < 0 ? 0.25 : -0.25), 0.5, 0.373], C.darkWood, 0.008);
+  }
+  const player = group(parent, [-0.22, 0.945, -0.01]);
+  box(player, [0.90, 0.11, 0.49], [0, 0, 0], '#a07858', 0.03);
+  cylinder(player, 0.18, 0.18, 0.01, [-0.11, 0.061, 0], '#424b43');
+  cylinder(player, 0.055, 0.055, 0.012, [-0.11, 0.069, 0], '#b68a65');
+  rod(player, [0.28, 0.09, -0.16], [0.2, 0.09, 0.12], 0.013, C.brass);
+  rod(player, [0.2, 0.09, 0.12], [0.10, 0.09, 0.14], 0.013, C.brass);
+  book(parent, 0.32, 0.06, 0.4, 0.57, 0.92, 0, bookColors[0]);
+  book(parent, 0.32, 0.045, 0.4, 0.57, 0.975, 0, bookColors[2]);
+}
+
+const candleGlow = { emissive: '#ffbd61', emissiveIntensity: 0.72 };
+function candle(parent, position, height = 0.28, radius = 0.065) {
+  const holder = group(parent, position);
+  cylinder(holder, radius * 1.45, radius * 1.6, 0.035, [0, 0.018, 0], '#b69760');
+  cylinder(holder, radius, radius, height, [0, height / 2 + 0.04, 0], '#ead6aa');
+  rod(holder, [0, height + 0.045, 0], [0, height + 0.078, 0], 0.007, '#594c37');
+  const flame = cylinder(holder, 0.008, radius * 0.65, 0.145, [0, height + 0.12, 0], '#ffd186', candleGlow);
+  flame.rotation.z = -0.14;
+}
+function fireplace(parent) {
+  const stone = '#aa957d', paleStone = '#bca98c', walnut = '#6b4b3b';
+  box(parent, [2.64, 0.16, 1.10], [0, 0.08, 0], '#796555', 0.04);
+  box(parent, [2.34, 1.85, 0.13], [0, 1.07, -0.405], '#756153', 0.025);
+  box(parent, [1.75, 1.41, 0.033], [0, 0.87, -0.321], '#342e2c', 0.01);
+  for (const x of [-1, 1]) {
+    for (let level = 0; level < 4; level++) box(parent, [0.35, 0.26, 0.69], [x * 0.99, 0.3 + level * 0.28, -0.025], level % 2 ? paleStone : stone, 0.014);
+    box(parent, [0.44, 0.115, 0.77], [x * 0.99, 0.215, -0.025], paleStone, 0.016);
+  }
+  for (let i = 0; i < 11; i++) {
+    const angle = i / 10 * Math.PI;
+    const brick = box(parent, [0.315, 0.26, 0.70], [Math.cos(angle) * 0.995, 1.09 + Math.sin(angle) * 0.88, -0.025], i % 2 ? paleStone : stone, 0.015);
+    brick.rotation.z = angle + Math.PI / 2;
+  }
+  box(parent, [2.62, 0.14, 0.91], [0, 2.11, -0.025], walnut, 0.025);
+  box(parent, [2.7, 0.11, 1.0], [0, 2.23, -0.025], '#8c6547', 0.025);
+  box(parent, [2.52, 0.028, 0.025], [0, 2.17, 0.445], '#c5a36d', 0.007);
+  for (const x of [-0.99, 0.99]) {
+    box(parent, [0.17, 0.21, 0.09], [x, 1.99, 0.4], walnut, 0.012);
+    const diamond = box(parent, [0.063, 0.063, 0.012], [x, 2.0, 0.455], '#bd9864', 0.007); diamond.rotation.z = Math.PI / 4;
+  }
+  for (let i = 0; i < 3; i++) book(parent, 0.54 - i * 0.035, 0.065, 0.35, -0.72, 2.32 + i * 0.068, -0.015, ['#7d8263', '#866574', '#c2a16c'][i], i === 1 ? 0.11 : 0);
+  candle(parent, [0.73, 2.288, 0.035], 0.37, 0.074);
+  candle(parent, [1.0, 2.288, 0.09], 0.22, 0.056);
+  box(parent, [0.61, 0.66, 0.075], [0.03, 2.615, -0.24], '#b89a63', 0.02);
+  box(parent, [0.50, 0.54, 0.021], [0.03, 2.615, -0.19], '#4f5d57', 0.008);
+  const moon = cylinder(parent, 0.145, 0.145, 0.009, [0.03, 2.65, -0.173], '#dbc494'); moon.rotation.x = Math.PI / 2;
+  const moonMask = cylinder(parent, 0.137, 0.137, 0.009, [0.087, 2.685, -0.16], '#4f5d57'); moonMask.rotation.x = Math.PI / 2;
+  rod(parent, [-0.58, 0.285, -0.1], [0.53, 0.285, 0.17], 0.09, '#684a37');
+  rod(parent, [-0.52, 0.39, 0.18], [0.51, 0.39, -0.1], 0.084, '#77503a');
+  for (let i = 0; i < 7; i++) {
+    const x = -0.48 + i * 0.155, height = 0.28 + (i % 3) * 0.11;
+    const flame = cylinder(parent, 0.005, 0.092, height, [x, 0.39 + height / 2, 0.10 - (i % 2) * 0.075], i % 2 ? '#ffb85e' : '#ffd58a', candleGlow);
+    flame.rotation.z = (i % 2 ? -1 : 1) * 0.13;
+    cylinder(parent, 0.045, 0.05, 0.018, [x, 0.2, 0.23], '#e5924f', candleGlow);
+  }
+  for (const x of [-0.60, -0.30, 0, 0.30, 0.60]) rod(parent, [x, 0.16, 0.395], [x, 0.46, 0.395], 0.019, '#514937');
+  rod(parent, [-0.66, 0.37, 0.395], [0.66, 0.37, 0.395], 0.022, '#514937');
+}
+function daybed(parent) {
+  const velvet = '#785965', lightVelvet = '#91707c', walnut = '#654939';
+  for (const x of [-1.26, 1.26]) for (const z of [-0.50, 0.50]) {
+    cylinder(parent, 0.052, 0.068, 0.23, [x, 0.115, z], walnut);
+    cylinder(parent, 0.075, 0.075, 0.044, [x, 0.057, z], '#b18f59');
+  }
+  box(parent, [2.99, 0.29, 1.4], [0, 0.37, -0.035], velvet, 0.04);
+  box(parent, [2.99, 0.80, 0.23], [0, 0.94, -0.64], velvet, 0.045);
+  for (const x of [-1.40, 1.40]) {
+    box(parent, [0.28, 0.64, 1.42], [x, 0.70, -0.005], velvet, 0.05);
+    box(parent, [0.23, 0.04, 1.31], [x, 1.035, -0.005], lightVelvet, 0.017);
+  }
+  for (const x of [-0.85, 0, 0.85]) {
+    box(parent, [0.81, 0.24, 1.04], [x, 0.615, 0.045], lightVelvet, 0.048);
+    box(parent, [0.78, 0.015, 0.023], [x, 0.613, 0.576], '#ad8690', 0.006);
+  }
+  for (const [x, color, angle] of [[-0.88, '#708374', 0.17], [-0.16, '#baa170', -0.10], [0.80, '#78886b', -0.16]]) {
+    const pillow = group(parent, [x, 1.0, -0.34]); pillow.rotation.z = angle; pillow.rotation.x = -0.15;
+    box(pillow, [0.59, 0.55, 0.22], [0, 0, 0], color, 0.05);
+    box(pillow, [0.025, 0.42, 0.012], [0, 0, 0.117], '#d0bc90', 0.004);
+    box(pillow, [0.42, 0.025, 0.012], [0, 0, 0.117], '#d0bc90', 0.004);
+    sphere(pillow, [0.035, 0.035, 0.018], [0, 0, 0.132], '#dfc99f');
+  }
+  box(parent, [0.51, 0.035, 1.17], [0.64, 0.756, 0.17], '#bfa471', 0.01);
+  box(parent, [0.51, 0.42, 0.045], [0.64, 0.53, 0.772], '#bfa471', 0.012);
+  for (let i = 0; i < 7; i++) {
+    rod(parent, [0.42 + i * 0.073, 0.31, 0.782], [0.42 + i * 0.073, 0.25, 0.805], 0.008, '#dfcba3');
+    box(parent, [0.016, 0.008, 1.10], [0.42 + i * 0.073, 0.779, 0.16], '#ddc89b', 0.003);
+  }
+}
+function leafBlade(parent, start, end, width, color) {
+  const direction = new Vector3(...end).subtract(new Vector3(...start));
+  const length = direction.length();
+  const positions = [0, -0.5, 0, -0.5, -0.13, 0, 0, 0.04, 0.13, 0.5, -0.13, 0, 0, 0.5, 0, 0, 0.04, -0.03];
+  const indices = [0, 2, 1, 0, 3, 2, 1, 2, 4, 2, 3, 4, 0, 1, 5, 0, 5, 3, 1, 4, 5, 5, 4, 3];
+  const data = new VertexData(); data.positions = positions; data.indices = indices; data.normals = [];
+  VertexData.ComputeNormals(positions, indices, data.normals);
+  const blade = new Mesh('folded-moonleaf', parent.getScene()); data.applyToMesh(blade);
+  mesh(parent, blade, color, new Vector3(...start).add(new Vector3(...end)).scale(0.5).asArray());
+  blade.scaling.set(width, length, width * 0.55);
+  blade.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), direction.normalize(), new Quaternion());
+}
+function moonTree(parent) {
+  const brass = { metalness: 0.4, roughness: 0.4 };
+  cylinder(parent, 0.35, 0.27, 0.62, [0, 0.31, 0], '#967a50', brass);
+  cylinder(parent, 0.366, 0.366, 0.052, [0, 0.62, 0], '#c2a16a', brass);
+  cylinder(parent, 0.327, 0.327, 0.02, [0, 0.65, 0], '#4d4938');
+  for (let i = 0; i < 12; i++) {
+    const angle = i * Math.PI / 6;
+    rod(parent, [Math.cos(angle) * 0.274, 0.08, Math.sin(angle) * 0.274], [Math.cos(angle) * 0.352, 0.59, Math.sin(angle) * 0.352], 0.009, '#b89a63');
+  }
+  const trunk = [[0, 0.65, 0], [-0.08, 1.2, 0.02], [0.11, 1.85, -0.04], [-0.02, 2.46, 0.02], [0.11, 2.93, -0.06]];
+  for (let i = 0; i < trunk.length - 1; i++) rod(parent, trunk[i], trunk[i + 1], 0.06 - i * 0.011, '#775d43');
+  for (let tier = 0; tier < 4; tier++) {
+    for (let branch = 0; branch < 3; branch++) {
+      const angle = tier * 1.2 + branch * Math.PI * 2 / 3;
+      const height = 1.34 + tier * 0.43, reach = tier === 3 ? 0.39 : 0.55;
+      const end = [Math.cos(angle) * reach, height + 0.24, Math.sin(angle) * reach];
+      rod(parent, [0, height - 0.05, 0], end, 0.020, '#816746');
+      for (let leaf = 0; leaf < 3; leaf++) {
+        const leafAngle = angle + (leaf - 1) * 0.74;
+        const origin = [end[0] * (0.58 + leaf * 0.14), end[1] - 0.1 + leaf * 0.045, end[2] * (0.58 + leaf * 0.14)];
+        const tip = [origin[0] + Math.cos(leafAngle) * 0.25, origin[1] + 0.29 + (leaf % 2) * 0.09, origin[2] + Math.sin(leafAngle) * 0.25];
+        leafBlade(parent, origin, tip, 0.27, ['#6f876b', '#8fa075', '#587565'][(tier + leaf) % 3]);
+      }
+    }
+  }
+  for (const [x, y, z] of [[-0.48, 1.82, 0.2], [0.42, 2.23, 0.27], [-0.15, 2.87, -0.23]]) {
+    rod(parent, [x, y, z], [x, y - 0.19, z], 0.005, '#bca36f');
+    const charm = box(parent, [0.075, 0.075, 0.023], [x, y - 0.23, z], '#d5bb78', 0.003); charm.rotation.z = Math.PI / 4;
+    box(parent, [0.026, 0.14, 0.020], [x, y - 0.23, z], '#d5bb78', 0.003);
+  }
+}
+function lanternCluster(parent) {
+  const brass = { metalness: 0.4, roughness: 0.4 };
+  for (const [x, z, height, radius] of [[-0.28, 0.03, 0.78, 0.175], [0.23, 0.26, 0.46, 0.15], [0.23, -0.28, 0.61, 0.155]]) {
+    const lantern = group(parent, [x, 0, z]);
+    cylinder(lantern, radius, radius * 1.04, 0.052, [0, 0.026, 0], '#ab8c52', brass);
+    cylinder(lantern, radius, radius, 0.038, [0, height, 0], '#c3a568', brass);
+    for (const px of [-1, 1]) for (const pz of [-1, 1]) rod(lantern, [px * radius * 0.62, 0.05, pz * radius * 0.62], [px * radius * 0.62, height, pz * radius * 0.62], 0.012, '#c0a16a', brass);
+    cylinder(lantern, radius * 0.28, radius * 1.08, 0.115, [0, height + 0.074, 0], '#927448', brass);
+    torus(lantern, radius * 0.37, 0.01, [0, height + 0.175, 0], '#c3a568');
+    candle(lantern, [0, 0.055, 0], height * 0.44, radius * 0.31);
+    for (const side of [-1, 1]) rod(lantern, [side * radius * 0.62, 0.075, radius * 0.63], [-side * radius * 0.62, height - 0.06, radius * 0.63], 0.006, '#b39157');
+  }
+}
+function moonRug(parent) {
+  const disk = (radius, y, color, height = 0.009) => mesh(parent, CreateCylinder('woven-circle', { diameter: radius * 2, height, tessellation: 48 }, parent.getScene()), color, [0, y, 0]);
+  disk(1.67, 0.025, '#9c835f', 0.04);
+  disk(1.59, 0.049, '#c5aa7c', 0.009);
+  disk(1.48, 0.056, '#676777', 0.009);
+  disk(1.36, 0.063, '#555a6d', 0.009);
+  // Different heights let the crescent and stars layer without flickering.
+  cylinder(parent, 0.47, 0.47, 0.006, [-0.09, 0.072, -0.10], '#d7c397');
+  cylinder(parent, 0.42, 0.42, 0.006, [0.09, 0.077, -0.16], '#555a6d');
+  for (let i = 0; i < 48; i++) {
+    const angle = i * Math.PI / 24;
+    rod(parent, [Math.cos(angle) * 1.65, 0.025, Math.sin(angle) * 1.65], [Math.cos(angle) * 1.785, 0.025, Math.sin(angle) * 1.785], 0.009, '#d0bb91');
+  }
+  for (let i = 0; i < 16; i++) {
+    const angle = i * Math.PI / 8;
+    const diamond = box(parent, [0.07, 0.006, 0.07], [Math.cos(angle) * 1.425, 0.064, Math.sin(angle) * 1.425], '#d2b987', 0.002); diamond.rotation.y = angle + Math.PI / 4;
+  }
+  for (const [x, z, size] of [[-0.71, 0.31, 0.12], [0.72, -0.21, 0.1], [0.37, 0.68, 0.13], [-0.35, -0.78, 0.075], [0.67, -0.76, 0.06]]) {
+    const star = box(parent, [size, 0.005, size], [x, 0.074, z], '#d9c495', 0.002); star.rotation.y = Math.PI / 4;
+    box(parent, [size * 0.2, 0.005, size * 1.9], [x, 0.077, z], '#d9c495', 0.001);
+    box(parent, [size * 1.9, 0.005, size * 0.2], [x, 0.077, z], '#d9c495', 0.001);
+  }
+}
+
+function avatarTemplate(scene) {
+  const templates = cacheFor(scene).templates;
+  if (templates.has('avatar')) return templates.get('avatar');
+  const body = new TransformNode('avatar-part', scene);
+  box(body, [0.51, 0.22, 0.43], [0, 0.77, -0.08], '#777e72', 0.08);
+  box(body, [0.60, 0.63, 0.43], [0, 1.15, -0.09], '#b88770', 0.12);
+  for (const x of [-0.15, 0.15]) {
+    rod(body, [x, 0.75, -0.08], [x, 0.65, -0.57], 0.115, '#777e72');
+    rod(body, [x, 0.65, -0.57], [x, 0.17, -0.67], 0.08, '#777e72');
+    box(body, [0.20, 0.12, 0.34], [x, 0.09, -0.75], C.cream, 0.05);
+  }
+  cylinder(body, 0.10, 0.12, 0.14, [0, 1.49, -0.14], C.skin);
+  for (const side of [-1, 1]) {
+    rod(body, [side * 0.27, 1.33, -0.13], [side * 0.36, 1.15, -0.44], 0.092, '#b88770');
+    rod(body, [side * 0.36, 1.15, -0.44], [side * 0.21, 1.35, -0.86], 0.073, '#b88770');
+  }
+  const head = new TransformNode('avatar-part', scene);
+  sphere(head, [0.232, 0.245, 0.22], [0, 0, 0], C.skin);
+  sphere(head, [0.24, 0.237, 0.22], [0, 0.061, 0.058], '#674d3b');
+  sphere(head, [0.12, 0.12, 0.10], [0, 0.19, 0.20], '#674d3b');
+  torus(head, 0.25, 0.026, [0, 0.017, 0.014], C.dark, Math.PI);
+  for (const x of [-0.244, 0.244]) sphere(head, [0.044, 0.091, 0.08], [x, 0.022, 0.014], C.sage);
+  const hand = new TransformNode('avatar-part', scene); sphere(hand, [0.074, 0.044, 0.10], [0, 0, 0], C.skin);
+  const value = { body: batch(body), head: batch(head), hand: batch(hand) };
+  Object.values(value).forEach(part => part.setEnabled(false));
+  templates.set('avatar', value); return value;
+}
+
+export function createFurniture(type, scene) {
+  const definition = getFurniture(type);
+  if (!definition) throw new Error(`Unknown furniture type: ${type}`);
+  if (!scene) throw new Error('createFurniture requires a Babylon Scene.');
+  const templates = cacheFor(scene).templates;
+  if (!templates.has(type)) {
+    const source = new TransformNode('furniture-source', scene);
+    const builders = {
+      'study-desk': parent => studyStation(parent, false), 'writing-desk': parent => studyStation(parent, true),
+      bookcase, 'lounge-chair': loungeChair, 'side-table': sideTable, 'floor-lamp': floorLamp,
+      plant, rug, ottoman, 'low-cabinet': cabinet,
+      fireplace, daybed, 'moon-tree': moonTree, 'lantern-cluster': lanternCluster, 'moon-rug': moonRug,
+    };
+    builders[type](source);
+    const template = batch(source); template.setEnabled(false); templates.set(type, template);
+  }
+  const result = new TransformNode(definition.name, scene);
+  result.position.y = 0.22; result.metadata = { type, sharedAssets: true };
+  const staticParts = templates.get(type).clone(`${type}-details`, result); staticParts.setEnabled(true);
+  if (definition.category === 'Study') {
+    const parts = avatarTemplate(scene);
+    const avatar = group(result, [0, 0, 0.52]); avatar.metadata = { dynamic: true }; avatar.name = 'Study companion';
+    const body = parts.body.clone('sweater-and-trousers', avatar); body.setEnabled(true);
+    const head = parts.head.clone('headphones', avatar); head.position.set(0, 1.72, -0.17); head.setEnabled(true);
+    const hands = [-1, 1].map(side => {
+      const hand = parts.hand.clone('typing-hand', avatar); hand.position.set(side * 0.21, 1.37, -0.94); hand.setEnabled(true); return hand;
+    });
+    result.metadata.study = true; result.metadata.avatar = avatar;
+    result.metadata.animate = (seconds, focused, reducedMotion) => {
+      const motion = reducedMotion ? 0 : 1;
+      head.rotation.x = motion * Math.sin(seconds * 0.55) * 0.018;
+      head.rotation.z = motion * Math.sin(seconds * 0.31) * 0.012;
+      for (let i = 0; i < hands.length; i++) hands[i].position.y = 1.37 + (focused ? motion * Math.sin(seconds * 6.2 + i * 1.7) * 0.011 : 0);
+    };
+  }
+  return result;
+}
+
+// Babylon reference-counts the cloned geometry. Ordinary instance.dispose() is
+// safe; scene.dispose() releases every instance, cached template and material.
+export function disposeFurnitureAssets(scene) {
+  const cache = sceneCaches.get(scene);
+  if (!cache) return;
+  for (const value of cache.templates.values()) {
+    if (value instanceof TransformNode) value.dispose(false, false);
+    else Object.values(value).forEach(node => node.dispose(false, false));
+  }
+  for (const mat of [...cache.materials.values(), ...cache.batches.values()]) mat.dispose();
+  sceneCaches.delete(scene);
+}

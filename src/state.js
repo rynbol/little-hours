@@ -1,10 +1,11 @@
 import { createSession, remainingAt, startSession, pauseSession } from './session.js';
+import { createLayout, normalizeLayout } from './layout.js';
 
 export const storageKey = 'little-hours-v1';
 const durations = [25, 50, 90];
 
 export function freshState() {
-  return { theme: 'dusk', task: '', decor: { plants: true, lights: true, rug: true }, session: createSession(), history: [] };
+  return { theme: 'dusk', task: '', decor: { plants: true, lights: true, rug: true }, layout: createLayout(), session: createSession(), history: [] };
 }
 
 export function localDate(timestamp = Date.now()) {
@@ -22,6 +23,7 @@ export function restoreState(raw) {
   for (const key of Object.keys(initial.decor)) {
     if (typeof saved.decor?.[key] === 'boolean') initial.decor[key] = saved.decor[key];
   }
+  if (saved.layout !== undefined) initial.layout = normalizeLayout(saved.layout);
   const session = saved.session;
   if (session && Number.isFinite(session.duration) && durations.includes(session.duration / 60_000)
     && Number.isFinite(session.remaining) && session.remaining >= 0 && session.remaining <= session.duration

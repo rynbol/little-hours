@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createSession, remainingAt, startSession, pauseSession, formatTime } from './session.js';
 import { createStateStore, freshState, localDate, restoreState, storageKey } from './state.js';
+import { createLayout } from './layout.js';
 
 function memoryStorage(initial = null) {
   let raw = initial;
@@ -132,4 +133,33 @@ test('blocked writes preserve this visit across later edits and refreshes', () =
   const current = store.refresh();
   assert.equal(current.session.running, true);
   assert.equal(current.task, 'Still working');
+});
+
+test('existing focus saves gain a furnished room without losing their session', () => {
+  const session = startSession(createSession(50), 1234);
+  const restored = restoreState(JSON.stringify({ theme: 'rain', task: 'An old room', session }));
+  assert.deepEqual(restored.layout, createLayout());
+  assert.deepEqual(restored.session, session);
+  assert.equal(restored.task, 'An old room');
+});
+
+test('restoring furniture drops invalid pieces while preserving the active study desk', () => {
+  const layout = createLayout('creative-corner');
+  const deskId = layout.activeDeskId;
+  layout.items.push(null, { id: 'unknown', type: 'not-in-the-collection', x: 0, z: 0, rotation: 0 }, { id: 'outside', type: 'plant', x: 100, z: 100, rotation: 0 });
+  const restored = restoreState(JSON.stringify({ layout }));
+  assert.deepEqual(restored.layout, createLayout('creative-corner'));
+  assert.equal(restored.layout.activeDeskId, deskId);
+});
+
+test('furniture edits from a stale tab preserve the current timer and persist the chosen arrangement', () => {
+  const storage = memoryStorage();
+  const first = createStateStore(storage, () => 1000);
+  const second = createStateStore(storage, () => 1000);
+  first.setRunning(true);
+  second.update(draft => { draft.layout = createLayout('quiet-library'); });
+  const restored = first.refresh();
+  assert.equal(restored.session.running, true);
+  assert.deepEqual(restored.layout, createLayout('quiet-library'));
+  assert.deepEqual(createStateStore(storage).state.layout, createLayout('quiet-library'));
 });
