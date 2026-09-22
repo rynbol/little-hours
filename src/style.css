@@ -387,3 +387,29 @@ h2 em { color: #a07147; font-weight: 400; }
   .is-decorating .furniture-art { height: 49px; }
   .is-decorating .room-panel, .is-decorating .toast { bottom: 228px; }
 }
+
+/* Room designs share the editor, but each is its own saved little world. */
+.preset-card[data-active='true'] { border-color: #9a7745; box-shadow: inset 0 0 0 1px #9a774555; }
+.preset-card .preset-art { height: 116px; border: 0; background: #dac6aa; }
+.preset-card .preset-art svg { width: 100%; height: 100%; display: block; }
+.preset-card[data-design='cloud'] .preset-art { background: #e4d5e5; }
+.preset-card[data-design='metro'] .preset-art { background: #aca6b9; }
+.preset-card[data-design='sakura'] .preset-art { background: #e3dcc0; }
+.preset-label { display: block; color: #8c6d48; font-size: 8px; letter-spacing: .07em; margin-bottom: 5px; }
+.preset-reset { border: 0; padding: 0; background: none; color: #7b6248; font-size: 10px; text-decoration: underline; cursor: pointer; justify-self: start; }
+.is-decorating .preset-card { grid-template-columns: 110px minmax(0, 1fr); }
+.is-decorating .preset-grid { grid-auto-columns: minmax(310px, 1fr); }
+.is-decorating .preset-card .preset-art { height: 105px; }
+.is-decorating .preset-reset { grid-column: 2; }
+body[data-design='cloud'] .stage { background: radial-gradient(ellipse at 50% 45%, #4d3c56 0, transparent 68%); }
+body[data-design='sakura'] .stage { background: radial-gradient(ellipse at 50% 45%, #464638 0, transparent 68%); }
+body[data-design='metro'] .stage { background: radial-gradient(ellipse at 50% 45%, #27334c 0, transparent 68%); }
+@media (max-width: 600px) {
+  .room-heading { flex-wrap: wrap; gap: 10px; }
+  .room-heading .heading-actions { flex-direction: row; width: 100%; justify-content: flex-end; align-items: center; margin-left: 0; }
+  .is-decorating .preset-grid { grid-auto-columns: minmax(290px, 1fr); }
+  .is-decorating .preset-card { grid-template-columns: 90px minmax(0, 1fr); }
+}
+
+.is-decorating .builder-panel[data-collection='presets'] .selection-inspector:not(:has(.selection-actions)) { display: none; }
+.is-decorating .builder-panel[data-collection='presets'] .preset-grid { max-height: calc(100% - 8px); overflow-y: auto; }

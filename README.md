@@ -20,7 +20,8 @@ The development server binds to `127.0.0.1`. Open the local URL Vite prints. Run
 - **Decorate** keeps the collection in a bottom tray. Hover furniture to highlight its outline, then drag it to a new spot. Drag it over the collection to see a faded piece and dashed return preview; release to put it away. **Undo** restores the last move or removal. Invalid drops and `Escape` return the piece to where it started.
 - Choose a collection item, move over the floor and click a valid spot to add it. Click-to-select/move and the inspector buttons also work. `R` rotates (including during a drag), arrow keys nudge, and `Escape` cancels. The last study desk stays in the room.
 - Solid furniture stays inside the room and cannot overlap other solid furniture or the cat's resting spot. Rugs can sit underneath furniture.
-- Three expansive, editable room designs: **Ember library**, **Moonlit greenhouse**, and **Writer’s loft**. **Undo** restores the preceding arrangement.
+- **Rooms** opens six editable designs. **Sakura studio** has shoji screens, tatami and cherry blossoms; **Cloud loft** has a round window, pastel checkerboard and cloud shelves; **Midnight metro** has exposed brick, steel windows and a neon city view. **Ember library**, **Moonlit greenhouse**, and **Writer’s loft** retain the original timber retreat.
+- Each room keeps its own furniture arrangement and active study desk in this browser. Switch away, decorate another room, and return later. **Reset layout** restores that design; **Undo** brings your previous arrangement back. Daylight, night and rain work in every design without interrupting your timer.
 - Select a desk and choose **Study here** to move your avatar's study spot. The last study station cannot be removed.
 - 25 / 50 / 90-minute focus sessions, pause/resume/reset, local saves, task text and completed-session history.
 - A visible local presence badge distinguishes **In your room**, **Focusing**, and **On a break**. It reflects your timer; shared online/friend presence is a future feature.
@@ -37,7 +38,7 @@ Everything is available in the prototype collection; there are no purchases. Thi
 
 ## Engine and art
 
-[Babylon.js](https://www.babylonjs.com/games/) provides the game engine, scene, orthographic camera, picking and rendering. Furniture models live in `src/furniture.js`, the collection in `src/catalog.js`, and room placement/presets in `src/layout.js`. The runtime reuses geometry and materials and batches static geometry to limit drawing work.
+[Babylon.js](https://www.babylonjs.com/games/) provides the game engine, scene, orthographic camera, picking and rendering. Furniture models live in `src/furniture.js`, the collection in `src/catalog.js`, room placement/presets in `src/layout.js`, and the new room architecture, procedural window views and furniture palettes in `src/architecture.js`. The runtime reuses geometry and materials and batches static geometry to limit drawing work.
 
 See [engine and performance notes](docs/engine-and-performance.md) for the baseline, measurement definitions and validation limits. A frame-rate measurement on one machine is not a guarantee across every browser or device.
 

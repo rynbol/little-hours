@@ -3,7 +3,7 @@ import { createRoom } from './room.js';
 import { createSession, remainingAt, formatTime } from './session.js';
 import { createStateStore, localDate, storageKey } from './state.js';
 import { FURNITURE, getFurniture } from './catalog.js';
-import { PRESETS, createLayout, normalizeLayout, MAX_ITEMS } from './layout.js';
+import { PRESETS, normalizeLayout, MAX_ITEMS, roomDesign } from './layout.js';
 import { companionIntent } from './companion.js';
 
 const icons = {
@@ -64,7 +64,7 @@ document.querySelector('#app').innerHTML = `
     </header>
     <main class="workspace">
       <section class="room-section" aria-labelledby="room-title">
-        <div class="room-heading"><div><p class="eyebrow">YOUR QUIET LITTLE WORLD</p><h1 id="room-title">The twilight retreat</h1><p class="room-subtitle" id="room-subtitle">The fire is warm. The night is yours.</p></div><div class="heading-actions"><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
+        <div class="room-heading"><div><p class="eyebrow">YOUR QUIET LITTLE WORLD</p><h1 id="room-title">The twilight retreat</h1><p class="room-subtitle" id="room-subtitle">The fire is warm. The night is yours.</p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Choose a room" aria-controls="builder-panel">${icon('home')}<span>Rooms</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
         <div class="stage" id="stage">
           <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a ginger cat. Drag to turn the room."></div>
           <div class="loading-note" id="loading-note">Making room for you…</div>
@@ -118,17 +118,19 @@ function toast(message) {
   toastTimeout = setTimeout(() => { $('#toast').hidden = true; }, 4200);
 }
 const themeCopy = {
-  dusk: ['The moonlit retreat', 'The candles are lit. Stay a little longer.'],
-  rain: ['Rain at the retreat', 'Raindrops, candlelight, and nowhere else to be.'],
-  day: ['The sunlit retreat', 'Sunlight on the books. A fresh little chapter.'],
+  dusk: 'The candles are lit. Stay a little longer.',
+  rain: 'Raindrops, candlelight, and nowhere else to be.',
+  day: 'Sunlight on the books. A fresh little chapter.',
 };
 function applyState(next, force = false) {
   const previous = state;
   state = next;
+  const design = roomDesign(state.layout);
+  document.body.dataset.design = design.style || 'retreat';
+  $('#room-title').textContent = design.name;
+  $('#room-subtitle').textContent = design.style ? ({ sakura: 'Soft light. Cherry blossoms. Room to breathe.', cloud: 'Head in the clouds. Feet on a soft little rug.', metro: 'The city hums. Your little corner is quiet.' })[design.style] : themeCopy[state.theme];
   if (force || previous.theme !== state.theme) {
     document.body.dataset.theme = state.theme;
-    $('#room-title').textContent = themeCopy[state.theme][0];
-    $('#room-subtitle').textContent = themeCopy[state.theme][1];
     room?.setTheme(state.theme);
     const [symbol, label] = state.theme === 'day' ? ['sun', 'Daylight'] : state.theme === 'rain' ? ['rain', 'Rain'] : ['moon', 'Night'];
     const nextLabel = state.theme === 'day' ? 'Switch to night' : 'Switch to daylight';
@@ -275,6 +277,7 @@ $('#focus-toggle').addEventListener('click', () => {
   else { focusCollapsed = !focusCollapsed; syncFocusDock(); }
   if (!focusCollapsed) revealFocusDock();
 });
+$('#rooms-button').addEventListener('click', () => { collectionTab = 'presets'; setEditMode(true); });
 $('#decorate-button').addEventListener('click', () => setEditMode(!editMode));
 $('#pet-button').addEventListener('click', () => { if (room) room.pet(); else petFeedback(); });
 $('#mini-button').addEventListener('click', () => {
@@ -332,7 +335,7 @@ function rememberControlFocus(container) {
   const active = document.activeElement;
   if (!container.contains(active)) return null;
   if (active.id) return { id: active.id };
-  for (const key of ['category', 'furniture', 'preset', 'nudge']) {
+  for (const key of ['category', 'furniture', 'preset', 'resetDesign', 'nudge']) {
     if (active.dataset?.[key] !== undefined) return { key, value: active.dataset[key] };
   }
   return null;
@@ -341,7 +344,8 @@ function rememberControlFocus(container) {
 function restoreControlFocus(container, remembered) {
   if (!remembered) return;
   const controls = [...container.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')];
-  const matching = controls.find(control => remembered.id ? control.id === remembered.id : control.dataset[remembered.key] === remembered.value);
+  const matching = controls.find(control => remembered.id ? control.id === remembered.id : control.dataset[remembered.key] === remembered.value)
+    || (remembered.key === 'preset' && controls.find(control => control.dataset.resetDesign === remembered.value));
   // If removal also removes its control, keep keyboard navigation in the editor.
   (matching || controls[0] || $('#decorate-button')).focus({ preventScroll: true });
 }
@@ -393,23 +397,38 @@ function furnitureArt(type) {
   return `<svg class="furniture-art" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="87" rx="35" ry="6" fill="#8c765714"/>${pieces[type] || pieces.plant}</svg>`;
 }
 
+function roomDesignArt(preset) {
+  const style = preset.style || 'retreat';
+  const [wall, side, floor, trim, sky, sofa] = ({ sakura: ['#ece1c9', '#f8ecd1', '#cbbb84', '#967650', '#eacbd0', '#a6b393'], cloud: ['#b8afd2', '#dec1d2', '#eeded7', '#f7e7db', '#becae3', '#b6a5cd'], metro: ['#424c65', '#956a6c', '#727b8c', '#293449', '#676080', '#8496ae'], retreat: ['#718572', '#c4b797', '#a77e57', '#674e3b', '#a1b6bd', '#876a79'] })[style];
+  const window = style === 'cloud' ? `<ellipse cx="111" cy="40" rx="15" ry="21" fill="${sky}" stroke="${trim}" stroke-width="4" transform="rotate(-22 111 40)"/>` : `<path d="M85 24 139 45V77L85 56Z" fill="${sky}" stroke="${trim}" stroke-width="3"/><path d="m103 31v31m18-24v31M85 41l54 21" stroke="${trim}" stroke-width="2"/>`;
+  const details = style === 'sakura' ? '<path d="M17 40v35m12-41v46m12-52v45m12-50v43M12 53l51-27M12 65l51-27" stroke="#b09066" stroke-width="1.4"/><circle cx="120" cy="50" r="3" fill="#f7d7dc"/><circle cx="114" cy="54" r="4" fill="#f0b9c5"/>' : style === 'cloud' ? '<path d="M16 54q8-18 16-8 8-17 16-6 8-10 12-5v6L16 65Z" fill="#faeadf"/><path d="m55 83 44 17m-26-26 45 17m-34-18-30 27m49-22-30 27" stroke="#d5b9bc" stroke-width="6"/>' : style === 'metro' ? '<path d="m87 54 10 4V44l8 3v14l10 4V44l8 3v21l13 5" fill="#2b3654"/><path d="m14 46 47-23m-47 32 47-23m-47 32 47-23m-47 32 47-23" stroke="#765767" stroke-width="1"/><path d="m90 27 46 18" stroke="#a7d6e4" stroke-width="2"/>' : '<path d="m14 39 46-24m22 6 56 23" stroke="#a7b79d" stroke-width="3"/><circle cx="32" cy="69" r="9" fill="#93a77d"/>';
+  return `<svg viewBox="0 0 160 130" aria-hidden="true"><path d="m10 82 60-34 80 34-59 37Z" fill="${floor}"/><path d="M10 82V36L70 6v45Z" fill="${side}"/><path d="M70 6 150 37v45L70 51Z" fill="${wall}"/>${window}${details}<path d="m20 71 39-19 23 10-39 20Z" fill="${trim}"/><path d="M24 75v15m48-21v15M43 82v15" stroke="${trim}" stroke-width="3"/><path d="m38 65 14-7 8 4-14 7Z" fill="#faf0dd"/><path d="m105 75 28 12v15l-28-12-19 10V85Z" fill="${sofa}"/><path d="m90 86 15-8 24 10-15 9Z" fill="#ded3c7"/><path d="m10 82 81 37 59-37v5l-59 37-81-37Z" fill="${trim}"/></svg>`;
+}
+
 function renderCollection() {
+  $('#builder-panel').dataset.collection = collectionTab;
   document.querySelectorAll('[data-collection-tab]').forEach(button => button.setAttribute('aria-pressed', button.dataset.collectionTab === collectionTab));
   const content = $('#collection-content');
   const rememberedFocus = rememberControlFocus(content);
   $('.collection-footnote').textContent = collectionTab === 'presets'
-    ? 'Start with a little inspiration, then make every corner your own.'
+    ? 'Each room keeps your decorations. Come back whenever the mood changes.'
     : 'Pick a piece to add it. Drag furniture back here to put it away.';
   if (collectionTab === 'presets') {
-    content.innerHTML = `<div class="preset-grid">${PRESETS.map((preset, index) => `<article class="preset-card preset-${index}"><div class="preset-art" aria-hidden="true"><span class="preset-window"></span><span class="preset-desk"></span><span class="preset-plant"></span><span class="preset-rug"></span></div><div><h3>${preset.name}</h3><p>${preset.description}</p></div><button class="quiet-button" data-preset="${preset.id}">Apply design ${icon('arrow')}</button></article>`).join('')}</div><p class="preset-note">A fresh arrangement of furniture. Your focus session stays with you, and Undo brings your room back.</p>`;
-    content.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => {
-      room?.cancelPlacement?.();
-      room?.selectItem?.(null);
-      selectedItem = null;
-      commitLayout(createLayout(button.dataset.preset));
-      toast(`${PRESETS.find(preset => preset.id === button.dataset.preset).name} is ready to make your own.`);
+    const designs = [...PRESETS.filter(preset => preset.style), ...PRESETS.filter(preset => !preset.style)];
+    content.innerHTML = `<div class="preset-grid">${designs.map(preset => {
+      const active = state.layout.presetId === preset.id, saved = Boolean(state.rooms[preset.id]);
+      return `<article class="preset-card" data-design="${preset.style || 'retreat'}" data-active="${active}"><div class="preset-art" aria-hidden="true">${roomDesignArt(preset)}</div><div><span class="preset-label">${active ? 'YOUR CURRENT ROOM' : saved ? 'SAVED ROOM' : preset.style ? 'A DIFFERENT LITTLE WORLD' : 'TIMBER RETREAT'}</span><h3>${preset.name}</h3><p>${preset.description}</p></div><button class="quiet-button" data-preset="${preset.id}" ${active ? 'disabled' : ''} aria-label="${saved ? 'Return to' : 'Enter'} ${preset.name}">${active ? "You’re here" : saved ? 'Return to room' : 'Enter room'} ${icon('arrow')}</button>${active ? `<button class="preset-reset" data-reset-design="${preset.id}">Reset layout</button>` : ''}</article>`;
+    }).join('')}</div><p class="preset-note">Six furnished rooms. Your timer travels with you; your decorations stay in each room.</p>`;
+    const useDesign = (presetId, reset = false) => {
+      room?.cancelPlacement?.(); room?.selectItem?.(null); selectedItem = null;
+      undoLayout = structuredClone(state.layout);
+      acceptUpdate(store.useRoom(presetId, reset)); $('#undo-layout').disabled = false;
+      toast(reset ? 'The original layout is back. Undo restores your decorations.' : `${roomDesign(state.layout).name}. Make yourself at home.`);
+      content.querySelector('.preset-card[data-active="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
       revealRoomForPlacement();
-    }));
+    };
+    content.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => useDesign(button.dataset.preset)));
+    content.querySelectorAll('[data-reset-design]').forEach(button => button.addEventListener('click', () => useDesign(button.dataset.resetDesign, true)));
     restoreControlFocus(content, rememberedFocus);
     return;
   }
@@ -506,7 +525,7 @@ function renderPanel() {
     panel.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click', () => {
       acceptUpdate(store.update(draft => { draft.theme = button.dataset.themeChoice; }));
     }));
-    panel.insertAdjacentHTML('beforeend', `<label class="fairy-lights"><span>Fairy lights</span><input type="checkbox" data-decor="lights" ${state.decor.lights ? 'checked' : ''}></label>`);
+    panel.insertAdjacentHTML('beforeend', `<label class="fairy-lights"><span>${roomDesign(state.layout).style ? 'Accent lights' : 'Fairy lights'}</span><input type="checkbox" data-decor="lights" ${state.decor.lights ? 'checked' : ''}></label>`);
     panel.querySelector('[data-decor]').addEventListener('change', event => acceptUpdate(store.update(draft => { draft.decor.lights = event.target.checked; })));
   } else {
     panel.insertAdjacentHTML('beforeend', `<div class="quality-options" aria-label="Room rendering quality">${[['auto', 'Adaptive'], ['high', 'Crisp'], ['battery', 'Save energy']].map(([id, label]) => `<button data-quality="${id}" aria-pressed="${quality === id}">${label}</button>`).join('')}</div><p class="performance-note">Adaptive balances detail and motion. Save energy limits animation to 30 frames per second.</p><dl class="performance-metrics" id="performance-metrics"></dl><p class="performance-note">Babylon.js engine · live measurements while this tab is visible. CPU measurements exclude GPU time.</p>`);

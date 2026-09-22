@@ -87,6 +87,26 @@ export const PRESETS = [
   },
 ];
 
+
+// Different architecture and palettes, with intentionally edited furniture lists.
+// The originals remain available as the three timber-retreat arrangements.
+const themedPreset = (id, name, style, description, sourceId, omit, additions = []) => {
+  const source = PRESETS.find(preset => preset.id === sourceId);
+  return { id, name, style, description, items: [...source.items.filter(entry => !omit.includes(entry.id)).map(entry => ({ ...entry, id: `${id}-${entry.id}` })), ...additions] };
+};
+PRESETS.push(
+  themedPreset('sakura-studio', 'Sakura studio', 'sakura', 'Shoji screens, woven tatami, paper lanterns and cherry blossoms beyond the window.', 'moonlit-greenhouse', ['green-tree-back', 'green-tree-window', 'green-tree-front', 'green-tree-right', 'green-hearth', 'green-records-side', 'green-lamp', 'green-moon-rug', 'green-window-rug', 'green-reading-rug', 'green-candles'], [
+    item('sakura-books', 'bookcase', 3.25, -3.75), item('sakura-plant', 'plant', -4.75, -3.5), item('sakura-lamp', 'floor-lamp', -5, 3.5),
+  ]),
+  themedPreset('cloud-loft', 'Cloud loft', 'cloud', 'A round sky window, blush checkerboard, lilac upholstery and shelves shaped like clouds.', 'ember-library', ['ember-hearth', 'ember-books-front', 'ember-books-right', 'ember-tree', 'ember-tree-right', 'ember-lanterns', 'ember-moon-rug'], [
+    item('cloud-books', 'bookcase', 3.25, -3.75), item('cloud-fern', 'plant', -4.75, -3.5), item('cloud-linen-rug', 'rug', 3, .5, 1),
+  ]),
+  themedPreset('midnight-metro', 'Midnight metro', 'metro', 'An exposed-brick listening loft, steel windows, soft neon and a city that stays up with you.', 'writers-loft', ['loft-hearth', 'loft-tree', 'loft-lanterns', 'loft-plant-front', 'loft-bookcase-right', 'loft-moon-rug'], [
+    item('metro-record-wall', 'low-cabinet', 4.75, -2.75, 3), item('metro-studio-rug', 'rug', 3.25, 2),
+  ]),
+);
+export function roomDesign(layout) { return PRESETS.find(preset => preset.id === layout?.presetId) || PRESETS[0]; }
+
 const isDesk = candidate => getFurniture(candidate?.type)?.category === 'Study';
 const snap = value => Math.round(value / GRID) * GRID;
 function bounds(candidate) {

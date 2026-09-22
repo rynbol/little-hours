@@ -1,11 +1,11 @@
 import { createSession, remainingAt, startSession, pauseSession } from './session.js';
-import { createLayout, normalizeLayout } from './layout.js';
+import { createLayout, normalizeLayout, PRESETS } from './layout.js';
 
 export const storageKey = 'little-hours-v1';
 const durations = [25, 50, 90];
 
 export function freshState() {
-  return { theme: 'dusk', task: '', decor: { plants: true, lights: true, rug: true }, layout: createLayout(), session: createSession(), history: [] };
+  return { theme: 'dusk', task: '', decor: { plants: true, lights: true, rug: true }, layout: createLayout(), rooms: {}, session: createSession(), history: [] };
 }
 
 export function localDate(timestamp = Date.now()) {
@@ -24,6 +24,11 @@ export function restoreState(raw) {
     if (typeof saved.decor?.[key] === 'boolean') initial.decor[key] = saved.decor[key];
   }
   if (saved.layout !== undefined) initial.layout = normalizeLayout(saved.layout);
+  for (const preset of PRESETS) {
+    const room = saved.rooms?.[preset.id];
+    if (room && room.presetId === preset.id) initial.rooms[preset.id] = normalizeLayout(room);
+  }
+  if (initial.layout.presetId) initial.rooms[initial.layout.presetId] = structuredClone(initial.layout);
   const session = saved.session;
   if (session && Number.isFinite(session.duration) && durations.includes(session.duration / 60_000)
     && Number.isFinite(session.remaining) && session.remaining >= 0 && session.remaining <= session.duration
@@ -72,7 +77,10 @@ export function createStateStore(storage, now = () => Date.now()) {
     const timestamp = now();
     const next = structuredClone(readLatest());
     const completed = completeDueSession(next, timestamp);
+    next.rooms ||= {};
+    if (next.layout.presetId) next.rooms[next.layout.presetId] = structuredClone(next.layout);
     mutate(next, { now: timestamp });
+    if (next.layout.presetId) next.rooms[next.layout.presetId] = structuredClone(next.layout);
     state = next;
     let persisted = false;
     try {
@@ -88,6 +96,10 @@ export function createStateStore(storage, now = () => Date.now()) {
     get state() { return state; },
     refresh() { state = readLatest(); return state; },
     update,
+    useRoom(presetId, reset = false) {
+      if (!PRESETS.some(preset => preset.id === presetId)) return update();
+      return update(draft => { draft.layout = structuredClone(!reset && draft.rooms[presetId] || createLayout(presetId)); });
+    },
     setRunning(running) {
       return update((draft, { now: timestamp }) => {
         draft.session = running ? startSession(draft.session, timestamp) : pauseSession(draft.session, timestamp);

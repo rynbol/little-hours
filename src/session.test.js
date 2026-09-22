@@ -163,3 +163,36 @@ test('furniture edits from a stale tab preserve the current timer and persist th
   assert.deepEqual(restored.layout, createLayout('quiet-library'));
   assert.deepEqual(createStateStore(storage).state.layout, createLayout('quiet-library'));
 });
+
+test('room visits preserve independent decorations, active desk and an ongoing focus session', () => {
+  let now = 1000;
+  const storage = memoryStorage(), store = createStateStore(storage, () => now);
+  store.useRoom('writers-loft');
+  store.update(draft => { draft.layout.items = draft.layout.items.filter(item => item.type !== 'plant'); draft.layout.activeDeskId = 'loft-writing-desk'; draft.task = 'Read chapter four'; draft.theme = 'day'; });
+  store.setRunning(true); const session = structuredClone(store.state.session), loft = structuredClone(store.state.layout);
+  now += 10000; store.useRoom('sakura-studio');
+  store.update(draft => { draft.layout.items = draft.layout.items.filter(item => item.type !== 'bookcase'); });
+  const sakura = structuredClone(store.state.layout);
+  store.useRoom('cloud-loft'); store.useRoom('writers-loft');
+  assert.deepEqual(store.state.layout, loft); assert.deepEqual(store.state.session, session);
+  assert.equal(store.state.task, 'Read chapter four'); assert.equal(store.state.theme, 'day');
+  const reopened = createStateStore(storage, () => now); reopened.useRoom('sakura-studio');
+  assert.deepEqual(reopened.state.layout, sakura);
+  reopened.useRoom('sakura-studio', true); assert.deepEqual(reopened.state.layout, createLayout('sakura-studio'));
+  reopened.update(draft => { draft.layout = sakura; }); // The editor's Undo.
+  reopened.useRoom('cloud-loft'); reopened.useRoom('sakura-studio'); assert.deepEqual(reopened.state.layout, sakura);
+});
+
+test('old saves keep their current room and saved rooms are bounded and sanitized', () => {
+  const legacy = freshState(); delete legacy.rooms; legacy.layout = createLayout('writers-loft');
+  legacy.layout.items = legacy.layout.items.filter(item => item.type !== 'plant');
+  const migrated = restoreState(JSON.stringify(legacy));
+  assert.deepEqual(migrated.layout, legacy.layout); assert.deepEqual(migrated.rooms['writers-loft'], legacy.layout);
+  const bad = { ...legacy, rooms: { unknown: createLayout(), 'cloud-loft': { presetId: 'cloud-loft', items: [] }, 'midnight-metro': createLayout('sakura-studio') } };
+  const cleaned = restoreState(JSON.stringify(bad));
+  assert.deepEqual(Object.keys(cleaned.rooms).sort(), ['cloud-loft', 'writers-loft']);
+  assert.deepEqual(cleaned.rooms['cloud-loft'], createLayout('cloud-loft'));
+  const storage = memoryStorage(), first = createStateStore(storage), second = createStateStore(storage);
+  first.useRoom('cloud-loft'); second.useRoom('midnight-metro');
+  assert.equal(second.state.rooms['cloud-loft'].presetId, 'cloud-loft', 'a stale tab keeps newly saved rooms');
+});

@@ -23,8 +23,9 @@ import '@babylonjs/core/Culling/ray.js';
 import '@babylonjs/core/Rendering/outlineRenderer.js';
 import { createFurniture, createRoundedBox, createMobileCompanion, disposeFurnitureAssets } from './furniture.js';
 import { createCompanionRoutine } from './companion.js';
+import { createArchitecture, styleFurniture } from './architecture.js';
 import { getFurniture } from './catalog.js';
-import { createLayout, normalizeLayout, validatePlacement, findFreePosition, MAX_ITEMS } from './layout.js';
+import { createLayout, normalizeLayout, validatePlacement, findFreePosition, MAX_ITEMS, roomDesign } from './layout.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -60,6 +61,7 @@ export function createRoom(container, options = {}) {
   const instrumentation = new SceneInstrumentation(scene);
   const color = value => Color3.FromHexString(value);
   const world = new TransformNode('room', scene);
+  const classicArchitecture = new TransformNode('architecture-retreat', scene); classicArchitecture.parent = world;
   const decor = { plants: new TransformNode('window-greenery', scene), lights: new TransformNode('fairy-lights', scene), rug: new TransformNode('legacy-rug', scene) };
   Object.values(decor).forEach(group => { group.parent = world; });
   const materials = new Map();
@@ -75,26 +77,26 @@ export function createRoom(container, options = {}) {
   };
   const palette = { cream: material('#c9bba2'), sage: material('#80917d'), wood: material('#926747'), darkWood: material('#503d30'), edge: material('#ac8357'), linen: material('#ebe1cc'), green: material('#758876'), dark: material('#4d5148'), brass: material('#bf9762', { metalness: 0.45 }), ginger: material('#c8884d'), gingerLight: material('#dda467'), leaf: material('#718b59') };
   let meshId = 0;
-  function finish(mesh, mat, position, parent = world, shadow = true) {
+  function finish(mesh, mat, position, parent = classicArchitecture, shadow = true) {
     mesh.material = mat; mesh.position.set(...position); mesh.parent = parent;
     mesh.receiveShadows = true; mesh.isPickable = false; mesh.metadata = { castShadow: shadow }; return mesh;
   }
-  function box(size, position, mat, radius = 0, parent = world) {
+  function box(size, position, mat, radius = 0, parent = classicArchitecture) {
     return finish(radius > 0 ? createRoundedBox(`box-${meshId++}`, size, radius, scene) : MeshBuilder.CreateBox(`box-${meshId++}`, { width: size[0], height: size[1], depth: size[2] }, scene), mat, position, parent);
   }
-  function sphere(size, position, mat, parent = world) {
+  function sphere(size, position, mat, parent = classicArchitecture) {
     const mesh = finish(MeshBuilder.CreateSphere(`soft-${meshId++}`, { diameter: 2, segments: 10 }, scene), mat, position, parent);
     mesh.scaling.set(...size); return mesh;
   }
-  function cylinder(top, bottom, height, position, mat, parent = world, segments = 16) {
+  function cylinder(top, bottom, height, position, mat, parent = classicArchitecture, segments = 16) {
     return finish(MeshBuilder.CreateCylinder(`turned-${meshId++}`, { diameterTop: top * 2, diameterBottom: bottom * 2, height, tessellation: segments }, scene), mat, position, parent);
   }
-  function rod(a, b, radius, mat, parent = world) {
+  function rod(a, b, radius, mat, parent = classicArchitecture) {
     const start = Vector3.FromArray(a), end = Vector3.FromArray(b), direction = end.subtract(start);
     const mesh = cylinder(radius, radius, direction.length(), [0, 0, 0], mat, parent, 8);
     mesh.position.copyFrom(start.add(end).scale(0.5)); mesh.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), direction.normalize(), new Quaternion()); return mesh;
   }
-  function tube(points, radius, mat, parent = world) {
+  function tube(points, radius, mat, parent = classicArchitecture) {
     return finish(MeshBuilder.CreateTube(`curve-${meshId++}`, { path: points.map(point => Vector3.FromArray(point)), radius, tessellation: 6, cap: Mesh.CAP_ALL }, scene), mat, [0, 0, 0], parent);
   }
   function drawing(width, height, draw, name) {
@@ -102,7 +104,7 @@ export function createRoom(container, options = {}) {
     const context = element.getContext('2d'); draw(context, width, height);
     const texture = new DynamicTexture(name, element, scene, false); texture.update(true); return texture;
   }
-  function picture(width, height, texture, position, parent = world) {
+  function picture(width, height, texture, position, parent = classicArchitecture) {
     const mat = new StandardMaterial(`picture-${meshId++}`, scene); mat.disableLighting = true; mat.emissiveTexture = texture; mat.diffuseColor = Color3.Black(); mat.backFaceCulling = false;
     return finish(MeshBuilder.CreatePlane(`print-${meshId++}`, { width, height }, scene), mat, position, parent, false);
   }
@@ -270,7 +272,7 @@ export function createRoom(container, options = {}) {
   }, 'moon-herbarium');
   box([1.04, 1.40, 0.08], [0.72, 3.45, -4.40], palette.darkWood, 0.025); picture(0.88, 1.23, artTexture, [0.72, 3.45, -4.35]);
   box([0.74, 1.02, 0.08], [5.04, 3.63, -4.40], palette.edge, 0.025); picture(0.60, 0.86, artTexture, [5.04, 3.63, -4.35]);
-  const wallClock = new TransformNode('moon-clock', scene); wallClock.parent = world; wallClock.position.set(-5.79, 4.56, 1.76); wallClock.rotation.y = Math.PI / 2;
+  const wallClock = new TransformNode('moon-clock', scene); wallClock.parent = classicArchitecture; wallClock.position.set(-5.79, 4.56, 1.76); wallClock.rotation.y = Math.PI / 2;
   const rim = cylinder(0.43, 0.43, 0.08, [0, 0, 0], palette.brass, wallClock, 32); rim.rotation.x = Math.PI / 2;
   const face = cylinder(0.37, 0.37, 0.015, [0, 0, 0.05], material('#e5d4ac'), wallClock, 32); face.rotation.x = Math.PI / 2;
   const clockMotion = new TransformNode('clock-movement', scene); clockMotion.parent = wallClock;
@@ -351,7 +353,7 @@ export function createRoom(container, options = {}) {
       merged.freezeWorldMatrix();
     }
   }
-  batchStatic(world, new Set([cat, heart, clockMotion, ...Object.values(decor)])); Object.values(decor).forEach(group => batchStatic(group, new Set(swayingLanterns)));
+  batchStatic(classicArchitecture, new Set([clockMotion])); Object.values(decor).forEach(group => batchStatic(group, new Set(swayingLanterns)));
   const rainSeeds = Array.from({ length: 40 }, (_, i) => { const x = -4.7 + ((i * 0.618033) % 1) * 3.98; return { x, y: (i * 0.371) % 1, speed: 0.55 + (i % 4) * 0.12, top: archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2)) - 0.12 }; });
   const rainLines = rainSeeds.map(seed => [new Vector3(seed.x, 2, -4.52), new Vector3(seed.x - 0.025, 2.18, -4.52)]);
   const rain = MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, updatable: true }, scene); rain.color = color('#fffdf5'); rain.alpha = 0.6; rain.isPickable = false; rain.setEnabled(false);
@@ -414,6 +416,9 @@ export function createRoom(container, options = {}) {
   const streakMaterial = new StandardMaterial('warm-shooting-star', scene); streakMaterial.disableLighting = true; streakMaterial.emissiveColor = color('#ffe8b7'); streakMaterial.backFaceCulling = false; streakMaterial.alpha = 0;
   shootingStar.material = streakMaterial; shootingStar.hasVertexAlpha = true; shootingStar.parent = world; shootingStar.isPickable = false; shootingStar.receiveShadows = false; shootingStar.position.set(-3.52, 4.63, -4.57);
   shootingStar.metadata = { castShadow: false, effect: 'window-shooting-star', delaySeconds: 3, periodSeconds: 14, durationSeconds: 1.6 }; shootingStar.setEnabled(false);
+  const windowEffects = new TransformNode('window-atmosphere', scene); windowEffects.parent = world;
+  for (const mesh of [rain, skyStars, shootingStar]) mesh.parent = windowEffects;
+  let architecture = null, architectureStyle = 'retreat';
   const furnitureRoot = new TransformNode('placed-furniture', scene), placedObjects = new Map(), settlingPieces = new Map(), animatedObjects = [];
   const decorVisible = { plants: true, lights: true, rug: true };
   let layout = createLayout(), selectedId = null, editing = false, placement = null, ghost = null, marker = null, lastPlacementState = '';
@@ -483,6 +488,20 @@ export function createRoom(container, options = {}) {
     marker.color = color('#b77d38'); marker.position.set(item.x, 0.30, item.z); marker.rotation.y = item.rotation * Math.PI / 2; marker.isPickable = false; marker.metadata = { castShadow: false };
   }
   function syncFurniture(settleNew = false) {
+    const nextStyle = roomDesign(layout).style || 'retreat';
+    if (architectureStyle !== nextStyle) {
+      architecture?.dispose(); architecture = null; architectureStyle = nextStyle;
+      for (const object of placedObjects.values()) object.dispose(false, false);
+      placedObjects.clear(); settlingPieces.clear();
+      if (nextStyle !== 'retreat') architecture = createArchitecture(nextStyle, scene);
+      classicArchitecture.setEnabled(nextStyle === 'retreat');
+      decor.plants.setEnabled(nextStyle === 'retreat' && decorVisible.plants);
+      decor.lights.setEnabled(nextStyle === 'retreat' && decorVisible.lights);
+      moths.setEnabled(nextStyle !== 'metro');
+      const scale = (architecture?.window.width || 4.2) / 4.2;
+      windowEffects.scaling.x = scale; windowEffects.position.x = (architecture?.window.x ?? -2.7) + 2.7 * scale;
+      architecture?.setTheme(theme); architecture?.setLights(decorVisible.lights);
+    }
     if (!settleNew) { for (const { object } of settlingPieces.values()) object.scaling.setAll(1); settlingPieces.clear(); }
     const ids = new Set(layout.items.map(item => item.id));
     for (const [id, object] of placedObjects) if (!ids.has(id)) { settlingPieces.delete(id); object.dispose(false, false); placedObjects.delete(id); }
@@ -491,7 +510,7 @@ export function createRoom(container, options = {}) {
       let object = placedObjects.get(item.id);
       if (object && object.metadata.furnitureType !== item.type) { settlingPieces.delete(item.id); object.dispose(false, false); placedObjects.delete(item.id); object = null; }
       if (!object) {
-        object = createFurniture(item.type, scene); object.parent = furnitureRoot;
+        object = createFurniture(item.type, scene); styleFurniture(object, architectureStyle); object.parent = furnitureRoot;
         object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type;
         object.getChildMeshes().forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = !mesh.metadata?.effect; });
         placedObjects.set(item.id, object);
@@ -586,7 +605,7 @@ export function createRoom(container, options = {}) {
   function setTheme(name) {
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
     const daylight = theme === 'day', night = theme === 'dusk';
-    paintSky(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
+    paintSky(theme); architecture?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
     if (!night) { shootingStar.setEnabled(false); streakMaterial.alpha = 0; }
     sun.diffuse = color(daylight ? '#fff1d2' : night ? '#c5ccec' : '#d5dfeb');
     sun.intensity = daylight ? 1.6 : night ? 0.62 : 0.82;
@@ -876,9 +895,9 @@ export function createRoom(container, options = {}) {
     setTheme, setLayout, setEditMode, selectItem, beginPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setQuality,
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet,
-    setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); decor[key]?.setEnabled(Boolean(value)); syncFurniture(); },
+    setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); if (key === 'lights') architecture?.setLights(Boolean(value)); syncFurniture(); },
     resetView() { camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, companion: companionRoutine.diagnostics(), dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
-    dispose() { if (disposed) return; cancelDrag(); disposed = true; cancelAnimationFrame(frame); observer.disconnect(); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; instrumentation.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    diagnostics() { return { scene, engine, camera, architectureStyle, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, companion: companionRoutine.diagnostics(), dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    dispose() { if (disposed) return; cancelDrag(); disposed = true; cancelAnimationFrame(frame); observer.disconnect(); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

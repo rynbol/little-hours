@@ -464,6 +464,29 @@ try {
     else delete performance.now;
   }
   console.log('PASS adaptive quality: intentional idle keeps resolution; visible stalls remain in frame metrics.');
+  motion.matches = true; motion.emit('change', { matches: true });
+  const beforeDesignLayout = diagnostics().layout;
+  const designCounts = new Map();
+  for (let cycle = 0; cycle < 3; cycle++) for (const [id, style] of [['sakura-studio', 'sakura'], ['cloud-loft', 'cloud'], ['midnight-metro', 'metro'], ['writers-loft', 'retreat']]) {
+    room.setEditMode(false); room.setLayout(createLayout(id)); advance(3);
+    assert.equal(diagnostics().architectureStyle, style);
+    const shell = scene.getTransformNodeByName(`architecture-${style}`); assert.ok(shell?.isEnabled());
+    assert.equal(scene.getTransformNodeByName('architecture-retreat').isEnabled(), style === 'retreat');
+    if (style !== 'retreat') {
+      assert.ok(shell.getChildMeshes().length <= 6, 'architecture is batched into at most six meshes');
+      for (const mesh of shell.getChildMeshes()) { assert.equal(mesh.isPickable, false); for (const value of mesh.getVerticesData('position')) assert.ok(Number.isFinite(value)); }
+      assert.equal(scene.getTransformNodeByName('fairy-lights').isEnabled(), false, 'the original decor stays inside the retreat');
+      room.setDecor('lights', false); assert.ok(shell.getChildMeshes().filter(mesh => mesh.name.endsWith('-accent')).every(mesh => !mesh.isEnabled()));
+      room.setTheme('day'); room.setTheme('rain'); room.setTheme('dusk'); room.setDecor('lights', true); advance(2);
+      room.setActivity('break'); advance(2); assert.equal(diagnostics().companion.state, 'resting', 'reduced motion still reaches a seat');
+      room.setActivity('idle'); advance(2);
+    }
+    const counts = [scene.meshes.length, scene.materials.length, scene.textures.length, scene.geometries.length];
+    if (cycle === 1) designCounts.set(id, counts);
+    if (cycle === 2) assert.deepEqual(counts, designCounts.get(id), 'repeated visits release old architecture and recolored geometry');
+  }
+  room.setLayout(beforeDesignLayout); advance(3);
+  console.log('PASS designs: four distinct shells, all new rooms usable, batched geometry, preserved decor, day/night/rain and stable assets across repeated visits.');
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);
   room.dispose(); assert.equal(frames.size, 0); assert.equal(motion.listenerCount, 0); assert.equal(doc.listenerCount, 0); assert.equal(canvas.listenerCount, 0); assert.equal(win.listenerCount, 0);
