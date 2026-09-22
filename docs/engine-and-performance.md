@@ -164,3 +164,13 @@ The cached sun shadow cannot darken floor that a wall already shades, so in dayl
 The sun shadow now uses hardware percentage-closer filtering (medium quality) instead of Poisson sampling, which removes the grain along shadow edges. The existing bias still suppresses floorboard acne. Babylon falls back to Poisson sampling on WebGL1.
 
 Verification: 44 unit tests and all runtime groups pass; the drag-outline check now excludes the shade mesh, which is deliberately never outlined. Headless Chrome on the Metal GPU (1440 × 900, device pixel ratio 2, Adaptive, 1.50 render pixel ratio) compared the same presets before and after. Ember library at night stayed at 60 fps with 16.7 ms frame-interval p95, moving from 123 to 142 draw calls and 205,758 to 219,516 triangles. Writer’s loft in daylight moved from 124 to 143 draw calls, and Midnight metro at night from 72 to 87, both at 60 fps. Headless measurements are not a guarantee for a visible browser window or other devices.
+
+## Native-density rendering
+
+Adaptive quality used to cap the render at 1.5× device pixels, so a 2× Retina display showed an upscaled image. Adaptive and Crisp now start at the display's own density, capped at 2×, so one canvas pixel lands on one screen pixel; Save energy stays at 1×. Only Adaptive steps down, still by 0.25 after three slow seconds.
+
+Previously a single slow moment lowered the resolution for the rest of the visit. Adaptive now steps back up by 0.25 after eight steady seconds (58 fps or better, no slow CPU samples, not reduced motion). If a step up turns slow again within fifteen seconds, that level becomes the ceiling until the viewer picks a quality setting again, so a borderline device settles instead of oscillating.
+
+The cached sun shadow map is now 2048 texels (about 1.2 cm per texel instead of 2.3 cm). It redraws only when lighting or casters change, so the cost is GPU memory and an occasional redraw rather than per-frame work. The existing bias showed no acne on floorboards or tatami in daylight.
+
+Verification: 44 unit tests and all runtime groups pass, including a new adaptive check (slow frames step down, steady frames restore full resolution, a failed step up becomes the ceiling, and choosing a quality resets it). Headless Chrome on the Metal GPU (1440 × 900, device pixel ratio 2) rendered at 1.50× before and 2.00× after in all eight captured scenes. Ember library at night, Writer’s loft in daylight and Midnight metro at night all held 60 fps with unchanged draw calls (142, 143, 87) and triangles. The Performance panel reports CPU time only; the extra 78% of pixels is GPU work it cannot show, so slower GPUs rely on Adaptive stepping down.

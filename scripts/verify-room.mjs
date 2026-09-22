@@ -460,11 +460,20 @@ try {
     motion.matches = false; motion.emit('change', { matches: false }); stats.length = 0;
     time += 750; advance(); time += 750; advance();
     assert.ok(stats.at(-1)?.p95FrameMs >= 750, 'visible frame stalls must not be filtered out of p95');
+    // Slow frames step down; steady frames bring the detail back. A step up
+    // that stalls again becomes the ceiling for the rest of the visit.
+    const run = (seconds, frameMs) => { for (let elapsed = 0; elapsed < seconds * 1000; elapsed += frameMs) { time += frameMs - 1000 / 60; advance(); } };
+    room.setQuality('auto'); const fullRatio = diagnostics().pixelRatio;
+    run(4, 50); assert.equal(diagnostics().pixelRatio, fullRatio - 0.25, 'sustained slow frames lower resolution one step');
+    run(9, 1000 / 60); assert.equal(diagnostics().pixelRatio, fullRatio, 'eight steady seconds restore full resolution');
+    run(4, 50); assert.equal(diagnostics().pixelRatio, fullRatio - 0.25, 'a step up that stalls again steps back down');
+    run(12, 1000 / 60); assert.equal(diagnostics().pixelRatio, fullRatio - 0.25, 'the level that stalled stays out of reach for this visit');
+    room.setQuality('auto'); assert.equal(diagnostics().pixelRatio, fullRatio, 'choosing a quality again resets the ceiling');
   } finally {
     if (clockDescriptor) Object.defineProperty(performance, 'now', clockDescriptor);
     else delete performance.now;
   }
-  console.log('PASS adaptive quality: intentional idle keeps resolution; visible stalls remain in frame metrics.');
+  console.log('PASS adaptive quality: intentional idle keeps resolution; visible stalls remain in frame metrics; steady frames restore detail below a learned ceiling.');
   motion.matches = true; motion.emit('change', { matches: true });
   const beforeDesignLayout = diagnostics().layout;
   const designCounts = new Map();

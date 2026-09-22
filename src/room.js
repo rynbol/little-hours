@@ -138,11 +138,13 @@ export function createRoom(container, options = {}) {
   const sun = new DirectionalLight('window-sun', new Vector3(3, -8, -5).normalize(), scene); sun.position.set(-5, 10, 6); sun.intensity = 0.85; sun.diffuse = color('#ffdaaa');
   sun.shadowMinZ = 0.5; sun.shadowMaxZ = 35; sun.autoUpdateExtends = false;
   sun.orthoLeft = -10; sun.orthoRight = 10; sun.orthoTop = 10; sun.orthoBottom = -10;
-  // The 20-unit ortho span (24 with Babylon's padding) at 1024 texels needs
-  // enough depth bias to keep filtered samples from shadowing the floor itself.
-  // Hardware PCF gives smooth edges instead of Poisson grain; Babylon falls
-  // back to Poisson sampling on WebGL1.
-  const shadow = new ShadowGenerator(1024, sun); shadow.usePercentageCloserFiltering = true; shadow.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+  // The 20-unit ortho span (24 with Babylon's padding) at 2048 texels gives
+  // about 1.2 cm per texel. The map is cached, so the finer map costs memory
+  // and an occasional redraw, not per-frame work. The depth bias still keeps
+  // filtered samples from shadowing the floor itself. Hardware PCF gives
+  // smooth edges instead of Poisson grain; Babylon falls back to Poisson
+  // sampling on WebGL1.
+  const shadow = new ShadowGenerator(2048, sun); shadow.usePercentageCloserFiltering = true; shadow.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
   shadow.bias = 0.002; shadow.normalBias = 0.02; shadow.darkness = 0.24;
   shadow.getShadowMap().refreshRate = 0;
   const windowGlow = new PointLight('window-lamplight', new Vector3(-2.7, 2.7, -3.3), scene); windowGlow.diffuse = color('#ffc178'); windowGlow.intensity = 1.0; windowGlow.range = 6;
@@ -514,7 +516,10 @@ export function createRoom(container, options = {}) {
   const ghostMaterial = new StandardMaterial('placement-preview', scene); ghostMaterial.diffuseColor = color('#85ac80'); ghostMaterial.emissiveColor = color('#42653f'); ghostMaterial.alpha = 0.43; ghostMaterial.disableLighting = true;
   let theme = 'dusk', focused = false, petStart = -Infinity, disposed = false, readyReported = false;
   let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true;
-  let quality = 'auto', pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5), statsStart = 0, intervalTotal = 0, sampleFrames = 0, slowSamples = 0;
+  // Adaptive and Crisp both start at the display's own density (capped at 2×),
+  // so one canvas pixel lands on one screen pixel; only Adaptive steps down.
+  const nativeRatio = () => Math.min(window.devicePixelRatio || 1, 2);
+  let quality = 'auto', pixelRatio = nativeRatio(), ratioCeiling = pixelRatio, raisedAt = -Infinity, statsStart = 0, intervalTotal = 0, sampleFrames = 0, slowSamples = 0, steadySamples = 0;
   const intervals = [], submissions = [];
   engine.setHardwareScalingLevel(1 / pixelRatio);
   const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -865,7 +870,8 @@ export function createRoom(container, options = {}) {
   }
   scene.onBeforeRenderObservable.add(() => { if (fitAlpha !== camera.alpha || fitBeta !== camera.beta) fitRoom(); });
   function resize() { const width = Math.max(1, container.clientWidth), height = Math.max(1, container.clientHeight); canvasAspect = width / height; engine.setSize(Math.round(width * pixelRatio), Math.round(height * pixelRatio)); fitRoom(); requestRender(); }
-  function setQuality(value) { quality = ['auto', 'battery', 'high'].includes(value) ? value : 'auto'; pixelRatio = Math.min(window.devicePixelRatio || 1, quality === 'battery' ? 1 : quality === 'high' ? 2 : 1.5); engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; bloom.isEnabled = quality !== 'battery'; resize(); }
+  function applyPixelRatio(value) { pixelRatio = value; engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; steadySamples = 0; resize(); }
+  function setQuality(value) { quality = ['auto', 'battery', 'high'].includes(value) ? value : 'auto'; ratioCeiling = quality === 'battery' ? Math.min(window.devicePixelRatio || 1, 1) : nativeRatio(); raisedAt = -Infinity; bloom.isEnabled = quality !== 'battery'; applyPixelRatio(ratioCeiling); }
   const observer = new ResizeObserver(resize); observer.observe(container);
   mobileCompanion = createMobileCompanion(scene);
   companionRoutine = createCompanionRoutine(status => {
@@ -957,7 +963,13 @@ export function createRoom(container, options = {}) {
     const fps = sampleFrames * 1000 / (now - statsStart), p95FrameMs = sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)] || 0, p95SubmitMs = cpu[Math.max(0, Math.ceil(cpu.length * 0.95) - 1)] || 0;
     options.onStats?.({ fps, frameMs: intervals.length ? intervalTotal / intervals.length : 0, p95FrameMs, submitMs: submissions.reduce((total, value) => total + value, 0) / submissions.length, p95SubmitMs, cpuRenderMsP95: p95SubmitMs, drawCalls: instrumentation.drawCallsCounter.current, triangles: Math.round(scene.getActiveIndices() / 3), pixelRatio, quality, engine: 'Babylon.js' });
     if (quality === 'auto') { // On-demand idle time is intentional, so it must never count as slow rendering.
-      slowSamples = (!reducedMotion && fps < 55) || p95SubmitMs > 12 ? slowSamples + 1 : 0; if (slowSamples >= 3 && pixelRatio > 0.75) { pixelRatio = Math.max(0.75, pixelRatio - 0.25); engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; bloom.isEnabled = quality !== 'battery'; resize(); } }
+      // Detail returns after eight steady seconds, so one busy moment no longer
+      // costs the whole visit. A step up that turns slow again within fifteen
+      // seconds lowers the ceiling instead of oscillating.
+      const slow = (!reducedMotion && fps < 55) || p95SubmitMs > 12;
+      slowSamples = slow ? slowSamples + 1 : 0; steadySamples = !slow && !reducedMotion && fps >= 58 ? steadySamples + 1 : 0;
+      if (slowSamples >= 3 && pixelRatio > 0.75) { if (now - raisedAt < 15000) ratioCeiling = pixelRatio - 0.25; applyPixelRatio(Math.max(0.75, pixelRatio - 0.25)); }
+      else if (steadySamples >= 8 && pixelRatio < ratioCeiling) { raisedAt = now; applyPixelRatio(Math.min(ratioCeiling, pixelRatio + 0.25)); } }
     statsStart = now; sampleFrames = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0;
   }
   function tick(now) {
