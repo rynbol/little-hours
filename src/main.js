@@ -214,7 +214,7 @@ function renderSession() {
     button.setAttribute('aria-pressed', Number(button.dataset.minutes) * 60000 === state.session.duration);
     button.disabled = state.session.running;
   });
-  $('#daily-note').textContent = minutes ? `${minutes} quiet minutes made today. Look at you go.` : 'Good things begin with a little time.';
+  $('#daily-note').textContent = minutes ? `${minutes} quiet minutes made today. Look at you go.` : presence === 'focusing' ? 'Your companion is working alongside you.' : presence === 'break' ? 'Take your time. Your companion is resting too.' : 'Start focusing to work alongside your companion.';
 }
 function tick() {
   if (state.session.running && remainingAt(state.session) <= 0) acceptUpdate(store.update());

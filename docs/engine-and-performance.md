@@ -93,3 +93,16 @@ Production preview, Ember library, dusk, 1280 × 720 viewport at browser device 
 The brief shooting-star effect adds its small draw while visible. These measurements cover one browser/device and scene; they do not prove universal 60 fps. Frequent screenshot capture can itself interrupt frame scheduling, so its intervals were not used as the warm sample. The normal narrow-screen check at 390 × 844 kept the full room framed and reported document width equal to viewport width.
 
 The final code passes 33 unit tests, thirteen native NullEngine verification groups, and the production build. Browser checks separately compared cat/floor shadows, observed the new particle and moth motion over multiple frames, exercised focus/reset and both performance modes, checked a narrow viewport, and found no production-page console errors. The main JavaScript chunk is approximately 318 KB gzipped plus lazy shader chunks; Vite still reports its size advisory.
+
+
+## Seated avatar and camera refinement
+
+The avatar now has a profiled knit torso, rounded shoulder/elbow joints, and tapered sleeves. Both sleeve segments share elbow anchors above the tabletop; wrists follow the hands while the legs remain planted. The previous elbows were below the desk surface, which hid the connecting geometry and made the forearms appear detached. The single upper-body mesh now updates retained position and normal buffers together so its lighting follows each pose, without adding draw calls.
+
+Focus begins with a short settling motion into typing or writing, followed by trackpad use and thinking pauses. Typing taps lift the hands by at most 2.4 cm. Pausing rests the hands; reduced motion restores the exact neutral geometry and normals. An eleven-second sampled test checks both arm joints and desk/laptop clearance across the full cycle, alongside hidden-avatar and shared-asset checks.
+
+Miso breathes on a 4.8-second cycle with a shorter inhale and longer exhale. The upper flank rises up to 7.5%, with the belly anchored and the head, paws and tail base remaining planted. Fur and stripes share one transform. The cat still avoids sampling the stale cached self-shadow that caused its earlier pixel artifacts.
+
+Camera azimuth now spans 10°–80° instead of roughly 32°–70°. Elevation spans 15°–67.5° instead of roughly 25°–50°. Automatic orthographic framing is checked at nine angles across five aspect ratios. The original home view, inertial reset, and fixed camera distance remain.
+
+This checkpoint passes 34 unit tests, thirteen runtime verification groups, and the production build. The main JavaScript chunk is approximately 319 KB gzipped plus lazy shader chunks. Browser checks inspected the working loop across captured frames and both new camera extremes, then verified Reset restores the original composition. In the current Writer’s loft at a 966 × 1044 viewport, one warm Adaptive sample reported 60 fps, 17.5 ms frame-interval p95, 2.3 ms CPU-render p95, 126 draw calls and a 1.50 render pixel ratio. The preview had no captured console errors. These are observations on this browser/device, not a cross-device FPS guarantee.

@@ -44,8 +44,10 @@ export function createRoom(container, options = {}) {
   const camera = new ArcRotateCamera('whole-room-camera', alphaHome, betaHome, 19, targetHome.clone(), scene);
   camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
   camera.minZ = 0.1; camera.maxZ = 80;
-  camera.lowerAlphaLimit = 0.55; camera.upperAlphaLimit = 1.22;
-  camera.lowerBetaLimit = 0.7; camera.upperBetaLimit = 1.13;
+  // A wider open-side orbit, from low desk-level views to looking into the room.
+  // Stay in front of both solid walls; fitRoom keeps the dollhouse in frame.
+  camera.lowerAlphaLimit = Math.PI / 18; camera.upperAlphaLimit = Math.PI * 4 / 9;
+  camera.lowerBetaLimit = Math.PI / 8; camera.upperBetaLimit = Math.PI * 5 / 12;
   camera.lowerRadiusLimit = camera.upperRadiusLimit = 19;
   camera.inertia = 0.82; camera.panningSensibility = 0;
   camera.angularSensibilityX = camera.angularSensibilityY = 700;
@@ -639,10 +641,16 @@ export function createRoom(container, options = {}) {
     shootingStar.position.set(-3.52 + streakProgress * 1.04, 4.63 - streakProgress * 0.48, -4.57); streakMaterial.alpha = streakVisible ? Math.sin(streakProgress * Math.PI) * 0.9 : 0;
     hearthGlow.intensity = (theme === 'dusk' ? 1.0 : 0.65) + (reducedMotion ? 0 : Math.sin(seconds * 2.1) * 0.07 + Math.sin(seconds * 4.1) * 0.04);
     const petAge = (now - petStart) / 1000, beingPet = petAge >= 0 && petAge < 1.6;
-    const breathing = reducedMotion ? 0 : Math.sin(seconds * 1.2);
-    catTorso.scaling.set(1, 1 + breathing * 0.014, 1 + breathing * 0.004);
-    // Anchor the underside while the upper flank expands by a few millimeters.
-    catTorso.position.y = breathing * 0.014 * 0.03;
+    const breathPhase = seconds % 4.8;
+    // A soft inhale, then a longer exhale; enough flank movement to read from
+    // the room camera. One transform moves fur and stripes together.
+    const breathing = reducedMotion ? 0 : breathPhase < 1.7
+      ? (1 - Math.cos(breathPhase / 1.7 * Math.PI)) / 2
+      : (1 + Math.cos((breathPhase - 1.7) / 3.1 * Math.PI)) / 2;
+    catTorso.scaling.set(1, 1 + breathing * 0.075, 1 + breathing * 0.028);
+    // Keep the underside, paws and head planted. Cat meshes intentionally do
+    // not receive the cached self-shadow that previously caused pixel noise.
+    catTorso.position.y = breathing * 0.075 * 0.03;
     const petEase = beingPet && !reducedMotion ? Math.sin(petAge / 1.6 * Math.PI) : 0;
     catHead.rotation.z = petEase ? -petEase * 0.025 : 0;
     const tailPhase = (seconds + 4.5) % 13.8 / 1.8;

@@ -221,9 +221,22 @@ test('the avatar types at its laptop, writes at its journal, and rests its hands
       furniture.metadata.animate(2.4, false, false);
       assert.deepEqual(hands.map(hand => hand.position.asArray()), [[-0.21, 1.37, -0.94], [0.21, 1.37, -0.94]]);
       furniture.metadata.animate(9.8, true, true);
-      assert.deepEqual(head.position.asArray(), [0, 1.72, -0.17]);
+      assert.deepEqual(head.position.asArray(), [0, 1.80, -0.17]);
       assert.deepEqual(head.rotation.asArray(), [0, 0, 0]);
       hands.forEach(hand => assert.deepEqual(hand.rotation.asArray(), [0, 0, 0]));
+      // Starting at what used to be the global clock's thinking phase must
+      // still produce visible work promptly, including after a pause.
+      furniture.metadata.animate(18.2, true, false);
+      furniture.metadata.animate(18.7, true, false);
+      assert.ok(head.position.z < -0.28, 'a new session settles visibly toward the desk');
+      furniture.metadata.animate(19, false, false);
+      furniture.metadata.animate(28.7, true, false);
+      furniture.metadata.animate(29.2, true, false);
+      assert.ok(head.position.z < -0.28, 'resuming starts work instead of a clock-dependent pause');
+      if (type === 'study-desk') {
+        furniture.metadata.animate(33.65, true, false);
+        assert.ok(Math.abs(hands[1].position.x - 0.025) < 1e-5 && Math.abs(hands[1].position.z + 0.76) < 1e-5, 'the right hand reaches the actual trackpad');
+      }
       furniture.dispose();
     }
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
@@ -353,7 +366,7 @@ test('typing and thinking move the upper body with connected wrists, grounded le
       const wristIndices = [-1, 1].map(side => {
         let closest = -1, distance = Infinity;
         for (let index = 0; index < neutralUpper.length; index += 3) {
-          const squared = (neutralUpper[index] - side * 0.21) ** 2 + (neutralUpper[index + 1] - 1.35) ** 2 + (neutralUpper[index + 2] + 0.86) ** 2;
+          const squared = (neutralUpper[index] - side * 0.21) ** 2 + (neutralUpper[index + 1] - 1.37) ** 2 + (neutralUpper[index + 2] + 0.87) ** 2;
           if (squared < distance) { closest = index; distance = squared; }
         }
         assert.ok(distance < 1e-10, 'forearm has an exact wrist attachment'); return closest;
@@ -364,13 +377,13 @@ test('typing and thinking move the upper body with connected wrists, grounded le
         for (let side = 0; side < 2; side++) {
           const index = wristIndices[side], hand = hands[side].position;
           assert.ok(Math.abs(positions[index] - hand.x) < 1e-5);
-          assert.ok(Math.abs(positions[index + 1] - (hand.y - 0.02)) < 1e-5);
-          assert.ok(Math.abs(positions[index + 2] - (hand.z + 0.08)) < 1e-5);
+          assert.ok(Math.abs(positions[index + 1] - hand.y) < 1e-5);
+          assert.ok(Math.abs(positions[index + 2] - (hand.z + 0.07)) < 1e-5);
         }
       }
-      furniture.metadata.animate(1.7, true, false); const workingHeadZ = head.position.z;
-      furniture.metadata.animate(8.2, true, false);
-      assert.ok(head.position.z - workingHeadZ > 0.06, 'a thinking pause changes the seated lean visibly');
+      furniture.metadata.animate(2.7, true, false); const workingHeadZ = head.position.z;
+      furniture.metadata.animate(8.5, true, false);
+      assert.ok(head.position.z - workingHeadZ > 0.14, 'a thinking pause changes the seated lean visibly at room scale');
       assert.deepEqual(hands.map(hand => hand.position.asArray()), [[-0.21, 1.37, -0.94], [0.21, 1.37, -0.94]]);
       assert.deepEqual(Array.from(legs.getChildMeshes()[0].getVerticesData('position')), legPositions);
       assert.deepEqual(legs.position.asArray(), [0, 0, 0]); assert.deepEqual(legs.rotation.asArray(), [0, 0, 0]);
@@ -380,7 +393,53 @@ test('typing and thinking move the upper body with connected wrists, grounded le
       assert.notDeepEqual(Array.from(steam.getVerticesData('position')), beforeSteam);
       avatar.setEnabled(true); furniture.metadata.animate(22, true, true);
       assert.deepEqual(Array.from(upper.getVerticesData('position')), neutralUpper);
-      assert.deepEqual(head.position.asArray(), [0, 1.72, -0.17]);
+      assert.deepEqual(head.position.asArray(), [0, 1.80, -0.17]);
+      furniture.dispose();
+    }
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('sleeves stay joined at both elbows and above the tabletop throughout typing, trackpad use, and writing', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    for (const type of ['study-desk', 'writing-desk']) {
+      const furniture = createFurniture(type, scene), avatar = furniture.metadata.avatar;
+      const upper = avatar.getChildMeshes().find(mesh => mesh.metadata?.part === 'avatar-upper-body');
+      const neutral = Array.from(upper.getVerticesData('position')), neutralNormals = Array.from(upper.getVerticesData('normal'));
+      const { ranges, joints } = upper.metadata.rig;
+      const armRanges = ranges.filter(range => range.arm);
+      const capCenters = armRanges.map(range => [range.a, range.b].map(point => {
+        let closest = -1, distance = Infinity;
+        for (let vertex = range.start; vertex < range.end; vertex++) {
+          const index = vertex * 3;
+          const squared = point.reduce((sum, value, axis) => sum + (neutral[index + axis] - value) ** 2, 0);
+          if (squared < distance) { closest = index; distance = squared; }
+        }
+        assert.ok(distance < 1e-10); return closest;
+      }));
+      furniture.metadata.animate(0, true, false);
+      for (let sample = 0; sample < 660; sample++) {
+        furniture.metadata.animate(sample / 60, true, false);
+        const positions = upper.getVerticesData('position'), normals = upper.getVerticesData('normal');
+        for (let arm = 0; arm < armRanges.length; arm++) {
+          const range = armRanges[arm], joint = joints[range.side < 0 ? 0 : 1];
+          const anchors = range.forearm ? [joint.elbow, joint.wrist] : [joint.shoulder, joint.elbow];
+          for (let end = 0; end < 2; end++) {
+            const index = capCenters[arm][end], target = anchors[end].asArray();
+            for (let axis = 0; axis < 3; axis++) assert.ok(Math.abs(positions[index + axis] - target[axis]) < 1e-5, 'both segments meet the same rounded joint');
+          }
+          for (let vertex = range.start; vertex < range.end; vertex++) {
+            const index = vertex * 3, x = positions[index], y = positions[index + 1], z = positions[index + 2];
+            if (z <= -0.44) assert.ok(y >= 1.25, `${type} sleeve clears the tabletop`);
+            if (Math.abs(x) <= 0.485 && z <= -0.64 && z >= -1.26) assert.ok(y >= 1.312, `${type} sleeve clears the laptop base`);
+            assert.ok(Math.abs(Math.hypot(normals[index], normals[index + 1], normals[index + 2]) - 1) < 1e-5, 'deformed lighting normals remain normalized');
+          }
+        }
+      }
+      assert.notDeepEqual(Array.from(upper.getVerticesData('normal')), neutralNormals, 'lighting follows the posed sleeves');
+      furniture.metadata.animate(12, true, true);
+      assert.deepEqual(Array.from(upper.getVerticesData('position')), neutral);
+      assert.deepEqual(Array.from(upper.getVerticesData('normal')), neutralNormals);
       furniture.dispose();
     }
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
@@ -398,7 +457,7 @@ test('crossed ember faces remain visible in every fireplace orientation and acro
       for (let rotation = 0; rotation < 4; rotation++) {
         fireplace.rotation.y = rotation * Math.PI / 2; embers.computeWorldMatrix(true);
         const world = embers.getWorldMatrix();
-        for (const azimuth of [0.55, Math.PI / 4, Math.atan2(12.4, 10.5), 1.22]) {
+        for (const azimuth of [Math.PI / 18, 0.55, Math.PI / 4, Math.atan2(12.4, 10.5), 1.22, Math.PI * 4 / 9]) {
           const screenRight = new Vector3(-Math.sin(azimuth), 0, Math.cos(azimuth));
           for (let particle = 0; particle < 16; particle++) {
             let bestProjection = 0;

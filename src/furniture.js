@@ -733,56 +733,121 @@ function createHearthEmbers(parent) {
   };
 }
 
+// Each sleeve uses the same shoulder/elbow/wrist anchors, with rounded joint
+// volumes covering the bends. Repose both vertices and normals in one draw call.
 function createArticulatedUpperBody(avatar, template) {
   const upper = template.getChildMeshes()[0].clone('articulated-sweater-and-arms', avatar);
-  upper.makeGeometryUnique(); upper.markVerticesDataAsUpdatable('position', true);
-  upper.metadata = { dynamic: true, part: 'avatar-upper-body' };
+  upper.makeGeometryUnique();
+  for (const kind of ['position', 'normal']) upper.markVerticesDataAsUpdatable(kind, true);
   const neutral = new Float32Array(upper.getVerticesData('position')), positions = new Float32Array(neutral);
+  const neutralNormals = new Float32Array(upper.getVerticesData('normal')), normals = new Float32Array(neutralNormals);
+  const joints = [-1, 1].map(side => ({
+    shoulder: new Vector3(side * 0.255, 1.43, -0.12),
+    elbow: new Vector3(side * 0.37, 1.40, -0.46),
+    wrist: new Vector3(side * 0.21, 1.37, -0.87),
+  }));
+  upper.metadata = { dynamic: true, part: 'avatar-upper-body', rig: { joints, ranges: template.metadata.ranges } };
   const originalBounds = upper.getBoundingInfo().boundingBox;
-  upper.setBoundingInfo(new BoundingInfo(originalBounds.minimum.subtract(new Vector3(0.08, 0.12, 0.16)), originalBounds.maximum.add(new Vector3(0.08, 0.12, 0.16))));
+  upper.setBoundingInfo(new BoundingInfo(originalBounds.minimum.subtract(new Vector3(0.08, 0.12, 0.24)), originalBounds.maximum.add(new Vector3(0.08, 0.12, 0.24))));
+  const direction = new Vector3(), radial = new Vector3(), rotated = new Vector3(), normal = new Vector3(), rotation = new Quaternion();
   let resting = true;
   return (lean, roll, breath, hands, reducedMotion) => {
     if (reducedMotion) {
-      if (!resting) { positions.set(neutral); upper.updateVerticesData('position', positions, false, false); }
+      if (!resting) {
+        positions.set(neutral); normals.set(neutralNormals);
+        upper.updateVerticesData('position', positions, false, false);
+        upper.updateVerticesData('normal', normals, false, false);
+      }
       resting = true; return;
     }
     resting = false;
     const cosLean = Math.cos(lean), sinLean = Math.sin(lean), cosRoll = Math.cos(roll), sinRoll = Math.sin(roll);
+    for (let index = 0; index < joints.length; index++) {
+      const side = index ? 1 : -1, hand = hands[index].position, joint = joints[index];
+      const y = side * 0.255 * sinRoll + 0.65 * cosRoll;
+      joint.shoulder.set(side * 0.255 * cosRoll - 0.65 * sinRoll,
+        0.78 + y * cosLean + 0.04 * sinLean + breath, -0.08 + y * sinLean - 0.04 * cosLean);
+      // Elbows rest above the desk instead of following the torso through it.
+      joint.elbow.set(side * 0.37 + (joint.shoulder.x - side * 0.255) * 0.35 + (hand.x - side * 0.21) * 0.12,
+        1.40 + (hand.y - 1.37) * 0.2, -0.46 + (joint.shoulder.z + 0.12) * 0.25);
+      joint.wrist.set(hand.x, hand.y, hand.z + 0.07);
+    }
     for (const range of template.metadata.ranges) {
-      if (!range.arm) {
+      const joint = joints[range.side < 0 ? 0 : 1];
+      if (range.arm) {
+        const start = range.forearm ? joint.elbow : joint.shoulder, end = range.forearm ? joint.wrist : joint.elbow;
+        end.subtractToRef(start, direction);
+        const length = direction.length(); direction.scaleInPlace(1 / length);
+        Quaternion.FromUnitVectorsToRef(range.direction, direction, rotation);
         for (let vertex = range.start; vertex < range.end; vertex++) {
-          const index = vertex * 3, x = neutral[index], y = neutral[index + 1] - 0.78, z = neutral[index + 2] + 0.08;
-          const rolledY = x * sinRoll + y * cosRoll;
-          positions[index] = x * cosRoll - y * sinRoll;
-          positions[index + 1] = 0.78 + rolledY * cosLean - z * sinLean + breath;
-          positions[index + 2] = -0.08 + rolledY * sinLean + z * cosLean;
+          const offset = vertex * 3, along = range.weights[vertex - range.start];
+          radial.set(neutral[offset] - range.a[0] - range.direction.x * along * range.length,
+            neutral[offset + 1] - range.a[1] - range.direction.y * along * range.length,
+            neutral[offset + 2] - range.a[2] - range.direction.z * along * range.length);
+          radial.rotateByQuaternionToRef(rotation, rotated);
+          positions[offset] = start.x + direction.x * along * length + rotated.x;
+          positions[offset + 1] = start.y + direction.y * along * length + rotated.y;
+          positions[offset + 2] = start.z + direction.z * along * length + rotated.z;
+          normal.set(neutralNormals[offset], neutralNormals[offset + 1], neutralNormals[offset + 2]);
+          const axial = Vector3.Dot(normal, range.direction) * (range.length / length - 1);
+          normal.x += range.direction.x * axial; normal.y += range.direction.y * axial; normal.z += range.direction.z * axial;
+          normal.normalize().rotateByQuaternionToRef(rotation, rotated);
+          normals[offset] = rotated.x; normals[offset + 1] = rotated.y; normals[offset + 2] = rotated.z;
         }
-        continue;
-      }
-      const a = range.a, b = range.b;
-      const aY = a[0] * sinRoll + (a[1] - 0.78) * cosRoll;
-      const startX = a[0] * cosRoll - (a[1] - 0.78) * sinRoll - a[0];
-      const startY = 0.78 + aY * cosLean - (a[2] + 0.08) * sinLean + breath - a[1];
-      const startZ = -0.08 + aY * sinLean + (a[2] + 0.08) * cosLean - a[2];
-      let endX, endY, endZ;
-      if (range.forearm) {
-        const hand = hands[range.side < 0 ? 0 : 1].position;
-        endX = hand.x - b[0]; endY = hand.y - 0.02 - b[1]; endZ = hand.z + 0.08 - b[2];
+      } else if (range.joint === 'elbow') {
+        for (let vertex = range.start; vertex < range.end; vertex++) {
+          const offset = vertex * 3;
+          positions[offset] = neutral[offset] + joint.elbow.x - range.center[0];
+          positions[offset + 1] = neutral[offset + 1] + joint.elbow.y - range.center[1];
+          positions[offset + 2] = neutral[offset + 2] + joint.elbow.z - range.center[2];
+        }
       } else {
-        const bY = b[0] * sinRoll + (b[1] - 0.78) * cosRoll;
-        endX = b[0] * cosRoll - (b[1] - 0.78) * sinRoll - b[0];
-        endY = 0.78 + bY * cosLean - (b[2] + 0.08) * sinLean + breath - b[1];
-        endZ = -0.08 + bY * sinLean + (b[2] + 0.08) * cosLean - b[2];
-      }
-      for (let vertex = range.start; vertex < range.end; vertex++) {
-        const index = vertex * 3, weight = range.weights[vertex - range.start];
-        positions[index] = neutral[index] + startX + (endX - startX) * weight;
-        positions[index + 1] = neutral[index + 1] + startY + (endY - startY) * weight;
-        positions[index + 2] = neutral[index + 2] + startZ + (endZ - startZ) * weight;
+        for (let vertex = range.start; vertex < range.end; vertex++) {
+          const offset = vertex * 3, x = neutral[offset], y = neutral[offset + 1] - 0.78, z = neutral[offset + 2] + 0.08;
+          const rolledY = x * sinRoll + y * cosRoll;
+          positions[offset] = x * cosRoll - y * sinRoll;
+          positions[offset + 1] = 0.78 + rolledY * cosLean - z * sinLean + breath;
+          positions[offset + 2] = -0.08 + rolledY * sinLean + z * cosLean;
+          const nx = neutralNormals[offset], ny = neutralNormals[offset + 1], nz = neutralNormals[offset + 2];
+          const rolledNormalY = nx * sinRoll + ny * cosRoll;
+          normals[offset] = nx * cosRoll - ny * sinRoll;
+          normals[offset + 1] = rolledNormalY * cosLean - nz * sinLean;
+          normals[offset + 2] = rolledNormalY * sinLean + nz * cosLean;
+        }
       }
     }
     upper.updateVerticesData('position', positions, false, false);
+    upper.updateVerticesData('normal', normals, false, false);
   };
+}
+
+function sweater(parent) {
+  // Elliptical rings give the knit a soft waist and sloping shoulders, rather
+  // than reusing the sharp furniture-box silhouette for a person.
+  const profile = [[0.83, 0.20, 0.155], [0.87, 0.245, 0.185], [0.95, 0.27, 0.205],
+    [1.22, 0.285, 0.20], [1.39, 0.26, 0.185], [1.49, 0.20, 0.145], [1.51, 0.12, 0.11]];
+  const positions = [], indices = [], normals = [], sides = 16;
+  for (const [y, width, depth] of profile) for (let side = 0; side < sides; side++) {
+    const angle = side / sides * Math.PI * 2;
+    positions.push(Math.cos(angle) * width, y, -0.085 + Math.sin(angle) * depth);
+  }
+  for (let ring = 0; ring < profile.length - 1; ring++) for (let side = 0; side < sides; side++) {
+    const a = ring * sides + side, b = ring * sides + (side + 1) % sides, c = a + sides, d = b + sides;
+    indices.push(a, b, c, b, d, c);
+  }
+  for (const [ring, reverse] of [[0, true], [profile.length - 1, false]]) {
+    const center = positions.length / 3; positions.push(0, profile[ring][0], -0.085);
+    for (let side = 0; side < sides; side++) {
+      const a = ring * sides + side, b = ring * sides + (side + 1) % sides;
+      indices.push(center, reverse ? b : a, reverse ? a : b);
+    }
+  }
+  VertexData.ComputeNormals(positions, indices, normals);
+  const data = new VertexData(); Object.assign(data, { positions, indices, normals });
+  const shape = new Mesh('soft-knit-sweater', parent.getScene()); data.applyToMesh(shape);
+  mesh(parent, shape, '#b88770', [0, 0, 0]);
+  const hem = cylinder(parent, 0.238, 0.218, 0.045, [0, 0.859, -0.085], '#a67863'); hem.scaling.z = 0.77;
+  const collar = torus(parent, 0.107, 0.025, [0, 1.515, -0.14], '#cb9b7d'); collar.rotation.x = Math.PI / 2;
 }
 
 function avatarTemplate(scene) {
@@ -796,13 +861,18 @@ function avatarTemplate(scene) {
     box(body, [0.20, 0.12, 0.34], [x, 0.09, -0.75], C.cream, 0.05);
   }
   const upperSource = new TransformNode('avatar-upper-body-source', scene);
-  box(upperSource, [0.60, 0.63, 0.43], [0, 1.15, -0.09], '#b88770', 0.12);
-  cylinder(upperSource, 0.10, 0.12, 0.14, [0, 1.49, -0.14], C.skin);
+  sweater(upperSource);
+  cylinder(upperSource, 0.10, 0.12, 0.14, [0, 1.565, -0.14], C.skin);
   for (const side of [-1, 1]) {
-    const shoulder = [side * 0.27, 1.33, -0.13], elbow = [side * 0.36, 1.15, -0.44], wrist = [side * 0.21, 1.35, -0.86];
+    const shoulder = [side * 0.255, 1.43, -0.12], elbow = [side * 0.37, 1.40, -0.46], wrist = [side * 0.21, 1.37, -0.87];
+    sphere(upperSource, [0.10, 0.10, 0.10], shoulder, '#b88770');
+    const elbowJoint = sphere(upperSource, [0.086, 0.086, 0.086], elbow, '#b88770');
+    elbowJoint.metadata = { joint: 'elbow', side, center: elbow };
     const upperArm = rod(upperSource, shoulder, elbow, 0.092, '#b88770');
     upperArm.metadata = { arm: true, a: shoulder, b: elbow, side, forearm: false };
-    const forearm = rod(upperSource, elbow, wrist, 0.073, '#b88770');
+    const start = new Vector3(...elbow), end = new Vector3(...wrist), direction = end.subtract(start);
+    const forearm = mesh(upperSource, CreateCylinder('tapered-sleeve', { diameterTop: 0.104, diameterBottom: 0.156, height: direction.length(), tessellation: 10 }, scene), '#b88770', start.add(end).scale(0.5).asArray());
+    forearm.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), direction.normalize(), new Quaternion());
     forearm.metadata = { arm: true, a: elbow, b: wrist, side, forearm: true };
   }
   const ranges = []; let vertexOffset = 0;
@@ -813,6 +883,7 @@ function avatarTemplate(scene) {
   const upper = batch(upperSource), upperPositions = upper.getChildMeshes()[0].getVerticesData('position');
   for (const range of ranges) if (range.arm) {
     const dx = range.b[0] - range.a[0], dy = range.b[1] - range.a[1], dz = range.b[2] - range.a[2], lengthSquared = dx * dx + dy * dy + dz * dz;
+    range.length = Math.sqrt(lengthSquared); range.direction = new Vector3(dx, dy, dz).scaleInPlace(1 / range.length);
     range.weights = new Float32Array(range.end - range.start);
     for (let vertex = range.start; vertex < range.end; vertex++) {
       const index = vertex * 3;
@@ -861,47 +932,58 @@ export function createFurniture(type, scene) {
     const avatar = group(result, [0, 0, 0.52]); avatar.metadata = { dynamic: true }; avatar.name = 'Study companion';
     const body = parts.body.clone('grounded-trousers-and-shoes', avatar); body.setEnabled(true);
     const articulateUpper = createArticulatedUpperBody(avatar, parts.upper);
-    const head = parts.head.clone('headphones', avatar); head.position.set(0, 1.72, -0.17); head.setEnabled(true);
+    const head = parts.head.clone('headphones', avatar); head.position.set(0, 1.80, -0.17); head.setEnabled(true);
     const writing = type === 'writing-desk';
     const hands = [-1, 1].map(side => {
       const template = writing && side === 1 ? parts.writingHand : parts.hand;
       const hand = template.clone('typing-hand', avatar); hand.position.set(side * 0.21, 1.37, -0.94); hand.setEnabled(true); return hand;
     });
     result.metadata.study = true; result.metadata.avatar = avatar;
+    let workStartedAt = null;
     animations.push((seconds, focused, reducedMotion) => {
       // An inactive desk keeps its companion hidden; its separate cup can still steam.
-      if (!avatar.isEnabled()) return;
-      head.position.set(0, 1.72, -0.17); head.rotation.set(0, 0, 0);
+      if (!avatar.isEnabled()) { workStartedAt = null; return; }
+      if (!focused || reducedMotion) workStartedAt = null;
+      else if (workStartedAt === null || seconds < workStartedAt) workStartedAt = seconds - 0.15;
+      head.position.set(0, 1.80, -0.17); head.rotation.set(0, 0, 0);
       for (let index = 0; index < hands.length; index++) {
         hands[index].position.set(index ? 0.21 : -0.21, 1.37, -0.94); hands[index].rotation.set(0, 0, 0);
       }
       if (reducedMotion) { articulateUpper(0, 0, 0, hands, true); return; }
-      const cycle = seconds % 10.5;
+      // Start each focus session with work, rather than landing in an arbitrary
+      // thinking pause from the page clock. A short ramp settles into the desk.
+      const cycle = focused ? (seconds - workStartedAt) % 10.5 : 0;
       const rampIn = Math.max(0, Math.min(1, cycle / 0.6)), rampOut = Math.max(0, Math.min(1, (6.7 - cycle) / 0.7));
       const work = focused ? rampIn * rampIn * (3 - 2 * rampIn) * rampOut * rampOut * (3 - 2 * rampOut) : 0;
-      const lean = focused ? 0.018 - work * (writing ? 0.083 : 0.112) : Math.sin(seconds * 0.65) * 0.009;
-      const roll = Math.sin(seconds * 0.91) * (focused ? 0.010 : 0.004);
+      const lean = focused ? 0.028 - work * (writing ? 0.17 : 0.215) : Math.sin(seconds * 0.65) * 0.009;
+      const roll = Math.sin(seconds * 0.91) * (focused ? 0.020 : 0.004);
       const breath = Math.sin(seconds * 1.15) * 0.009;
       const cosLean = Math.cos(lean), sinLean = Math.sin(lean), cosRoll = Math.cos(roll), sinRoll = Math.sin(roll);
-      head.position.x = -0.94 * sinRoll;
-      head.position.y = 0.78 + 0.94 * cosRoll * cosLean + 0.09 * sinLean + breath;
-      head.position.z = -0.08 + 0.94 * cosRoll * sinLean - 0.09 * cosLean;
-      head.rotation.x = lean - work * 0.035 + Math.sin(seconds * 0.7) * 0.020;
-      head.rotation.y = focused ? (1 - work) * Math.sin(seconds * 0.55) * 0.19 : Math.sin(seconds * 0.38) * 0.075;
+      head.position.x = -1.02 * sinRoll;
+      head.position.y = 0.78 + 1.02 * cosRoll * cosLean + 0.09 * sinLean + breath;
+      head.position.z = -0.08 + 1.02 * cosRoll * sinLean - 0.09 * cosLean;
+      head.rotation.x = lean - work * 0.045 + Math.sin(seconds * 0.7) * 0.025;
+      head.rotation.y = focused ? (1 - work) * Math.sin(seconds * 0.55) * 0.27 : Math.sin(seconds * 0.38) * 0.075;
       head.rotation.z = roll + Math.sin(seconds * 0.41) * 0.016;
       if (work > 0 && writing) {
-        hands[1].position.x += Math.sin(seconds * 3.9) * 0.035;
+        hands[1].position.x += Math.sin(seconds * 3.9) * 0.055;
         hands[1].position.x = 0.21 + (hands[1].position.x - 0.21) * work;
-        hands[1].position.z += Math.sin(seconds * 5.2) * 0.036 * work;
+        hands[1].position.z += Math.sin(seconds * 5.2) * 0.045 * work;
         hands[1].position.y += (0.5 + Math.sin(seconds * 5.2) * 0.5) * 0.012 * work;
         hands[1].rotation.y = Math.sin(seconds * 3.9) * 0.12 * work;
       } else if (work > 0) {
         for (let i = 0; i < hands.length; i++) {
-          const rhythm = seconds * 7.6 + i * 2.2;
-          hands[i].position.y += (0.5 + Math.sin(rhythm) * 0.5) * 0.046 * work;
-          hands[i].position.z += Math.cos(rhythm * 0.71) * 0.019 * work;
-          hands[i].rotation.x = Math.sin(rhythm) * 0.08 * work;
+          const rhythm = seconds * 10.4 + i * Math.PI;
+          hands[i].position.y += (0.5 + Math.sin(rhythm) * 0.5) * 0.024 * work;
+          hands[i].position.x += Math.sin(rhythm * 0.37) * 0.024 * work;
+          hands[i].position.z += Math.cos(rhythm * 0.71) * 0.027 * work;
+          hands[i].rotation.x = Math.sin(rhythm) * 0.12 * work;
         }
+        // Occasionally slide the right hand from the keys to the trackpad.
+        const trackpad = cycle > 4.3 && cycle < 5.9 ? Math.sin((cycle - 4.3) / 1.6 * Math.PI) ** 2 : 0;
+        hands[1].position.x += (0.025 - hands[1].position.x) * trackpad;
+        hands[1].position.z += (-0.76 - hands[1].position.z) * trackpad;
+        hands[1].position.y += (1.37 - hands[1].position.y) * trackpad;
       }
       articulateUpper(lean, roll, breath, hands, false);
     });

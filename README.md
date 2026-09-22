@@ -23,6 +23,7 @@ The development server binds to `127.0.0.1`. Open the local URL Vite prints. Run
 - Select a desk and choose **Study here** to move your avatar's study spot. The last study station cannot be removed.
 - 25 / 50 / 90-minute focus sessions, pause/resume/reset, local saves, task text and completed-session history.
 - A visible local presence badge distinguishes **In your room**, **Focusing**, and **On a break**. It reflects your timer; shared online/friend presence is a future feature.
+- Drag to orbit through wider side views and elevations from 15° to 67.5°. The room stays framed; **Reset room view** returns to the original composition.
 - Animated hearth flames and rising embers, curling tea steam, connected typing/writing gestures and thinking pauses, a breathing cat with petting reactions, swaying leaves and hanging lanterns, ticking clock hands, a swinging pendulum, a turning record, twinkling fireflies, drifting window stars, fluttering moths, occasional shooting stars, rain and a gentle settling motion when furniture is placed. Reduced motion returns the scene to still poses.
 - Three atmosphere presets, fairy lights, pet interaction, and user-activated synthesized rain audio.
 - Mini view demonstrates a smaller room **inside this page**.

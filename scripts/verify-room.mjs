@@ -202,7 +202,7 @@ try {
   for (const aspect of [0.45, 0.75, 1, 1.5, 2.5]) {
     container.clientWidth = 600 * aspect; container.clientHeight = 600;
     canvas.clientWidth = container.clientWidth; canvas.clientHeight = 600; observer.callback();
-    for (const a of [camera.lowerAlphaLimit, camera.upperAlphaLimit]) for (const b of [camera.lowerBetaLimit, camera.upperBetaLimit]) {
+    for (const a of [camera.lowerAlphaLimit, home.alpha, camera.upperAlphaLimit]) for (const b of [camera.lowerBetaLimit, home.beta, camera.upperBetaLimit]) {
       camera.alpha = a; camera.beta = b; advance(2); scene.render();
       for (const corner of corners) {
         const point = Vector3.TransformCoordinates(corner, camera.getTransformationMatrix());
@@ -211,7 +211,7 @@ try {
       }
     }
   }
-  room.resetView(); console.log(`PASS framing: five aspects × four camera limits, maximum NDC ${largest.toFixed(3)}.`);
+  room.resetView(); console.log(`PASS framing: five aspects × nine camera angles, maximum NDC ${largest.toFixed(3)}.`);
   const desk = createLayout().items.find(item => item.type === 'study-desk');
   room.setLayout({ presetId: null, items: [desk, { id: 'test-plant', type: 'plant', x: 2, z: 0, rotation: 0 }], activeDeskId: desk.id });
   assert.equal(changes.length, 0, 'setLayout must not recursively persist');
@@ -247,7 +247,7 @@ try {
   const torso = scene.getTransformNodeByName('miso-breathing'), catHead = scene.getTransformNodeByName('miso-head'), catTail = scene.getTransformNodeByName('miso-tail'), catTailTip = scene.getTransformNodeByName('miso-tail-tip'), catPaw = scene.getMeshByName('miso-resting-paw'), heart = scene.getTransformNodeByName('pet-heart');
   const headPosition = catHead.getAbsolutePosition().asArray(), pawPosition = catPaw.getAbsolutePosition().asArray(), tailPosition = catTail.getAbsolutePosition().asArray();
   let smallestBreath = Infinity, largestBreath = -Infinity;
-  for (let i = 0; i < 180; i++) {
+  for (let i = 0; i < 300; i++) {
     advance(); smallestBreath = Math.min(smallestBreath, torso.scaling.y); largestBreath = Math.max(largestBreath, torso.scaling.y);
     assert.deepEqual(catHead.getAbsolutePosition().asArray(), headPosition, 'sleeping head stays grounded instead of bobbing');
     assert.deepEqual(catHead.rotation.asArray(), [0, 0, 0], 'resting head never rocks repetitively');
@@ -257,8 +257,8 @@ try {
     assert.ok(Math.abs(-0.03 * torso.scaling.y + torso.position.y + 0.03) < 1e-10, 'breathing anchors the lower torso');
     assert.ok(Math.abs(catTailTip.rotation.y) <= 0.111, 'tail movement stays confined to a small tip flex');
   }
-  assert.ok(largestBreath - smallestBreath > 0.005, 'Miso retains subtle breathing');
-  assert.ok(smallestBreath >= 0.985 && largestBreath <= 1.015, 'breathing never inflates the body broadly');
+  assert.ok(largestBreath - smallestBreath > 0.07, 'Miso has a visible inhale and exhale across a full breath');
+  assert.ok(smallestBreath >= 1 && largestBreath <= 1.076, 'breathing stays within the authored flank expansion');
   room.pet(); advance(30);
   assert.deepEqual(catHead.getAbsolutePosition().asArray(), headPosition, 'petting does not lift the head');
   assert.deepEqual(catPaw.getAbsolutePosition().asArray(), pawPosition, 'petting keeps paws planted');
