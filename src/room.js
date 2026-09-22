@@ -185,27 +185,43 @@ export function createRoom(container, options = {}) {
   const skyTexture = drawing(768, 768, () => {}, 'painted-enchanted-forest');
   picture(4.2, 3.82, skyTexture, [archCenter, 3.34, -4.64]);
   function paintSky(theme) {
-    const ctx = skyTexture.getContext(), size = 768;
-    const stops = theme === 'day' ? ['#839cac', '#d5b8a1', '#f4d597'] : theme === 'rain' ? ['#404c6a', '#73728c', '#bba39b'] : ['#443c69', '#8b6887', '#efb280'];
+    const ctx = skyTexture.getContext(), size = 768, daylight = theme === 'day', night = theme === 'dusk';
+    const stops = daylight ? ['#8bc5dc', '#bededc', '#f7e6b4'] : night ? ['#182643', '#384667', '#8b7e9c'] : ['#5a7288', '#a1b2b8', '#d1cebb'];
     const gradient = ctx.createLinearGradient(0, 0, 0, size); stops.forEach((hex, i) => gradient.addColorStop(i / 2, hex)); ctx.fillStyle = gradient; ctx.fillRect(0, 0, size, size);
-    // Moon, delicate constellations, distant rolling hills and hand-painted firs.
-    ctx.fillStyle = theme === 'day' ? '#fff2bf' : '#f9dfaa'; ctx.beginPath(); ctx.arc(532, 230, theme === 'day' ? 55 : 67, 0, Math.PI * 2); ctx.fill();
-    if (theme !== 'day') {
-      ctx.fillStyle = '#fff0c6';
-      for (let i = 0; i < 42; i++) { const x = 30 + ((i * 173) % 700), y = 45 + ((i * 97) % 380); ctx.beginPath(); ctx.arc(x, y, i % 6 === 0 ? 2.2 : 1, 0, Math.PI * 2); ctx.fill(); }
+    if (daylight || night) {
+      const halo = ctx.createRadialGradient(532, 230, 25, 532, 230, daylight ? 150 : 116);
+      halo.addColorStop(0, daylight ? '#fff3bf99' : '#e4e6ff30'); halo.addColorStop(1, '#ffffff00');
+      ctx.fillStyle = halo; ctx.fillRect(360, 60, 344, 344);
+      ctx.fillStyle = daylight ? '#fff4c7' : '#f5e8c6'; ctx.beginPath(); ctx.arc(532, 230, daylight ? 49 : 62, 0, Math.PI * 2); ctx.fill();
     }
-    [[510, '#737681'], [575, '#53686b'], [650, '#344e53']].forEach(([height, hex], layer) => {
-      ctx.fillStyle = hex; ctx.beginPath(); ctx.moveTo(0, size); ctx.lineTo(0, height);
+    if (night) {
+      ctx.fillStyle = '#a0a4b529';
+      for (const [x, y, r] of [[511, 215, 12], [550, 248, 17], [543, 201, 7]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#fff0ce';
+      for (let i = 0; i < 58; i++) { const x = 30 + ((i * 173) % 700), y = 45 + ((i * 97) % 420); ctx.beginPath(); ctx.arc(x, y, i % 6 === 0 ? 2.2 : 1, 0, Math.PI * 2); ctx.fill(); }
+    } else {
+      // Soft cloud banks are drawn once when the time of day changes.
+      ctx.fillStyle = daylight ? '#fff8eac9' : '#d6dee080';
+      for (const [x, y, scale] of [[170, 225, 1], [600, 370, 0.78], [345, 120, 0.52]]) {
+        ctx.beginPath();
+        for (const [dx, dy, rx, ry] of [[-48, 8, 55, 18], [0, -3, 62, 27], [51, 11, 55, 17]]) {
+          ctx.ellipse(x + dx * scale, y + dy * scale, rx * scale, ry * scale, 0, 0, Math.PI * 2);
+        }
+        ctx.fill();
+      }
+    }
+    const hills = daylight ? ['#90afaa', '#6f9687', '#507d69'] : night ? ['#55627b', '#384f60', '#233e49'] : ['#809398', '#607e80', '#446569'];
+    [510, 575, 650].forEach((height, layer) => {
+      ctx.fillStyle = hills[layer]; ctx.beginPath(); ctx.moveTo(0, size); ctx.lineTo(0, height);
       for (let x = 0; x <= size + 40; x += 30) ctx.lineTo(x, height + Math.sin(x * 0.008 + layer * 2) * 50 + Math.cos(x * 0.013) * 24); ctx.lineTo(size, size); ctx.fill();
     });
     for (let i = 0; i < 21; i++) {
       const x = i * 41 - 15, base = 700 + Math.sin(i * 2.4) * 30, height = 100 + (i % 5) * 24;
-      ctx.fillStyle = i % 2 ? '#28494c' : '#375456'; ctx.fillRect(x - 3, base - height, 6, height + 80);
+      ctx.fillStyle = daylight ? (i % 2 ? '#3e6d57' : '#578269') : (i % 2 ? '#243f47' : '#34515a'); ctx.fillRect(x - 3, base - height, 6, height + 80);
       for (let tier = 0; tier < 4; tier++) { const y = base - height + tier * height * 0.17, width = 22 + tier * 13; ctx.beginPath(); ctx.moveTo(x, y - 20); ctx.lineTo(x - width, y + height * 0.4); ctx.lineTo(x + width, y + height * 0.4); ctx.fill(); }
     }
     skyTexture.update(true);
   }
-  paintSky('dusk');
   const windowFrame = material('#be9566'), windowDark = material('#634632'), glazing = material('#d7b572');
   [-1, 1].forEach(side => box([0.18, archSpring - windowBottom, 0.34], [archCenter + side * archRadius, (archSpring + windowBottom) / 2, -4.43], windowFrame, 0.025));
   const archPoints = []; for (let i = 0; i <= 32; i++) { const angle = i / 32 * Math.PI; archPoints.push([archCenter + Math.cos(angle) * archRadius, archSpring + Math.sin(angle) * archRadius, -4.43]); }
@@ -361,7 +377,7 @@ export function createRoom(container, options = {}) {
   starShape.indices = []; for (let i = 0; i < 8; i++) starShape.indices.push(0, i + 1, (i + 1) % 8 + 1);
   starShape.normals = Array.from({ length: 27 }, (_, i) => i % 3 === 2 ? 1 : 0); starShape.applyToMesh(skyStars);
   const starMaterial = new StandardMaterial('warm-sky-starlight', scene); starMaterial.disableLighting = true; starMaterial.emissiveColor = color('#ffe3ae'); starMaterial.backFaceCulling = false;
-  skyStars.material = starMaterial; skyStars.isPickable = false; skyStars.receiveShadows = false; skyStars.metadata = { castShadow: false }; skyStars.alwaysSelectAsActiveMesh = true;
+  skyStars.material = starMaterial; skyStars.parent = world; skyStars.isPickable = false; skyStars.receiveShadows = false; skyStars.metadata = { castShadow: false, effect: 'window-stars' }; skyStars.alwaysSelectAsActiveMesh = true;
   const starSeeds = Array.from({ length: 20 }, (_, i) => {
     const x = archCenter - 1.7 + ((i * 0.618033) % 1) * 3.4, top = archSpring + Math.sqrt(1.90 ** 2 - (x - archCenter) ** 2);
     return { x, y: 3.40 + ((i * 0.381966 + 0.23) % 1) * (top - 3.59), z: -4.59, scale: 0.62 + ((i * 0.47) % 1) * 0.60 };
@@ -524,10 +540,22 @@ export function createRoom(container, options = {}) {
     if (!editing) { cancelPlacement(); selectItem(null); } updateMarker(); requestRender();
   }
   function setTheme(name) {
-    theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk'; paintSky(theme); rain.setEnabled(theme === 'rain');
-    sun.diffuse = color(theme === 'rain' ? '#d5dfeb' : theme === 'day' ? '#fff1d8' : '#ffdaaa'); sun.intensity = theme === 'rain' ? 0.82 : theme === 'day' ? 1.40 : 0.85;
-    hemisphere.diffuse = color(theme === 'rain' ? '#e0e7ed' : theme === 'day' ? '#edf4e8' : '#ffe3c5'); hemisphere.intensity = theme === 'day' ? 0.84 : theme === 'rain' ? 0.70 : 0.55;
-    windowGlow.intensity = theme === 'dusk' ? 1.0 : 0.65;
+    theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
+    const daylight = theme === 'day', night = theme === 'dusk';
+    paintSky(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
+    if (!night) { shootingStar.setEnabled(false); streakMaterial.alpha = 0; }
+    sun.diffuse = color(daylight ? '#fff1d2' : night ? '#c5ccec' : '#d5dfeb');
+    sun.intensity = daylight ? 1.6 : night ? 0.62 : 0.82;
+    sun.position.set(...(daylight ? [-4, 10, -8] : [-5, 10, 6]));
+    sun.direction.set(...(daylight ? [3, -8, 7] : [3, -8, -5])).normalize();
+    hemisphere.diffuse = color(daylight ? '#edf4e8' : night ? '#e1d3ed' : '#e0e7ed');
+    hemisphere.groundColor = color(daylight ? '#a48b6b' : '#645441');
+    hemisphere.intensity = daylight ? 0.90 : night ? 0.44 : 0.70;
+    windowGlow.intensity = daylight ? 0.22 : night ? 1.25 : 0.65;
+    bulb.emissiveColor = color('#ffd392').scale(daylight ? 0.50 : night ? 1.25 : 0.80);
+    bloom.intensity = daylight ? 0.18 : night ? 0.40 : 0.26;
+    shadow.darkness = daylight ? 0.34 : 0.24;
+    // Light direction changes only here, so the shadow map remains cached.
     requestRender(true);
   }
   function pet() { petStart = performance.now(); heart.setEnabled(true); options.onPet?.(); requestRender(); }
@@ -599,7 +627,7 @@ export function createRoom(container, options = {}) {
   function resize() { const width = Math.max(1, container.clientWidth), height = Math.max(1, container.clientHeight); canvasAspect = width / height; engine.setSize(Math.round(width * pixelRatio), Math.round(height * pixelRatio)); fitRoom(); requestRender(); }
   function setQuality(value) { quality = ['auto', 'battery', 'high'].includes(value) ? value : 'auto'; pixelRatio = Math.min(window.devicePixelRatio || 1, quality === 'battery' ? 1 : quality === 'high' ? 2 : 1.5); engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; bloom.isEnabled = quality !== 'battery'; resize(); }
   const observer = new ResizeObserver(resize); observer.observe(container);
-  syncFurniture(); resize();
+  syncFurniture(); setTheme(theme); resize();
   function animate(now) {
     const seconds = now / 1000;
     const ambientTime = reducedMotion ? 0 : seconds;
@@ -635,11 +663,11 @@ export function createRoom(container, options = {}) {
     }
     moths.updateVerticesData('position', mothPositions, false, false);
     const streakAge = seconds - ambienceStart - shootingStar.metadata.delaySeconds, streakPhase = streakAge % shootingStar.metadata.periodSeconds;
-    const streakVisible = !reducedMotion && streakAge >= 0 && streakPhase < shootingStar.metadata.durationSeconds;
+    const streakVisible = theme === 'dusk' && !reducedMotion && streakAge >= 0 && streakPhase < shootingStar.metadata.durationSeconds;
     shootingStar.setEnabled(streakVisible);
     const streakProgress = streakVisible ? streakPhase / shootingStar.metadata.durationSeconds : 0;
     shootingStar.position.set(-3.52 + streakProgress * 1.04, 4.63 - streakProgress * 0.48, -4.57); streakMaterial.alpha = streakVisible ? Math.sin(streakProgress * Math.PI) * 0.9 : 0;
-    hearthGlow.intensity = (theme === 'dusk' ? 1.0 : 0.65) + (reducedMotion ? 0 : Math.sin(seconds * 2.1) * 0.07 + Math.sin(seconds * 4.1) * 0.04);
+    hearthGlow.intensity = (theme === 'day' ? 0.30 : theme === 'dusk' ? 1.0 : 0.65) + (reducedMotion ? 0 : Math.sin(seconds * 2.1) * 0.07 + Math.sin(seconds * 4.1) * 0.04);
     const petAge = (now - petStart) / 1000, beingPet = petAge >= 0 && petAge < 1.6;
     const breathPhase = seconds % 4.8;
     // A soft inhale, then a longer exhale; enough flank movement to read from

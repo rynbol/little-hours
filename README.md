@@ -25,7 +25,8 @@ The development server binds to `127.0.0.1`. Open the local URL Vite prints. Run
 - A visible local presence badge distinguishes **In your room**, **Focusing**, and **On a break**. It reflects your timer; shared online/friend presence is a future feature.
 - Drag to orbit through wider side views and elevations from 15° to 67.5°. The room stays framed; **Reset room view** returns to the original composition.
 - Animated hearth flames and rising embers, curling tea steam, connected typing/writing gestures and thinking pauses, a breathing cat with petting reactions, swaying leaves and hanging lanterns, ticking clock hands, a swinging pendulum, a turning record, twinkling fireflies, drifting window stars, fluttering moths, occasional shooting stars, rain and a gentle settling motion when furniture is placed. Reduced motion returns the scene to still poses.
-- Three atmosphere presets, fairy lights, pet interaction, and user-activated synthesized rain audio.
+- A sun/moon button switches between **Daylight** and **Night**. Daylight brings a blue sky, clouds, green hills and sunlight through the window; night brings moonlight, stars and warm pools of lamplight. The choice is saved. **Atmosphere** also offers a rainy afternoon, plus the fairy-light toggle.
+- Pet interaction and user-activated synthesized rain audio.
 - Mini view demonstrates a smaller room **inside this page**.
 - An optional Performance panel shows measured frame cadence, CPU submission, drawing cost and quality controls.
 

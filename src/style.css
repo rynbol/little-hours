@@ -17,11 +17,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .brand-mark { width: 28px; height: 30px; display: grid; place-items: center; border: 1px solid #b58a58; color: #dfbb80; border-radius: 12px 12px 6px 6px; }
 .brand-mark svg { width: 17px; height: 17px; }
 .brand-dot { color: #cc9c62; }
-.header-right { display: flex; align-items: center; gap: 23px; }
+.header-right { display: flex; align-items: center; gap: 10px; }
 .room-label { font-size: 12px; color: #b8a996; }
-.focus-toggle { display: flex; gap: 8px; align-items: center; min-height: 31px; padding: 5px 11px; color: #dbc49f; background: #2d2732; border: 1px solid #64513c; border-radius: 9px; font-size: 11px; }
-.focus-toggle:hover, .focus-toggle[aria-expanded='true'] { background: #3b3036; border-color: #9b784c; }
-.focus-toggle svg { width: 15px; height: 15px; }
+.focus-toggle, .time-toggle { display: flex; gap: 8px; align-items: center; min-height: 31px; padding: 5px 11px; color: #dbc49f; background: #2d2732; border: 1px solid #64513c; border-radius: 9px; font-size: 11px; }
+.focus-toggle:hover, .focus-toggle[aria-expanded='true'], .time-toggle:hover { background: #3b3036; border-color: #9b784c; }
+.focus-toggle svg, .time-toggle svg { width: 15px; height: 15px; }
+.time-toggle { min-width: 86px; justify-content: center; }
+body[data-theme='day'] .time-toggle { background: #e8cc96; color: #58462d; border-color: #e8cc96; }
 #dock-timer { font-variant-numeric: tabular-nums; color: #e8d2aa; border-left: 1px solid #786047; padding-left: 8px; }
 .is-focusing #dock-timer { color: #c9d6ae; }
 .workspace { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 244px; gap: 20px; align-items: start; padding: 12px 0 0; }
@@ -247,7 +249,9 @@ h2 em { color: #a07147; font-weight: 400; }
   .brand { font-size: 19px; gap: 8px; }
   .brand-mark { width: 25px; height: 28px; }
   .room-label { display: none; }
-  .header-right { gap: 0; }
+  .header-right { gap: 6px; }
+  .time-toggle { width: 33px; min-width: 33px; padding: 5px; }
+  .time-toggle span { display: none; }
   .focus-toggle { gap: 5px; padding: 6px 8px; }
   .focus-toggle > span:first-of-type { display: none; }
   #dock-timer { padding-left: 6px; }
@@ -306,7 +310,8 @@ h2 em { color: #a07147; font-weight: 400; }
 }
 @media (pointer: coarse) {
   .icon-button, .panel-heading .icon-button { width: 40px; height: 40px; }
-  .mode-button, .small-button, .nudge-buttons button, .quiet-button, .category-list button, .collection-tabs button, .focus-toggle { min-height: 44px; }
+  .mode-button, .small-button, .nudge-buttons button, .quiet-button, .category-list button, .collection-tabs button, .focus-toggle, .time-toggle { min-height: 44px; }
+  .time-toggle { min-width: 44px; }
   .nudge-buttons { grid-template-columns: repeat(4, 31px); }
   .small-button { min-width: 37px; }
   .sound-button, .reset-session, .fairy-lights { min-height: 44px; }

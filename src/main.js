@@ -56,7 +56,7 @@ document.querySelector('#app').innerHTML = `
   <div class="app-shell">
     <header class="app-header">
       <a class="brand" href="/" aria-label="Little Hours home"><span class="brand-mark">${icon('home')}</span><span>little hours<span class="brand-dot">.</span></span></a>
-      <div class="header-right"><span class="room-label">A little world, all your own.</span><button class="focus-toggle" id="focus-toggle" aria-expanded="true" aria-controls="focus-card" aria-label="Hide focus panel">${icon('clock')}<span>Focus</span><span id="dock-timer">25:00</span></button></div>
+      <div class="header-right"><span class="room-label">A little world, all your own.</span><button class="time-toggle" id="time-toggle" aria-label="Switch to daylight" title="Switch to daylight">${icon('moon')}<span>Night</span></button><button class="focus-toggle" id="focus-toggle" aria-expanded="true" aria-controls="focus-card" aria-label="Hide focus panel">${icon('clock')}<span>Focus</span><span id="dock-timer">25:00</span></button></div>
     </header>
     <main class="workspace">
       <section class="room-section" aria-labelledby="room-title">
@@ -111,9 +111,9 @@ function toast(message) {
   toastTimeout = setTimeout(() => { $('#toast').hidden = true; }, 4200);
 }
 const themeCopy = {
-  dusk: ['The twilight retreat', 'The fire is warm. The night is yours.'],
+  dusk: ['The moonlit retreat', 'The candles are lit. Stay a little longer.'],
   rain: ['Rain at the retreat', 'Raindrops, candlelight, and nowhere else to be.'],
-  day: ['A little morning magic', 'Sunlight on the books. A fresh little chapter.'],
+  day: ['The sunlit retreat', 'Sunlight on the books. A fresh little chapter.'],
 };
 function applyState(next, force = false) {
   const previous = state;
@@ -123,6 +123,11 @@ function applyState(next, force = false) {
     $('#room-title').textContent = themeCopy[state.theme][0];
     $('#room-subtitle').textContent = themeCopy[state.theme][1];
     room?.setTheme(state.theme);
+    const [symbol, label] = state.theme === 'day' ? ['sun', 'Daylight'] : state.theme === 'rain' ? ['rain', 'Rain'] : ['moon', 'Night'];
+    const nextLabel = state.theme === 'day' ? 'Switch to night' : 'Switch to daylight';
+    $('#time-toggle').innerHTML = `${icon(symbol)}<span>${label}</span>`;
+    $('#time-toggle').setAttribute('aria-label', nextLabel);
+    $('#time-toggle').title = nextLabel;
   }
   if ($('#task').value !== state.task) $('#task').value = state.task;
   for (const [key, visible] of Object.entries(state.decor)) {
@@ -235,6 +240,9 @@ document.querySelectorAll('[data-minutes]').forEach(button => button.addEventLis
 $('#task').addEventListener('input', event => {
   const task = event.target.value;
   acceptUpdate(store.update(draft => { draft.task = task; }));
+});
+$('#time-toggle').addEventListener('click', () => {
+  acceptUpdate(store.update(draft => { draft.theme = draft.theme === 'day' ? 'dusk' : 'day'; }));
 });
 $('#reset-view').addEventListener('click', () => room?.resetView());
 $('#focus-toggle').addEventListener('click', () => {
@@ -447,7 +455,7 @@ function renderPanel() {
   if (!currentPanel) return;
   panel.innerHTML = `<div class="panel-heading"><span>${currentPanel === 'atmosphere' ? 'Find your kind of quiet' : 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
   if (currentPanel === 'atmosphere') {
-    panel.insertAdjacentHTML('beforeend', `<div class="theme-options">${[['dusk', 'moon', 'Golden evening'], ['rain', 'rain', 'Rainy afternoon'], ['day', 'sun', 'Slow morning']].map(([key, symbol, title]) => `<button class="theme-option ${key}" data-theme-choice="${key}" aria-pressed="${state.theme === key}">${icon(symbol)}<span>${title}</span></button>`).join('')}</div>`);
+    panel.insertAdjacentHTML('beforeend', `<div class="theme-options">${[['day', 'sun', 'Daylight'], ['dusk', 'moon', 'Night'], ['rain', 'rain', 'Rainy afternoon']].map(([key, symbol, title]) => `<button class="theme-option ${key}" data-theme-choice="${key}" aria-pressed="${state.theme === key}">${icon(symbol)}<span>${title}</span></button>`).join('')}</div>`);
     panel.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click', () => {
       acceptUpdate(store.update(draft => { draft.theme = button.dataset.themeChoice; }));
     }));

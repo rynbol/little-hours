@@ -182,6 +182,33 @@ try {
   assert.notEqual(secondHand.rotation.z, secondAngle, 'the wall clock ticks once per second');
   assert.ok(Math.abs(pendulum.rotation.z - pendulumAngle) > 0.01, 'the clock pendulum swings');
   console.log('PASS decorative motion: fixed lantern mounts, two meshes per lantern, ticking clock and swinging pendulum.');
+  // Switch time of day through the real runtime, including a glow-list rebuild
+  // while stars are hidden. Switching must not allocate another scene or layout.
+  const lightingMeshCount = scene.meshes.length, lightingMaterialCount = scene.materials.length;
+  const timeOfDayLayout = JSON.stringify(diagnostics().layout);
+  const keyLight = scene.getLightByName('window-sun'), ambientLight = scene.getLightByName('warm-ambient');
+  const nightKeyIntensity = keyLight.intensity, nightAmbientIntensity = ambientLight.intensity;
+  const stars = scene.getMeshByName('window-drifting-stars'), rainMesh = scene.getMeshByName('window-rain');
+  room.setTheme('day'); advance(3);
+  assert.ok(keyLight.intensity > nightKeyIntensity * 2 && ambientLight.intensity > nightAmbientIntensity * 2, 'daylight brightens real scene lighting');
+  assert.ok(keyLight.direction.z > 0, 'daylight enters from the window side');
+  assert.equal(stars.isEnabled(), false); assert.equal(shootingStar.isEnabled(), false); assert.equal(rainMesh.isEnabled(), false);
+  room.setDecor('lights', false); advance(2);
+  assert.ok(scene.effectLayers.find(layer => layer.name === 'candlelight-bloom').mainTexture.renderList.includes(stars), 'editing daylight keeps night stars in the cached glow list');
+  const daylightMeteorStart = (Math.ceil(Math.max(0, (time / 1000 - meteor.delaySeconds) / meteor.periodSeconds)) * meteor.periodSeconds + meteor.delaySeconds) * 1000;
+  time = daylightMeteorStart + 400; advance();
+  assert.equal(shootingStar.isEnabled(), false, 'scheduled shooting stars stay hidden in daylight');
+  room.setTheme('rain'); advance(2);
+  assert.equal(rainMesh.isEnabled(), true); assert.equal(stars.isEnabled(), false); assert.equal(shootingStar.isEnabled(), false);
+  room.setTheme('dusk'); advance(2);
+  assert.equal(stars.isEnabled(), true); assert.equal(shootingStar.isEnabled(), true); assert.equal(rainMesh.isEnabled(), false);
+  assert.equal(scene.getTransformNodeByName('fairy-lights').isEnabled(), false, 'changing time of day preserves the fairy-light preference');
+  room.setDecor('lights', true); advance(2);
+  assert.equal(keyLight.intensity, nightKeyIntensity); assert.equal(ambientLight.intensity, nightAmbientIntensity);
+  assert.equal(keyLight.getShadowGenerator().getShadowMap().refreshRate, 0, 'lighting changes retain the cached shadow-map policy');
+  assert.equal(scene.meshes.length, lightingMeshCount); assert.equal(scene.materials.length, lightingMaterialCount);
+  assert.equal(JSON.stringify(diagnostics().layout), timeOfDayLayout, 'changing lighting preserves furniture and the active desk');
+  console.log('PASS time of day: distinct daylight/night lighting, night-only stars, rain, saved decor, retained glow and no extra meshes.');
   const home = { alpha: camera.alpha, beta: camera.beta };
   camera.alpha += 0.2; camera.beta += 0.1; camera.inertialAlphaOffset = 0.1;
   room.resetView(); advance(90);

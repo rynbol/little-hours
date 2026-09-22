@@ -106,3 +106,15 @@ Miso breathes on a 4.8-second cycle with a shorter inhale and longer exhale. The
 Camera azimuth now spans 10°–80° instead of roughly 32°–70°. Elevation spans 15°–67.5° instead of roughly 25°–50°. Automatic orthographic framing is checked at nine angles across five aspect ratios. The original home view, inertial reset, and fixed camera distance remain.
 
 This checkpoint passes 34 unit tests, thirteen runtime verification groups, and the production build. The main JavaScript chunk is approximately 319 KB gzipped plus lazy shader chunks. Browser checks inspected the working loop across captured frames and both new camera extremes, then verified Reset restores the original composition. In the current Writer’s loft at a 966 × 1044 viewport, one warm Adaptive sample reported 60 fps, 17.5 ms frame-interval p95, 2.3 ms CPU-render p95, 126 draw calls and a 1.50 render pixel ratio. The preview had no captured console errors. These are observations on this browser/device, not a cross-device FPS guarantee.
+
+
+## Daylight and night
+
+The header sun/moon button switches the saved room atmosphere between Daylight and Night; Atmosphere also retains Rainy afternoon. Existing saved `dusk` values map to Night, so this refinement needs no storage migration and does not change the furniture layout or timer.
+
+Daylight changes the actual directional and ambient lights, sends sunlight from the window side, softens local lamplight/glow, and paints a blue sky with clouds and greener forest layers. Night uses a deep blue sky, a softly glowing moon, stars and warmer local lights. Stars and shooting stars are hidden in daylight and rain; their cached glow membership survives furniture/decor changes so they reappear correctly at night. Sky painting happens on theme changes, and the existing shadow map is refreshed once per change. No scene geometry or additional lights are allocated by switching.
+
+The runtime harness verifies light contrast/direction, night-only stars, rain visibility, fairy-light preference preservation, glow restoration and unchanged layout/mesh/material counts. Screenshot comparisons separately check the rendered day and night appearances.
+
+
+The production preview kept the saved Daylight selection after reload, synchronized the header and Atmosphere choices, and fit the new control at 320 pixels without horizontal overflow. A warm native-window Daylight sample reported 60 fps, 17.3 ms frame-interval p95, 2.1 ms CPU-render p95, 124 draw calls, and 1.50 render pixel ratio. The scene remains the user's Writer’s loft arrangement; these are single-device observations. The complete checkpoint passes 34 unit tests, fourteen runtime groups, and the production build.
