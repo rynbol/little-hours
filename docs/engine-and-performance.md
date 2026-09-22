@@ -32,7 +32,7 @@ The original loop attempted to cap rendering at 30 fps by skipping browser anima
 
 CPU render submission measures JavaScript time spent calling the renderer; it is not GPU execution time. The frame interval includes browser scheduling. Neither metric establishes battery life or performance on other devices.
 
-## Expanded Babylon room checkpoint
+## Expanded Babylon room checkpoint (`4a6f80b`)
 
 The fully furnished Ember library was inspected in the production build at a 1280 × 720 viewport. One warm sample from the visible Performance panel reported:
 
@@ -57,3 +57,9 @@ Browser checks covered all three room designs; valid placement and overlap rejec
 Use the visible Performance panel to measure the running game after shader warm-up. Compare at the same viewport, quality, atmosphere and preset, with only the relevant tab foregrounded. Check normal study mode, active furniture placement, a populated room, and a narrow viewport. Also verify that hidden tabs suspend rendering and reduced-motion settings are respected.
 
 Automated room checks exercise engine geometry, camera math and room rules without a GPU. They can check bounds, placement, lifecycle and drawing complexity, but actual browser rendering must be inspected separately.
+
+## Animation and FPS work
+
+Ambient animation reuses existing avatar and cat transforms. Seven fire flames share one dynamic mesh; moving them adds no triangles. Each cup's tea steam uses a single 56-triangle ribbon mesh. Dynamic effects update retained typed buffers, and furniture settles using a short scale interpolation without changing saved positions. Reduced motion resets the scene to neutral poses.
+
+Pointer hover is processed at most once per render callback and skipped while orbiting. Placement previews only intersect the mathematical floor; nearest-object picking happens when clicking. Glow receives an explicit list of emitting meshes, avoiding preparation of unrelated scene meshes. Rain reuses a position buffer and fixed bounds instead of rebuilding a line system and bounds each frame. Steam is excluded from picking, shadows and glow. Adaptive quality yields resolution after sustained samples below 55 fps, and the timer avoids rewriting unchanged UI.

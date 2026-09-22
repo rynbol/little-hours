@@ -43,7 +43,15 @@ h1 { font-family: Georgia, 'Times New Roman', serif; margin: 0; font-size: clamp
 .stage::before { content: ''; position: absolute; inset: 14% 3% 0; z-index: -1; background: radial-gradient(ellipse at 50% 60%, #b5794720, transparent 67%); pointer-events: none; }
 .room-canvas { position: absolute; inset: -6px -12px 10px; }
 .room-canvas canvas { width: 100%; height: 100%; display: block; touch-action: pan-y; }
+.stage-presence { position: absolute; top: 17px; left: 14px; z-index: 1; display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border: 1px solid #665044; border-radius: 20px; background: #2b2531ed; color: #d8c4a7; font-size: 12px; line-height: 1.3; box-shadow: 0 4px 15px #10091420; }
+#presence-icon { display: flex; align-items: center; color: #c1a47c; }
+#presence-icon svg { width: 14px; height: 14px; }
+.stage-presence[data-presence='focusing'] { border-color: #727e57; background: #30392eed; color: #dce6c4; }
+.stage-presence[data-presence='focusing'] #presence-icon { color: #bfd391; }
+.stage-presence[data-presence='break'] { border-color: #8e6f46; color: #e4c68e; }
+.stage-presence[data-presence='break'] #presence-icon { color: #d5ad70; }
 .stage.is-mini .room-canvas { inset: 23% 26% 23%; border: 1px solid #8c674c; border-radius: 24px; background: #302735; box-shadow: 0 16px 55px #08050c65; }
+.stage.is-mini .stage-presence { top: calc(23% - 15px); left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; }
 .mini-caption { position: absolute; bottom: 13%; color: #d4bc98; font-size: 11px; text-align: center; width: 100%; }
 .stage.is-mini .room-hint { visibility: hidden; }
 .room-hint { position: absolute; bottom: 2px; max-width: calc(100% - 20px); font-size: 11px; line-height: 1.4; color: #bdac99; text-align: center; pointer-events: none; }
@@ -51,8 +59,8 @@ h1 { font-family: Georgia, 'Times New Roman', serif; margin: 0; font-size: clamp
 .loading-note { position: relative; z-index: 2; pointer-events: none; max-width: 260px; text-align: center; color: #ecd9b8; font-size: 13px; background: #332938ed; border: 1px solid #795d45; border-radius: 12px; padding: 13px 18px; }
 .pet-bubble { position: absolute; bottom: 25%; left: 43%; background: #f4e5c5; color: #66503b; border: 1px solid #c7a374; border-radius: 14px 14px 14px 2px; padding: 11px 14px; font-size: 12px; box-shadow: 0 8px 25px #120a1940; pointer-events: none; }
 .room-bottom { display: flex; justify-content: space-between; gap: 15px; align-items: center; min-height: 44px; }
-.room-status { color: #c1ad94; font-size: 11px; display: flex; align-items: center; gap: 7px; white-space: nowrap; padding-left: 6px; }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: #b2b680; box-shadow: 0 0 9px #c7b67445; }
+.room-company { color: #c1ad94; font-size: 11px; display: flex; align-items: center; gap: 7px; white-space: nowrap; padding-left: 6px; }
+.room-company svg { width: 14px; height: 14px; color: #b39670; }
 .room-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: min(414px, 100%); padding: 4px; background: #2c2532; border: 1px solid #57433f; border-radius: 11px; }
 .tool { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; background: transparent; border: 0; padding: 8px 7px; font-size: 11px; color: #d1ba97; border-radius: 6px; }
 .tool:hover, .tool[aria-expanded='true'], .tool[aria-pressed='true'] { background: #4b363d; color: #f0d4a2; }
@@ -212,7 +220,7 @@ h2 em { color: #a07147; font-weight: 400; }
 @media (max-width: 1150px) {
   .app-shell { padding-left: 18px; padding-right: 18px; }
   .workspace { grid-template-columns: minmax(0, 1fr) 232px; gap: 14px; }
-  .room-status { display: none; }
+  .room-company { display: none; }
   .room-bottom { justify-content: center; }
   .focus-card { padding-left: 16px; padding-right: 16px; }
 }
@@ -253,6 +261,7 @@ h2 em { color: #a07147; font-weight: 400; }
   .icon-button { width: 30px; height: 30px; }
   .stage, .is-decorating .stage { height: 415px; }
   .room-canvas { inset: -3px -11px 10px; }
+  .stage-presence { top: 11px; left: 4px; font-size: 11px; }
   .room-bottom { margin-top: 2px; }
   .room-tools { width: 100%; }
   .tool { padding: 8px 3px; flex-direction: column; gap: 4px; }

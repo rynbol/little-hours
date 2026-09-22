@@ -7,6 +7,7 @@ import { CreateCylinder } from '@babylonjs/core/Meshes/Builders/cylinderBuilder.
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { Vector3, Quaternion } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
 import { getFurniture } from './catalog.js';
 
 // Hand-built forms, real joinery, small deliberate details. No downloaded models,
@@ -361,9 +362,7 @@ function fireplace(parent) {
   rod(parent, [-0.58, 0.285, -0.1], [0.53, 0.285, 0.17], 0.09, '#684a37');
   rod(parent, [-0.52, 0.39, 0.18], [0.51, 0.39, -0.1], 0.084, '#77503a');
   for (let i = 0; i < 7; i++) {
-    const x = -0.48 + i * 0.155, height = 0.28 + (i % 3) * 0.11;
-    const flame = cylinder(parent, 0.005, 0.092, height, [x, 0.39 + height / 2, 0.10 - (i % 2) * 0.075], i % 2 ? '#ffb85e' : '#ffd58a', candleGlow);
-    flame.rotation.z = (i % 2 ? -1 : 1) * 0.13;
+    const x = -0.48 + i * 0.155;
     cylinder(parent, 0.045, 0.05, 0.018, [x, 0.2, 0.23], '#e5924f', candleGlow);
   }
   for (const x of [-0.60, -0.30, 0, 0.30, 0.60]) rod(parent, [x, 0.16, 0.395], [x, 0.46, 0.395], 0.019, '#514937');
@@ -479,6 +478,108 @@ function moonRug(parent) {
   }
 }
 
+function createDancingFire(parent) {
+  const scene = parent.getScene(), templates = cacheFor(scene).templates;
+  if (!templates.has('dancing-fire')) {
+    const source = new TransformNode('flame-source', scene), ranges = [];
+    let vertexOffset = 0;
+    for (let i = 0; i < 7; i++) {
+      const height = 0.28 + (i % 3) * 0.11;
+      const flame = cylinder(source, 0.005, 0.092, height, [-0.48 + i * 0.155, 0.39 + height / 2, 0.10 - (i % 2) * 0.075], i % 2 ? '#ffb85e' : '#ffd58a', candleGlow);
+      flame.rotation.z = (i % 2 ? -1 : 1) * 0.13;
+      ranges.push({ start: vertexOffset, end: vertexOffset + flame.getTotalVertices(), height, phase: i * 1.41 });
+      vertexOffset += flame.getTotalVertices();
+    }
+    const template = batch(source); template.metadata = { ranges }; template.setEnabled(false);
+    templates.set('dancing-fire', template);
+  }
+  const template = templates.get('dancing-fire');
+  const fire = template.getChildMeshes()[0].clone('dancing-hearth-flames', parent);
+  // The material remains shared, while only this tiny vertex buffer is unique.
+  fire.makeGeometryUnique(); fire.markVerticesDataAsUpdatable('position', true);
+  fire.metadata = { dynamic: true, effect: 'hearth-flames' };
+  fire.isPickable = false; fire.receiveShadows = false;
+  fire.setBoundingInfo(new BoundingInfo(new Vector3(-0.7, 0.3, -0.14), new Vector3(0.7, 1.1, 0.25)));
+  const neutral = new Float32Array(fire.getVerticesData('position'));
+  const positions = new Float32Array(neutral);
+  let resting = true;
+  return (seconds, focused, reducedMotion) => {
+    if (reducedMotion) {
+      if (!resting) { positions.set(neutral); fire.updateVerticesData('position', positions, false, false); }
+      resting = true; return;
+    }
+    resting = false;
+    for (const { start, end, height, phase } of template.metadata.ranges) {
+      const stretch = 1 + Math.sin(seconds * 5.3 + phase) * 0.17 + Math.sin(seconds * 8.7 + phase * 0.53) * 0.07;
+      const sway = Math.sin(seconds * 3.1 + phase) * 0.05 + Math.sin(seconds * 7.1 + phase) * 0.012;
+      const drift = Math.sin(seconds * 4.3 + phase) * 0.017;
+      for (let vertex = start; vertex < end; vertex++) {
+        const index = vertex * 3, lift = neutral[index + 1] - 0.39;
+        const tip = Math.max(0, Math.min(1, lift / height));
+        positions[index] = neutral[index] + sway * tip * tip;
+        positions[index + 1] = 0.39 + lift * stretch;
+        positions[index + 2] = neutral[index + 2] + drift * tip;
+      }
+    }
+    fire.updateVerticesData('position', positions, false, false);
+  };
+}
+
+function createTeaSteam(parent, origin, scale = 1) {
+  const scene = parent.getScene(), cache = cacheFor(scene);
+  if (!cache.batches.has('tea-steam')) {
+    const steamMaterial = new StandardMaterial('warm-tea-steam', scene);
+    steamMaterial.diffuseColor = Color3.White(); steamMaterial.specularColor = Color3.Black();
+    steamMaterial.emissiveColor = new Color3(0.17, 0.15, 0.12);
+    steamMaterial.backFaceCulling = false;
+    cache.batches.set('tea-steam', steamMaterial);
+  }
+  const segments = 14, ribbons = 2, positions = new Float32Array((segments + 1) * ribbons * 6);
+  const colors = new Float32Array((segments + 1) * ribbons * 8), indices = [], normals = new Float32Array(positions.length);
+  for (let ribbon = 0; ribbon < ribbons; ribbon++) {
+    for (let point = 0; point <= segments; point++) {
+      const first = (ribbon * (segments + 1) + point) * 2;
+      for (let side = 0; side < 2; side++) { normals[(first + side) * 3] = Math.SQRT1_2; normals[(first + side) * 3 + 2] = Math.SQRT1_2; }
+      if (point < segments) indices.push(first, first + 2, first + 1, first + 1, first + 2, first + 3);
+    }
+  }
+  function pose(seconds) {
+    for (let ribbon = 0; ribbon < ribbons; ribbon++) {
+      for (let point = 0; point <= segments; point++) {
+        const height = point / segments, phase = seconds * 1.25 + ribbon * 2.7;
+        const curl = Math.sin(height * 8.5 - phase) * (0.008 + height * 0.028);
+        const centerX = (ribbon ? 0.023 : -0.023) + curl + Math.sin(phase * 0.6) * height * 0.028;
+        const centerZ = Math.cos(height * 6.5 - phase) * height * 0.028;
+        const width = (0.009 + Math.sin(height * Math.PI) * 0.010) * scale;
+        const opacity = Math.sin(height * Math.PI) ** 1.3 * (0.23 + 0.11 * Math.sin(height * 6.2 - phase));
+        for (let side = 0; side < 2; side++) {
+          const vertex = (ribbon * (segments + 1) + point) * 2 + side, sign = side ? 1 : -1;
+          positions[vertex * 3] = origin[0] + centerX * scale + sign * width;
+          positions[vertex * 3 + 1] = origin[1] + height * 0.57 * scale;
+          positions[vertex * 3 + 2] = origin[2] + centerZ * scale - sign * width;
+          colors[vertex * 4] = 0.91; colors[vertex * 4 + 1] = 0.88; colors[vertex * 4 + 2] = 0.80; colors[vertex * 4 + 3] = opacity;
+        }
+      }
+    }
+  }
+  pose(0);
+  const neutralPositions = new Float32Array(positions), neutralColors = new Float32Array(colors);
+  const steam = new Mesh('curling-tea-steam', scene); steam.parent = parent;
+  const data = new VertexData(); Object.assign(data, { positions, normals, colors, indices }); data.applyToMesh(steam, true);
+  steam.material = cache.batches.get('tea-steam'); steam.useVertexColors = true; steam.hasVertexAlpha = true;
+  steam.isPickable = false; steam.receiveShadows = false; steam.metadata = { dynamic: true, effect: 'tea-steam' };
+  steam.setBoundingInfo(new BoundingInfo(new Vector3(origin[0] - 0.15 * scale, origin[1], origin[2] - 0.12 * scale), new Vector3(origin[0] + 0.15 * scale, origin[1] + 0.58 * scale, origin[2] + 0.12 * scale)));
+  let resting = true;
+  return (seconds, focused, reducedMotion) => {
+    if (reducedMotion) {
+      if (resting) return;
+      positions.set(neutralPositions); colors.set(neutralColors); resting = true;
+    } else { pose(seconds); resting = false; }
+    steam.updateVerticesData('position', positions, false, false);
+    steam.updateVerticesData('color', colors, false, false);
+  };
+}
+
 function avatarTemplate(scene) {
   const templates = cacheFor(scene).templates;
   if (templates.has('avatar')) return templates.get('avatar');
@@ -502,7 +603,11 @@ function avatarTemplate(scene) {
   torus(head, 0.25, 0.026, [0, 0.017, 0.014], C.dark, Math.PI);
   for (const x of [-0.244, 0.244]) sphere(head, [0.044, 0.091, 0.08], [x, 0.022, 0.014], C.sage);
   const hand = new TransformNode('avatar-part', scene); sphere(hand, [0.074, 0.044, 0.10], [0, 0, 0], C.skin);
-  const value = { body: batch(body), head: batch(head), hand: batch(hand) };
+  const writingHand = new TransformNode('avatar-part', scene);
+  sphere(writingHand, [0.074, 0.044, 0.10], [0, 0, 0], C.skin);
+  rod(writingHand, [0.015, -0.048, -0.045], [0.075, 0.15, 0.025], 0.009, '#bb9b61');
+  rod(writingHand, [0.011, -0.058, -0.049], [0.015, -0.048, -0.045], 0.005, '#514e3b');
+  const value = { body: batch(body), head: batch(head), hand: batch(hand), writingHand: batch(writingHand) };
   Object.values(value).forEach(part => part.setEnabled(false));
   templates.set('avatar', value); return value;
 }
@@ -525,23 +630,51 @@ export function createFurniture(type, scene) {
   }
   const result = new TransformNode(definition.name, scene);
   result.position.y = 0.22; result.metadata = { type, sharedAssets: true };
+  const animations = [];
   const staticParts = templates.get(type).clone(`${type}-details`, result); staticParts.setEnabled(true);
   if (definition.category === 'Study') {
     const parts = avatarTemplate(scene);
     const avatar = group(result, [0, 0, 0.52]); avatar.metadata = { dynamic: true }; avatar.name = 'Study companion';
     const body = parts.body.clone('sweater-and-trousers', avatar); body.setEnabled(true);
     const head = parts.head.clone('headphones', avatar); head.position.set(0, 1.72, -0.17); head.setEnabled(true);
+    const writing = type === 'writing-desk';
     const hands = [-1, 1].map(side => {
-      const hand = parts.hand.clone('typing-hand', avatar); hand.position.set(side * 0.21, 1.37, -0.94); hand.setEnabled(true); return hand;
+      const template = writing && side === 1 ? parts.writingHand : parts.hand;
+      const hand = template.clone('typing-hand', avatar); hand.position.set(side * 0.21, 1.37, -0.94); hand.setEnabled(true); return hand;
     });
     result.metadata.study = true; result.metadata.avatar = avatar;
-    result.metadata.animate = (seconds, focused, reducedMotion) => {
-      const motion = reducedMotion ? 0 : 1;
-      head.rotation.x = motion * Math.sin(seconds * 0.55) * 0.018;
-      head.rotation.z = motion * Math.sin(seconds * 0.31) * 0.012;
-      for (let i = 0; i < hands.length; i++) hands[i].position.y = 1.37 + (focused ? motion * Math.sin(seconds * 6.2 + i * 1.7) * 0.011 : 0);
-    };
+    animations.push((seconds, focused, reducedMotion) => {
+      head.position.y = 1.72; head.rotation.set(0, 0, 0);
+      for (let index = 0; index < hands.length; index++) {
+        hands[index].position.set(index ? 0.21 : -0.21, 1.37, -0.94); hands[index].rotation.set(0, 0, 0);
+      }
+      if (reducedMotion) return;
+      head.position.y += Math.sin(seconds * 1.25) * 0.009;
+      head.rotation.x = (focused ? -0.045 : 0) + Math.sin(seconds * (focused ? 0.9 : 0.55)) * (focused ? 0.028 : 0.023);
+      head.rotation.y = Math.sin(seconds * 0.38) * (focused ? 0.025 : 0.075);
+      head.rotation.z = Math.sin(seconds * 0.41) * 0.022;
+      if (!focused) return;
+      if (writing) {
+        hands[1].position.x += Math.sin(seconds * 3.9) * 0.035;
+        hands[1].position.z += Math.sin(seconds * 5.2) * 0.036;
+        hands[1].position.y += (0.5 + Math.sin(seconds * 5.2) * 0.5) * 0.012;
+        hands[1].rotation.y = Math.sin(seconds * 3.9) * 0.12;
+      } else {
+        for (let i = 0; i < hands.length; i++) {
+          const rhythm = seconds * 7.6 + i * 2.2;
+          hands[i].position.y += (0.5 + Math.sin(rhythm) * 0.5) * 0.034;
+          hands[i].position.z += Math.cos(rhythm * 0.71) * 0.015;
+          hands[i].rotation.x = Math.sin(rhythm) * 0.06;
+        }
+      }
+    });
+    animations.push(createTeaSteam(result, writing ? [0.72, 1.445, -0.06] : [0.83, 1.465, -0.13], writing ? 0.9 : 1));
   }
+  if (type === 'side-table') animations.push(createTeaSteam(result, [0.18, 0.846, 0.07], 0.72));
+  if (type === 'fireplace') animations.push(createDancingFire(result));
+  if (animations.length) result.metadata.animate = (seconds, focused, reducedMotion) => {
+    for (const animate of animations) animate(seconds, focused, reducedMotion);
+  };
   return result;
 }
 

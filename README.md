@@ -22,6 +22,8 @@ The development server binds to `127.0.0.1`. Open the local URL Vite prints. Run
 - Three expansive, editable room designs: **Ember library**, **Moonlit greenhouse**, and **Writer’s loft**. **Undo** restores the preceding arrangement.
 - Select a desk and choose **Study here** to move your avatar's study spot. The last study station cannot be removed.
 - 25 / 50 / 90-minute focus sessions, pause/resume/reset, local saves, task text and completed-session history.
+- A visible local presence badge distinguishes **In your room**, **Focusing**, and **On a break**. It reflects your timer; shared online/friend presence is a future feature.
+- Animated hearth flames, curling tea steam, typing/writing motions, a breathing cat with petting reactions, drifting fireflies, rain and a gentle settling motion when furniture is placed. Reduced motion returns the scene to still poses.
 - Three atmosphere presets, fairy lights, pet interaction, and user-activated synthesized rain audio.
 - Mini view demonstrates a smaller room **inside this page**.
 - An optional Performance panel shows measured frame cadence, CPU submission, drawing cost and quality controls.
@@ -38,7 +40,7 @@ See [engine and performance notes](docs/engine-and-performance.md) for the basel
 
 Start with [the competitor map](research/competitor-map.md), then [web and social](research/web-and-social.md) and [desktop and notch](research/desktop-and-notch.md). Research was checked September 21, 2026. Official feature claims are not equivalent to hands-on verification.
 
-The user's chosen direction is browser first, with a whole cutaway room visible like Rooms.xyz, then desktop/notch and optional friends. Virtual Cottage 2 is the main product benchmark under that framing; Rooms is the visual reference. The competitive opportunity remains a hypothesis to validate through actual sessions.
+The chosen direction is browser first, with a whole cutaway room visible like Rooms.xyz, then friends joining rooms and clearly visible study presence. The notch is an optional companion to that experience. See [product direction](docs/product-vision.md). Virtual Cottage 2 is the main product benchmark under that framing; Rooms is the visual reference. The competitive opportunity remains a hypothesis to validate through actual sessions.
 
 ## Verification
 
@@ -59,5 +61,5 @@ npm run build
 1. Refine the furniture art and room game with the user; validate the placement flow at desktop and mobile sizes.
 2. Expand the deliberate furniture collection, room shapes and palettes; validate a focus-earned progression loop before adding an economy.
 3. Validate repeat use with a small pilot. Measure time to first focus session, repeat completed sessions, and observed memory/frame/battery performance.
-4. Add an expandable native Mac notch companion using the same room, pet and focus state. Show which invited friends are studying and let the companion expand into a view of their rooms. This needs native implementation and device testing.
-5. Add private invite-only study visits with visible presence, synchronized optional timers, and explicit leave/block controls. Broader public discovery can follow proven demand.
+4. Add invite-only study visits with visible presence: distinguish online availability, active focus and breaks. Synchronize room and focus state for invited friends.
+5. Add an optional expandable native Mac notch/desktop companion using that same room, pet, focus and presence state. Show which friends are studying and let the companion expand into their rooms. This needs native implementation and device testing.

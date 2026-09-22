@@ -106,7 +106,7 @@ test('native Babylon furniture meshes fit declared footprints and the room heigh
   try {
     for (const definition of FURNITURE) {
       const furniture = createFurniture(definition.id, scene);
-      assert.ok(furniture.getChildMeshes().length <= 7, `${definition.id} stays within its draw budget`);
+      assert.ok(furniture.getChildMeshes().length <= 8, `${definition.id} stays within its draw budget`);
       for (let rotation = 0; rotation < 4; rotation++) {
         furniture.rotation.y = rotation * Math.PI / 2;
         furniture.getChildMeshes().forEach(part => part.computeWorldMatrix(true));
@@ -143,5 +143,87 @@ test('furniture instances share static geometry, retain independent avatars, and
     const fresh = createFurniture('plant', scene);
     assert.equal(fresh.getChildMeshes().length, 1);
     fresh.dispose();
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('fire flickers independently without moving the mantel or changing shared materials', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const first = createFurniture('fireplace', scene), second = createFurniture('fireplace', scene);
+    const flames = item => item.getChildMeshes().find(mesh => mesh.metadata?.effect === 'hearth-flames');
+    const firstFlames = flames(first), secondFlames = flames(second);
+    const neutral = Array.from(firstFlames.getVerticesData('position'));
+    const otherNeutral = Array.from(secondFlames.getVerticesData('position'));
+    const stone = first.getChildMeshes().find(mesh => !mesh.metadata?.dynamic);
+    const stonePositions = Array.from(stone.getVerticesData('position'));
+    const glow = firstFlames.material.emissiveColor.asArray();
+    assert.equal(first.getChildMeshes().length, 3, 'the entire fire adds only one draw call');
+    assert.equal(firstFlames.isEnabled(), true);
+    assert.notEqual(firstFlames.geometry, secondFlames.geometry, 'animated buffers belong to each instance');
+    assert.equal(firstFlames.material, secondFlames.material, 'unchanging material stays shared');
+    first.metadata.animate(1.7, false, false);
+    assert.notDeepEqual(Array.from(firstFlames.getVerticesData('position')), neutral);
+    assert.deepEqual(Array.from(secondFlames.getVerticesData('position')), otherNeutral);
+    assert.deepEqual(Array.from(stone.getVerticesData('position')), stonePositions);
+    assert.deepEqual(firstFlames.material.emissiveColor.asArray(), glow);
+    first.metadata.animate(22, false, true);
+    assert.deepEqual(Array.from(firstFlames.getVerticesData('position')), neutral);
+    first.metadata.animate(123, false, true);
+    assert.deepEqual(Array.from(firstFlames.getVerticesData('position')), neutral);
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('tea curls and fades in one small mesh, stays inside its furniture footprint, and resets exactly', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    for (const type of ['study-desk', 'writing-desk', 'side-table']) {
+      const furniture = createFurniture(type, scene);
+      const steam = furniture.getChildMeshes().find(mesh => mesh.metadata?.effect === 'tea-steam');
+      const neutralPositions = Array.from(steam.getVerticesData('position'));
+      const neutralColors = Array.from(steam.getVerticesData('color'));
+      assert.equal(steam.getTotalIndices() / 3, 56);
+      assert.equal(steam.isPickable, false);
+      const [width, depth] = getFurniture(type).footprint;
+      for (const seconds of [0.4, 1.7, 3.2, 7.8]) {
+        furniture.metadata.animate(seconds, true, false);
+        const positions = steam.getVerticesData('position');
+        for (let index = 0; index < positions.length; index += 3) {
+          assert.ok(Math.abs(positions[index]) <= width / 2);
+          assert.ok(Math.abs(positions[index + 2]) <= depth / 2);
+          assert.ok(positions[index + 1] > 0 && positions[index + 1] < 5.3);
+        }
+      }
+      assert.notDeepEqual(Array.from(steam.getVerticesData('position')), neutralPositions);
+      assert.notDeepEqual(Array.from(steam.getVerticesData('color')), neutralColors);
+      furniture.metadata.animate(28, true, true);
+      assert.deepEqual(Array.from(steam.getVerticesData('position')), neutralPositions);
+      assert.deepEqual(Array.from(steam.getVerticesData('color')), neutralColors);
+      furniture.metadata.animate(83, true, true);
+      assert.deepEqual(Array.from(steam.getVerticesData('position')), neutralPositions);
+      furniture.dispose();
+    }
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('the avatar types at its laptop, writes at its journal, and rests its hands when focus is paused', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    for (const type of ['study-desk', 'writing-desk']) {
+      const furniture = createFurniture(type, scene);
+      const avatar = furniture.metadata.avatar;
+      const hands = avatar.getChildren().filter(node => node.name === 'typing-hand');
+      const head = avatar.getChildren().find(node => node.name === 'headphones');
+      furniture.metadata.animate(1.7, true, false);
+      assert.notEqual(hands[1].position.y, 1.37);
+      assert.notEqual(head.rotation.x, 0);
+      if (type === 'writing-desk') assert.notEqual(hands[1].position.x, 0.21);
+      furniture.metadata.animate(2.4, false, false);
+      assert.deepEqual(hands.map(hand => hand.position.asArray()), [[-0.21, 1.37, -0.94], [0.21, 1.37, -0.94]]);
+      furniture.metadata.animate(9.8, true, true);
+      assert.deepEqual(head.position.asArray(), [0, 1.72, -0.17]);
+      assert.deepEqual(head.rotation.asArray(), [0, 0, 0]);
+      hands.forEach(hand => assert.deepEqual(hand.rotation.asArray(), [0, 0, 0]));
+      furniture.dispose();
+    }
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });

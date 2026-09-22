@@ -15,6 +15,7 @@ import { GlowLayer } from '@babylonjs/core/Layers/glowLayer.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js';
+import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
 import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstrumentation.js';
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 import '@babylonjs/core/Culling/ray.js';
@@ -227,15 +228,18 @@ export function createRoom(container, options = {}) {
   for (let i = 0; i < 12; i++) { const angle = i / 12 * Math.PI * 2; sphere([0.018, 0.018, 0.008], [Math.cos(angle) * 0.31, Math.sin(angle) * 0.31, 0.067], palette.darkWood, wallClock); }
 
   const cat = new TransformNode('sleeping-cat', scene); cat.parent = world; cat.position.set(0.84, 0.29, 1.59); cat.rotation.y = -0.3;
-  const catBody = sphere([0.56, 0.26, 0.36], [-0.08, 0.23, 0], palette.ginger, cat);
-  sphere([0.37, 0.14, 0.26], [0.08, 0.13, 0.19], palette.gingerLight, cat);
-  const head = sphere([0.29, 0.245, 0.25], [0.33, 0.26, 0.15], palette.gingerLight, cat);
-  [-0.16, 0.15].forEach((x, i) => { const ear = cylinder(0, 0.115, 0.24, [0.33 + x, 0.47, 0.09], palette.ginger, cat, 3); ear.rotation.set(0.12, i ? -0.15 : 0.15, i ? -0.16 : 0.16); });
-  [-0.105, 0.105].forEach(x => tube([[0.33 + x - 0.037, 0.295, 0.371], [0.33 + x, 0.28, 0.389], [0.33 + x + 0.037, 0.295, 0.378]], 0.012, material('#6e513b'), cat));
-  sphere([0.031, 0.019, 0.019], [0.33, 0.225, 0.398], material('#b87869'), cat);
+  const catTorso = new TransformNode('miso-breathing', scene); catTorso.parent = cat;
+  const catBody = sphere([0.56, 0.26, 0.36], [-0.08, 0.23, 0], palette.ginger, catTorso); catBody.name = 'miso-body';
+  sphere([0.37, 0.14, 0.26], [0.08, 0.13, 0.19], palette.gingerLight, catTorso);
+  const catHead = new TransformNode('miso-head', scene); catHead.parent = cat; catHead.position.set(0.33, 0.26, 0.15);
+  sphere([0.29, 0.245, 0.25], [0, 0, 0], palette.gingerLight, catHead);
+  const catEars = [-0.16, 0.15].map((x, i) => { const ear = cylinder(0, 0.115, 0.24, [x, 0.21, -0.06], palette.ginger, catHead, 3); ear.name = i ? 'miso-ear-right' : 'miso-ear-left'; ear.rotation.set(0.12, i ? -0.15 : 0.15, i ? -0.16 : 0.16); return ear; });
+  [-0.105, 0.105].forEach(x => tube([[x - 0.037, 0.035, 0.221], [x, 0.02, 0.239], [x + 0.037, 0.035, 0.228]], 0.012, material('#6e513b'), catHead));
+  sphere([0.031, 0.019, 0.019], [0, -0.035, 0.248], material('#b87869'), catHead);
   sphere([0.11, 0.065, 0.07], [0.25, 0.14, 0.31], palette.linen, cat);
-  tube([[-0.52, 0.22, -0.12], [-0.62, 0.13, 0.10], [-0.49, 0.105, 0.37], [-0.22, 0.105, 0.43], [0.04, 0.12, 0.35]], 0.10, palette.gingerLight, cat);
-  [-0.32, -0.08, 0.13].forEach(x => sphere([0.047, 0.015, 0.22], [x, 0.478 - Math.abs(x + 0.08) * 0.06, -0.045], material('#ac7041'), cat));
+  const catTail = new TransformNode('miso-tail', scene); catTail.parent = cat; catTail.position.set(-0.52, 0.22, -0.12);
+  tube([[0, 0, 0], [-0.10, -0.09, 0.22], [0.03, -0.115, 0.49], [0.30, -0.115, 0.55], [0.56, -0.10, 0.47]], 0.10, palette.gingerLight, catTail);
+  [-0.32, -0.08, 0.13].forEach(x => sphere([0.047, 0.015, 0.22], [x, 0.478 - Math.abs(x + 0.08) * 0.06, -0.045], material('#ac7041'), catTorso));
   cat.getChildMeshes().forEach(mesh => { mesh.isPickable = true; mesh.metadata.cat = true; });
   const heart = new TransformNode('pet-heart', scene); heart.parent = world; heart.position.set(1.18, 1.12, 1.62); heart.setEnabled(false);
   const heartMaterial = material('#c77868', { emissive: '#c77868', emissiveIntensity: 0.3 });
@@ -278,20 +282,22 @@ export function createRoom(container, options = {}) {
     }
   }
   batchStatic(world, new Set([cat, heart, ...Object.values(decor)])); Object.values(decor).forEach(group => batchStatic(group));
-  const rainSeeds = Array.from({ length: 40 }, (_, i) => ({ x: -4.7 + ((i * 0.618033) % 1) * 3.98, y: (i * 0.371) % 1, speed: 0.55 + (i % 4) * 0.12 }));
+  const rainSeeds = Array.from({ length: 40 }, (_, i) => { const x = -4.7 + ((i * 0.618033) % 1) * 3.98; return { x, y: (i * 0.371) % 1, speed: 0.55 + (i % 4) * 0.12, top: archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2)) - 0.12 }; });
   const rainLines = rainSeeds.map(seed => [new Vector3(seed.x, 2, -4.52), new Vector3(seed.x - 0.025, 2.18, -4.52)]);
   const rain = MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, updatable: true }, scene); rain.color = color('#fffdf5'); rain.alpha = 0.6; rain.isPickable = false; rain.setEnabled(false);
+  const rainPositions = Float32Array.from(rain.getVerticesData('position'));
+  rain.setBoundingInfo(new BoundingInfo(new Vector3(-4.75, 1.55, -4.53), new Vector3(-0.65, 5.28, -4.51)));
   // Sixteen soft fireflies share one instanced draw call, and are never picked.
   const fireflies = MeshBuilder.CreateSphere('floating-fireflies', { diameter: 0.045, segments: 3 }, scene); fireflies.material = bulb; fireflies.isPickable = false; fireflies.metadata = { castShadow: false }; fireflies.alwaysSelectAsActiveMesh = true;
   const fireflyMatrices = new Float32Array(16 * 16), fireflyTransform = Matrix.Identity();
   const fireflySeeds = Array.from({ length: 16 }, (_, i) => ({ x: -4.7 + ((i * 0.618033) % 1) * 9.8, y: 1.15 + ((i * 0.377) % 1) * 3.5, z: -3.6 + ((i * 0.713) % 1) * 6.3 }));
   fireflySeeds.forEach((seed, i) => { Matrix.TranslationToRef(seed.x, seed.y, seed.z, fireflyTransform); fireflyTransform.copyToArray(fireflyMatrices, i * 16); }); fireflies.thinInstanceSetBuffer('matrix', fireflyMatrices, 16, false);
-  const furnitureRoot = new TransformNode('placed-furniture', scene), placedObjects = new Map();
+  const furnitureRoot = new TransformNode('placed-furniture', scene), placedObjects = new Map(), settlingPieces = new Map(), animatedObjects = [];
   const decorVisible = { plants: true, lights: true, rug: true };
   let layout = createLayout(), selectedId = null, editing = false, placement = null, ghost = null, marker = null, lastPlacementState = '';
   const ghostMaterial = new StandardMaterial('placement-preview', scene); ghostMaterial.diffuseColor = color('#85ac80'); ghostMaterial.emissiveColor = color('#42653f'); ghostMaterial.alpha = 0.43; ghostMaterial.disableLighting = true;
   let theme = 'dusk', focused = false, petStart = -Infinity, disposed = false, readyReported = false;
-  let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden;
+  let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true;
   let quality = 'auto', pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5), statsStart = 0, intervalTotal = 0, sampleFrames = 0, slowSamples = 0;
   const intervals = [], submissions = [];
   engine.setHardwareScalingLevel(1 / pixelRatio);
@@ -302,13 +308,15 @@ export function createRoom(container, options = {}) {
   const isDesk = item => item && Boolean(placedObjects.get(item.id)?.metadata.study);
   function requestRender(shadows = false) {
     if (disposed) return;
+    needsRender = true;
     if (shadows) shadow.getShadowMap()?.resetRefreshCounter();
     if (visible && !frame) frame = requestAnimationFrame(tick);
   }
   function refreshShadows() {
-    shadow.getShadowMap().renderList = scene.meshes.filter(mesh => mesh.metadata?.castShadow !== false && mesh !== rain && mesh !== marker && !mesh.isDescendantOf(heart) && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
+    shadow.getShadowMap().renderList = scene.meshes.filter(mesh => mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && mesh !== rain && mesh !== marker && !mesh.isDescendantOf(heart) && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
     for (const mesh of glowingMeshes) bloom.removeIncludedOnlyMesh(mesh); glowingMeshes.clear();
-    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; if (emission && emission.r + emission.g + emission.b > 0.1 && mesh.isEnabled() && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
+    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; if (emission && mesh.metadata?.effect !== 'tea-steam' && emission.r + emission.g + emission.b > 0.1 && mesh.isEnabled() && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
+    bloom.mainTexture.renderList = [...glowingMeshes];
     requestRender(true);
   }
   function updateMarker() {
@@ -319,18 +327,20 @@ export function createRoom(container, options = {}) {
     marker = MeshBuilder.CreateLines('selected-footprint', { points: [new Vector3(-w, 0, -d), new Vector3(w, 0, -d), new Vector3(w, 0, d), new Vector3(-w, 0, d), new Vector3(-w, 0, -d)] }, scene);
     marker.color = color('#b77d38'); marker.position.set(item.x, 0.30, item.z); marker.rotation.y = item.rotation * Math.PI / 2; marker.isPickable = false; marker.metadata = { castShadow: false };
   }
-  function syncFurniture() {
+  function syncFurniture(settleNew = false) {
+    if (!settleNew) { for (const { object } of settlingPieces.values()) object.scaling.setAll(1); settlingPieces.clear(); }
     const ids = new Set(layout.items.map(item => item.id));
-    for (const [id, object] of placedObjects) if (!ids.has(id)) { object.dispose(false, false); placedObjects.delete(id); }
+    for (const [id, object] of placedObjects) if (!ids.has(id)) { settlingPieces.delete(id); object.dispose(false, false); placedObjects.delete(id); }
     let rugLayer = 0;
     for (const item of layout.items) {
       let object = placedObjects.get(item.id);
-      if (object && object.metadata.furnitureType !== item.type) { object.dispose(false, false); placedObjects.delete(item.id); object = null; }
+      if (object && object.metadata.furnitureType !== item.type) { settlingPieces.delete(item.id); object.dispose(false, false); placedObjects.delete(item.id); object = null; }
       if (!object) {
         object = createFurniture(item.type, scene); object.parent = furnitureRoot;
         object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type;
-        object.getChildMeshes().forEach(mesh => { mesh.isPickable = true; mesh.receiveShadows = true; });
+        object.getChildMeshes().forEach(mesh => { mesh.isPickable = !mesh.metadata?.effect; mesh.receiveShadows = !mesh.metadata?.effect; });
         placedObjects.set(item.id, object);
+        if (settleNew && !reducedMotion) { object.scaling.setAll(0.92); settlingPieces.set(item.id, { object, start: performance.now() }); }
       }
       object.position.y = getFurniture(item.type).category === 'Rugs' ? 0.22 + rugLayer++ * 0.006 : 0.22;
       object.position.x = item.x; object.position.z = item.z; object.rotation.y = item.rotation * Math.PI / 2;
@@ -338,6 +348,8 @@ export function createRoom(container, options = {}) {
       object.metadata.avatar?.setEnabled(item.id === layout.activeDeskId);
     }
     if (selectedId && !ids.has(selectedId)) { selectedId = null; options.onSelectionChange?.(null); }
+    animatedObjects.length = 0;
+    for (const object of placedObjects.values()) if (object.metadata.animate) animatedObjects.push(object);
     const desk = layout.items.find(item => item.id === layout.activeDeskId);
     if (desk) { const offset = Vector3.TransformCoordinates(new Vector3(0.85, 2.08, -0.35), Matrix.RotationY(desk.rotation * Math.PI / 2)); windowGlow.position.set(desk.x + offset.x, offset.y, desk.z + offset.z); }
     const fireplace = layout.items.find(item => item.type === 'fireplace'); hearthGlow.setEnabled(Boolean(fireplace));
@@ -349,7 +361,7 @@ export function createRoom(container, options = {}) {
     if (selectedId) options.onSelectionChange?.({ ...layout.items.find(item => item.id === selectedId) });
     if (placement) updatePlacement(placement.x, placement.z);
   }
-  function commitLayout() { syncFurniture(); options.onLayoutChange?.(copyLayout()); }
+  function commitLayout() { syncFurniture(true); options.onLayoutChange?.(copyLayout()); }
   function selectItem(id) {
     selectedId = layout.items.some(item => item.id === id) ? id : null; updateMarker();
     const item = layout.items.find(candidate => candidate.id === selectedId); options.onSelectionChange?.(item ? { ...item } : null); requestRender();
@@ -426,15 +438,17 @@ export function createRoom(container, options = {}) {
     return scene.createPickingRay(x, y, Matrix.IdentityReadOnly, camera);
   }
   function itemAncestor(mesh) { for (let node = mesh; node; node = node.parent) if (node.metadata?.itemId) return node; return null; }
-  function hitItem(ray) {
-    const hit = scene.pickWithRay(ray, mesh => mesh.isEnabled() && mesh.isPickable && Boolean(itemAncestor(mesh)), false);
+  function hitItem(ray, fastCheck = false) {
+    const hit = scene.pickWithRay(ray, mesh => mesh.isEnabled() && mesh.isPickable && Boolean(itemAncestor(mesh)), fastCheck);
     return hit?.hit ? itemAncestor(hit.pickedMesh)?.metadata.itemId : null;
   }
   const floorHit = new Vector3();
   function floorPosition(ray) { const distance = (0.22 - ray.origin.y) / ray.direction.y; if (!Number.isFinite(distance) || distance < 0) return null; floorHit.copyFrom(ray.direction).scaleInPlace(distance).addInPlace(ray.origin); return floorHit; }
-  let downPosition = null;
+  let downPosition = null, hasPendingPointer = false;
+  const pendingPointer = { clientX: 0, clientY: 0, pointerType: 'mouse' };
   const onPointerDown = event => { downPosition = { x: event.clientX, y: event.clientY }; requestRender(); };
   const onPointerUp = event => {
+    hasPendingPointer = false;
     const clicked = downPosition && Math.hypot(event.clientX - downPosition.x, event.clientY - downPosition.y) < 7; downPosition = null; requestRender(); if (!clicked) return;
     const ray = castPointer(event);
     if (!editing) { if (scene.pickWithRay(ray, mesh => mesh.metadata?.cat)?.hit) pet(); return; }
@@ -448,13 +462,24 @@ export function createRoom(container, options = {}) {
     if (id && !(selectedId && getFurniture(hit?.type)?.category === 'Rugs' && selectedId !== id)) { selectItem(id); return; }
     if (selectedId && floor) { const item = layout.items.find(candidate => candidate.id === selectedId); moveSelection(snap(floor.x) - item.x, snap(floor.z) - item.z); } else selectItem(null);
   };
-  const onPointerCancel = () => { downPosition = null; canvas.style.cursor = editing ? 'crosshair' : 'grab'; };
+  const onPointerCancel = () => { hasPendingPointer = false; downPosition = null; canvas.style.cursor = editing ? 'crosshair' : 'grab'; };
   const onPointerMove = event => {
-    const ray = castPointer(event);
-    if (editing && placement) { const floor = floorPosition(ray); if (floor) updatePlacement(floor.x, floor.z); }
-    if (event.pointerType === 'mouse') canvas.style.cursor = editing ? hitItem(ray) ? 'pointer' : 'crosshair' : scene.pickWithRay(ray, mesh => mesh.metadata?.cat)?.hit ? 'pointer' : downPosition ? 'grabbing' : 'grab';
-    if (downPosition) requestRender();
+    if (!editing && downPosition) { canvas.style.cursor = 'grabbing'; requestRender(); return; }
+    pendingPointer.clientX = event.clientX; pendingPointer.clientY = event.clientY; pendingPointer.pointerType = event.pointerType; hasPendingPointer = true;
+    // Reuse the existing render callback so high-rate pointer devices cannot
+    // cause more than one expensive hover pick per displayed frame.
+    if (visible && !frame) frame = requestAnimationFrame(tick);
   };
+  function processPendingPointer() {
+    if (!hasPendingPointer) return;
+    hasPendingPointer = false;
+    const ray = castPointer(pendingPointer);
+    if (editing && placement) {
+      const floor = floorPosition(ray); if (floor) updatePlacement(floor.x, floor.z);
+      canvas.style.cursor = 'crosshair'; return;
+    }
+    if (pendingPointer.pointerType === 'mouse') canvas.style.cursor = editing ? hitItem(ray, true) ? 'pointer' : 'crosshair' : scene.pickWithRay(ray, mesh => mesh.metadata?.cat, true)?.hit ? 'pointer' : 'grab';
+  }
   canvas.addEventListener('pointerdown', onPointerDown); canvas.addEventListener('pointerup', onPointerUp); canvas.addEventListener('pointercancel', onPointerCancel); canvas.addEventListener('pointermove', onPointerMove);
 
   const roomCorners = []; for (const x of [-6.19, 6.19]) for (const y of [-0.32, 6.02]) for (const z of [-4.78, 4.78]) roomCorners.push(new Vector3(x, y, z));
@@ -473,14 +498,34 @@ export function createRoom(container, options = {}) {
   syncFurniture(); resize();
   function animate(now) {
     const seconds = now / 1000;
-    fireflySeeds.forEach((seed, i) => { const t = reducedMotion ? 0 : seconds; Matrix.TranslationToRef(seed.x + Math.sin(t * 0.21 + i * 2) * 0.22, seed.y + Math.sin(t * 0.31 + i) * 0.16, seed.z + Math.cos(t * 0.18 + i * 3) * 0.19, fireflyTransform); fireflyTransform.copyToArray(fireflyMatrices, i * 16); }); fireflies.thinInstanceBufferUpdated('matrix');
+    const ambientTime = reducedMotion ? 0 : seconds;
+    for (let i = 0; i < fireflySeeds.length; i++) { const seed = fireflySeeds[i]; Matrix.TranslationToRef(seed.x + Math.sin(ambientTime * 0.21 + i * 2) * 0.22, seed.y + Math.sin(ambientTime * 0.31 + i) * 0.16, seed.z + Math.cos(ambientTime * 0.18 + i * 3) * 0.19, fireflyTransform); fireflyTransform.copyToArray(fireflyMatrices, i * 16); } fireflies.thinInstanceBufferUpdated('matrix');
     hearthGlow.intensity = (theme === 'dusk' ? 1.0 : 0.65) + (reducedMotion ? 0 : Math.sin(seconds * 2.1) * 0.025 + Math.sin(seconds * 5.3) * 0.016);
-    catBody.scaling.y = 0.26 * (reducedMotion ? 1 : 1 + Math.sin(seconds * (focused ? 1.35 : 1.7)) * 0.035);
-    for (const [id, object] of placedObjects) if (id === layout.activeDeskId) object.metadata.animate?.(seconds, focused, reducedMotion);
-    const petAge = (now - petStart) / 1000;
-    if (petAge < 1.6) { heart.setEnabled(true); heart.position.y = 1.12 + (reducedMotion ? 0 : petAge * 0.48); heartMaterial.alpha = Math.min(1, (1.6 - petAge) * 2.6); if (!reducedMotion) head.rotation.z = Math.sin(petAge * 8) * 0.07; }
-    else { heart.setEnabled(false); head.rotation.z = 0; }
-    if (rain.isEnabled()) { for (let i = 0; i < rainSeeds.length; i++) { const seed = rainSeeds[i], top = archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (seed.x - archCenter) ** 2)) - 0.12, y = 1.62 + ((seed.y - (reducedMotion ? 0 : seconds * seed.speed) % 1 + 1) % 1) * (top - 1.62); rainLines[i][0].y = y; rainLines[i][1].y = Math.min(y + 0.20, top); } MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, instance: rain }, scene); }
+    const petAge = (now - petStart) / 1000, beingPet = petAge >= 0 && petAge < 1.6, petTime = beingPet ? petAge : 0;
+    const breathing = reducedMotion ? 0 : Math.sin(seconds * (focused ? 1.35 : 1.65));
+    catTorso.scaling.set(1 + breathing * 0.012, 1 + breathing * 0.065, 1 + breathing * 0.012);
+    const petEase = beingPet && !reducedMotion ? Math.sin(petAge / 1.6 * Math.PI) : 0;
+    catHead.position.y = 0.26 + (reducedMotion ? 0 : breathing * 0.009) + petEase * 0.055;
+    catHead.rotation.set(-petEase * 0.14, 0, petEase * Math.sin(petTime * 7) * 0.14);
+    const tailPhase = seconds % 7.8 / 1.25;
+    catTail.rotation.y = reducedMotion ? 0 : petEase * Math.sin(petTime * 9) * 0.38 + (tailPhase < 1 ? Math.sin(tailPhase * Math.PI * 4) * Math.sin(tailPhase * Math.PI) * 0.22 : 0);
+    const earPhase = seconds % 9.2 / 0.55;
+    const earTwitch = reducedMotion ? 0 : petEase * Math.sin(petTime * 11) * 0.13 + (earPhase < 1 ? Math.sin(earPhase * Math.PI * 4) * Math.sin(earPhase * Math.PI) * 0.19 : 0);
+    for (let i = 0; i < catEars.length; i++) { const ear = catEars[i]; ear.rotation.x = 0.12 + earTwitch * (i ? -0.5 : 1); ear.rotation.z = (i ? -0.16 : 0.16) + earTwitch * 0.45; }
+    for (let i = 0; i < animatedObjects.length; i++) { const object = animatedObjects[i]; object.metadata.animate(seconds, focused && object.metadata.itemId === layout.activeDeskId, reducedMotion); }
+    let settled = false;
+    for (const [id, entry] of settlingPieces) {
+      const progress = Math.min(1, Math.max(0, (now - entry.start) / 420));
+      if (reducedMotion || progress >= 1) { entry.object.scaling.setAll(1); settlingPieces.delete(id); settled = true; }
+      else entry.object.scaling.setAll(0.92 + 0.08 * (1 - (1 - progress) ** 3));
+    }
+    if (settled) requestRender(true);
+    if (beingPet) { heart.setEnabled(true); heart.position.y = 1.12 + (reducedMotion ? 0 : petAge * 0.48); heartMaterial.alpha = Math.min(1, (1.6 - petAge) * 2.6); }
+    else heart.setEnabled(false);
+    if (rain.isEnabled()) {
+      for (let i = 0; i < rainSeeds.length; i++) { const seed = rainSeeds[i], top = seed.top, y = 1.62 + ((seed.y - (reducedMotion ? 0 : seconds * seed.speed) % 1 + 1) % 1) * (top - 1.62); rainPositions[i * 6 + 1] = y; rainPositions[i * 6 + 4] = Math.min(y + 0.20, top); }
+      rain.updateVerticesData('position', rainPositions, false, false);
+    }
   }
   function reportStats(now, submitMs) {
     if (!statsStart) statsStart = now;
@@ -490,13 +535,16 @@ export function createRoom(container, options = {}) {
     const fps = sampleFrames * 1000 / (now - statsStart), p95FrameMs = sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)] || 0, p95SubmitMs = cpu[Math.max(0, Math.ceil(cpu.length * 0.95) - 1)] || 0;
     options.onStats?.({ fps, frameMs: intervals.length ? intervalTotal / intervals.length : 0, p95FrameMs, submitMs: submissions.reduce((total, value) => total + value, 0) / submissions.length, p95SubmitMs, cpuRenderMsP95: p95SubmitMs, drawCalls: instrumentation.drawCallsCounter.current, triangles: Math.round(scene.getActiveIndices() / 3), pixelRatio, quality, engine: 'Babylon.js' });
     if (quality === 'auto') { // On-demand idle time is intentional, so it must never count as slow rendering.
-      slowSamples = (!reducedMotion && fps < 43) || p95SubmitMs > 12 ? slowSamples + 1 : 0; if (slowSamples >= 3 && pixelRatio > 0.75) { pixelRatio = Math.max(0.75, pixelRatio - 0.25); engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; bloom.isEnabled = quality !== 'battery'; resize(); } }
+      slowSamples = (!reducedMotion && fps < 55) || p95SubmitMs > 12 ? slowSamples + 1 : 0; if (slowSamples >= 3 && pixelRatio > 0.75) { pixelRatio = Math.max(0.75, pixelRatio - 0.25); engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; bloom.isEnabled = quality !== 'battery'; resize(); } }
     statsStart = now; sampleFrames = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0;
   }
   function tick(now) {
     frame = 0; if (disposed || !visible) return;
     const interval = quality === 'battery' ? 1000 / 30 : 1000 / 60, elapsed = now - lastFrame;
     if (lastFrame && elapsed < interval - 1) { frame = requestAnimationFrame(tick); return; }
+    processPendingPointer();
+    if (reducedMotion && !needsRender && readyReported && !downPosition && now - petStart >= 1650) return;
+    needsRender = false;
     lastFrame = elapsed > interval * 3 ? now : lastFrame + interval; animate(now);
     const start = performance.now(); engine.beginFrame(); scene.render(); engine.endFrame(); reportStats(now, performance.now() - start); lastRenderedAt = now;
     if (!readyReported && scene.isReady()) { readyReported = true; requestRender(true); options.onReady?.(); }
@@ -513,6 +561,6 @@ export function createRoom(container, options = {}) {
     setDecor(key, value) { if (!(key in decorVisible)) return; decorVisible[key] = Boolean(value); decor[key]?.setEnabled(Boolean(value)); syncFurniture(); },
     resetView() { camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
     diagnostics() { return { scene, engine, camera, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio }; },
-    dispose() { if (disposed) return; disposed = true; cancelAnimationFrame(frame); observer.disconnect(); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); instrumentation.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    dispose() { if (disposed) return; disposed = true; cancelAnimationFrame(frame); observer.disconnect(); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); settlingPieces.clear(); animatedObjects.length = 0; instrumentation.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

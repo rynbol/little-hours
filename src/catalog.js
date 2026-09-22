@@ -2,7 +2,7 @@
 export const FURNITURE = [
   { id: 'study-desk', name: 'Oak study station', category: 'Study', description: 'A generous oak desk, laptop, shaded lamp and a chair for your study companion.', footprint: [3, 2.1], color: '#ac7953', blocking: true },
   { id: 'writing-desk', name: 'Little writing desk', category: 'Study', description: 'A compact cream desk with a journal, pencil cup and a warm terracotta chair.', footprint: [2.5, 2.1], color: '#d8ccb1', blocking: true },
-  { id: 'bookcase', name: 'Collected bookcase', category: 'Storage', description: 'Three shelves of well-loved books, a ceramic vase and a linen basket.', footprint: [1.9, 0.65], color: '#9c7150', blocking: true },
+  { id: 'bookcase', name: 'Collected bookcase', category: 'Storage', description: 'Four shelves of well-loved books, a ceramic vase and a linen basket.', footprint: [1.9, 0.65], color: '#9c7150', blocking: true },
   { id: 'lounge-chair', name: 'Sunday armchair', category: 'Seating', description: 'Soft sage cushions, a honey-colored pillow and a tasseled throw.', footprint: [1.7, 1.8], color: '#82958b', blocking: true },
   { id: 'side-table', name: 'Tea time table', category: 'Storage', description: 'A small turned-wood table, a book and your favorite little cup.', footprint: [0.85, 0.85], color: '#b7895d', blocking: true },
   { id: 'floor-lamp', name: 'Pleated floor lamp', category: 'Lighting', description: 'A brass stem and a gently glowing linen shade for the reading corner.', footprint: [0.7, 0.7], color: '#d7b783', blocking: true },

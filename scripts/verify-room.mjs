@@ -29,6 +29,9 @@ class Canvas extends Surface {
 }
 doc.createElement = () => new Canvas();
 const frames = new Map(); let frameId = 0, time = 0, observer;
+// RAF and animation start times use the same deterministic clock.
+const originalClockDescriptor = Object.getOwnPropertyDescriptor(performance, 'now');
+Object.defineProperty(performance, 'now', { configurable: true, value: () => time });
 globalThis.document = doc; globalThis.window = win;
 globalThis.requestAnimationFrame = callback => { frames.set(++frameId, callback); return frameId; };
 globalThis.cancelAnimationFrame = id => frames.delete(id);
@@ -66,10 +69,35 @@ const diagnostics = () => room.diagnostics();
 try {
   advance(5);
   const { scene, camera } = diagnostics();
+  // NullEngine does not compile GPU effect-layer shaders. Simulate completed
+  // warmup for render-scheduler checks; browser verification covers readiness.
+  scene.isReady = () => true; advance(2);
   assert.equal(camera.mode, Camera.ORTHOGRAPHIC_CAMERA);
   assert.ok(scene.meshes.length > 20);
   assert.equal(canvas.style.touchAction, 'pan-y');
   console.log(`PASS engine: native Babylon scene, orthographic camera, ${scene.meshes.length} meshes, mobile pan-y.`);
+  const nativePick = scene.pickWithRay; let hoverPicks = 0;
+  scene.pickWithRay = function (...args) { hoverPicks++; return nativePick.apply(this, args); };
+  for (let i = 0; i < 40; i++) canvas.emit('pointermove', { clientX: 150 + i, clientY: 180, pointerType: 'mouse' });
+  assert.equal(hoverPicks, 0, 'raw pointer events only queue their latest coordinates');
+  advance(); assert.equal(hoverPicks, 1, 'hover events coalesce into one pick per rendered frame');
+  canvas.emit('pointerdown', { clientX: 200, clientY: 180, pointerType: 'mouse' });
+  canvas.emit('pointermove', { clientX: 250, clientY: 180, pointerType: 'mouse' }); advance();
+  canvas.emit('pointerup', { clientX: 250, clientY: 180, pointerType: 'mouse' });
+  assert.equal(hoverPicks, 1, 'orbit dragging skips hover raycasts');
+  room.beginPlacement('plant'); canvas.emit('pointermove', { clientX: 330, clientY: 230, pointerType: 'mouse' }); advance();
+  assert.equal(hoverPicks, 1, 'a placement preview only intersects the mathematical floor');
+  room.cancelPlacement(); room.setEditMode(false); scene.pickWithRay = nativePick;
+  const effects = scene.meshes.filter(mesh => mesh.metadata?.effect && mesh.isEnabled());
+  const steam = effects.find(mesh => mesh.metadata.effect === 'tea-steam'), flames = effects.find(mesh => mesh.metadata.effect === 'hearth-flames');
+  assert.ok(steam && flames, 'the furnished room contains tea and hearth effects');
+  const oldSteam = Array.from(steam.getVerticesData('position')), oldFlames = Array.from(flames.getVerticesData('position')); advance(20);
+  assert.notDeepEqual(Array.from(steam.getVerticesData('position')), oldSteam, 'placed cup animation is updated by the room');
+  assert.notDeepEqual(Array.from(flames.getVerticesData('position')), oldFlames, 'placed fireplace animation is updated by the room');
+  const shadowCasters = scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList;
+  const glowMeshes = scene.effectLayers.find(layer => layer.name === 'candlelight-bloom').mainTexture.renderList;
+  for (const mesh of effects) if (mesh.metadata.effect === 'tea-steam') { assert.equal(mesh.isPickable, false); assert.ok(!shadowCasters.includes(mesh) && !glowMeshes.includes(mesh)); }
+  console.log('PASS animation cost: hover picks coalesce; orbit/placement skip mesh picking; steam stays out of shadows and bloom.');
   const home = { alpha: camera.alpha, beta: camera.beta };
   camera.alpha += 0.2; camera.beta += 0.1; camera.inertialAlphaOffset = 0.1;
   room.resetView(); advance(90);
@@ -120,13 +148,41 @@ try {
   assert.equal(diagnostics().layout.items.length, 2, 'clicking the visible floor preview should commit a piece');
   const placed = diagnostics().layout.items.find(item => item.id !== desk.id);
   assert.equal(placed.x, 2); assert.equal(placed.z, -2);
+  const placedNode = scene.transformNodes.find(node => node.metadata?.itemId === placed.id);
+  const savedAfterPlacement = JSON.stringify(diagnostics().layout);
+  assert.equal(placedNode.scaling.x, 0.92, 'a new piece begins its small settling transition');
+  advance(12);
+  assert.ok(placedNode.scaling.x > 0.92 && placedNode.scaling.x < 1, 'settling should ease toward final size over time');
+  assert.equal(JSON.stringify(diagnostics().layout), savedAfterPlacement, 'visual settling must not alter stored coordinates');
+  advance(20);
+  assert.deepEqual(placedNode.scaling.asArray(), [1, 1, 1], 'settling finishes at exact catalog size');
   room.beginPlacement('plant'); clickFloor(desk.x, desk.z);
   assert.equal(diagnostics().layout.items.length, 2, 'a pointer click on occupied floor must not place furniture');
   room.cancelPlacement(); assert.equal(diagnostics().placement, null);
   console.log('PASS editing: pointer placement/picking, collision rejection, move/rotate/remove, last desk guard and cancellation.');
+  const torso = scene.getTransformNodeByName('miso-breathing'), catHead = scene.getTransformNodeByName('miso-head'), catTail = scene.getTransformNodeByName('miso-tail'), heart = scene.getTransformNodeByName('pet-heart');
+  const originalBreath = torso.scaling.y; advance(24);
+  assert.ok(Math.abs(torso.scaling.y - originalBreath) > 0.001, 'Miso breathes while resting');
+  room.pet(); advance(30);
+  assert.ok(catHead.position.y > 0.28 && Math.abs(catTail.rotation.y) > 0.01, 'petting lifts Miso’s head and swishes its tail');
+  assert.ok(heart.isEnabled(), 'pet feedback remains visible during the reaction');
+  advance(75);
+  assert.ok(!heart.isEnabled() && Math.abs(catHead.position.y - 0.26) < 0.012, 'pet reaction returns to the resting pose');
+  room.beginPlacement('side-table'); clickFloor(3, 0);
+  const pendingSettle = diagnostics().layout.items.find(item => item.type === 'side-table');
+  const pendingNode = scene.transformNodes.find(node => node.metadata?.itemId === pendingSettle.id);
+  assert.ok(pendingNode.scaling.x < 1);
+  motion.matches = true; motion.emit('change', { matches: true }); advance(2);
+  assert.deepEqual(pendingNode.scaling.asArray(), [1, 1, 1], 'reduced motion immediately completes settling');
+  assert.deepEqual(torso.scaling.asArray(), [1, 1, 1]);
+  assert.equal(catHead.position.y, 0.26); assert.equal(catTail.rotation.y, 0);
+  room.selectItem(pendingSettle.id); room.removeSelection();
+  console.log('PASS animations: timed settling preserves saved layout; pet reaction ends; reduced motion restores neutral poses.');
   room.setEditMode(false); room.setTheme('rain'); motion.matches = true; motion.emit('change', { matches: true }); advance(10);
   const snapshot = () => scene.transformNodes.concat(scene.meshes).map(n => [...n.position.asArray(), ...n.rotation.asArray(), ...n.scaling.asArray()]);
   const still = snapshot(); advance(120); assert.deepEqual(snapshot(), still);
+  assert.equal(frames.size, 0, 'a ready reduced-motion scene stops requesting frames');
+  room.setFocused(false); advance(3); assert.equal(frames.size, 0, 'one reduced-motion state change renders and returns to idle');
   console.log('PASS reduced motion: transforms stay still.');
   // Deliberately idle on-demand frames are not evidence of a slow renderer.
   // Hold CPU time still here so this isolates the FPS adaptation rule.
@@ -153,3 +209,4 @@ try {
   console.log('PASS lifecycle: hidden suspension; scene, frames, observers and listeners disposed.');
   console.log('Babylon room checks passed. GPU appearance and native gestures require browser checks.');
 } catch (error) { room.dispose(); throw error; }
+finally { if (originalClockDescriptor) Object.defineProperty(performance, 'now', originalClockDescriptor); else delete performance.now; }

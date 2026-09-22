@@ -49,6 +49,7 @@ let roomLayoutSignature = '';
 let quality = 'auto';
 let performanceStats = null;
 let focusCollapsed = false;
+let lastSessionRender = '';
 const listeners = new AbortController();
 
 document.querySelector('#app').innerHTML = `
@@ -63,12 +64,13 @@ document.querySelector('#app').innerHTML = `
         <div class="stage" id="stage">
           <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a ginger cat. Drag to turn the room."></div>
           <div class="loading-note" id="loading-note">Making room for you…</div>
+          <div class="stage-presence" id="stage-presence" data-presence="idle" role="status" aria-live="polite" aria-atomic="true" aria-label="Your local focus status: In your room" title="Your focus status in this browser."><span id="presence-icon" aria-hidden="true">${icon('home')}</span><span id="room-status">In your room</span></div>
           <div class="mini-caption" id="mini-caption" hidden>Mini view preview · inside this page</div>
           <div class="room-hint" id="room-hint">Drag to look around<span>·</span>Try petting the cat</div>
           <div class="pet-bubble" id="pet-bubble" hidden>Miso is happy you’re here.</div>
         </div>
         <div class="room-bottom">
-          <div class="room-status"><span class="status-dot"></span><span id="room-status">Just you & Miso</span></div>
+          <div class="room-company">${icon('cat')}<span>You & Miso</span></div>
           <nav class="room-tools" aria-label="Room controls">
             <button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Atmosphere</span></button>
             <button class="tool" data-panel="performance" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Performance</span></button>
@@ -183,6 +185,14 @@ applyState(state, true);
 function renderSession() {
   const ms = remainingAt(state.session);
   const formatted = formatTime(ms);
+  const presence = state.session.running ? 'focusing' : ms < state.session.duration ? 'break' : 'idle';
+  const today = localDate();
+  const minutes = state.history.filter(h => h.date === today).reduce((sum, h) => sum + h.minutes, 0);
+  const renderKey = `${formatted}:${presence}:${state.session.duration}:${today}:${minutes}`;
+  // The clock polls for deadlines twice a second, but idle rooms and unchanged
+  // displayed seconds do not need another set of DOM mutations.
+  if (renderKey === lastSessionRender) return;
+  lastSessionRender = renderKey;
   $('#timer').textContent = formatted;
   $('#dock-timer').textContent = formatted;
   $('#timer').setAttribute('aria-label', `${formatted} remaining`);
@@ -191,14 +201,19 @@ function renderSession() {
   const label = state.session.running ? 'Pause a moment' : ms === 0 ? 'Begin another session' : ms < state.session.duration ? 'Keep going' : 'Start focusing';
   $('#start-button span').textContent = label;
   $('#reset-session').hidden = !state.session.running && ms === state.session.duration;
-  $('#room-status').textContent = state.session.running ? 'You & Miso, settling in' : 'Just you & Miso';
+  const presenceBadge = $('#stage-presence');
+  if (presenceBadge.dataset.presence !== presence) {
+    const [status, symbol] = presence === 'focusing' ? ['Focusing', 'clock'] : presence === 'break' ? ['On a break', 'moon'] : ['In your room', 'home'];
+    presenceBadge.dataset.presence = presence;
+    presenceBadge.setAttribute('aria-label', `Your local focus status: ${status}`);
+    $('#room-status').textContent = status;
+    $('#presence-icon').innerHTML = icon(symbol);
+  }
   document.body.classList.toggle('is-focusing', state.session.running);
   document.querySelectorAll('[data-minutes]').forEach(button => {
     button.setAttribute('aria-pressed', Number(button.dataset.minutes) * 60000 === state.session.duration);
     button.disabled = state.session.running;
   });
-  const today = localDate();
-  const minutes = state.history.filter(h => h.date === today).reduce((sum, h) => sum + h.minutes, 0);
   $('#daily-note').textContent = minutes ? `${minutes} quiet minutes made today. Look at you go.` : 'Good things begin with a little time.';
 }
 function tick() {
