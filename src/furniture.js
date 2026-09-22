@@ -271,17 +271,23 @@ function floorLamp(parent) {
   rod(parent, [0.13, 1.75, 0.02], [0.13, 1.47, 0.02], 0.006, C.brass, brass);
   sphere(parent, [0.02, 0.03, 0.02], [0.13, 1.46, 0.02], C.brass);
 }
-function plant(parent) {
-  cylinder(parent, 0.23, 0.16, 0.36, [0, 0.18, 0], C.terracotta);
-  cylinder(parent, 0.245, 0.245, 0.055, [0, 0.36, 0], C.terracotta);
-  cylinder(parent, 0.211, 0.211, 0.013, [0, 0.392, 0], C.darkWood);
+function plant(parent, canopyOnly = false) {
+  if (!canopyOnly) {
+    cylinder(parent, 0.23, 0.16, 0.36, [0, 0.18, 0], C.terracotta);
+    cylinder(parent, 0.245, 0.245, 0.055, [0, 0.36, 0], C.terracotta);
+    cylinder(parent, 0.211, 0.211, 0.013, [0, 0.392, 0], C.darkWood);
+  }
   for (let i = 0; i < 7; i++) {
     const angle = i * 2.4, h = 0.73 + (i % 3) * 0.16;
     const x = Math.cos(angle) * 0.20, z = Math.sin(angle) * 0.20;
-    rod(parent, [0, 0.39, 0], [x, h, z], 0.012, C.darkLeaf);
-    const leaf = sphere(parent, [0.115, 0.255, 0.035], [x * 1.25, h + 0.07, z * 1.25], i % 2 ? C.leaf : '#95a576');
-    leaf.rotation.set(0.34, -angle, -0.50);
-    rod(parent, [x * 1.25, h - 0.06, z * 1.25 + 0.03], [x * 1.25 + 0.08, h + 0.18, z * 1.25 + 0.02], 0.005, '#acb889');
+    if (!canopyOnly) rod(parent, [0, 0.39, 0], [x, h, z], 0.012, C.darkLeaf);
+    else {
+      const leaf = sphere(parent, [0.115, 0.255, 0.035], [x * 1.25, h + 0.07, z * 1.25], i % 2 ? C.leaf : '#95a576');
+      leaf.rotation.set(0.34, -angle, -0.50);
+      const vein = rod(parent, [x * 1.25, h - 0.06, z * 1.25 + 0.03], [x * 1.25 + 0.08, h + 0.18, z * 1.25 + 0.02], 0.005, '#acb889');
+      const sway = { anchorY: h, height: 0.3, phase: i * 0.81 };
+      leaf.metadata = { sway }; vein.metadata = { sway };
+    }
   }
 }
 function rug(parent) {
@@ -314,8 +320,6 @@ function cabinet(parent) {
   }
   const player = group(parent, [-0.22, 0.945, -0.01]);
   box(player, [0.90, 0.11, 0.49], [0, 0, 0], '#a07858', 0.03);
-  cylinder(player, 0.18, 0.18, 0.01, [-0.11, 0.061, 0], '#424b43');
-  cylinder(player, 0.055, 0.055, 0.012, [-0.11, 0.069, 0], '#b68a65');
   rod(player, [0.28, 0.09, -0.16], [0.2, 0.09, 0.12], 0.013, C.brass);
   rod(player, [0.2, 0.09, 0.12], [0.10, 0.09, 0.14], 0.013, C.brass);
   book(parent, 0.32, 0.06, 0.4, 0.57, 0.92, 0, bookColors[0]);
@@ -409,33 +413,37 @@ function leafBlade(parent, start, end, width, color) {
   mesh(parent, blade, color, new Vector3(...start).add(new Vector3(...end)).scale(0.5).asArray());
   blade.scaling.set(width, length, width * 0.55);
   blade.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), direction.normalize(), new Quaternion());
+  return blade;
 }
-function moonTree(parent) {
+function moonTree(parent, canopyOnly = false) {
   const brass = { metalness: 0.4, roughness: 0.4 };
-  cylinder(parent, 0.35, 0.27, 0.62, [0, 0.31, 0], '#967a50', brass);
-  cylinder(parent, 0.366, 0.366, 0.052, [0, 0.62, 0], '#c2a16a', brass);
-  cylinder(parent, 0.327, 0.327, 0.02, [0, 0.65, 0], '#4d4938');
-  for (let i = 0; i < 12; i++) {
-    const angle = i * Math.PI / 6;
-    rod(parent, [Math.cos(angle) * 0.274, 0.08, Math.sin(angle) * 0.274], [Math.cos(angle) * 0.352, 0.59, Math.sin(angle) * 0.352], 0.009, '#b89a63');
+  if (!canopyOnly) {
+    cylinder(parent, 0.35, 0.27, 0.62, [0, 0.31, 0], '#967a50', brass);
+    cylinder(parent, 0.366, 0.366, 0.052, [0, 0.62, 0], '#c2a16a', brass);
+    cylinder(parent, 0.327, 0.327, 0.02, [0, 0.65, 0], '#4d4938');
+    for (let i = 0; i < 12; i++) {
+      const angle = i * Math.PI / 6;
+      rod(parent, [Math.cos(angle) * 0.274, 0.08, Math.sin(angle) * 0.274], [Math.cos(angle) * 0.352, 0.59, Math.sin(angle) * 0.352], 0.009, '#b89a63');
+    }
+    const trunk = [[0, 0.65, 0], [-0.08, 1.2, 0.02], [0.11, 1.85, -0.04], [-0.02, 2.46, 0.02], [0.11, 2.93, -0.06]];
+    for (let i = 0; i < trunk.length - 1; i++) rod(parent, trunk[i], trunk[i + 1], 0.06 - i * 0.011, '#775d43');
   }
-  const trunk = [[0, 0.65, 0], [-0.08, 1.2, 0.02], [0.11, 1.85, -0.04], [-0.02, 2.46, 0.02], [0.11, 2.93, -0.06]];
-  for (let i = 0; i < trunk.length - 1; i++) rod(parent, trunk[i], trunk[i + 1], 0.06 - i * 0.011, '#775d43');
   for (let tier = 0; tier < 4; tier++) {
     for (let branch = 0; branch < 3; branch++) {
       const angle = tier * 1.2 + branch * Math.PI * 2 / 3;
       const height = 1.34 + tier * 0.43, reach = tier === 3 ? 0.39 : 0.55;
       const end = [Math.cos(angle) * reach, height + 0.24, Math.sin(angle) * reach];
-      rod(parent, [0, height - 0.05, 0], end, 0.020, '#816746');
-      for (let leaf = 0; leaf < 3; leaf++) {
+      if (!canopyOnly) rod(parent, [0, height - 0.05, 0], end, 0.020, '#816746');
+      else for (let leaf = 0; leaf < 3; leaf++) {
         const leafAngle = angle + (leaf - 1) * 0.74;
         const origin = [end[0] * (0.58 + leaf * 0.14), end[1] - 0.1 + leaf * 0.045, end[2] * (0.58 + leaf * 0.14)];
         const tip = [origin[0] + Math.cos(leafAngle) * 0.25, origin[1] + 0.29 + (leaf % 2) * 0.09, origin[2] + Math.sin(leafAngle) * 0.25];
-        leafBlade(parent, origin, tip, 0.27, ['#6f876b', '#8fa075', '#587565'][(tier + leaf) % 3]);
+        const blade = leafBlade(parent, origin, tip, 0.27, ['#6f876b', '#8fa075', '#587565'][(tier + leaf) % 3]);
+        blade.metadata = { sway: { anchorY: origin[1], height: tip[1] - origin[1], phase: tier * 0.7 + branch * 1.3 + leaf * 0.4 } };
       }
     }
   }
-  for (const [x, y, z] of [[-0.48, 1.82, 0.2], [0.42, 2.23, 0.27], [-0.15, 2.87, -0.23]]) {
+  if (!canopyOnly) for (const [x, y, z] of [[-0.48, 1.82, 0.2], [0.42, 2.23, 0.27], [-0.15, 2.87, -0.23]]) {
     rod(parent, [x, y, z], [x, y - 0.19, z], 0.005, '#bca36f');
     const charm = box(parent, [0.075, 0.075, 0.023], [x, y - 0.23, z], '#d5bb78', 0.003); charm.rotation.z = Math.PI / 4;
     box(parent, [0.026, 0.14, 0.020], [x, y - 0.23, z], '#d5bb78', 0.003);
@@ -476,6 +484,85 @@ function moonRug(parent) {
     box(parent, [size * 0.2, 0.005, size * 1.9], [x, 0.077, z], '#d9c495', 0.001);
     box(parent, [size * 1.9, 0.005, size * 0.2], [x, 0.077, z], '#d9c495', 0.001);
   }
+}
+
+function createSwayingCanopy(parent, type) {
+  const scene = parent.getScene(), templates = cacheFor(scene).templates, key = `${type}-canopy`;
+  if (!templates.has(key)) {
+    const source = new TransformNode('leaf-source', scene);
+    if (type === 'plant') plant(source, true); else moonTree(source, true);
+    const ranges = []; let vertexOffset = 0;
+    for (const leaf of source.getChildMeshes()) {
+      ranges.push({ start: vertexOffset, end: vertexOffset + leaf.getTotalVertices(), ...leaf.metadata.sway });
+      vertexOffset += leaf.getTotalVertices();
+    }
+    const template = batch(source); template.metadata = { ranges }; template.setEnabled(false); templates.set(key, template);
+  }
+  const template = templates.get(key);
+  const canopy = template.getChildMeshes()[0].clone('swaying-leaf-canopy', parent);
+  canopy.makeGeometryUnique(); canopy.markVerticesDataAsUpdatable('position', true);
+  canopy.metadata = { dynamic: true, effect: 'leaf-sway' }; canopy.isPickable = false;
+  const neutral = new Float32Array(canopy.getVerticesData('position')), positions = new Float32Array(neutral);
+  const [width, depth] = getFurniture(type).footprint;
+  const limitX = width / 2 - 0.002, limitZ = depth / 2 - 0.002;
+  const originalBounds = canopy.getBoundingInfo().boundingBox;
+  canopy.setBoundingInfo(new BoundingInfo(new Vector3(-width / 2, originalBounds.minimum.y - 0.02, -depth / 2), new Vector3(width / 2, originalBounds.maximum.y + 0.02, depth / 2)));
+  const amplitude = type === 'plant' ? 0.075 : 0.11, phaseOffset = parent.uniqueId * 0.37;
+  let resting = true;
+  return (seconds, focused, reducedMotion) => {
+    if (reducedMotion) {
+      if (!resting) { positions.set(neutral); canopy.updateVerticesData('position', positions, false, false); }
+      resting = true; return;
+    }
+    resting = false;
+    for (const { start, end, anchorY, height, phase } of template.metadata.ranges) {
+      const wind = Math.sin(seconds * 0.82 + phaseOffset + phase * 0.3);
+      const flutter = Math.sin(seconds * 1.63 + phaseOffset + phase);
+      const swayX = (wind * 0.82 + flutter * 0.18) * amplitude;
+      const swayZ = Math.sin(seconds * 0.67 + phaseOffset + phase * 0.4) * amplitude * 0.45;
+      for (let vertex = start; vertex < end; vertex++) {
+        const index = vertex * 3;
+        // Only the leaf above its attachment moves. The pot, trunk, branches,
+        // and the bottom of each blade keep their exact original position.
+        const tip = Math.max(0, Math.min(1, (neutral[index + 1] - anchorY) / height));
+        const bend = tip * tip;
+        positions[index] = Math.max(-limitX, Math.min(limitX, neutral[index] + swayX * bend));
+        positions[index + 1] = neutral[index + 1] + flutter * bend * 0.012;
+        positions[index + 2] = Math.max(-limitZ, Math.min(limitZ, neutral[index + 2] + swayZ * bend));
+      }
+    }
+    canopy.updateVerticesData('position', positions, false, false);
+  };
+}
+
+function createSpinningRecord(parent) {
+  const scene = parent.getScene(), templates = cacheFor(scene).templates;
+  if (!templates.has('spinning-record')) {
+    const source = new TransformNode('record-source', scene);
+    cylinder(source, 0.18, 0.18, 0.01, [0, 0, 0], '#424b43');
+    cylinder(source, 0.055, 0.055, 0.012, [0, 0.008, 0], '#b68a65');
+    // A cream label stripe and an off-center highlight make the turn readable
+    // at room scale instead of spinning an indistinguishable solid circle.
+    mesh(source, CreateBox('record-label', { width: 0.052, height: 0.002, depth: 0.017 }, scene), '#e2d1ac', [0, 0.015, 0.017]);
+    mesh(source, CreateBox('record-label-ink', { width: 0.027, height: 0.002, depth: 0.005 }, scene), '#635c4b', [0, 0.017, 0.017]);
+    const positions = [], indices = [], normals = [];
+    for (let point = 0; point <= 12; point++) {
+      const angle = -0.35 + point / 12 * 1.35;
+      for (const radius of [0.132, 0.136]) {
+        positions.push(Math.cos(angle) * radius, 0.006, Math.sin(angle) * radius); normals.push(0, 1, 0);
+      }
+      if (point < 12) { const first = point * 2; indices.push(first, first + 1, first + 2, first + 1, first + 3, first + 2); }
+    }
+    const groove = new Mesh('record-groove-highlight', scene), data = new VertexData();
+    Object.assign(data, { positions, indices, normals }); data.applyToMesh(groove);
+    mesh(source, groove, '#7b8371', [0, 0, 0]);
+    const template = batch(source); template.setEnabled(false); templates.set('spinning-record', template);
+  }
+  const record = templates.get('spinning-record').clone('spinning-vinyl-record', parent); record.setEnabled(true);
+  record.position.set(-0.33, 1.006, -0.01); record.metadata = { dynamic: true, effect: 'record-spin' };
+  for (const part of record.getChildMeshes()) { part.metadata = { dynamic: true, effect: 'record-spin' }; part.isPickable = false; }
+  // Rigid rotation lets every record keep sharing the same geometry and material.
+  return (seconds, focused, reducedMotion) => { record.rotation.y = reducedMotion ? 0 : seconds * 1.25 % (Math.PI * 2); };
 }
 
 function createDancingFire(parent) {
@@ -580,22 +667,159 @@ function createTeaSteam(parent, origin, scale = 1) {
   };
 }
 
+function createHearthEmbers(parent) {
+  const scene = parent.getScene(), cache = cacheFor(scene), count = 16;
+  if (!cache.batches.has('hearth-embers')) {
+    const emberMaterial = new StandardMaterial('rising-hearth-embers', scene);
+    emberMaterial.diffuseColor = Color3.White(); emberMaterial.specularColor = Color3.Black();
+    emberMaterial.emissiveColor = new Color3(1, 0.46, 0.10);
+    emberMaterial.disableLighting = true; emberMaterial.backFaceCulling = false;
+    cache.batches.set('hearth-embers', emberMaterial);
+  }
+  const positions = new Float32Array(count * 24), colors = new Float32Array(count * 32);
+  const normals = new Float32Array(count * 24), indices = [];
+  for (let particle = 0; particle < count; particle++) {
+    for (let plane = 0; plane < 2; plane++) {
+      const vertex = particle * 8 + plane * 4;
+      indices.push(vertex, vertex + 1, vertex + 2, vertex, vertex + 2, vertex + 3);
+      for (let corner = 0; corner < 4; corner++) {
+        normals[(vertex + corner) * 3] = Math.SQRT1_2;
+        normals[(vertex + corner) * 3 + 2] = plane ? -Math.SQRT1_2 : Math.SQRT1_2;
+      }
+    }
+  }
+  function pose(seconds) {
+    for (let particle = 0; particle < count; particle++) {
+      const phase = particle * 2.399963, lifetime = 5.5 + (particle % 4) * 0.55;
+      const rise = (seconds / lifetime + particle * 0.618034) % 1;
+      const x = Math.sin(phase) * 0.31 + Math.sin(rise * 5.5 + phase) * rise * 0.17;
+      const y = 0.75 + rise * 3.0;
+      const approach = Math.min(1, rise * 4), drift = approach * approach * (3 - 2 * approach);
+      const z = 0.15 + drift * 0.36 + Math.cos(rise * 4.2 + phase) * 0.012;
+      const size = (0.017 + (particle % 3) * 0.006) * (1 - rise * 0.3);
+      const opacity = Math.min(1, rise / 0.09) * Math.max(0, 1 - rise) ** 1.3 * 0.86;
+      // Crossed diamonds keep at least one broad face visible after any quarter
+      // turn of the fireplace, without camera-facing updates or extra draw calls.
+      for (let plane = 0; plane < 2; plane++) {
+        for (let corner = 0; corner < 4; corner++) {
+          const across = corner === 0 ? -size : corner === 2 ? size : 0;
+          const up = corner === 1 ? size * 1.4 : corner === 3 ? -size * 1.4 : 0;
+          const vertex = particle * 8 + plane * 4 + corner;
+          positions[vertex * 3] = x + across; positions[vertex * 3 + 1] = y + up;
+          positions[vertex * 3 + 2] = z + (plane ? across : -across);
+          colors[vertex * 4] = 1; colors[vertex * 4 + 1] = 0.63 + (particle % 3) * 0.08;
+          colors[vertex * 4 + 2] = 0.22; colors[vertex * 4 + 3] = opacity;
+        }
+      }
+    }
+  }
+  pose(0);
+  const neutralPositions = new Float32Array(positions), neutralColors = new Float32Array(colors);
+  const embers = new Mesh('rising-hearth-embers', scene); embers.parent = parent;
+  const data = new VertexData(); Object.assign(data, { positions, colors, indices, normals }); data.applyToMesh(embers, true);
+  embers.material = cache.batches.get('hearth-embers'); embers.useVertexColors = true; embers.hasVertexAlpha = true;
+  embers.isPickable = false; embers.receiveShadows = false; embers.metadata = { dynamic: true, effect: 'hearth-embers', castShadow: false };
+  embers.setBoundingInfo(new BoundingInfo(new Vector3(-0.54, 0.68, 0.1), new Vector3(0.54, 3.85, 0.565)));
+  let resting = true;
+  return (seconds, focused, reducedMotion) => {
+    if (reducedMotion) {
+      embers.setEnabled(false);
+      if (resting) return;
+      positions.set(neutralPositions); colors.set(neutralColors); resting = true;
+    } else {
+      embers.setEnabled(true); pose(seconds); resting = false;
+    }
+    embers.updateVerticesData('position', positions, false, false); embers.updateVerticesData('color', colors, false, false);
+  };
+}
+
+function createArticulatedUpperBody(avatar, template) {
+  const upper = template.getChildMeshes()[0].clone('articulated-sweater-and-arms', avatar);
+  upper.makeGeometryUnique(); upper.markVerticesDataAsUpdatable('position', true);
+  upper.metadata = { dynamic: true, part: 'avatar-upper-body' };
+  const neutral = new Float32Array(upper.getVerticesData('position')), positions = new Float32Array(neutral);
+  const originalBounds = upper.getBoundingInfo().boundingBox;
+  upper.setBoundingInfo(new BoundingInfo(originalBounds.minimum.subtract(new Vector3(0.08, 0.12, 0.16)), originalBounds.maximum.add(new Vector3(0.08, 0.12, 0.16))));
+  let resting = true;
+  return (lean, roll, breath, hands, reducedMotion) => {
+    if (reducedMotion) {
+      if (!resting) { positions.set(neutral); upper.updateVerticesData('position', positions, false, false); }
+      resting = true; return;
+    }
+    resting = false;
+    const cosLean = Math.cos(lean), sinLean = Math.sin(lean), cosRoll = Math.cos(roll), sinRoll = Math.sin(roll);
+    for (const range of template.metadata.ranges) {
+      if (!range.arm) {
+        for (let vertex = range.start; vertex < range.end; vertex++) {
+          const index = vertex * 3, x = neutral[index], y = neutral[index + 1] - 0.78, z = neutral[index + 2] + 0.08;
+          const rolledY = x * sinRoll + y * cosRoll;
+          positions[index] = x * cosRoll - y * sinRoll;
+          positions[index + 1] = 0.78 + rolledY * cosLean - z * sinLean + breath;
+          positions[index + 2] = -0.08 + rolledY * sinLean + z * cosLean;
+        }
+        continue;
+      }
+      const a = range.a, b = range.b;
+      const aY = a[0] * sinRoll + (a[1] - 0.78) * cosRoll;
+      const startX = a[0] * cosRoll - (a[1] - 0.78) * sinRoll - a[0];
+      const startY = 0.78 + aY * cosLean - (a[2] + 0.08) * sinLean + breath - a[1];
+      const startZ = -0.08 + aY * sinLean + (a[2] + 0.08) * cosLean - a[2];
+      let endX, endY, endZ;
+      if (range.forearm) {
+        const hand = hands[range.side < 0 ? 0 : 1].position;
+        endX = hand.x - b[0]; endY = hand.y - 0.02 - b[1]; endZ = hand.z + 0.08 - b[2];
+      } else {
+        const bY = b[0] * sinRoll + (b[1] - 0.78) * cosRoll;
+        endX = b[0] * cosRoll - (b[1] - 0.78) * sinRoll - b[0];
+        endY = 0.78 + bY * cosLean - (b[2] + 0.08) * sinLean + breath - b[1];
+        endZ = -0.08 + bY * sinLean + (b[2] + 0.08) * cosLean - b[2];
+      }
+      for (let vertex = range.start; vertex < range.end; vertex++) {
+        const index = vertex * 3, weight = range.weights[vertex - range.start];
+        positions[index] = neutral[index] + startX + (endX - startX) * weight;
+        positions[index + 1] = neutral[index + 1] + startY + (endY - startY) * weight;
+        positions[index + 2] = neutral[index + 2] + startZ + (endZ - startZ) * weight;
+      }
+    }
+    upper.updateVerticesData('position', positions, false, false);
+  };
+}
+
 function avatarTemplate(scene) {
   const templates = cacheFor(scene).templates;
   if (templates.has('avatar')) return templates.get('avatar');
   const body = new TransformNode('avatar-part', scene);
   box(body, [0.51, 0.22, 0.43], [0, 0.77, -0.08], '#777e72', 0.08);
-  box(body, [0.60, 0.63, 0.43], [0, 1.15, -0.09], '#b88770', 0.12);
   for (const x of [-0.15, 0.15]) {
     rod(body, [x, 0.75, -0.08], [x, 0.65, -0.57], 0.115, '#777e72');
     rod(body, [x, 0.65, -0.57], [x, 0.17, -0.67], 0.08, '#777e72');
     box(body, [0.20, 0.12, 0.34], [x, 0.09, -0.75], C.cream, 0.05);
   }
-  cylinder(body, 0.10, 0.12, 0.14, [0, 1.49, -0.14], C.skin);
+  const upperSource = new TransformNode('avatar-upper-body-source', scene);
+  box(upperSource, [0.60, 0.63, 0.43], [0, 1.15, -0.09], '#b88770', 0.12);
+  cylinder(upperSource, 0.10, 0.12, 0.14, [0, 1.49, -0.14], C.skin);
   for (const side of [-1, 1]) {
-    rod(body, [side * 0.27, 1.33, -0.13], [side * 0.36, 1.15, -0.44], 0.092, '#b88770');
-    rod(body, [side * 0.36, 1.15, -0.44], [side * 0.21, 1.35, -0.86], 0.073, '#b88770');
+    const shoulder = [side * 0.27, 1.33, -0.13], elbow = [side * 0.36, 1.15, -0.44], wrist = [side * 0.21, 1.35, -0.86];
+    const upperArm = rod(upperSource, shoulder, elbow, 0.092, '#b88770');
+    upperArm.metadata = { arm: true, a: shoulder, b: elbow, side, forearm: false };
+    const forearm = rod(upperSource, elbow, wrist, 0.073, '#b88770');
+    forearm.metadata = { arm: true, a: elbow, b: wrist, side, forearm: true };
   }
+  const ranges = []; let vertexOffset = 0;
+  for (const part of upperSource.getChildMeshes()) {
+    const range = { start: vertexOffset, end: vertexOffset + part.getTotalVertices(), ...part.metadata };
+    ranges.push(range); vertexOffset += part.getTotalVertices();
+  }
+  const upper = batch(upperSource), upperPositions = upper.getChildMeshes()[0].getVerticesData('position');
+  for (const range of ranges) if (range.arm) {
+    const dx = range.b[0] - range.a[0], dy = range.b[1] - range.a[1], dz = range.b[2] - range.a[2], lengthSquared = dx * dx + dy * dy + dz * dz;
+    range.weights = new Float32Array(range.end - range.start);
+    for (let vertex = range.start; vertex < range.end; vertex++) {
+      const index = vertex * 3;
+      range.weights[vertex - range.start] = Math.max(0, Math.min(1, ((upperPositions[index] - range.a[0]) * dx + (upperPositions[index + 1] - range.a[1]) * dy + (upperPositions[index + 2] - range.a[2]) * dz) / lengthSquared));
+    }
+  }
+  upper.metadata = { ranges };
   const head = new TransformNode('avatar-part', scene);
   sphere(head, [0.232, 0.245, 0.22], [0, 0, 0], C.skin);
   sphere(head, [0.24, 0.237, 0.22], [0, 0.061, 0.058], '#674d3b');
@@ -607,7 +831,7 @@ function avatarTemplate(scene) {
   sphere(writingHand, [0.074, 0.044, 0.10], [0, 0, 0], C.skin);
   rod(writingHand, [0.015, -0.048, -0.045], [0.075, 0.15, 0.025], 0.009, '#bb9b61');
   rod(writingHand, [0.011, -0.058, -0.049], [0.015, -0.048, -0.045], 0.005, '#514e3b');
-  const value = { body: batch(body), head: batch(head), hand: batch(hand), writingHand: batch(writingHand) };
+  const value = { body: batch(body), upper, head: batch(head), hand: batch(hand), writingHand: batch(writingHand) };
   Object.values(value).forEach(part => part.setEnabled(false));
   templates.set('avatar', value); return value;
 }
@@ -635,7 +859,8 @@ export function createFurniture(type, scene) {
   if (definition.category === 'Study') {
     const parts = avatarTemplate(scene);
     const avatar = group(result, [0, 0, 0.52]); avatar.metadata = { dynamic: true }; avatar.name = 'Study companion';
-    const body = parts.body.clone('sweater-and-trousers', avatar); body.setEnabled(true);
+    const body = parts.body.clone('grounded-trousers-and-shoes', avatar); body.setEnabled(true);
+    const articulateUpper = createArticulatedUpperBody(avatar, parts.upper);
     const head = parts.head.clone('headphones', avatar); head.position.set(0, 1.72, -0.17); head.setEnabled(true);
     const writing = type === 'writing-desk';
     const hands = [-1, 1].map(side => {
@@ -644,34 +869,48 @@ export function createFurniture(type, scene) {
     });
     result.metadata.study = true; result.metadata.avatar = avatar;
     animations.push((seconds, focused, reducedMotion) => {
-      head.position.y = 1.72; head.rotation.set(0, 0, 0);
+      // An inactive desk keeps its companion hidden; its separate cup can still steam.
+      if (!avatar.isEnabled()) return;
+      head.position.set(0, 1.72, -0.17); head.rotation.set(0, 0, 0);
       for (let index = 0; index < hands.length; index++) {
         hands[index].position.set(index ? 0.21 : -0.21, 1.37, -0.94); hands[index].rotation.set(0, 0, 0);
       }
-      if (reducedMotion) return;
-      head.position.y += Math.sin(seconds * 1.25) * 0.009;
-      head.rotation.x = (focused ? -0.045 : 0) + Math.sin(seconds * (focused ? 0.9 : 0.55)) * (focused ? 0.028 : 0.023);
-      head.rotation.y = Math.sin(seconds * 0.38) * (focused ? 0.025 : 0.075);
-      head.rotation.z = Math.sin(seconds * 0.41) * 0.022;
-      if (!focused) return;
-      if (writing) {
+      if (reducedMotion) { articulateUpper(0, 0, 0, hands, true); return; }
+      const cycle = seconds % 10.5;
+      const rampIn = Math.max(0, Math.min(1, cycle / 0.6)), rampOut = Math.max(0, Math.min(1, (6.7 - cycle) / 0.7));
+      const work = focused ? rampIn * rampIn * (3 - 2 * rampIn) * rampOut * rampOut * (3 - 2 * rampOut) : 0;
+      const lean = focused ? 0.018 - work * (writing ? 0.083 : 0.112) : Math.sin(seconds * 0.65) * 0.009;
+      const roll = Math.sin(seconds * 0.91) * (focused ? 0.010 : 0.004);
+      const breath = Math.sin(seconds * 1.15) * 0.009;
+      const cosLean = Math.cos(lean), sinLean = Math.sin(lean), cosRoll = Math.cos(roll), sinRoll = Math.sin(roll);
+      head.position.x = -0.94 * sinRoll;
+      head.position.y = 0.78 + 0.94 * cosRoll * cosLean + 0.09 * sinLean + breath;
+      head.position.z = -0.08 + 0.94 * cosRoll * sinLean - 0.09 * cosLean;
+      head.rotation.x = lean - work * 0.035 + Math.sin(seconds * 0.7) * 0.020;
+      head.rotation.y = focused ? (1 - work) * Math.sin(seconds * 0.55) * 0.19 : Math.sin(seconds * 0.38) * 0.075;
+      head.rotation.z = roll + Math.sin(seconds * 0.41) * 0.016;
+      if (work > 0 && writing) {
         hands[1].position.x += Math.sin(seconds * 3.9) * 0.035;
-        hands[1].position.z += Math.sin(seconds * 5.2) * 0.036;
-        hands[1].position.y += (0.5 + Math.sin(seconds * 5.2) * 0.5) * 0.012;
-        hands[1].rotation.y = Math.sin(seconds * 3.9) * 0.12;
-      } else {
+        hands[1].position.x = 0.21 + (hands[1].position.x - 0.21) * work;
+        hands[1].position.z += Math.sin(seconds * 5.2) * 0.036 * work;
+        hands[1].position.y += (0.5 + Math.sin(seconds * 5.2) * 0.5) * 0.012 * work;
+        hands[1].rotation.y = Math.sin(seconds * 3.9) * 0.12 * work;
+      } else if (work > 0) {
         for (let i = 0; i < hands.length; i++) {
           const rhythm = seconds * 7.6 + i * 2.2;
-          hands[i].position.y += (0.5 + Math.sin(rhythm) * 0.5) * 0.034;
-          hands[i].position.z += Math.cos(rhythm * 0.71) * 0.015;
-          hands[i].rotation.x = Math.sin(rhythm) * 0.06;
+          hands[i].position.y += (0.5 + Math.sin(rhythm) * 0.5) * 0.046 * work;
+          hands[i].position.z += Math.cos(rhythm * 0.71) * 0.019 * work;
+          hands[i].rotation.x = Math.sin(rhythm) * 0.08 * work;
         }
       }
+      articulateUpper(lean, roll, breath, hands, false);
     });
     animations.push(createTeaSteam(result, writing ? [0.72, 1.445, -0.06] : [0.83, 1.465, -0.13], writing ? 0.9 : 1));
   }
   if (type === 'side-table') animations.push(createTeaSteam(result, [0.18, 0.846, 0.07], 0.72));
-  if (type === 'fireplace') animations.push(createDancingFire(result));
+  if (type === 'fireplace') { animations.push(createDancingFire(result)); animations.push(createHearthEmbers(result)); }
+  if (type === 'plant' || type === 'moon-tree') animations.push(createSwayingCanopy(result, type));
+  if (type === 'low-cabinet') animations.push(createSpinningRecord(result));
   if (animations.length) result.metadata.animate = (seconds, focused, reducedMotion) => {
     for (const animate of animations) animate(seconds, focused, reducedMotion);
   };

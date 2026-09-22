@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, createLayout, validatePlacement, normalizeLayout, findFreePosition } from './layout.js';
 import { createFurniture, disposeFurnitureAssets } from './furniture.js';
@@ -106,7 +107,7 @@ test('native Babylon furniture meshes fit declared footprints and the room heigh
   try {
     for (const definition of FURNITURE) {
       const furniture = createFurniture(definition.id, scene);
-      assert.ok(furniture.getChildMeshes().length <= 8, `${definition.id} stays within its draw budget`);
+      assert.ok(furniture.getChildMeshes().length <= 9, `${definition.id} stays within its draw budget`);
       for (let rotation = 0; rotation < 4; rotation++) {
         furniture.rotation.y = rotation * Math.PI / 2;
         furniture.getChildMeshes().forEach(part => part.computeWorldMatrix(true));
@@ -141,7 +142,7 @@ test('furniture instances share static geometry, retain independent avatars, and
     second.dispose();
     disposeFurnitureAssets(scene);
     const fresh = createFurniture('plant', scene);
-    assert.equal(fresh.getChildMeshes().length, 1);
+    assert.equal(fresh.getChildMeshes().length, 2);
     fresh.dispose();
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
@@ -157,7 +158,7 @@ test('fire flickers independently without moving the mantel or changing shared m
     const stone = first.getChildMeshes().find(mesh => !mesh.metadata?.dynamic);
     const stonePositions = Array.from(stone.getVerticesData('position'));
     const glow = firstFlames.material.emissiveColor.asArray();
-    assert.equal(first.getChildMeshes().length, 3, 'the entire fire adds only one draw call');
+    assert.equal(first.getChildMeshes().length, 4, 'flames and embers each use one batched draw call');
     assert.equal(firstFlames.isEnabled(), true);
     assert.notEqual(firstFlames.geometry, secondFlames.geometry, 'animated buffers belong to each instance');
     assert.equal(firstFlames.material, secondFlames.material, 'unchanging material stays shared');
@@ -224,6 +225,193 @@ test('the avatar types at its laptop, writes at its journal, and rests its hands
       assert.deepEqual(head.rotation.asArray(), [0, 0, 0]);
       hands.forEach(hand => assert.deepEqual(hand.rotation.asArray(), [0, 0, 0]));
       furniture.dispose();
+    }
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('plant canopies sway while paused, keep their trunks planted, and reset their independent buffers', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    for (const type of ['plant', 'moon-tree']) {
+      const first = createFurniture(type, scene), second = createFurniture(type, scene);
+      const leafMesh = furniture => furniture.getChildMeshes().find(mesh => mesh.metadata?.effect === 'leaf-sway');
+      const canopy = leafMesh(first), otherCanopy = leafMesh(second);
+      const neutral = Array.from(canopy.getVerticesData('position'));
+      const otherNeutral = Array.from(otherCanopy.getVerticesData('position'));
+      const staticParts = first.getChildMeshes().filter(mesh => !mesh.metadata?.dynamic);
+      const staticPositions = staticParts.map(mesh => Array.from(mesh.getVerticesData('position')));
+      assert.equal(first.getChildMeshes().length, type === 'plant' ? 2 : 3);
+      assert.equal(canopy.material, otherCanopy.material);
+      assert.notEqual(canopy.geometry, otherCanopy.geometry);
+      assert.equal(canopy.isEnabled(), true);
+      const [width, depth] = getFurniture(type).footprint;
+      let travel = 0;
+      for (let sample = 0; sample < 40; sample++) {
+        first.metadata.animate(sample * 0.55, false, false);
+        const positions = canopy.getVerticesData('position');
+        for (let index = 0; index < positions.length; index += 3) {
+          assert.ok(Math.abs(positions[index]) <= width / 2);
+          assert.ok(Math.abs(positions[index + 2]) <= depth / 2);
+          assert.ok(positions[index + 1] > 0 && positions[index + 1] < 5.3);
+          travel = Math.max(travel, Math.abs(positions[index] - neutral[index]));
+        }
+      }
+      assert.ok(travel >= (type === 'plant' ? 0.055 : 0.085), `${type} has visible leaf-tip travel`);
+      assert.deepEqual(staticParts.map(mesh => Array.from(mesh.getVerticesData('position'))), staticPositions);
+      assert.deepEqual(Array.from(otherCanopy.getVerticesData('position')), otherNeutral);
+      first.metadata.animate(44, false, true);
+      assert.deepEqual(Array.from(canopy.getVerticesData('position')), neutral);
+      first.metadata.animate(123, true, true);
+      assert.deepEqual(Array.from(canopy.getVerticesData('position')), neutral);
+      first.dispose(); second.dispose();
+    }
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('the record spins with shared geometry while its cabinet and tonearm remain still', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const first = createFurniture('low-cabinet', scene), second = createFurniture('low-cabinet', scene);
+    const recordNode = furniture => furniture.getChildren().find(node => node.metadata?.effect === 'record-spin');
+    const record = recordNode(first), otherRecord = recordNode(second);
+    const disc = record.getChildMeshes()[0], otherDisc = otherRecord.getChildMeshes()[0];
+    const cabinet = first.getChildMeshes().find(mesh => !mesh.metadata?.dynamic);
+    const cabinetPositions = Array.from(cabinet.getVerticesData('position'));
+    const discPositions = Array.from(disc.getVerticesData('position'));
+    assert.equal(first.getChildMeshes().length, 2, 'the disc adds exactly one draw call');
+    assert.equal(disc.geometry, otherDisc.geometry);
+    assert.equal(disc.material, otherDisc.material);
+    const [width, depth] = getFurniture('low-cabinet').footprint;
+    for (let sample = 0; sample < 20; sample++) {
+      first.metadata.animate(sample * 0.6, false, false);
+      first.getChildMeshes().forEach(mesh => mesh.computeWorldMatrix(true));
+      const bounds = first.getHierarchyBoundingVectors();
+      assert.ok(bounds.min.x >= -width / 2 && bounds.max.x <= width / 2);
+      assert.ok(bounds.min.z >= -depth / 2 && bounds.max.z <= depth / 2);
+    }
+    assert.notEqual(record.rotation.y, 0);
+    assert.equal(otherRecord.rotation.y, 0);
+    assert.deepEqual(record.position.asArray(), [-0.33, 1.006, -0.01]);
+    assert.deepEqual(Array.from(cabinet.getVerticesData('position')), cabinetPositions);
+    assert.deepEqual(Array.from(disc.getVerticesData('position')), discPositions);
+    first.metadata.animate(92, false, true);
+    assert.equal(record.rotation.y, 0);
+    first.metadata.animate(123, false, true);
+    assert.equal(record.rotation.y, 0);
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('hearth embers rise and fade inside their footprint, with no particles in reduced motion', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const fireplace = createFurniture('fireplace', scene);
+    const embers = fireplace.getChildMeshes().find(mesh => mesh.metadata?.effect === 'hearth-embers');
+    const neutralPositions = Array.from(embers.getVerticesData('position'));
+    const neutralColors = Array.from(embers.getVerticesData('color'));
+    assert.equal(embers.getTotalIndices() / 3, 64);
+    assert.equal(embers.isPickable, false);
+    assert.equal(embers.receiveShadows, false);
+    assert.equal(embers.metadata.castShadow, false);
+    fireplace.metadata.animate(1, false, false);
+    assert.ok(embers.getVerticesData('position')[1] > neutralPositions[1], 'particles travel upwards');
+    assert.notDeepEqual(Array.from(embers.getVerticesData('color')), neutralColors);
+    const [width, depth] = getFurniture('fireplace').footprint;
+    for (let sample = 0; sample < 100; sample++) {
+      fireplace.metadata.animate(sample * 0.37, false, false);
+      const positions = embers.getVerticesData('position'), colors = embers.getVerticesData('color');
+      for (let index = 0; index < positions.length; index += 3) {
+        assert.ok(Math.abs(positions[index]) < width / 2);
+        assert.ok(Math.abs(positions[index + 2]) < depth / 2);
+        assert.ok(positions[index + 1] > 0 && positions[index + 1] < 5.3);
+      }
+      for (let index = 3; index < colors.length; index += 4) assert.ok(colors[index] >= 0 && colors[index] <= 1);
+    }
+    fireplace.metadata.animate(50, false, true);
+    assert.equal(embers.isEnabled(), false);
+    assert.deepEqual(Array.from(embers.getVerticesData('position')), neutralPositions);
+    assert.deepEqual(Array.from(embers.getVerticesData('color')), neutralColors);
+    fireplace.metadata.animate(99, false, true);
+    assert.deepEqual(Array.from(embers.getVerticesData('position')), neutralPositions);
+    fireplace.metadata.animate(100, false, false);
+    assert.equal(embers.isEnabled(), true);
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('typing and thinking move the upper body with connected wrists, grounded legs, and a still hidden avatar', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    for (const type of ['study-desk', 'writing-desk']) {
+      const furniture = createFurniture(type, scene), avatar = furniture.metadata.avatar;
+      const upper = avatar.getChildMeshes().find(mesh => mesh.metadata?.part === 'avatar-upper-body');
+      const legs = avatar.getChildren().find(node => node.name === 'grounded-trousers-and-shoes');
+      const legPositions = Array.from(legs.getChildMeshes()[0].getVerticesData('position'));
+      const neutralUpper = Array.from(upper.getVerticesData('position'));
+      const head = avatar.getChildren().find(node => node.name === 'headphones');
+      const hands = avatar.getChildren().filter(node => node.name === 'typing-hand');
+      const steam = furniture.getChildMeshes().find(mesh => mesh.metadata?.effect === 'tea-steam');
+      assert.equal(upper.isEnabled(), true);
+      const wristIndices = [-1, 1].map(side => {
+        let closest = -1, distance = Infinity;
+        for (let index = 0; index < neutralUpper.length; index += 3) {
+          const squared = (neutralUpper[index] - side * 0.21) ** 2 + (neutralUpper[index + 1] - 1.35) ** 2 + (neutralUpper[index + 2] + 0.86) ** 2;
+          if (squared < distance) { closest = index; distance = squared; }
+        }
+        assert.ok(distance < 1e-10, 'forearm has an exact wrist attachment'); return closest;
+      });
+      for (const seconds of [1.7, 3.6, 6.3, 8.2, 12.1]) {
+        furniture.metadata.animate(seconds, true, false);
+        const positions = upper.getVerticesData('position');
+        for (let side = 0; side < 2; side++) {
+          const index = wristIndices[side], hand = hands[side].position;
+          assert.ok(Math.abs(positions[index] - hand.x) < 1e-5);
+          assert.ok(Math.abs(positions[index + 1] - (hand.y - 0.02)) < 1e-5);
+          assert.ok(Math.abs(positions[index + 2] - (hand.z + 0.08)) < 1e-5);
+        }
+      }
+      furniture.metadata.animate(1.7, true, false); const workingHeadZ = head.position.z;
+      furniture.metadata.animate(8.2, true, false);
+      assert.ok(head.position.z - workingHeadZ > 0.06, 'a thinking pause changes the seated lean visibly');
+      assert.deepEqual(hands.map(hand => hand.position.asArray()), [[-0.21, 1.37, -0.94], [0.21, 1.37, -0.94]]);
+      assert.deepEqual(Array.from(legs.getChildMeshes()[0].getVerticesData('position')), legPositions);
+      assert.deepEqual(legs.position.asArray(), [0, 0, 0]); assert.deepEqual(legs.rotation.asArray(), [0, 0, 0]);
+      const beforeHidden = Array.from(upper.getVerticesData('position')), beforeSteam = Array.from(steam.getVerticesData('position'));
+      avatar.setEnabled(false); furniture.metadata.animate(13, true, false);
+      assert.deepEqual(Array.from(upper.getVerticesData('position')), beforeHidden);
+      assert.notDeepEqual(Array.from(steam.getVerticesData('position')), beforeSteam);
+      avatar.setEnabled(true); furniture.metadata.animate(22, true, true);
+      assert.deepEqual(Array.from(upper.getVerticesData('position')), neutralUpper);
+      assert.deepEqual(head.position.asArray(), [0, 1.72, -0.17]);
+      furniture.dispose();
+    }
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('crossed ember faces remain visible in every fireplace orientation and across the camera orbit', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const fireplace = createFurniture('fireplace', scene);
+    const embers = fireplace.getChildMeshes().find(mesh => mesh.metadata?.effect === 'hearth-embers');
+    assert.equal(fireplace.getChildMeshes().filter(mesh => mesh.metadata?.effect === 'hearth-embers').length, 1);
+    for (const seconds of [1.2, 4.8]) {
+      fireplace.metadata.animate(seconds, false, false);
+      const positions = embers.getVerticesData('position');
+      for (let rotation = 0; rotation < 4; rotation++) {
+        fireplace.rotation.y = rotation * Math.PI / 2; embers.computeWorldMatrix(true);
+        const world = embers.getWorldMatrix();
+        for (const azimuth of [0.55, Math.PI / 4, Math.atan2(12.4, 10.5), 1.22]) {
+          const screenRight = new Vector3(-Math.sin(azimuth), 0, Math.cos(azimuth));
+          for (let particle = 0; particle < 16; particle++) {
+            let bestProjection = 0;
+            for (let plane = 0; plane < 2; plane++) {
+              const left = (particle * 8 + plane * 4) * 3, right = left + 6;
+              const edge = new Vector3(positions[right] - positions[left], positions[right + 1] - positions[left + 1], positions[right + 2] - positions[left + 2]);
+              const direction = Vector3.TransformNormal(edge, world).normalize();
+              bestProjection = Math.max(bestProjection, Math.abs(Vector3.Dot(direction, screenRight)));
+            }
+            assert.ok(bestProjection >= Math.SQRT1_2 - 1e-5, `particle ${particle}, turn ${rotation}, azimuth ${azimuth} retains visible width`);
+          }
+        }
+      }
     }
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });

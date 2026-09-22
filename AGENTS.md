@@ -4,6 +4,8 @@ Build a browser-first cozy study room. Keep the whole cutaway room visible, like
 
 The product is becoming a room-decorating study game: editable preset rooms, a furniture collection, and study stations for the avatar. Model furniture deliberately in JavaScript with reusable procedural geometry. Avoid generated raster artwork as a substitute for furniture models. Smooth interaction is a priority: measure actual browser performance, batch static geometry, and avoid unnecessary rendering work.
 
+The user wants a visibly animated room while preserving FPS. Reuse transforms and typed buffers; keep particles, moving foliage and effects within small draw budgets. Motion should read at the whole-room scale, with visible sky motes and occasional ambient events, while staying physically grounded: seated avatars keep their legs planted, and the sleeping cat uses restrained breathing and tail-tip movement. Honor reduced motion and suspend rendering in hidden tabs.
+
 Use Babylon.js as the game engine. The visual direction is an expansive, fantastical and exceptionally cozy study retreat, with layered warm lighting and deliberately detailed furniture. The long-term vision is friends joining rooms to study and an expandable native notch companion showing friends' study presence. Keep that as product direction; current work prioritizes graphics and the solo decorating game.
 
 The room and shared study presence are the core product. Make online availability, active focus and breaks visibly distinct. The notch is an optional extension of that same room/presence system, not a requirement for the website or friends feature. Current local timer status must not imply a live friends connection. See `docs/product-vision.md`.

@@ -6,6 +6,7 @@ import { Vector3, Matrix, Quaternion } from '@babylonjs/core/Maths/math.vector.j
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
+import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture.js';
@@ -101,11 +102,39 @@ export function createRoom(container, options = {}) {
     const mat = new StandardMaterial(`picture-${meshId++}`, scene); mat.disableLighting = true; mat.emissiveTexture = texture; mat.diffuseColor = Color3.Black(); mat.backFaceCulling = false;
     return finish(MeshBuilder.CreatePlane(`print-${meshId++}`, { width, height }, scene), mat, position, parent, false);
   }
+  // Keep moving decorative objects inexpensive: vertex colors retain all the
+  // painted parts in one opaque draw, with a second draw for emissive flames.
+  const movingPaint = new StandardMaterial('moving-painted-details', scene);
+  movingPaint.diffuseColor = Color3.White(); movingPaint.specularColor = color('#18140f'); movingPaint.specularPower = 20;
+  function batchMoving(parent) {
+    parent.computeWorldMatrix(true);
+    const inverse = parent.getWorldMatrix().clone().invert(), batches = new Map();
+    const parts = parent.getChildMeshes();
+    for (const part of parts) {
+      part.computeWorldMatrix(true);
+      const mat = part.material, emissive = mat.emissiveColor.r + mat.emissiveColor.g + mat.emissiveColor.b > 0.1;
+      const key = emissive ? mat.uniqueId : 'paint';
+      if (!batches.has(key)) batches.set(key, { material: emissive ? mat : movingPaint, emissive, data: [] });
+      const data = VertexData.ExtractFromMesh(part, true, true);
+      data.transform(part.getWorldMatrix().multiply(inverse)); data.uvs = undefined; data.uvs2 = undefined;
+      data.colors = []; const paint = mat.diffuseColor;
+      for (let i = 0; i < data.positions.length; i += 3) data.colors.push(paint.r, paint.g, paint.b, 1);
+      batches.get(key).data.push(data);
+    }
+    for (const batch of batches.values()) {
+      const data = batch.data[0]; if (batch.data.length > 1) data.merge(batch.data.slice(1), true);
+      const mesh = new Mesh(`${parent.name}-${batch.emissive ? 'glow' : 'body'}`, scene); data.applyToMesh(mesh); mesh.parent = parent; mesh.material = batch.material;
+      mesh.useVertexColors = true; mesh.hasVertexAlpha = false; mesh.receiveShadows = true; mesh.isPickable = false; mesh.metadata = { dynamic: true, castShadow: !batch.emissive };
+    }
+    parts.forEach(part => part.dispose(false, false));
+  }
   const hemisphere = new HemisphericLight('warm-ambient', new Vector3(0, 1, 0), scene); hemisphere.intensity = 0.55; hemisphere.diffuse = color('#ffe3c5'); hemisphere.groundColor = color('#645441');
   const sun = new DirectionalLight('window-sun', new Vector3(3, -8, -5).normalize(), scene); sun.position.set(-5, 10, 6); sun.intensity = 0.85; sun.diffuse = color('#ffdaaa');
   sun.shadowMinZ = 0.5; sun.shadowMaxZ = 35; sun.autoUpdateExtends = false;
   sun.orthoLeft = -10; sun.orthoRight = 10; sun.orthoTop = 10; sun.orthoBottom = -10;
-  const shadow = new ShadowGenerator(1024, sun); shadow.usePoissonSampling = true; shadow.bias = 0.0005; shadow.normalBias = 0.02; shadow.darkness = 0.24;
+  // The 20-unit ortho span (24 with Babylon's padding) at 1024 texels needs
+  // enough depth bias to keep Poisson samples from shadowing the floor itself.
+  const shadow = new ShadowGenerator(1024, sun); shadow.usePoissonSampling = true; shadow.bias = 0.002; shadow.normalBias = 0.02; shadow.darkness = 0.24;
   shadow.getShadowMap().refreshRate = 0;
   const windowGlow = new PointLight('window-lamplight', new Vector3(-2.7, 2.7, -3.3), scene); windowGlow.diffuse = color('#ffc178'); windowGlow.intensity = 1.0; windowGlow.range = 6;
   const hearthGlow = new PointLight('hearth-lamplight', new Vector3(3.25, 1.0, -2.9), scene); hearthGlow.diffuse = color('#ffa555'); hearthGlow.intensity = 1.0; hearthGlow.range = 6;
@@ -224,7 +253,18 @@ export function createRoom(container, options = {}) {
   const wallClock = new TransformNode('moon-clock', scene); wallClock.parent = world; wallClock.position.set(-5.79, 4.56, 1.76); wallClock.rotation.y = Math.PI / 2;
   const rim = cylinder(0.43, 0.43, 0.08, [0, 0, 0], palette.brass, wallClock, 32); rim.rotation.x = Math.PI / 2;
   const face = cylinder(0.37, 0.37, 0.015, [0, 0, 0.05], material('#e5d4ac'), wallClock, 32); face.rotation.x = Math.PI / 2;
-  rod([0, 0, 0.065], [0.13, 0.18, 0.065], 0.014, palette.darkWood, wallClock); rod([0, 0, 0.068], [-0.19, 0.04, 0.068], 0.014, palette.darkWood, wallClock);
+  const clockMotion = new TransformNode('clock-movement', scene); clockMotion.parent = wallClock;
+  const hourHand = new TransformNode('clock-hour-hand', scene); hourHand.parent = clockMotion;
+  const minuteHand = new TransformNode('clock-minute-hand', scene); minuteHand.parent = clockMotion;
+  const secondHand = new TransformNode('clock-second-hand', scene); secondHand.parent = clockMotion;
+  rod([0, 0, 0.065], [0.13, 0.18, 0.065], 0.014, palette.darkWood, hourHand);
+  rod([0, 0, 0.075], [-0.25, 0.045, 0.075], 0.012, palette.darkWood, minuteHand);
+  rod([0, -0.055, 0.085], [0, 0.30, 0.085], 0.008, palette.ginger, secondHand);
+  const pendulum = new TransformNode('clock-pendulum', scene); pendulum.parent = clockMotion; pendulum.position.set(0, -0.25, 0.07);
+  box([0.31, 0.87, 0.065], [0, -0.77, 0], palette.darkWood, 0.035, wallClock);
+  rod([0, 0, 0], [0, -0.67, 0], 0.017, palette.brass, pendulum);
+  const bob = cylinder(0.13, 0.13, 0.052, [0, -0.69, 0], palette.brass, pendulum, 20); bob.rotation.x = Math.PI / 2;
+  batchMoving(pendulum);
   for (let i = 0; i < 12; i++) { const angle = i / 12 * Math.PI * 2; sphere([0.018, 0.018, 0.008], [Math.cos(angle) * 0.31, Math.sin(angle) * 0.31, 0.067], palette.darkWood, wallClock); }
 
   const cat = new TransformNode('sleeping-cat', scene); cat.parent = world; cat.position.set(0.84, 0.29, 1.59); cat.rotation.y = -0.3;
@@ -236,11 +276,16 @@ export function createRoom(container, options = {}) {
   const catEars = [-0.16, 0.15].map((x, i) => { const ear = cylinder(0, 0.115, 0.24, [x, 0.21, -0.06], palette.ginger, catHead, 3); ear.name = i ? 'miso-ear-right' : 'miso-ear-left'; ear.rotation.set(0.12, i ? -0.15 : 0.15, i ? -0.16 : 0.16); return ear; });
   [-0.105, 0.105].forEach(x => tube([[x - 0.037, 0.035, 0.221], [x, 0.02, 0.239], [x + 0.037, 0.035, 0.228]], 0.012, material('#6e513b'), catHead));
   sphere([0.031, 0.019, 0.019], [0, -0.035, 0.248], material('#b87869'), catHead);
-  sphere([0.11, 0.065, 0.07], [0.25, 0.14, 0.31], palette.linen, cat);
+  const catPaw = sphere([0.11, 0.065, 0.07], [0.25, 0.14, 0.31], palette.linen, cat); catPaw.name = 'miso-resting-paw';
   const catTail = new TransformNode('miso-tail', scene); catTail.parent = cat; catTail.position.set(-0.52, 0.22, -0.12);
-  tube([[0, 0, 0], [-0.10, -0.09, 0.22], [0.03, -0.115, 0.49], [0.30, -0.115, 0.55], [0.56, -0.10, 0.47]], 0.10, palette.gingerLight, catTail);
+  tube([[0, 0, 0], [-0.10, -0.09, 0.22], [0.03, -0.115, 0.49], [0.30, -0.115, 0.55]], 0.10, palette.gingerLight, catTail);
+  // The curled tail stays on the floor. Only its short, tapered tip can flex.
+  const catTailTip = new TransformNode('miso-tail-tip', scene); catTailTip.parent = catTail; catTailTip.position.set(0.30, -0.115, 0.55);
+  finish(MeshBuilder.CreateTube('miso-tail-tip-fur', { path: [new Vector3(0, 0, 0), new Vector3(0.14, 0.005, -0.015), new Vector3(0.26, 0.015, -0.08)], radiusFunction: i => 0.10 - i * 0.018, tessellation: 6, cap: Mesh.CAP_END }, scene), palette.gingerLight, [0, 0, 0], catTailTip);
   [-0.32, -0.08, 0.13].forEach(x => sphere([0.047, 0.015, 0.22], [x, 0.478 - Math.abs(x + 0.08) * 0.06, -0.045], material('#ac7041'), catTorso));
-  cat.getChildMeshes().forEach(mesh => { mesh.isPickable = true; mesh.metadata.cat = true; });
+  // A cached depth map cannot follow the breathing pose accurately. Keep the
+  // cat's cast shadow on the floor, without sampling stale shadows on its fur.
+  cat.getChildMeshes().forEach(mesh => { mesh.isPickable = true; mesh.receiveShadows = false; mesh.metadata.cat = true; });
   const heart = new TransformNode('pet-heart', scene); heart.parent = world; heart.position.set(1.18, 1.12, 1.62); heart.setEnabled(false);
   const heartMaterial = material('#c77868', { emissive: '#c77868', emissiveIntensity: 0.3 });
   const leftHeart = sphere([0.09, 0.12, 0.055], [-0.052, 0.018, 0], heartMaterial, heart); leftHeart.rotation.z = -0.7;
@@ -250,12 +295,17 @@ export function createRoom(container, options = {}) {
   for (let i = 0; i < 20; i++) { const x = -5.37 + i * 0.56, y = 5.50 - Math.sin((i + 0.35) / 20 * Math.PI) * 0.53; rod([x, y, -4.12], [x, y - 0.13, -4.12], 0.012, wire, decor.lights); sphere([0.057, 0.083, 0.057], [x, y - 0.18, -4.12], bulb, decor.lights); }
   const sideWire = []; for (let i = 0; i <= 24; i++) sideWire.push([-5.49, 5.44 - Math.sin(i / 24 * Math.PI) * 0.49, -4.20 + i * 0.36]); tube(sideWire, 0.014, wire, decor.lights);
   for (let i = 0; i < 15; i++) { const z = -4.07 + i * 0.57, y = 5.44 - Math.sin((i + 0.35) / 15 * Math.PI) * 0.49; rod([-5.49, y, z], [-5.49, y - 0.11, z], 0.011, wire, decor.lights); sphere([0.052, 0.072, 0.052], [-5.49, y - 0.16, z], bulb, decor.lights); }
+  const swayingLanterns = [];
   function lantern(x, y, z) {
-    const lantern = new TransformNode('hanging-lantern', scene); lantern.parent = decor.lights; lantern.position.set(x, y, z);
+    const pivot = new TransformNode(`swaying-lantern-${swayingLanterns.length + 1}`, scene); pivot.parent = decor.lights; pivot.position.set(x, y + 1.1, z);
+    const lantern = new TransformNode('lantern-local-model', scene); lantern.parent = pivot; lantern.position.y = -1.1;
+    // The wall bracket stays fixed while the chain and body swing from its tip.
+    rod(x < -5 ? [-5.78, y + 1.1, z] : [x, y + 1.1, -4.43], [x, y + 1.1, z], 0.022, palette.brass, decor.lights);
     rod([0, 0.35, 0], [0, 1.10, 0], 0.018, palette.brass, lantern);
     cylinder(0.13, 0.27, 0.20, [0, 0.27, 0], palette.darkWood, lantern, 6); cylinder(0.27, 0.20, 0.13, [0, -0.32, 0], palette.brass, lantern, 6);
     for (let i = 0; i < 6; i++) { const angle = i * Math.PI / 3; rod([Math.cos(angle) * 0.23, -0.26, Math.sin(angle) * 0.23], [Math.cos(angle) * 0.23, 0.17, Math.sin(angle) * 0.23], 0.018, palette.darkWood, lantern); }
     cylinder(0.11, 0.12, 0.31, [0, -0.10, 0], material('#efdab1'), lantern); sphere([0.055, 0.115, 0.055], [0, 0.16, 0], bulb, lantern);
+    batchMoving(pivot); swayingLanterns.push(pivot);
   }
   lantern(-5.33, 4.32, 2.86); lantern(1.64, 4.35, -4.05); lantern(4.40, 4.54, -4.08);
   for (let i = 0; i < 5; i++) {
@@ -281,17 +331,69 @@ export function createRoom(container, options = {}) {
       merged.freezeWorldMatrix();
     }
   }
-  batchStatic(world, new Set([cat, heart, ...Object.values(decor)])); Object.values(decor).forEach(group => batchStatic(group));
+  batchStatic(world, new Set([cat, heart, clockMotion, ...Object.values(decor)])); Object.values(decor).forEach(group => batchStatic(group, new Set(swayingLanterns)));
   const rainSeeds = Array.from({ length: 40 }, (_, i) => { const x = -4.7 + ((i * 0.618033) % 1) * 3.98; return { x, y: (i * 0.371) % 1, speed: 0.55 + (i % 4) * 0.12, top: archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2)) - 0.12 }; });
   const rainLines = rainSeeds.map(seed => [new Vector3(seed.x, 2, -4.52), new Vector3(seed.x - 0.025, 2.18, -4.52)]);
   const rain = MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, updatable: true }, scene); rain.color = color('#fffdf5'); rain.alpha = 0.6; rain.isPickable = false; rain.setEnabled(false);
   const rainPositions = Float32Array.from(rain.getVerticesData('position'));
   rain.setBoundingInfo(new BoundingInfo(new Vector3(-4.75, 1.55, -4.53), new Vector3(-0.65, 5.28, -4.51)));
-  // Sixteen soft fireflies share one instanced draw call, and are never picked.
-  const fireflies = MeshBuilder.CreateSphere('floating-fireflies', { diameter: 0.045, segments: 3 }, scene); fireflies.material = bulb; fireflies.isPickable = false; fireflies.metadata = { castShadow: false }; fireflies.alwaysSelectAsActiveMesh = true;
-  const fireflyMatrices = new Float32Array(16 * 16), fireflyTransform = Matrix.Identity();
-  const fireflySeeds = Array.from({ length: 16 }, (_, i) => ({ x: -4.7 + ((i * 0.618033) % 1) * 9.8, y: 1.15 + ((i * 0.377) % 1) * 3.5, z: -3.6 + ((i * 0.713) % 1) * 6.3 }));
-  fireflySeeds.forEach((seed, i) => { Matrix.TranslationToRef(seed.x, seed.y, seed.z, fireflyTransform); fireflyTransform.copyToArray(fireflyMatrices, i * 16); }); fireflies.thinInstanceSetBuffer('matrix', fireflyMatrices, 16, false);
+  // Forty-eight drifting motes share one draw; size and tint vary per instance.
+  const fireflies = MeshBuilder.CreateSphere('floating-fireflies', { diameter: 0.07, segments: 3 }, scene); fireflies.material = bulb; fireflies.isPickable = false; fireflies.metadata = { castShadow: false }; fireflies.alwaysSelectAsActiveMesh = true;
+  const fireflySeeds = Array.from({ length: 48 }, (_, i) => ({ x: -4.7 + ((i * 0.618033) % 1) * 9.8, y: 1.15 + ((i * 0.377) % 1) * 3.5, z: -3.6 + ((i * 0.713) % 1) * 6.3, scale: 0.65 + ((i * 0.413) % 1) * 0.65 }));
+  function seedParticles(mesh, seeds, minimumIntensity = 0.45) {
+    const matrices = new Float32Array(seeds.length * 16), colors = new Float32Array(seeds.length * 4);
+    seeds.forEach((seed, i) => {
+      const offset = i * 16, intensity = minimumIntensity + ((i * 0.731) % 1) * (1 - minimumIntensity);
+      matrices[offset] = matrices[offset + 5] = matrices[offset + 10] = seed.scale; matrices[offset + 15] = 1;
+      matrices[offset + 12] = seed.x; matrices[offset + 13] = seed.y; matrices[offset + 14] = seed.z;
+      colors[i * 4] = intensity; colors[i * 4 + 1] = intensity * (0.86 + (i % 3) * 0.05); colors[i * 4 + 2] = intensity * 0.73; colors[i * 4 + 3] = 1;
+    });
+    mesh.thinInstanceSetBuffer('matrix', matrices, 16, false); mesh.thinInstanceSetBuffer('color', colors, 4, true);
+    return matrices;
+  }
+  const fireflyMatrices = seedParticles(fireflies, fireflySeeds, 0.65);
+  // Tiny four-point stars float just in front of the painted sky, behind all
+  // window joinery. The inset arch bounds leave room for their full drift.
+  const skyStars = new Mesh('window-drifting-stars', scene), starShape = new VertexData();
+  starShape.positions = [0, 0, 0, 0, 0.06, 0, 0.012, 0.012, 0, 0.047, 0, 0, 0.012, -0.012, 0, 0, -0.06, 0, -0.012, -0.012, 0, -0.047, 0, 0, -0.012, 0.012, 0];
+  starShape.indices = []; for (let i = 0; i < 8; i++) starShape.indices.push(0, i + 1, (i + 1) % 8 + 1);
+  starShape.normals = Array.from({ length: 27 }, (_, i) => i % 3 === 2 ? 1 : 0); starShape.applyToMesh(skyStars);
+  const starMaterial = new StandardMaterial('warm-sky-starlight', scene); starMaterial.disableLighting = true; starMaterial.emissiveColor = color('#ffe3ae'); starMaterial.backFaceCulling = false;
+  skyStars.material = starMaterial; skyStars.isPickable = false; skyStars.receiveShadows = false; skyStars.metadata = { castShadow: false }; skyStars.alwaysSelectAsActiveMesh = true;
+  const starSeeds = Array.from({ length: 20 }, (_, i) => {
+    const x = archCenter - 1.7 + ((i * 0.618033) % 1) * 3.4, top = archSpring + Math.sqrt(1.90 ** 2 - (x - archCenter) ** 2);
+    return { x, y: 3.40 + ((i * 0.381966 + 0.23) % 1) * (top - 3.59), z: -4.59, scale: 0.62 + ((i * 0.47) % 1) * 0.60 };
+  });
+  const starMatrices = seedParticles(skyStars, starSeeds);
+  const ambienceStart = performance.now() / 1000;
+  // Three small moths use one colored mesh. Only their original position buffer
+  // changes: no meshes, vectors or geometry builders are created during flight.
+  const moths = new Mesh('window-moths', scene), mothShape = new VertexData();
+  const mothLocal = [], mothColors = [], mothWings = [], mothIndices = [];
+  const mothSeeds = [{ x: -4.05, y: 3.87, z: -3.87 }, { x: -2.86, y: 4.52, z: -3.76 }, { x: -1.30, y: 3.91, z: -3.82 }];
+  function mothPolygon(points, tint, wing) {
+    const first = mothLocal.length / 3;
+    points.forEach(([x, y, z = 0]) => { mothLocal.push(x * 0.68, y * 0.68, z); mothColors.push(...tint, 1); mothWings.push(wing); });
+    for (let i = 1; i < points.length - 1; i++) mothIndices.push(first, first + i, first + i + 1);
+  }
+  for (let i = 0; i < mothSeeds.length; i++) {
+    for (const side of [-1, 1]) mothPolygon([[0, 0], [side * 0.10, 0.075], [side * 0.21, 0.115], [side * 0.255, 0.015], [side * 0.145, -0.105], [side * 0.03, -0.055]], i % 2 ? [0.88, 0.66, 0.35] : [1, 0.85, 0.55], 1);
+    mothPolygon([[-0.021, -0.075], [0.021, -0.075], [0.016, 0.095], [-0.016, 0.095]], [0.49, 0.28, 0.13], 0);
+    for (const side of [-1, 1]) mothPolygon([[side * 0.008, 0.08], [side * 0.09, 0.16], [side * 0.022, 0.095]], [0.77, 0.54, 0.26], 0);
+  }
+  const mothLocalPositions = Float32Array.from(mothLocal), mothPositions = new Float32Array(mothLocal.length), mothVertices = mothWings.length / mothSeeds.length;
+  for (let i = 0; i < mothSeeds.length; i++) for (let v = 0; v < mothVertices; v++) {
+    const offset = (i * mothVertices + v) * 3, seed = mothSeeds[i]; mothPositions[offset] = seed.x + mothLocalPositions[offset]; mothPositions[offset + 1] = seed.y + mothLocalPositions[offset + 1]; mothPositions[offset + 2] = seed.z + mothLocalPositions[offset + 2];
+  }
+  mothShape.positions = mothPositions; mothShape.indices = mothIndices; mothShape.colors = mothColors; mothShape.normals = Array.from({ length: mothPositions.length }, (_, i) => i % 3 === 2 ? 1 : 0); mothShape.applyToMesh(moths, true);
+  const mothMaterial = new StandardMaterial('warm-moth-wings', scene); mothMaterial.disableLighting = true; mothMaterial.emissiveColor = color('#f5d49a'); mothMaterial.backFaceCulling = false;
+  moths.material = mothMaterial; moths.parent = world; moths.isPickable = false; moths.receiveShadows = false; moths.metadata = { castShadow: false, effect: 'window-moths', count: 3 }; moths.alwaysSelectAsActiveMesh = true;
+  moths.setBoundingInfo(new BoundingInfo(new Vector3(-4.6, 3.35, -4.10), new Vector3(-0.75, 5.02, -3.40)));
+  const shootingStar = new Mesh('window-shooting-star', scene), streakShape = new VertexData();
+  streakShape.positions = [0.025, 0, 0, 0, -0.013, 0, -0.38, 0.14, 0, 0, 0.013, 0]; streakShape.indices = [0, 1, 2, 0, 2, 3]; streakShape.normals = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]; streakShape.colors = [1, 0.93, 0.75, 1, 1, 0.84, 0.55, 0.8, 1, 0.66, 0.32, 0, 1, 0.84, 0.55, 0.8]; streakShape.applyToMesh(shootingStar);
+  const streakMaterial = new StandardMaterial('warm-shooting-star', scene); streakMaterial.disableLighting = true; streakMaterial.emissiveColor = color('#ffe8b7'); streakMaterial.backFaceCulling = false; streakMaterial.alpha = 0;
+  shootingStar.material = streakMaterial; shootingStar.hasVertexAlpha = true; shootingStar.parent = world; shootingStar.isPickable = false; shootingStar.receiveShadows = false; shootingStar.position.set(-3.52, 4.63, -4.57);
+  shootingStar.metadata = { castShadow: false, effect: 'window-shooting-star', delaySeconds: 3, periodSeconds: 14, durationSeconds: 1.6 }; shootingStar.setEnabled(false);
   const furnitureRoot = new TransformNode('placed-furniture', scene), placedObjects = new Map(), settlingPieces = new Map(), animatedObjects = [];
   const decorVisible = { plants: true, lights: true, rug: true };
   let layout = createLayout(), selectedId = null, editing = false, placement = null, ghost = null, marker = null, lastPlacementState = '';
@@ -315,7 +417,7 @@ export function createRoom(container, options = {}) {
   function refreshShadows() {
     shadow.getShadowMap().renderList = scene.meshes.filter(mesh => mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && mesh !== rain && mesh !== marker && !mesh.isDescendantOf(heart) && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
     for (const mesh of glowingMeshes) bloom.removeIncludedOnlyMesh(mesh); glowingMeshes.clear();
-    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; if (emission && mesh.metadata?.effect !== 'tea-steam' && emission.r + emission.g + emission.b > 0.1 && mesh.isEnabled() && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
+    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && mesh.metadata?.effect !== 'tea-steam' && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
     bloom.mainTexture.renderList = [...glowingMeshes];
     requestRender(true);
   }
@@ -499,19 +601,56 @@ export function createRoom(container, options = {}) {
   function animate(now) {
     const seconds = now / 1000;
     const ambientTime = reducedMotion ? 0 : seconds;
-    for (let i = 0; i < fireflySeeds.length; i++) { const seed = fireflySeeds[i]; Matrix.TranslationToRef(seed.x + Math.sin(ambientTime * 0.21 + i * 2) * 0.22, seed.y + Math.sin(ambientTime * 0.31 + i) * 0.16, seed.z + Math.cos(ambientTime * 0.18 + i * 3) * 0.19, fireflyTransform); fireflyTransform.copyToArray(fireflyMatrices, i * 16); } fireflies.thinInstanceBufferUpdated('matrix');
-    hearthGlow.intensity = (theme === 'dusk' ? 1.0 : 0.65) + (reducedMotion ? 0 : Math.sin(seconds * 2.1) * 0.025 + Math.sin(seconds * 5.3) * 0.016);
-    const petAge = (now - petStart) / 1000, beingPet = petAge >= 0 && petAge < 1.6, petTime = beingPet ? petAge : 0;
-    const breathing = reducedMotion ? 0 : Math.sin(seconds * (focused ? 1.35 : 1.65));
-    catTorso.scaling.set(1 + breathing * 0.012, 1 + breathing * 0.065, 1 + breathing * 0.012);
+    for (let i = 0; i < swayingLanterns.length; i++) { const lantern = swayingLanterns[i]; lantern.rotation.z = reducedMotion ? 0 : Math.sin(seconds * 0.85 + i * 1.7) * 0.085; lantern.rotation.x = reducedMotion ? 0 : Math.sin(seconds * 0.63 + i * 1.3) * 0.025; }
+    hourHand.rotation.z = reducedMotion ? 0 : -(seconds % 43200) * Math.PI / 21600;
+    minuteHand.rotation.z = reducedMotion ? 0 : -(seconds % 3600) * Math.PI / 1800;
+    secondHand.rotation.z = reducedMotion ? 0 : -(Math.floor(seconds) % 60) * Math.PI / 30;
+    pendulum.rotation.z = reducedMotion ? 0 : Math.sin(seconds * 2.8) * 0.17;
+    for (let i = 0; i < fireflySeeds.length; i++) {
+      const seed = fireflySeeds[i], offset = i * 16;
+      const scale = seed.scale * (reducedMotion ? 1 : 1 + Math.sin(seconds * 1.15 + i * 2.7) * 0.16);
+      fireflyMatrices[offset] = fireflyMatrices[offset + 5] = fireflyMatrices[offset + 10] = scale;
+      fireflyMatrices[offset + 12] = seed.x + (reducedMotion ? 0 : Math.sin(ambientTime * 0.29 + i * 2) * 0.32);
+      fireflyMatrices[offset + 13] = seed.y + (reducedMotion ? 0 : Math.sin(ambientTime * 0.37 + i) * 0.23);
+      fireflyMatrices[offset + 14] = seed.z + (reducedMotion ? 0 : Math.cos(ambientTime * 0.23 + i * 3) * 0.26);
+    }
+    fireflies.thinInstanceBufferUpdated('matrix');
+    for (let i = 0; i < starSeeds.length; i++) {
+      const seed = starSeeds[i], offset = i * 16;
+      starMatrices[offset + 12] = seed.x + (reducedMotion ? 0 : Math.sin(seconds * 0.25 + i * 1.7) * 0.09);
+      starMatrices[offset + 13] = seed.y + (reducedMotion ? 0 : Math.cos(seconds * 0.19 + i * 2.3) * 0.055);
+    }
+    skyStars.thinInstanceBufferUpdated('matrix');
+    moths.setEnabled(!reducedMotion);
+    for (let i = 0; i < mothSeeds.length; i++) {
+      const seed = mothSeeds[i], phase = seconds * 0.52 + i * 2.1;
+      const x = seed.x + (reducedMotion ? 0 : Math.sin(phase) * 0.24), y = seed.y + (reducedMotion ? 0 : Math.cos(phase * 1.27) * 0.20), z = seed.z + (reducedMotion ? 0 : Math.sin(phase * 0.83) * 0.13);
+      const flap = reducedMotion ? 0 : 0.60 + Math.sin(seconds * (9 + i * 0.7) + i * 2) * 0.50, foldX = Math.cos(flap), foldZ = Math.sin(flap);
+      for (let v = 0; v < mothVertices; v++) {
+        const vertex = i * mothVertices + v, offset = vertex * 3, localX = mothLocalPositions[offset];
+        mothPositions[offset] = x + localX * (mothWings[vertex] ? foldX : 1); mothPositions[offset + 1] = y + mothLocalPositions[offset + 1]; mothPositions[offset + 2] = z + (mothWings[vertex] ? Math.abs(localX) * foldZ : mothLocalPositions[offset + 2]);
+      }
+    }
+    moths.updateVerticesData('position', mothPositions, false, false);
+    const streakAge = seconds - ambienceStart - shootingStar.metadata.delaySeconds, streakPhase = streakAge % shootingStar.metadata.periodSeconds;
+    const streakVisible = !reducedMotion && streakAge >= 0 && streakPhase < shootingStar.metadata.durationSeconds;
+    shootingStar.setEnabled(streakVisible);
+    const streakProgress = streakVisible ? streakPhase / shootingStar.metadata.durationSeconds : 0;
+    shootingStar.position.set(-3.52 + streakProgress * 1.04, 4.63 - streakProgress * 0.48, -4.57); streakMaterial.alpha = streakVisible ? Math.sin(streakProgress * Math.PI) * 0.9 : 0;
+    hearthGlow.intensity = (theme === 'dusk' ? 1.0 : 0.65) + (reducedMotion ? 0 : Math.sin(seconds * 2.1) * 0.07 + Math.sin(seconds * 4.1) * 0.04);
+    const petAge = (now - petStart) / 1000, beingPet = petAge >= 0 && petAge < 1.6;
+    const breathing = reducedMotion ? 0 : Math.sin(seconds * 1.2);
+    catTorso.scaling.set(1, 1 + breathing * 0.014, 1 + breathing * 0.004);
+    // Anchor the underside while the upper flank expands by a few millimeters.
+    catTorso.position.y = breathing * 0.014 * 0.03;
     const petEase = beingPet && !reducedMotion ? Math.sin(petAge / 1.6 * Math.PI) : 0;
-    catHead.position.y = 0.26 + (reducedMotion ? 0 : breathing * 0.009) + petEase * 0.055;
-    catHead.rotation.set(-petEase * 0.14, 0, petEase * Math.sin(petTime * 7) * 0.14);
-    const tailPhase = seconds % 7.8 / 1.25;
-    catTail.rotation.y = reducedMotion ? 0 : petEase * Math.sin(petTime * 9) * 0.38 + (tailPhase < 1 ? Math.sin(tailPhase * Math.PI * 4) * Math.sin(tailPhase * Math.PI) * 0.22 : 0);
-    const earPhase = seconds % 9.2 / 0.55;
-    const earTwitch = reducedMotion ? 0 : petEase * Math.sin(petTime * 11) * 0.13 + (earPhase < 1 ? Math.sin(earPhase * Math.PI * 4) * Math.sin(earPhase * Math.PI) * 0.19 : 0);
-    for (let i = 0; i < catEars.length; i++) { const ear = catEars[i]; ear.rotation.x = 0.12 + earTwitch * (i ? -0.5 : 1); ear.rotation.z = (i ? -0.16 : 0.16) + earTwitch * 0.45; }
+    catHead.rotation.z = petEase ? -petEase * 0.025 : 0;
+    const tailPhase = (seconds + 4.5) % 13.8 / 1.8;
+    const tailFlex = tailPhase < 1 ? Math.sin(tailPhase * Math.PI) ** 2 : 0;
+    catTailTip.rotation.y = reducedMotion ? 0 : Math.max(tailFlex, petEase) * 0.11;
+    const earPhase = (seconds + 2.6) % 17.3 / 0.8;
+    const earTwitch = reducedMotion ? 0 : Math.max(petEase * 0.65, earPhase < 1 ? Math.sin(earPhase * Math.PI) ** 2 : 0);
+    for (let i = 0; i < catEars.length; i++) { const ear = catEars[i]; ear.rotation.x = 0.12 - earTwitch * (i ? 0.025 : 0.075); ear.rotation.z = (i ? -0.16 : 0.16) + earTwitch * (i ? 0.012 : -0.025); }
     for (let i = 0; i < animatedObjects.length; i++) { const object = animatedObjects[i]; object.metadata.animate(seconds, focused && object.metadata.itemId === layout.activeDeskId, reducedMotion); }
     let settled = false;
     for (const [id, entry] of settlingPieces) {
@@ -543,7 +682,7 @@ export function createRoom(container, options = {}) {
     const interval = quality === 'battery' ? 1000 / 30 : 1000 / 60, elapsed = now - lastFrame;
     if (lastFrame && elapsed < interval - 1) { frame = requestAnimationFrame(tick); return; }
     processPendingPointer();
-    if (reducedMotion && !needsRender && readyReported && !downPosition && now - petStart >= 1650) return;
+    if (reducedMotion && !needsRender && readyReported && !downPosition && Math.abs(camera.inertialAlphaOffset) + Math.abs(camera.inertialBetaOffset) <= 0.0001 && now - petStart >= 1650) return;
     needsRender = false;
     lastFrame = elapsed > interval * 3 ? now : lastFrame + interval; animate(now);
     const start = performance.now(); engine.beginFrame(); scene.render(); engine.endFrame(); reportStats(now, performance.now() - start); lastRenderedAt = now;

@@ -59,6 +59,12 @@ const room = createRoom(container, {
   onStats: value => stats.push(value),
 });
 const canvas = container.canvas;
+const particleNames = ['floating-fireflies', 'window-drifting-stars'];
+// Babylon drops its public buffer CPU reference after a direct upload. Retain
+// the original arrays now, so later assertions check the same live buffers.
+const particleBuffers = particleNames.map(name => room.diagnostics().scene.getMeshByName(name).getVertexBuffer('world0').getData());
+const particleRestMatrices = particleBuffers.map(buffer => Array.from(buffer));
+const restingMothPositions = Array.from(room.diagnostics().scene.getMeshByName('window-moths').getVerticesData('position'));
 function advance(count = 1) {
   for (let i = 0; i < count && frames.size; i++) {
     assert.equal(frames.size, 1, 'one scheduled animation callback');
@@ -97,7 +103,85 @@ try {
   const shadowCasters = scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList;
   const glowMeshes = scene.effectLayers.find(layer => layer.name === 'candlelight-bloom').mainTexture.renderList;
   for (const mesh of effects) if (mesh.metadata.effect === 'tea-steam') { assert.equal(mesh.isPickable, false); assert.ok(!shadowCasters.includes(mesh) && !glowMeshes.includes(mesh)); }
+  const catMeshes = scene.meshes.filter(mesh => mesh.metadata?.cat);
+  assert.ok(catMeshes.length > 0);
+  for (const mesh of catMeshes) {
+    assert.equal(mesh.receiveShadows, false, 'moving cat fur must not sample a stale cached shadow pose');
+    assert.ok(shadowCasters.includes(mesh), 'the cat still casts its grounding shadow onto the floor');
+  }
   console.log('PASS animation cost: hover picks coalesce; orbit/placement skip mesh picking; steam stays out of shadows and bloom.');
+  const particles = particleNames.map(name => scene.getMeshByName(name));
+  assert.deepEqual(particles.map(mesh => mesh.thinInstanceCount), [48, 20], 'ambient particles stay in two instanced batches');
+  const beforeParticleDrift = particleBuffers.map(buffer => Array.from(buffer)); advance(30);
+  for (let i = 0; i < particles.length; i++) {
+    const mesh = particles[i];
+    assert.notDeepEqual(Array.from(particleBuffers[i]), beforeParticleDrift[i], 'particles drift using their original persistent buffers');
+    assert.equal(mesh.isPickable, false); assert.equal(mesh.receiveShadows, false);
+    assert.ok(!shadowCasters.includes(mesh) && glowMeshes.includes(mesh), 'dust glows without casting shadows or blocking the editor');
+  }
+  const starPositions = particleBuffers[1];
+  for (let i = 0; i < 20; i++) {
+    const offset = i * 16, x = starPositions[offset + 12], y = starPositions[offset + 13], z = starPositions[offset + 14], extent = starPositions[offset] * 0.06;
+    assert.ok(y - extent > 3.15 && (Math.abs(x + 2.7) + extent) ** 2 + (y - 3.15 + extent) ** 2 < 2.1 ** 2, 'star corners stay inside the upper window arch');
+    assert.ok(z > -4.64 && z < -4.43, 'stars sit in front of the artwork and behind the window frame');
+  }
+  console.log(`PASS particles: 48 fireflies + 20 window stars, two batches, ${particles.reduce((sum, mesh) => sum + mesh.getTotalIndices() / 3 * mesh.thinInstanceCount, 0)} instanced triangles, reusable buffers and window confinement.`);
+  assert.notEqual(particleBuffers[0][0], beforeParticleDrift[0][0], 'motes gently twinkle through their existing matrix scale');
+  const moths = scene.getMeshByName('window-moths'), shootingStar = scene.getMeshByName('window-shooting-star');
+  assert.equal(moths.metadata.count, 3); assert.ok(moths.getTotalIndices() / 3 <= 40, 'three fluttering moths share a small mesh');
+  const mothBuffer = moths.getVerticesData('position'), mothBefore = Array.from(mothBuffer); advance(17);
+  assert.equal(moths.getVerticesData('position'), mothBuffer, 'moth flight reuses its original position buffer');
+  assert.notDeepEqual(Array.from(mothBuffer), mothBefore, 'moths move along their calm flight paths');
+  const spanBefore = Math.abs(mothBefore[6] - mothBefore[24]), spanAfter = Math.abs(mothBuffer[6] - mothBuffer[24]);
+  assert.ok(Math.abs(spanBefore - spanAfter) > 0.005, 'wing span changes independently of translation during flutter');
+  for (const mesh of [moths, shootingStar]) {
+    assert.equal(mesh.isPickable, false); assert.equal(mesh.receiveShadows, false);
+    assert.ok(!shadowCasters.includes(mesh) && glowMeshes.includes(mesh), 'window motion retains glow membership without cached shadows');
+  }
+  const meteor = shootingStar.metadata, nextMeteorStart = (Math.ceil(Math.max(0, (time / 1000 - meteor.delaySeconds) / meteor.periodSeconds)) * meteor.periodSeconds + meteor.delaySeconds) * 1000;
+  time = nextMeteorStart + 400 - 1000 / 60; advance();
+  assert.ok(shootingStar.isEnabled() && shootingStar.material.alpha > 0.5, 'the short shooting star becomes visible at its scheduled time');
+  const firstMeteorX = shootingStar.position.x; advance(30);
+  assert.ok(shootingStar.position.x > firstMeteorX && shootingStar.isEnabled(), 'the shooting star travels across the sky');
+  for (let i = 0; i < shootingStar.getVerticesData('position').length; i += 3) {
+    const points = shootingStar.getVerticesData('position'), x = points[i] + shootingStar.position.x, y = points[i + 1] + shootingStar.position.y;
+    assert.ok(y > 3.15 && (x + 2.7) ** 2 + (y - 3.15) ** 2 < 2.1 ** 2, 'the entire short streak remains within the upper window arch');
+  }
+  assert.ok(shootingStar.position.z > -4.64 && shootingStar.position.z < -4.43);
+  time = nextMeteorStart + meteor.durationSeconds * 1000 + 100 - 1000 / 60; advance();
+  assert.equal(shootingStar.isEnabled(), false); assert.equal(shootingStar.material.alpha, 0);
+  time = nextMeteorStart + meteor.periodSeconds * 1000 + 300 - 1000 / 60; advance();
+  assert.equal(shootingStar.isEnabled(), true, 'the occasional shooting star returns on its next cycle');
+  console.log('PASS lively ambience: motes twinkle, three moths flap in one 36-triangle mesh, and a 2-triangle shooting star follows its bounded timing.');
+  const embers = effects.find(mesh => mesh.metadata.effect === 'hearth-embers');
+  assert.ok(embers, 'the furnished room contains hearth embers');
+  motion.matches = true; motion.emit('change', { matches: true }); advance(3);
+  assert.equal(embers.isEnabled(), false, 'reduced motion hides embers');
+  assert.equal(moths.isEnabled(), false); assert.equal(shootingStar.isEnabled(), false);
+  assert.deepEqual(Array.from(mothBuffer), restingMothPositions, 'reduced motion resets hidden moth geometry exactly');
+  assert.deepEqual(shootingStar.position.asArray(), [-3.52, 4.63, -4.57]); assert.equal(shootingStar.material.alpha, 0);
+  assert.equal(scene.getLightByName('hearth-lamplight').intensity, 1, 'reduced motion restores steady hearth light');
+  room.setDecor('lights', false); advance(3);
+  assert.ok(scene.effectLayers.find(layer => layer.name === 'candlelight-bloom').mainTexture.renderList.includes(embers), 'temporary motion suppression does not remove a live emitter from the glow list');
+  assert.ok(scene.effectLayers.find(layer => layer.name === 'candlelight-bloom').mainTexture.renderList.includes(shootingStar), 'hidden shooting stars also retain bloom membership after decoration edits');
+  motion.matches = false; motion.emit('change', { matches: false }); advance(3);
+  assert.ok(embers.isEnabled(), 'embers return when motion resumes');
+  assert.ok(scene.effectLayers.find(layer => layer.name === 'candlelight-bloom').mainTexture.renderList.includes(embers), 'resumed embers retain their glow after decoration edits');
+  room.setDecor('lights', true); advance(2);
+  console.log('PASS glow lifecycle: hidden motion effects retain glow membership across decoration changes.');
+  const lanterns = scene.transformNodes.filter(node => node.name.startsWith('swaying-lantern-'));
+  assert.equal(lanterns.length, 3);
+  for (const lantern of lanterns) assert.equal(lantern.getChildMeshes().length, 2, 'each moving lantern stays within two meshes');
+  const mounts = lanterns.map(lantern => lantern.getAbsolutePosition().asArray());
+  const lampAngles = lanterns.map(lantern => lantern.rotation.z);
+  const secondHand = scene.getTransformNodeByName('clock-second-hand'), pendulum = scene.getTransformNodeByName('clock-pendulum');
+  const secondAngle = secondHand.rotation.z, pendulumAngle = pendulum.rotation.z;
+  advance(75);
+  assert.ok(lanterns.some((lantern, i) => Math.abs(lantern.rotation.z - lampAngles[i]) > 0.01), 'lanterns visibly sway over time');
+  assert.deepEqual(lanterns.map(lantern => lantern.getAbsolutePosition().asArray()), mounts, 'lantern mounting points remain fixed');
+  assert.notEqual(secondHand.rotation.z, secondAngle, 'the wall clock ticks once per second');
+  assert.ok(Math.abs(pendulum.rotation.z - pendulumAngle) > 0.01, 'the clock pendulum swings');
+  console.log('PASS decorative motion: fixed lantern mounts, two meshes per lantern, ticking clock and swinging pendulum.');
   const home = { alpha: camera.alpha, beta: camera.beta };
   camera.alpha += 0.2; camera.beta += 0.1; camera.inertialAlphaOffset = 0.1;
   room.resetView(); advance(90);
@@ -160,14 +244,30 @@ try {
   assert.equal(diagnostics().layout.items.length, 2, 'a pointer click on occupied floor must not place furniture');
   room.cancelPlacement(); assert.equal(diagnostics().placement, null);
   console.log('PASS editing: pointer placement/picking, collision rejection, move/rotate/remove, last desk guard and cancellation.');
-  const torso = scene.getTransformNodeByName('miso-breathing'), catHead = scene.getTransformNodeByName('miso-head'), catTail = scene.getTransformNodeByName('miso-tail'), heart = scene.getTransformNodeByName('pet-heart');
-  const originalBreath = torso.scaling.y; advance(24);
-  assert.ok(Math.abs(torso.scaling.y - originalBreath) > 0.001, 'Miso breathes while resting');
+  const torso = scene.getTransformNodeByName('miso-breathing'), catHead = scene.getTransformNodeByName('miso-head'), catTail = scene.getTransformNodeByName('miso-tail'), catTailTip = scene.getTransformNodeByName('miso-tail-tip'), catPaw = scene.getMeshByName('miso-resting-paw'), heart = scene.getTransformNodeByName('pet-heart');
+  const headPosition = catHead.getAbsolutePosition().asArray(), pawPosition = catPaw.getAbsolutePosition().asArray(), tailPosition = catTail.getAbsolutePosition().asArray();
+  let smallestBreath = Infinity, largestBreath = -Infinity;
+  for (let i = 0; i < 180; i++) {
+    advance(); smallestBreath = Math.min(smallestBreath, torso.scaling.y); largestBreath = Math.max(largestBreath, torso.scaling.y);
+    assert.deepEqual(catHead.getAbsolutePosition().asArray(), headPosition, 'sleeping head stays grounded instead of bobbing');
+    assert.deepEqual(catHead.rotation.asArray(), [0, 0, 0], 'resting head never rocks repetitively');
+    assert.deepEqual(catPaw.getAbsolutePosition().asArray(), pawPosition, 'paws stay planted while the flank breathes');
+    assert.deepEqual(catTail.getAbsolutePosition().asArray(), tailPosition);
+    assert.deepEqual(catTail.rotation.asArray(), [0, 0, 0], 'the curled tail base never wags');
+    assert.ok(Math.abs(-0.03 * torso.scaling.y + torso.position.y + 0.03) < 1e-10, 'breathing anchors the lower torso');
+    assert.ok(Math.abs(catTailTip.rotation.y) <= 0.111, 'tail movement stays confined to a small tip flex');
+  }
+  assert.ok(largestBreath - smallestBreath > 0.005, 'Miso retains subtle breathing');
+  assert.ok(smallestBreath >= 0.985 && largestBreath <= 1.015, 'breathing never inflates the body broadly');
   room.pet(); advance(30);
-  assert.ok(catHead.position.y > 0.28 && Math.abs(catTail.rotation.y) > 0.01, 'petting lifts Miso’s head and swishes its tail');
+  assert.deepEqual(catHead.getAbsolutePosition().asArray(), headPosition, 'petting does not lift the head');
+  assert.deepEqual(catPaw.getAbsolutePosition().asArray(), pawPosition, 'petting keeps paws planted');
+  assert.deepEqual(catTail.rotation.asArray(), [0, 0, 0]);
+  assert.ok(Math.abs(catHead.rotation.z) < 0.026 && catTailTip.rotation.y > 0, 'pet response is a restrained lean and tail-tip flex');
   assert.ok(heart.isEnabled(), 'pet feedback remains visible during the reaction');
   advance(75);
-  assert.ok(!heart.isEnabled() && Math.abs(catHead.position.y - 0.26) < 0.012, 'pet reaction returns to the resting pose');
+  assert.ok(!heart.isEnabled(), 'pet feedback ends');
+  assert.deepEqual(catHead.rotation.asArray(), [0, 0, 0], 'pet reaction returns exactly to the resting head pose');
   room.beginPlacement('side-table'); clickFloor(3, 0);
   const pendingSettle = diagnostics().layout.items.find(item => item.type === 'side-table');
   const pendingNode = scene.transformNodes.find(node => node.metadata?.itemId === pendingSettle.id);
@@ -175,14 +275,27 @@ try {
   motion.matches = true; motion.emit('change', { matches: true }); advance(2);
   assert.deepEqual(pendingNode.scaling.asArray(), [1, 1, 1], 'reduced motion immediately completes settling');
   assert.deepEqual(torso.scaling.asArray(), [1, 1, 1]);
-  assert.equal(catHead.position.y, 0.26); assert.equal(catTail.rotation.y, 0);
+  assert.equal(torso.position.y, 0); assert.equal(catHead.position.y, 0.26); assert.equal(catTail.rotation.y, 0); assert.equal(catTailTip.rotation.y, 0);
+  assert.deepEqual(catHead.rotation.asArray(), [0, 0, 0]);
+  assert.deepEqual(scene.getMeshByName('miso-ear-left').rotation.asArray(), [0.12, 0.15, 0.16]);
+  assert.deepEqual(scene.getMeshByName('miso-ear-right').rotation.asArray(), [0.12, -0.15, -0.16]);
+  assert.deepEqual(particleBuffers.map(buffer => Array.from(buffer)), particleRestMatrices, 'reduced motion restores every particle to its exact authored position');
+  assert.equal(moths.isEnabled(), false); assert.equal(shootingStar.isEnabled(), false);
+  assert.deepEqual(Array.from(mothBuffer), restingMothPositions);
   room.selectItem(pendingSettle.id); room.removeSelection();
   console.log('PASS animations: timed settling preserves saved layout; pet reaction ends; reduced motion restores neutral poses.');
   room.setEditMode(false); room.setTheme('rain'); motion.matches = true; motion.emit('change', { matches: true }); advance(10);
   const snapshot = () => scene.transformNodes.concat(scene.meshes).map(n => [...n.position.asArray(), ...n.rotation.asArray(), ...n.scaling.asArray()]);
   const still = snapshot(); advance(120); assert.deepEqual(snapshot(), still);
+  assert.deepEqual(particleBuffers.map(buffer => Array.from(buffer)), particleRestMatrices, 'particle buffers stay still while reduced motion is idle');
   assert.equal(frames.size, 0, 'a ready reduced-motion scene stops requesting frames');
   room.setFocused(false); advance(3); assert.equal(frames.size, 0, 'one reduced-motion state change renders and returns to idle');
+  for (const lantern of lanterns) assert.deepEqual(lantern.rotation.asArray(), [0, 0, 0], 'reduced motion restores lanterns to neutral');
+  assert.equal(secondHand.rotation.z, 0); assert.equal(pendulum.rotation.z, 0);
+  camera.inertialAlphaOffset = 0.025; room.setFocused(false); advance(80);
+  assert.equal(camera.inertialAlphaOffset, 0, 'reduced motion lets camera inertia finish instead of deferring a later drift');
+  assert.equal(frames.size, 0, 'camera inertia returns the reduced-motion scheduler to idle');
+  room.resetView(); advance(3);
   console.log('PASS reduced motion: transforms stay still.');
   // Deliberately idle on-demand frames are not evidence of a slow renderer.
   // Hold CPU time still here so this isolates the FPS adaptation rule.
