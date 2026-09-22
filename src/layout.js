@@ -5,7 +5,7 @@ export const MAX_ITEMS = 32;
 const GRID = 0.25;
 const EPSILON = 1e-7;
 // The resident cat has a little permanent spot. A rug can sit underneath it.
-const CAT_BOUNDS = { minX: 0.15, maxX: 1.5, minZ: 1.1, maxZ: 2.15 };
+export const CAT_BOUNDS = Object.freeze({ minX: 0.15, maxX: 1.5, minZ: 1.1, maxZ: 2.15 });
 const item = (id, type, x, z, rotation = 0) => ({ id, type, x, z, rotation });
 
 export const PRESETS = [

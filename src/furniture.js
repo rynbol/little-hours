@@ -4,6 +4,7 @@ import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { CreateBox, CreateSegmentedBoxVertexData } from '@babylonjs/core/Meshes/Builders/boxBuilder.js';
 import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder.js';
 import { CreateCylinder } from '@babylonjs/core/Meshes/Builders/cylinderBuilder.js';
+import { CreateLineSystem } from '@babylonjs/core/Meshes/Builders/linesBuilder.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { Vector3, Quaternion } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
@@ -893,6 +894,8 @@ function avatarTemplate(scene) {
   upper.metadata = { ranges };
   const head = new TransformNode('avatar-part', scene);
   sphere(head, [0.232, 0.245, 0.22], [0, 0, 0], C.skin);
+  for (const x of [-.072, .072]) sphere(head, [.012, .015, .009], [x, -.025, -.209], '#51443a');
+  sphere(head, [.031, .033, .035], [0, -.070, -.215], C.skin);
   sphere(head, [0.24, 0.237, 0.22], [0, 0.061, 0.058], '#674d3b');
   sphere(head, [0.12, 0.12, 0.10], [0, 0.19, 0.20], '#674d3b');
   torus(head, 0.25, 0.026, [0, 0.017, 0.014], C.dark, Math.PI);
@@ -905,6 +908,113 @@ function avatarTemplate(scene) {
   const value = { body: batch(body), upper, head: batch(head), hand: batch(hand), writingHand: batch(writingHand) };
   Object.values(value).forEach(part => part.setEnabled(false));
   templates.set('avatar', value); return value;
+}
+
+// One independently posed body buffer plus the shared head. The same sweater,
+// palette and proportions carry the desk companion through walks and breaks.
+export function createMobileCompanion(scene) {
+  const root = new TransformNode('Walking companion', scene), source = new TransformNode('companion-rig-source', scene);
+  sweater(source); cylinder(source, .10, .12, .14, [0, 1.565, -.14], C.skin);
+  box(source, [.51, .22, .43], [0, .77, -.08], '#777e72', .08);
+  source.getChildMeshes().forEach(part => { part.metadata = { bone: 'torso' }; });
+  const joints = {}, bones = {};
+  for (const side of [-1, 1]) {
+    const key = side < 0 ? 'L' : 'R';
+    const anchors = { shoulder: [side * .255, 1.43, -.12], elbow: [side * .34, 1.10, -.14], wrist: [side * .30, .89, -.18], hip: [side * .15, .76, -.08], knee: [side * .15, .65, -.57], ankle: [side * .15, .17, -.67] };
+    for (const [name, point] of Object.entries(anchors)) joints[name + key] = new Vector3(...point);
+    for (const [name, a, b, radius, tint] of [['upperArm', 'shoulder', 'elbow', .092, '#b88770'], ['forearm', 'elbow', 'wrist', .075, '#b88770'], ['thigh', 'hip', 'knee', .108, '#777e72'], ['shin', 'knee', 'ankle', .078, '#777e72']]) {
+      const bone = name + key, part = rod(source, anchors[a], anchors[b], radius, tint);
+      part.metadata = { bone }; bones[bone] = { a: a + key, b: b + key, start: new Vector3(...anchors[a]), end: new Vector3(...anchors[b]) };
+      const joint = sphere(source, [radius, radius, radius], anchors[a], tint); joint.metadata = { joint: a + key };
+    }
+    const hand = sphere(source, [.074, .082, .066], anchors.wrist, C.skin); hand.metadata = { joint: 'wrist' + key };
+    const shoe = box(source, [.20, .12, .34], [side * .15, .09, -.75], C.cream, .05); shoe.metadata = { joint: 'ankle' + key };
+  }
+  const ranges = []; let vertex = 0;
+  for (const part of source.getChildMeshes()) { ranges.push({ start: vertex, end: vertex + part.getTotalVertices(), ...part.metadata }); vertex += part.getTotalVertices(); }
+  const bodyGroup = batch(source); bodyGroup.parent = root;
+  const body = bodyGroup.getChildMeshes()[0]; body.name = 'companion-articulated-body';
+  for (const kind of ['position', 'normal']) body.markVerticesDataAsUpdatable(kind, true);
+  const neutral = Float32Array.from(body.getVerticesData('position')), positions = new Float32Array(neutral);
+  const neutralNormals = Float32Array.from(body.getVerticesData('normal')), normals = new Float32Array(neutralNormals);
+  for (const bone of Object.values(bones)) { bone.direction = bone.end.subtract(bone.start); bone.length = bone.direction.length(); bone.direction.scaleInPlace(1 / bone.length); }
+  for (const range of ranges) {
+    if (range.joint) range.center = joints[range.joint].clone();
+    if (!bones[range.bone]) continue;
+    const bone = bones[range.bone]; range.weights = new Float32Array(range.end - range.start);
+    for (let i = range.start; i < range.end; i++) range.weights[i - range.start] = Math.max(0, Math.min(1, ((neutral[i * 3] - bone.start.x) * bone.direction.x + (neutral[i * 3 + 1] - bone.start.y) * bone.direction.y + (neutral[i * 3 + 2] - bone.start.z) * bone.direction.z) / bone.length));
+  }
+  body.metadata = { dynamic: true, castShadow: false, companion: true, rig: { joints } };
+  body.setBoundingInfo(new BoundingInfo(new Vector3(-.6, 0, -.95), new Vector3(.6, 2.1, .65)));
+  const head = avatarTemplate(scene).head.clone('companion-head', root); head.setEnabled(true);
+  const sleepLetters = CreateLineSystem('companion-sleep-letters', { lines: [0, 1].map(i => {
+    const x = i * .19, y = i * .22, size = i ? .10 : .14;
+    return [new Vector3(x, y + size, 0), new Vector3(x + size, y + size, 0), new Vector3(x, y, 0), new Vector3(x + size, y, 0)];
+  }) }, scene);
+  sleepLetters.parent = root; sleepLetters.billboardMode = Mesh.BILLBOARDMODE_ALL; sleepLetters.color = Color3.FromHexString('#eadac3'); sleepLetters.setEnabled(false);
+  root.getChildMeshes().forEach(part => { part.isPickable = false; part.receiveShadows = false; part.metadata = { ...part.metadata, castShadow: false, companion: true }; });
+  const contact = CreateCylinder('companion-contact-shadow', { diameter: .65, height: .004, tessellation: 16 }, scene);
+  const contactMaterial = new StandardMaterial('companion-contact-shadow', scene); contactMaterial.diffuseColor = new Color3(.14, .10, .08); contactMaterial.emissiveColor = new Color3(.14, .10, .08); contactMaterial.disableLighting = true; contactMaterial.alpha = .16;
+  contact.material = contactMaterial; contact.isPickable = false; contact.metadata = { castShadow: false, companion: true }; contact.position.y = .245;
+  const direction = new Vector3(), radial = new Vector3(), rotated = new Vector3(), normal = new Vector3(), rotation = new Quaternion();
+  const torsoPoint = (x, y, z, hip, lean, roll, out) => {
+    const ry = x * Math.sin(roll) + y * Math.cos(roll);
+    out.set(x * Math.cos(roll) - y * Math.sin(roll), hip + ry * Math.cos(lean) - z * Math.sin(lean), -.08 + ry * Math.sin(lean) + z * Math.cos(lean));
+  };
+  return {
+    root, contact,
+    animate(pose, seconds, reducedMotion) {
+      const visible = !pose.atDesk;
+      root.setEnabled(visible); contact.setEnabled(visible);
+      if (!visible) return;
+      root.position.set(pose.x, .22, pose.z); root.rotation.y = pose.yaw;
+      sleepLetters.setEnabled(pose.doze > .25 && !reducedMotion);
+      if (sleepLetters.isEnabled()) { const drift = seconds / 3 % 1; sleepLetters.position.set(.12, 2.08 + drift * .20, 0); sleepLetters.alpha = Math.sin(drift * Math.PI) * .70; }
+      contact.position.x = pose.x; contact.position.z = pose.z;
+      const sit = pose.sit, phase = pose.moving && !reducedMotion ? pose.step : 0;
+      const breath = reducedMotion ? 0 : Math.sin(seconds * (pose.doze > 0 ? 1.05 : 1.4)) * .007;
+      const hip = 1.10 * (1 - sit) + pose.seatHeight * sit + (pose.moving && !reducedMotion ? Math.cos(phase * 2) * .016 : 0);
+      const lean = sit * (.08 + pose.doze * .11), roll = reducedMotion ? 0 : Math.sin(phase) * .025 * (1 - sit);
+      for (const side of [-1, 1]) {
+        const key = side < 0 ? 'L' : 'R', stride = Math.sin(phase + (side < 0 ? 0 : Math.PI)), lift = pose.moving && !reducedMotion ? Math.max(0, Math.cos(phase + (side < 0 ? 0 : Math.PI))) * .10 : 0;
+        torsoPoint(side * .255, .65, -.04, hip + breath, lean, roll, joints['shoulder' + key]);
+        joints['elbow' + key].set(side * (.32 + sit * .01), hip + .31 + sit * .06, -.10 + stride * .12 * (1 - sit));
+        joints['wrist' + key].set(side * (.30 - sit * .10), hip + .08 + sit * .13, -.16 - sit * .25 + stride * .22 * (1 - sit));
+        joints['hip' + key].set(side * .15, hip - .02, -.08);
+        joints['knee' + key].set(side * .15, .56 * (1 - sit) + (pose.seatHeight - .13) * sit, -.57 * sit - .06 + stride * .14 * (1 - sit));
+        joints['ankle' + key].set(side * .15, .17 * sit + .15 * (1 - sit) + lift * (1 - sit), -.67 * sit - stride * .29 * (1 - sit));
+      }
+      for (const range of ranges) {
+        const bone = bones[range.bone];
+        let length = 1, start;
+        if (bone) { start = joints[bone.a]; joints[bone.b].subtractToRef(start, direction); length = direction.length(); direction.scaleInPlace(1 / length); Quaternion.FromUnitVectorsToRef(bone.direction, direction, rotation); }
+        for (let vertex = range.start; vertex < range.end; vertex++) {
+          const i = vertex * 3;
+          if (bone) {
+            const along = range.weights[vertex - range.start];
+            radial.set(neutral[i] - bone.start.x - bone.direction.x * along * bone.length, neutral[i + 1] - bone.start.y - bone.direction.y * along * bone.length, neutral[i + 2] - bone.start.z - bone.direction.z * along * bone.length);
+            radial.rotateByQuaternionToRef(rotation, rotated);
+            positions[i] = start.x + direction.x * along * length + rotated.x; positions[i + 1] = start.y + direction.y * along * length + rotated.y; positions[i + 2] = start.z + direction.z * along * length + rotated.z;
+            normal.set(neutralNormals[i], neutralNormals[i + 1], neutralNormals[i + 2]);
+            const axial = Vector3.Dot(normal, bone.direction) * (bone.length / length - 1);
+            normal.addInPlaceFromFloats(bone.direction.x * axial, bone.direction.y * axial, bone.direction.z * axial).normalize().rotateByQuaternionToRef(rotation, rotated);
+            normals[i] = rotated.x; normals[i + 1] = rotated.y; normals[i + 2] = rotated.z;
+          } else if (range.joint) {
+            const joint = joints[range.joint];
+            positions[i] = neutral[i] + joint.x - range.center.x; positions[i + 1] = neutral[i + 1] + joint.y - range.center.y; positions[i + 2] = neutral[i + 2] + joint.z - range.center.z;
+          } else {
+            torsoPoint(neutral[i], neutral[i + 1] - .78, neutral[i + 2] + .08, hip + breath, lean, roll, rotated);
+            positions[i] = rotated.x; positions[i + 1] = rotated.y; positions[i + 2] = rotated.z;
+            torsoPoint(neutralNormals[i], neutralNormals[i + 1], neutralNormals[i + 2], 0, lean, roll, rotated);
+            normals[i] = rotated.x; normals[i + 1] = rotated.y; normals[i + 2] = rotated.z + .08;
+          }
+        }
+      }
+      body.updateVerticesData('position', positions, false, false); body.updateVerticesData('normal', normals, false, false);
+      torsoPoint(0, 1.02, -.09, hip + breath, lean, roll, head.position);
+      head.rotation.set(lean - pose.doze * .36, reducedMotion ? 0 : Math.sin(seconds * .45) * .055 * sit, roll + pose.doze * .09);
+    },
+  };
 }
 
 export function createFurniture(type, scene) {

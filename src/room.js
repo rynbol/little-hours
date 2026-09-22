@@ -21,7 +21,8 @@ import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstr
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 import '@babylonjs/core/Culling/ray.js';
 import '@babylonjs/core/Rendering/outlineRenderer.js';
-import { createFurniture, createRoundedBox, disposeFurnitureAssets } from './furniture.js';
+import { createFurniture, createRoundedBox, createMobileCompanion, disposeFurnitureAssets } from './furniture.js';
+import { createCompanionRoutine } from './companion.js';
 import { getFurniture } from './catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, MAX_ITEMS } from './layout.js';
 
@@ -417,6 +418,7 @@ export function createRoom(container, options = {}) {
   const decorVisible = { plants: true, lights: true, rug: true };
   let layout = createLayout(), selectedId = null, editing = false, placement = null, ghost = null, marker = null, lastPlacementState = '';
   let hoveredId = null, drag = null, outlineKey = '';
+  let companionRoutine, mobileCompanion, companionTime = 0, companionLayoutKey = '';
   const outlinedMeshes = [];
   const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782');
   const ghostMaterial = new StandardMaterial('placement-preview', scene); ghostMaterial.diffuseColor = color('#85ac80'); ghostMaterial.emissiveColor = color('#42653f'); ghostMaterial.alpha = 0.43; ghostMaterial.disableLighting = true;
@@ -440,7 +442,7 @@ export function createRoom(container, options = {}) {
   function refreshShadows() {
     shadow.getShadowMap().renderList = scene.meshes.filter(mesh => mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && (!drag?.active || itemAncestor(mesh)?.metadata.itemId !== drag.id) && mesh !== rain && mesh !== marker && !mesh.isDescendantOf(heart) && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
     for (const mesh of glowingMeshes) bloom.removeIncludedOnlyMesh(mesh); glowingMeshes.clear();
-    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && mesh.metadata?.effect !== 'tea-steam' && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
+    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && !mesh.metadata?.companion && mesh.metadata?.effect !== 'tea-steam' && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
     bloom.mainTexture.renderList = [...glowingMeshes];
     requestRender(true);
   }
@@ -467,6 +469,11 @@ export function createRoom(container, options = {}) {
     hoveredId = id; updateOutline();
   }
   function canRemove(item) { return !isDesk(item) || layout.items.filter(isDesk).length > 1; }
+  function syncCompanionVisibility() {
+    const atDesk = companionRoutine?.pose.atDesk ?? true;
+    for (const [id, object] of placedObjects) object.metadata.avatar?.setEnabled(atDesk && id === layout.activeDeskId);
+    mobileCompanion?.root.setEnabled(!atDesk); mobileCompanion?.contact.setEnabled(!atDesk);
+  }
   function updateMarker() {
     marker?.dispose(); marker = null;
     const item = layout.items.find(candidate => candidate.id === selectedId);
@@ -493,7 +500,6 @@ export function createRoom(container, options = {}) {
       object.position.y = getFurniture(item.type).category === 'Rugs' ? 0.22 + rugLayer++ * 0.006 : 0.22;
       object.position.x = item.x; object.position.z = item.z; object.rotation.y = item.rotation * Math.PI / 2;
       object.setEnabled(item.type === 'plant' ? decorVisible.plants : getFurniture(item.type).category === 'Rugs' ? decorVisible.rug : true);
-      object.metadata.avatar?.setEnabled(item.id === layout.activeDeskId);
     }
     if (selectedId && !ids.has(selectedId)) { selectedId = null; options.onSelectionChange?.(null); }
     animatedObjects.length = 0;
@@ -503,6 +509,9 @@ export function createRoom(container, options = {}) {
     const fireplace = layout.items.find(item => item.type === 'fireplace'); hearthGlow.setEnabled(Boolean(fireplace));
     if (fireplace) { const offset = Vector3.TransformCoordinates(new Vector3(0, 1.0, 0.70), Matrix.RotationY(fireplace.rotation * Math.PI / 2)); hearthGlow.position.set(fireplace.x + offset.x, offset.y, fireplace.z + offset.z); }
     if (hoveredId && !ids.has(hoveredId)) hoveredId = null;
+    const layoutKey = JSON.stringify(layout);
+    if (companionLayoutKey !== layoutKey) { companionLayoutKey = layoutKey; companionRoutine?.setLayout(layout); }
+    syncCompanionVisibility();
     outlineKey = ''; updateOutline(); updateMarker(); refreshShadows();
   }
   function setLayout(next) {
@@ -567,6 +576,7 @@ export function createRoom(container, options = {}) {
   function setEditMode(value) {
     cancelDrag(); hoverItem(null);
     const wasEditing = editing; editing = Boolean(value);
+    companionRoutine?.setEditing(editing); syncCompanionVisibility(); refreshShadows();
     if (!options.engineFactory && wasEditing !== editing) { if (editing) camera.detachControl(); else camera.attachControl(canvas, false); }
     camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0;
     canvas.style.touchAction = editing ? 'none' : 'pan-y'; canvas.style.cursor = editing ? 'crosshair' : 'grab';
@@ -752,9 +762,16 @@ export function createRoom(container, options = {}) {
   function resize() { const width = Math.max(1, container.clientWidth), height = Math.max(1, container.clientHeight); canvasAspect = width / height; engine.setSize(Math.round(width * pixelRatio), Math.round(height * pixelRatio)); fitRoom(); requestRender(); }
   function setQuality(value) { quality = ['auto', 'battery', 'high'].includes(value) ? value : 'auto'; pixelRatio = Math.min(window.devicePixelRatio || 1, quality === 'battery' ? 1 : quality === 'high' ? 2 : 1.5); engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; bloom.isEnabled = quality !== 'battery'; resize(); }
   const observer = new ResizeObserver(resize); observer.observe(container);
+  mobileCompanion = createMobileCompanion(scene);
+  companionRoutine = createCompanionRoutine(status => {
+    syncCompanionVisibility(); refreshShadows(); options.onCompanionState?.(status);
+  });
   syncFurniture(); setTheme(theme); resize();
   function animate(now) {
     const seconds = now / 1000;
+    const companionDelta = companionTime ? Math.max(0, Math.min(.1, (now - companionTime) / 1000)) : 0;
+    companionTime = now;
+    mobileCompanion.animate(companionRoutine.update(companionDelta, reducedMotion), seconds, reducedMotion);
     const ambientTime = reducedMotion ? 0 : seconds;
     for (let i = 0; i < swayingLanterns.length; i++) { const lantern = swayingLanterns[i]; lantern.rotation.z = reducedMotion ? 0 : Math.sin(seconds * 0.85 + i * 1.7) * 0.085; lantern.rotation.x = reducedMotion ? 0 : Math.sin(seconds * 0.63 + i * 1.3) * 0.025; }
     hourHand.rotation.z = reducedMotion ? 0 : -(seconds % 43200) * Math.PI / 21600;
@@ -851,16 +868,17 @@ export function createRoom(container, options = {}) {
     if (!reducedMotion || !scene.isReady() || downPosition || Math.abs(camera.inertialAlphaOffset) + Math.abs(camera.inertialBetaOffset) > 0.0001 || now - petStart < 1650) if (!frame) frame = requestAnimationFrame(tick);
   }
   const onMotionChange = event => { reducedMotion = event.matches; requestRender(); }; motionQuery.addEventListener('change', onMotionChange);
-  const onVisibility = () => { visible = !document.hidden; if (visible) { lastFrame = 0; lastRenderedAt = 0; statsStart = 0; sampleFrames = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0; requestRender(); } else { cancelDrag(); hoverItem(null); cancelAnimationFrame(frame); frame = 0; } };
+  const onVisibility = () => { visible = !document.hidden; companionTime = 0; if (visible) { lastFrame = 0; lastRenderedAt = 0; statsStart = 0; sampleFrames = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0; requestRender(); } else { cancelDrag(); hoverItem(null); cancelAnimationFrame(frame); frame = 0; } };
   document.addEventListener('visibilitychange', onVisibility);
   requestRender();
 
   return {
     setTheme, setLayout, setEditMode, selectItem, beginPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setQuality,
-    setFocused(value) { focused = Boolean(value); requestRender(); }, pet,
+    setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
+    setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); decor[key]?.setEnabled(Boolean(value)); syncFurniture(); },
     resetView() { camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    diagnostics() { return { scene, engine, camera, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, companion: companionRoutine.diagnostics(), dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
     dispose() { if (disposed) return; cancelDrag(); disposed = true; cancelAnimationFrame(frame); observer.disconnect(); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; instrumentation.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

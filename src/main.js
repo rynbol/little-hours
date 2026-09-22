@@ -4,6 +4,7 @@ import { createSession, remainingAt, formatTime } from './session.js';
 import { createStateStore, localDate, storageKey } from './state.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { PRESETS, createLayout, normalizeLayout, MAX_ITEMS } from './layout.js';
+import { companionIntent } from './companion.js';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -52,6 +53,7 @@ let focusCollapsed = false;
 let lastSessionRender = '';
 let draggedItemId = null;
 let dragHint = '';
+let companionActivity = 'idle';
 const listeners = new AbortController();
 
 document.querySelector('#app').innerHTML = `
@@ -67,6 +69,7 @@ document.querySelector('#app').innerHTML = `
           <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a ginger cat. Drag to turn the room."></div>
           <div class="loading-note" id="loading-note">Making room for you…</div>
           <div class="stage-presence" id="stage-presence" data-presence="idle" role="status" aria-live="polite" aria-atomic="true" aria-label="Your local focus status: In your room" title="Your focus status in this browser."><span id="presence-icon" aria-hidden="true">${icon('home')}</span><span id="room-status">In your room</span></div>
+          <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
           <div class="mini-caption" id="mini-caption" hidden>Mini view preview · inside this page</div>
           <div class="room-hint" id="room-hint">Drag to look around<span>·</span>Try petting the cat</div>
           <div class="pet-bubble" id="pet-bubble" hidden>Miso is happy you’re here.</div>
@@ -146,7 +149,7 @@ function applyState(next, force = false) {
     if (editMode && collectionTab === 'presets') renderCollection();
   }
   $('#item-count').textContent = `${state.layout.items.length} / ${MAX_ITEMS} pieces`;
-  room?.setFocused(state.session.running);
+  room?.setActivity(companionIntent(state.session));
   document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', button.dataset.themeChoice === state.theme));
   document.querySelectorAll('[data-decor]').forEach(input => { input.checked = state.decor[input.dataset.decor]; });
 }
@@ -175,6 +178,13 @@ try {
       $('#decorate-button').disabled = false;
     },
     onPet: petFeedback,
+    onCompanionState({ state: activity }) {
+      companionActivity = activity;
+      const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', 'resting-at-desk': 'Resting at the desk' };
+      $('#companion-status').dataset.state = activity;
+      $('#companion-status-text').textContent = `Companion · ${labels[activity] || 'In the room'}`;
+      renderCompanionNote();
+    },
     onLayoutChange(layout) {
       roomLayoutSignature = JSON.stringify(layout);
       commitLayout(layout);
@@ -197,6 +207,11 @@ try {
 }
 applyState(state, true);
 
+function renderCompanionNote() {
+  const minutes = state.history.filter(h => h.date === localDate()).reduce((sum, h) => sum + h.minutes, 0);
+  const notes = { idle: 'Start focusing to work alongside your companion.', working: 'Your companion is working alongside you.', walking: 'A little stretch. Your companion is finding a cozy spot.', returning: 'Your companion is on the way back to the desk.', resting: 'A soft seat and a little breather. Take your time.', sleeping: 'Your companion has drifted off. Resume whenever you’re ready.', 'resting-at-desk': 'Your companion is taking a quiet break at the desk.' };
+  $('#daily-note').textContent = minutes ? `${minutes} quiet minutes made today. Look at you go.` : notes[companionActivity];
+}
 function renderSession() {
   const ms = remainingAt(state.session);
   const formatted = formatTime(ms);
@@ -229,7 +244,7 @@ function renderSession() {
     button.setAttribute('aria-pressed', Number(button.dataset.minutes) * 60000 === state.session.duration);
     button.disabled = state.session.running;
   });
-  $('#daily-note').textContent = minutes ? `${minutes} quiet minutes made today. Look at you go.` : presence === 'focusing' ? 'Your companion is working alongside you.' : presence === 'break' ? 'Take your time. Your companion is resting too.' : 'Start focusing to work alongside your companion.';
+  renderCompanionNote();
 }
 function tick() {
   if (state.session.running && remainingAt(state.session) <= 0) acceptUpdate(store.update());
@@ -547,7 +562,7 @@ $('#sound-button').addEventListener('click', toggleSound);
 $('#volume').addEventListener('input', event => {
   if (soundEnabled && gainNode) gainNode.gain.setTargetAtTime(Number(event.target.value) / 130, audioContext.currentTime, 0.1);
 });
-room?.setFocused(state.session.running);
+room?.setActivity(companionIntent(state.session));
 tick();
 const tickInterval = setInterval(tick, 500);
 function refreshState() {
