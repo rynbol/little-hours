@@ -109,6 +109,7 @@ export function roomDesign(layout) { return PRESETS.find(preset => preset.id ===
 
 const isDesk = candidate => getFurniture(candidate?.type)?.category === 'Study';
 const snap = value => Math.round(value / GRID) * GRID;
+export function footprintBounds(candidate) { return bounds(candidate); }
 function bounds(candidate) {
   const definition = getFurniture(candidate.type);
   const [width, depth] = candidate.rotation % 2 ? [...definition.footprint].reverse() : definition.footprint;

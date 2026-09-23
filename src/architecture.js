@@ -13,7 +13,8 @@ import { createRoundedBox } from './furniture.js';
 export function createArchitecture(style, scene) {
   const root = new TransformNode(`architecture-${style}`, scene);
   const parts = [], materials = [], textures = [], glows = [], paint = new Map();
-  const window = style === 'metro' ? { x: -1, y: 3.35, width: 8.1, height: 3.65 } : { x: -2.7, y: 3.35, width: 4.2, height: 3.82 };
+  // `radius` marks Cloud loft's round opening; the other shells are rectangles.
+  const window = style === 'metro' ? { x: -1, y: 3.35, width: 8.1, height: 3.65, radius: 0 } : { x: -2.7, y: 3.35, width: 4.2, height: 3.82, radius: style === 'cloud' ? 1.95 : 0 };
   const tint = hex => Color3.FromHexString(hex);
   function material(hex, glow = false) {
     const key = hex + glow;
@@ -81,7 +82,7 @@ export function createArchitecture(style, scene) {
     for (let x = 0; x < 16; x++) for (let z = 0; z < 12; z++) box([.746, .05, .765], [-5.625 + x * .75, .194, -4.2075 + z * .765], (x + z) % 2 ? '#dfc6c0' : '#f3e7db');
     box([.22, 5.6, 9.2], [-5.94, 3.01, 0], '#dcbfcf');
     // A genuine circular opening, filled around with narrow plaster strips.
-    const radius = 1.95;
+    const radius = window.radius;
     for (let i = 0; i < 96; i++) {
       const x = -6 + (i + .5) * .125, dx = x - window.x;
       if (Math.abs(dx) >= radius) box([.13, 5.58, .22], [x, 3.01, -4.6], '#b5afcf');
@@ -153,12 +154,16 @@ export function createArchitecture(style, scene) {
   const texture = new DynamicTexture(`${style}-view`, canvas, scene, false); textures.push(texture);
   const viewMaterial = new StandardMaterial(`${style}-view`, scene); viewMaterial.disableLighting = true; viewMaterial.emissiveTexture = texture; viewMaterial.diffuseColor = Color3.Black(); viewMaterial.backFaceCulling = false; materials.push(viewMaterial);
   const view = MeshBuilder.CreatePlane(`${style}-window-view`, { width: window.width, height: window.height }, scene); view.position.set(window.x, window.y, -4.64); view.material = viewMaterial; view.parent = root; view.isPickable = false; view.metadata = { castShadow: false, architecture: style };
-  const accents = root.getChildMeshes().filter(mesh => mesh.name.endsWith('-accent'));
-  function setTheme(theme) {
-    paintView(texture.getContext(), style, theme); texture.update(true);
-    for (const mat of glows) mat.emissiveColor = mat.diffuseColor.scale(theme === 'day' ? .32 : theme === 'rain' ? .6 : .9);
+  // Accent lights switch off rather than vanish: the globes and neon keep their
+  // shape with no glow, so cords and lantern ribs never hang empty.
+  let theme = 'dusk', lit = true;
+  const applyGlow = () => { for (const mat of glows) mat.emissiveColor = lit ? mat.diffuseColor.scale(theme === 'day' ? .32 : theme === 'rain' ? .6 : .9) : Color3.Black(); };
+  function setTheme(next) {
+    theme = next; paintView(texture.getContext(), style, theme); texture.update(true); applyGlow();
   }
-  return { root, window, setTheme, setLights(enabled) { accents.forEach(mesh => mesh.setEnabled(enabled)); }, dispose() { root.dispose(false, false); materials.forEach(mat => mat.dispose()); textures.forEach(texture => texture.dispose()); } };
+  // Top of the walkable floor surface (tatami stripes stand slightly proud).
+  const floorTop = style === 'sakura' ? .2275 : .219;
+  return { root, window, floorTop, setTheme, setLights(enabled) { lit = enabled; applyGlow(); }, dispose() { root.dispose(false, false); materials.forEach(mat => mat.dispose()); textures.forEach(texture => texture.dispose()); } };
 }
 
 // Procedural views are painted once per atmosphere change, never per frame.

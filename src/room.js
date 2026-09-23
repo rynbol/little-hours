@@ -25,7 +25,7 @@ import { createFurniture, createRoundedBox, createContactShadow, createMobileCom
 import { createCompanionRoutine } from './companion.js';
 import { createArchitecture, styleFurniture } from './architecture.js';
 import { getFurniture } from './catalog.js';
-import { createLayout, normalizeLayout, validatePlacement, findFreePosition, MAX_ITEMS, roomDesign } from './layout.js';
+import { createLayout, normalizeLayout, validatePlacement, findFreePosition, footprintBounds, MAX_ITEMS, roomDesign } from './layout.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -439,9 +439,22 @@ export function createRoom(container, options = {}) {
     });
     const data = new VertexData(); Object.assign(data, { positions, colors, indices, normals: positions.map((_, i) => i % 3 === 1 ? 1 : 0) });
     const mesh = new Mesh(name, scene); data.applyToMesh(mesh); mesh.material = floorShadeMaterial; mesh.hasVertexAlpha = true;
-    mesh.parent = world; mesh.position.y = 0.232; mesh.isPickable = false; mesh.receiveShadows = false; mesh.metadata = { castShadow: false, effect: 'contact-shadow' };
+    mesh.parent = world; mesh.isPickable = false; mesh.receiveShadows = false; mesh.metadata = { castShadow: false, effect: 'contact-shadow' };
+    return mesh;
   }
-  wallShade('back-wall-shade', true); wallShade('side-wall-shade', false);
+  const wallShades = [wallShade('back-wall-shade', true), wallShade('side-wall-shade', false)];
+  // Shade sits 2 mm above whatever is under it: the highest rug it overlaps,
+  // or the floor. Rugs stack 6 mm apart, so one fixed height either z-fights a
+  // rug top or floats over bare floor and darkens the base of each piece.
+  const rugTops = new Map(), rugSurfaces = [], pointArea = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+  let floorTop = 0.219;
+  function surfaceBelow(area) {
+    let top = floorTop;
+    for (const rug of rugSurfaces) if (area.minX < rug.maxX && area.maxX > rug.minX && area.minZ < rug.maxZ && area.maxZ > rug.minZ) top = Math.max(top, rug.top);
+    return top + 0.002;
+  }
+  function liftShade(object, item) { const shade = object?.metadata.shade; if (shade) shade.position.y = surfaceBelow(footprintBounds(item)) - object.position.y; }
+  for (const mesh of wallShades) mesh.position.y = floorTop + 0.002;
   const catShade = createContactShadow('miso-contact-shadow', 0.95, 0.5, scene, { soft: 0.32, strength: 0.34 });
   catShade.parent = cat; catShade.position.set(-0.02, 0.006, 0.06);
   // Each piece gets baked ambient shade under it. The cached sun map cannot
@@ -502,8 +515,7 @@ export function createRoom(container, options = {}) {
     const shade = new Mesh('contact-shadow', scene); contactShadeData.get(type).applyToMesh(shade);
     shade.material = floorShadeMaterial; shade.hasVertexAlpha = true; shade.isPickable = false; shade.receiveShadows = false;
     shade.metadata = { castShadow: false, effect: 'contact-shadow' }; shade.parent = object;
-    // Above the thickest stacked rug, so pieces standing on rugs stay grounded.
-    shade.position.y = 0.08;
+    object.metadata.shade = shade; // Its height follows the rugs below, set by liftShade.
   }
   let architecture = null, architectureStyle = 'retreat';
   const furnitureRoot = new TransformNode('placed-furniture', scene), placedObjects = new Map(), settlingPieces = new Map(), animatedObjects = [];
@@ -520,6 +532,7 @@ export function createRoom(container, options = {}) {
   // so one canvas pixel lands on one screen pixel; only Adaptive steps down.
   const nativeRatio = () => Math.min(window.devicePixelRatio || 1, 2);
   let quality = 'auto', pixelRatio = nativeRatio(), ratioCeiling = pixelRatio, raisedAt = -Infinity, statsStart = 0, intervalTotal = 0, sampleFrames = 0, slowSamples = 0, steadySamples = 0;
+  let rafCalls = 0, lastRafAt = 0, fastRafFrames = 0, onScreen = true;
   const intervals = [], submissions = [];
   engine.setHardwareScalingLevel(1 / pixelRatio);
   const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -532,7 +545,7 @@ export function createRoom(container, options = {}) {
     if (disposed) return;
     needsRender = true;
     if (shadows) shadow.getShadowMap()?.resetRefreshCounter();
-    if (visible && !frame) frame = requestAnimationFrame(tick);
+    if (visible && onScreen && !frame) frame = requestAnimationFrame(tick);
   }
   function refreshShadows() {
     shadow.getShadowMap().renderList = scene.meshes.filter(mesh => mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && (!drag?.active || itemAncestor(mesh)?.metadata.itemId !== drag.id) && mesh !== rain && mesh !== marker && !mesh.isDescendantOf(heart) && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
@@ -590,6 +603,18 @@ export function createRoom(container, options = {}) {
       moths.setEnabled(nextStyle !== 'metro');
       const scale = (architecture?.window.width || 4.2) / 4.2;
       windowEffects.scaling.x = scale; windowEffects.position.x = (architecture?.window.x ?? -2.7) + 2.7 * scale;
+      // The effects stretch to a wider window, but stars and the shooting star
+      // keep their shape, and rain falls to the top of this shell's opening.
+      for (let i = 0; i < starSeeds.length; i++) starMatrices[i * 16] = starSeeds[i].scale / scale;
+      skyStars.thinInstanceBufferUpdated('matrix'); shootingStar.scaling.x = 1 / scale;
+      const opening = architecture?.window;
+      for (const seed of rainSeeds) {
+        const x = windowEffects.position.x + seed.x * scale;
+        seed.top = (!opening ? archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2))
+          : opening.radius ? opening.y + Math.sqrt(Math.max(0, opening.radius ** 2 - (x - opening.x) ** 2)) : opening.y + opening.height / 2) - 0.12;
+      }
+      floorTop = architecture?.floorTop ?? 0.219;
+      for (const mesh of wallShades) mesh.position.y = floorTop + 0.002;
       architecture?.setTheme(theme); architecture?.setLights(decorVisible.lights);
     }
     if (!settleNew) { for (const { object } of settlingPieces.values()) object.scaling.setAll(1); settlingPieces.clear(); }
@@ -611,6 +636,14 @@ export function createRoom(container, options = {}) {
       object.position.x = item.x; object.position.z = item.z; object.rotation.y = item.rotation * Math.PI / 2;
       object.setEnabled(item.type === 'plant' ? decorVisible.plants : getFurniture(item.type).category === 'Rugs' ? decorVisible.rug : true);
     }
+    rugSurfaces.length = 0;
+    for (const item of layout.items) {
+      const object = placedObjects.get(item.id);
+      if (getFurniture(item.type).category !== 'Rugs' || !object.isEnabled()) continue;
+      if (!rugTops.has(item.type)) rugTops.set(item.type, object.getHierarchyBoundingVectors(true).max.y - object.position.y);
+      rugSurfaces.push({ ...footprintBounds(item), top: object.position.y + rugTops.get(item.type) });
+    }
+    for (const item of layout.items) liftShade(placedObjects.get(item.id), item);
     if (selectedId && !ids.has(selectedId)) { selectedId = null; options.onSelectionChange?.(null); }
     animatedObjects.length = 0;
     for (const object of placedObjects.values()) if (object.metadata.animate) animatedObjects.push(object);
@@ -657,6 +690,13 @@ export function createRoom(container, options = {}) {
     placement = { id: `piece-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, type, x: 0, z: 0, rotation: 0 };
     updateOutline();
     const free = findFreePosition(layout.items, type); updatePlacement(free?.x ?? 0, free?.z ?? 0); return true;
+  }
+  // Adds the previewed piece where it stands. Pointer clicks and the Enter key
+  // share this path, so keyboard users can add furniture too.
+  function confirmPlacement() {
+    if (!placement) return false;
+    if (!placement.valid) { options.onNotice?.(placement.reason || 'Choose a clear spot inside the room.'); return false; }
+    const { id, type, x, z, rotation } = placement; layout.items.push({ id, type, x, z, rotation }); cancelPlacement(); commitLayout(); selectItem(id); return true;
   }
   function moveSelection(dx, dz) {
     if (drag) return;
@@ -741,6 +781,7 @@ export function createRoom(container, options = {}) {
     if (drag) {
       drag.object.position.copyFrom(drag.originalPosition); drag.object.rotation.y = drag.original.rotation * Math.PI / 2;
       for (const [mesh, visibility] of drag.visibility) if (!mesh.isDisposed()) mesh.visibility = visibility;
+      liftShade(drag.object, drag.original);
     }
     drag = null; downPosition = null; hasPendingPointer = false; releasePointer(pointerId);
     if (wasDragging) {
@@ -775,7 +816,7 @@ export function createRoom(container, options = {}) {
         drag.candidate = { ...drag.original, x: snap(floor.x - drag.offsetX), z: snap(floor.z - drag.offsetZ), rotation: drag.rotation };
         const verdict = validatePlacement(layout.items, drag.candidate); drag.valid = verdict.valid; drag.reason = verdict.reason || '';
         drag.object.position.x = drag.candidate.x; drag.object.position.z = drag.candidate.z;
-        drag.object.rotation.y = drag.rotation * Math.PI / 2;
+        drag.object.rotation.y = drag.rotation * Math.PI / 2; liftShade(drag.object, drag.candidate);
       } else { drag.valid = false; drag.reason = 'Drop inside the room, or return this piece to the collection.'; }
     }
     for (const [mesh, visibility] of drag.visibility) mesh.visibility = overCollection && drag.removable ? visibility * 0.13 : visibility;
@@ -819,9 +860,8 @@ export function createRoom(container, options = {}) {
     if (!editing) { if (scene.pickWithRay(ray, mesh => mesh.metadata?.cat)?.hit) pet(); return; }
     const floor = floorPosition(ray);
     if (placement) {
-      if (floor) updatePlacement(floor.x, floor.z);
-      if (!floor || !placement.valid) { options.onNotice?.(placement.reason || 'Choose a clear spot inside the room.'); return; }
-      const { id, type, x, z, rotation } = placement; layout.items.push({ id, type, x, z, rotation }); cancelPlacement(); commitLayout(); selectItem(id); return;
+      if (!floor) { options.onNotice?.(placement.reason || 'Choose a clear spot inside the room.'); return; }
+      updatePlacement(floor.x, floor.z); confirmPlacement(); return;
     }
     const id = hitItem(ray), hit = layout.items.find(item => item.id === id);
     if (id && !(selectedId && getFurniture(hit?.type)?.category === 'Rugs' && selectedId !== id)) { selectItem(id); return; }
@@ -838,7 +878,7 @@ export function createRoom(container, options = {}) {
     pendingPointer.clientX = event.clientX; pendingPointer.clientY = event.clientY; pendingPointer.pointerType = event.pointerType; hasPendingPointer = true;
     // One closest-object pick per rendered frame; drag motion only intersects
     // the floor. Pointer capture keeps the same gesture alive over the tray.
-    if (visible && !frame) frame = requestAnimationFrame(tick);
+    if (visible && onScreen && !frame) frame = requestAnimationFrame(tick);
   };
   function processPendingPointer() {
     if (!hasPendingPointer) return;
@@ -873,6 +913,18 @@ export function createRoom(container, options = {}) {
   function applyPixelRatio(value) { pixelRatio = value; engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; steadySamples = 0; resize(); }
   function setQuality(value) { quality = ['auto', 'battery', 'high'].includes(value) ? value : 'auto'; ratioCeiling = quality === 'battery' ? Math.min(window.devicePixelRatio || 1, 1) : nativeRatio(); raisedAt = -Infinity; bloom.isEnabled = quality !== 'battery'; applyPixelRatio(ratioCeiling); }
   const observer = new ResizeObserver(resize); observer.observe(container);
+  // Moving the window to a screen with another density changes the native
+  // ratio without any CSS resize, so follow the display itself.
+  let densityQuery = null;
+  function watchDensity() { densityQuery?.removeEventListener('change', onDensityChange); densityQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`); densityQuery.addEventListener('change', onDensityChange); }
+  function onDensityChange() { watchDensity(); setQuality(quality); }
+  watchDensity();
+  // Scrolled out of view, the room pauses like a hidden tab.
+  const viewObserver = typeof IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
+    const next = entries[entries.length - 1].isIntersecting; if (next === onScreen) return;
+    onScreen = next; if (onScreen) resumeFrames(); else { cancelAnimationFrame(frame); frame = 0; }
+  }) : null;
+  viewObserver?.observe(container);
   mobileCompanion = createMobileCompanion(scene);
   companionRoutine = createCompanionRoutine(status => {
     syncCompanionVisibility(); refreshShadows(); options.onCompanionState?.(status);
@@ -882,7 +934,12 @@ export function createRoom(container, options = {}) {
     const seconds = now / 1000;
     const companionDelta = companionTime ? Math.max(0, Math.min(.1, (now - companionTime) / 1000)) : 0;
     companionTime = now;
-    mobileCompanion.animate(companionRoutine.update(companionDelta, reducedMotion), seconds, reducedMotion);
+    const companionPose = companionRoutine.update(companionDelta, reducedMotion);
+    mobileCompanion.animate(companionPose, seconds, reducedMotion);
+    if (!companionPose.atDesk) {
+      pointArea.minX = pointArea.maxX = companionPose.x; pointArea.minZ = pointArea.maxZ = companionPose.z;
+      mobileCompanion.contact.position.y = surfaceBelow(pointArea);
+    }
     const ambientTime = reducedMotion ? 0 : seconds;
     for (let i = 0; i < swayingLanterns.length; i++) { const lantern = swayingLanterns[i]; lantern.rotation.z = reducedMotion ? 0 : Math.sin(seconds * 0.85 + i * 1.7) * 0.085; lantern.rotation.x = reducedMotion ? 0 : Math.sin(seconds * 0.63 + i * 1.3) * 0.025; }
     hourHand.rotation.z = reducedMotion ? 0 : -(seconds % 43200) * Math.PI / 21600;
@@ -904,7 +961,7 @@ export function createRoom(container, options = {}) {
       starMatrices[offset + 13] = seed.y + (reducedMotion ? 0 : Math.cos(seconds * 0.19 + i * 2.3) * 0.055);
     }
     skyStars.thinInstanceBufferUpdated('matrix');
-    moths.setEnabled(!reducedMotion);
+    moths.setEnabled(!reducedMotion && architectureStyle !== 'metro');
     for (let i = 0; i < mothSeeds.length; i++) {
       const seed = mothSeeds[i], phase = seconds * 0.52 + i * 2.1;
       const x = seed.x + (reducedMotion ? 0 : Math.sin(phase) * 0.24), y = seed.y + (reducedMotion ? 0 : Math.cos(phase * 1.27) * 0.20), z = seed.z + (reducedMotion ? 0 : Math.sin(phase * 0.83) * 0.13);
@@ -965,15 +1022,22 @@ export function createRoom(container, options = {}) {
     if (quality === 'auto') { // On-demand idle time is intentional, so it must never count as slow rendering.
       // Detail returns after eight steady seconds, so one busy moment no longer
       // costs the whole visit. A step up that turns slow again within fifteen
-      // seconds lowers the ceiling instead of oscillating.
-      const slow = (!reducedMotion && fps < 55) || p95SubmitMs > 12;
-      slowSamples = slow ? slowSamples + 1 : 0; steadySamples = !slow && !reducedMotion && fps >= 58 ? steadySamples + 1 : 0;
-      if (slowSamples >= 3 && pixelRatio > 0.75) { if (now - raisedAt < 15000) ratioCeiling = pixelRatio - 0.25; applyPixelRatio(Math.max(0.75, pixelRatio - 0.25)); }
+      // seconds lowers the ceiling once, instead of oscillating.
+      // Speed is judged against what this display can show: a screen that never
+      // delivered 60 Hz callbacks (a 30 Hz low-power mode, a 50 Hz panel) is not
+      // slow at its own rate, and a lower resolution would not make it faster.
+      const rafRate = rafCalls * 1000 / (now - statsStart), target = fastRafFrames >= 30 ? 60 : Math.min(60, rafRate);
+      const slow = (!reducedMotion && fps < target * 0.9) || p95SubmitMs > 12;
+      slowSamples = slow ? slowSamples + 1 : 0; steadySamples = !slow && !reducedMotion && fps >= target * 0.96 ? steadySamples + 1 : 0;
+      if (slowSamples >= 3 && pixelRatio > 0.75) { if (now - raisedAt < 15000) { ratioCeiling = pixelRatio - 0.25; raisedAt = -Infinity; } applyPixelRatio(Math.max(0.75, pixelRatio - 0.25)); }
       else if (steadySamples >= 8 && pixelRatio < ratioCeiling) { raisedAt = now; applyPixelRatio(Math.min(ratioCeiling, pixelRatio + 0.25)); } }
-    statsStart = now; sampleFrames = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0;
+    statsStart = now; sampleFrames = 0; rafCalls = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0;
   }
   function tick(now) {
-    frame = 0; if (disposed || !visible) return;
+    frame = 0; if (disposed || !visible || !onScreen) return;
+    // Raw display callbacks, skipped ones included, show whether this screen
+    // can deliver 60 Hz at all.
+    rafCalls++; if (lastRafAt && now - lastRafAt > 4 && now - lastRafAt < 1000 / 55) fastRafFrames++; lastRafAt = now;
     const interval = quality === 'battery' ? 1000 / 30 : 1000 / 60, elapsed = now - lastFrame;
     if (lastFrame && elapsed < interval - 1) { frame = requestAnimationFrame(tick); return; }
     processPendingPointer();
@@ -985,17 +1049,19 @@ export function createRoom(container, options = {}) {
     if (!reducedMotion || !scene.isReady() || downPosition || Math.abs(camera.inertialAlphaOffset) + Math.abs(camera.inertialBetaOffset) > 0.0001 || now - petStart < 1650) if (!frame) frame = requestAnimationFrame(tick);
   }
   const onMotionChange = event => { reducedMotion = event.matches; requestRender(); }; motionQuery.addEventListener('change', onMotionChange);
-  const onVisibility = () => { visible = !document.hidden; companionTime = 0; if (visible) { lastFrame = 0; lastRenderedAt = 0; statsStart = 0; sampleFrames = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0; requestRender(); } else { cancelDrag(); hoverItem(null); cancelAnimationFrame(frame); frame = 0; } };
+  // Restart timing from scratch after a pause, so the gap never reads as a slow frame.
+  function resumeFrames() { companionTime = 0; lastFrame = 0; lastRenderedAt = 0; statsStart = 0; sampleFrames = 0; rafCalls = 0; lastRafAt = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0; requestRender(); }
+  const onVisibility = () => { visible = !document.hidden; companionTime = 0; if (visible) resumeFrames(); else { cancelDrag(); hoverItem(null); cancelAnimationFrame(frame); frame = 0; } };
   document.addEventListener('visibilitychange', onVisibility);
   requestRender();
 
   return {
-    setTheme, setLayout, setEditMode, selectItem, beginPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setQuality,
+    setTheme, setLayout, setEditMode, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setQuality,
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); if (key === 'lights') architecture?.setLights(Boolean(value)); syncFurniture(); },
     resetView() { camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
     diagnostics() { return { scene, engine, camera, architectureStyle, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, companion: companionRoutine.diagnostics(), dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
-    dispose() { if (disposed) return; cancelDrag(); disposed = true; cancelAnimationFrame(frame); observer.disconnect(); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    dispose() { if (disposed) return; cancelDrag(); disposed = true; cancelAnimationFrame(frame); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
-import { createLayout } from '../src/layout.js';
+import { createLayout, footprintBounds } from '../src/layout.js';
 
 class Surface {
   listeners = new Map();
@@ -42,6 +42,12 @@ win.requestAnimationFrame = globalThis.requestAnimationFrame; win.cancelAnimatio
 globalThis.ResizeObserver = class {
   disconnected = false;
   constructor(callback) { this.callback = callback; observer = this; }
+  observe() {} disconnect() { this.disconnected = true; }
+};
+let intersection;
+globalThis.IntersectionObserver = class {
+  disconnected = false;
+  constructor(callback) { this.callback = callback; intersection = this; }
   observe() {} disconnect() { this.disconnected = true; }
 };
 const { createRoom } = await import('../src/room.js');
@@ -469,6 +475,14 @@ try {
     run(4, 50); assert.equal(diagnostics().pixelRatio, fullRatio - 0.25, 'a step up that stalls again steps back down');
     run(12, 1000 / 60); assert.equal(diagnostics().pixelRatio, fullRatio - 0.25, 'the level that stalled stays out of reach for this visit');
     room.setQuality('auto'); assert.equal(diagnostics().pixelRatio, fullRatio, 'choosing a quality again resets the ceiling');
+    // One long slow period after a step up lowers the ceiling one level only.
+    run(4, 50); run(9, 1000 / 60); assert.equal(diagnostics().pixelRatio, fullRatio);
+    run(12, 50); assert.equal(diagnostics().pixelRatio, 0.75, 'a long stall still steps all the way down');
+    run(40, 1000 / 60); assert.equal(diagnostics().pixelRatio, fullRatio - 0.25, 'steady frames climb back to one level below the failed one');
+    room.setQuality('auto');
+    // Moving the window to a screen with another density follows the display.
+    win.devicePixelRatio = 2; motion.emit('change', { matches: motion.matches }); assert.equal(diagnostics().pixelRatio, 2, 'a 2x screen renders at 2x');
+    win.devicePixelRatio = 1.5; motion.emit('change', { matches: motion.matches }); assert.equal(diagnostics().pixelRatio, 1.5, 'back on the original screen');
   } finally {
     if (clockDescriptor) Object.defineProperty(performance, 'now', clockDescriptor);
     else delete performance.now;
@@ -486,8 +500,15 @@ try {
       assert.ok(shell.getChildMeshes().length <= 6, 'architecture is batched into at most six meshes');
       for (const mesh of shell.getChildMeshes()) { assert.equal(mesh.isPickable, false); for (const value of mesh.getVerticesData('position')) assert.ok(Number.isFinite(value)); }
       assert.equal(scene.getTransformNodeByName('fairy-lights').isEnabled(), false, 'the original decor stays inside the retreat');
-      room.setDecor('lights', false); assert.ok(shell.getChildMeshes().filter(mesh => mesh.name.endsWith('-accent')).every(mesh => !mesh.isEnabled()));
-      room.setTheme('day'); room.setTheme('rain'); room.setTheme('dusk'); room.setDecor('lights', true); advance(2);
+      // Accent lights switch off in place: fixtures stay, glow goes, so cords never hang empty.
+      const accents = shell.getChildMeshes().filter(mesh => mesh.name.endsWith('-accent')), bloomList = () => scene.effectLayers.find(layer => layer.name === 'candlelight-bloom').mainTexture.renderList;
+      const glow = mesh => mesh.material.emissiveColor.r + mesh.material.emissiveColor.g + mesh.material.emissiveColor.b;
+      room.setDecor('lights', false);
+      assert.ok(accents.length && accents.every(mesh => mesh.isEnabled() && glow(mesh) === 0 && !bloomList().includes(mesh)), 'switched-off accents stay visible without glow');
+      room.setTheme('day'); room.setTheme('rain'); room.setTheme('dusk');
+      assert.ok(accents.every(mesh => glow(mesh) === 0), 'a theme change keeps switched-off accents dark');
+      room.setDecor('lights', true); advance(2);
+      assert.ok(accents.every(mesh => glow(mesh) > 0.1 && bloomList().includes(mesh)), 'accents glow again when switched on');
       room.setActivity('break'); advance(2); assert.equal(diagnostics().companion.state, 'resting', 'reduced motion still reaches a seat');
       room.setActivity('idle'); advance(2);
     }
@@ -497,11 +518,72 @@ try {
   }
   room.setLayout(beforeDesignLayout); advance(3);
   console.log('PASS designs: four distinct shells, all new rooms usable, batched geometry, preserved decor, day/night/rain and stable assets across repeated visits.');
+  {
+    // Contact shade sits 2 mm above the highest rug under each piece, or the floor.
+    for (const id of ['ember-library', 'moonlit-greenhouse', 'sakura-studio']) {
+      room.setLayout(createLayout(id)); advance(3);
+      const floor = id === 'sakura-studio' ? .2275 : .219, items = diagnostics().layout.items;
+      const nodes = new Map(scene.transformNodes.filter(node => node.metadata?.itemId).map(node => [node.metadata.itemId, node]));
+      const rugs = items.filter(item => ['rug', 'moon-rug'].includes(item.type)).map(item => ({ area: footprintBounds(item), top: nodes.get(item.id).getHierarchyBoundingVectors(true).max.y }));
+      let onRug = 0;
+      for (const item of items) {
+        const shade = nodes.get(item.id)?.metadata.shade; if (!shade) continue;
+        const a = footprintBounds(item), under = rugs.filter(r => a.minX < r.area.maxX && a.maxX > r.area.minX && a.minZ < r.area.maxZ && a.maxZ > r.area.minZ);
+        const top = Math.max(floor, ...under.map(r => r.top)), y = shade.getAbsolutePosition().y; onRug += under.length > 0;
+        assert.ok(Math.abs(y - (top + .002)) < 1e-4, `${id} ${item.id}: shade ${y.toFixed(4)} sits 2 mm above ${top.toFixed(4)}`);
+      }
+      assert.ok(onRug > 0, `${id} has pieces standing on rugs`);
+    }
+    // The walking companion's shade follows the same rule.
+    room.setLayout(createLayout('ember-library')); advance(3); room.setActivity('break'); advance(90);
+    const contact = scene.getMeshByName('companion-contact-shadow');
+    assert.ok(contact.isEnabled() && contact.position.y >= .221 - 1e-6, 'the walking companion keeps a grounded shade');
+    room.setActivity('idle'); advance(90);
+    // Moths stay out of the Midnight metro window, even after animation frames.
+    const motionWas = motion.matches; motion.matches = false; motion.emit('change', { matches: false });
+    room.setLayout(createLayout('midnight-metro')); advance(5);
+    assert.equal(scene.getMeshByName('window-moths').isEnabled(), false, 'no moths in the city window, even with motion on');
+    motion.matches = motionWas; motion.emit('change', { matches: motionWas });
+    // Stars keep their shape although the effects stretch to the wide window.
+    const stars = scene.getMeshByName('window-drifting-stars'), star = particleBuffers[1];
+    assert.ok(Math.abs(star[0] * stars.parent.scaling.x - star[5]) < 1e-6 && stars.parent.scaling.x > 1.5, 'metro stars are not stretched');
+    assert.ok(Math.abs(scene.getMeshByName('window-shooting-star').scaling.x * stars.parent.scaling.x - 1) < 1e-6, 'the shooting star is not stretched');
+    room.setLayout(beforeDesignLayout); advance(3);
+    assert.ok(Math.abs(star[0] - star[5]) < 1e-6, 'retreat stars keep their original shape');
+    // Scrolled out of view, the loop stops; back in view, it resumes.
+    intersection.callback([{ isIntersecting: false }]); assert.equal(frames.size, 0, 'no frames while scrolled away');
+    room.setFocused(true); assert.equal(frames.size, 0, 'state changes wait until the room is visible');
+    intersection.callback([{ isIntersecting: true }]); assert.equal(frames.size, 1, 'the room draws again when visible');
+    room.setFocused(false); advance(3);
+    // Enter-key placement: the preview spot becomes a real piece.
+    room.setEditMode(true); const count = diagnostics().layout.items.length;
+    room.beginPlacement('plant'); assert.equal(room.confirmPlacement(), true); advance(2);
+    assert.equal(diagnostics().layout.items.length, count + 1, 'confirming a placement adds the piece');
+    assert.equal(room.confirmPlacement(), false, 'nothing to confirm afterwards');
+    room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
+    console.log('PASS review fixes: shade 2 mm above rugs and floor, grounded companion, no metro moths, unstretched stars, off-screen pause, keyboard placement.');
+  }
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);
   room.dispose(); assert.equal(frames.size, 0); assert.equal(motion.listenerCount, 0); assert.equal(doc.listenerCount, 0); assert.equal(canvas.listenerCount, 0); assert.equal(win.listenerCount, 0);
-  assert.ok(observer.disconnected && canvas.removed && scene.isDisposed);
+  assert.ok(observer.disconnected && intersection.disconnected && canvas.removed && scene.isDisposed);
   console.log('PASS lifecycle: hidden suspension; scene, frames, observers and listeners disposed.');
+  {
+    // A 30 Hz display (a phone low-power mode) is not a slow GPU: resolution stays.
+    motion.matches = false;
+    const container30 = { clientWidth: 800, clientHeight: 600, appendChild(child) { this.canvas = child; } };
+    const room30 = createRoom(container30, { engineFactory(surface) {
+      const capped = new NullEngine({ renderWidth: 800, renderHeight: 600, textureSize: 512, deterministicLockstep: true, lockstepMaxSteps: 1 });
+      capped._renderingCanvas = surface; const setSize = capped.setSize.bind(capped);
+      capped.setSize = (w, h, force) => { capped._options.renderWidth = w; capped._options.renderHeight = h; return setSize(w, h, force); };
+      return capped;
+    } });
+    room30.diagnostics().scene.isReady = () => true;
+    for (let i = 0; i < 30 * 15; i++) { time += 1000 / 30 - 1000 / 60; advance(); }
+    assert.equal(room30.diagnostics().pixelRatio, 1.5, 'a 30 Hz screen keeps full resolution');
+    room30.dispose(); assert.equal(frames.size, 0);
+    console.log('PASS capped displays: a 30 Hz screen keeps full resolution instead of reading as a slow GPU.');
+  }
   console.log('Babylon room checks passed. GPU appearance and native gestures require browser checks.');
 } catch (error) { room.dispose(); throw error; }
 finally { if (originalClockDescriptor) Object.defineProperty(performance, 'now', originalClockDescriptor); else delete performance.now; }
