@@ -46,7 +46,6 @@ h1 { font-family: Georgia, 'Times New Roman', serif; margin: 0; font-size: clamp
 .room-canvas { position: absolute; inset: -6px -12px 10px; }
 .room-canvas canvas { width: 100%; height: 100%; display: block; touch-action: pan-y; }
 .room-canvas canvas:focus { outline: none; }
-.room-canvas canvas:focus-visible { outline: 2px solid #d2a76c; outline-offset: -2px; }
 .stage-presence { position: absolute; top: 17px; left: 14px; z-index: 1; display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border: 1px solid #665044; border-radius: 20px; background: #2b2531ed; color: #d8c4a7; font-size: 12px; line-height: 1.3; box-shadow: 0 4px 15px #10091420; }
 .companion-status { position: absolute; top: 58px; left: 14px; z-index: 1; display: flex; gap: 6px; align-items: center; padding: 5px 9px; border-radius: 12px; background: #2b2531d9; color: #bcab99; font-size: 10px; pointer-events: none; }
 .companion-status[data-state='working'] { color: #c4d0ae; }
