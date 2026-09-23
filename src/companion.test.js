@@ -7,6 +7,8 @@ import { createMobileCompanion, disposeFurnitureAssets } from './furniture.js';
 import { petSpots } from './pet.js';
 import { companionIntent, localPoint, planCompanionTrip, planActivityTrip, activitySpots, navigationObstacles, walkable, clearSegment, createCompanionRoutine, DOZE_AFTER, ACTIVITIES } from './companion.js';
 
+// A repeatable "random".
+const seeded = (seed = 7) => () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 const advance = (routine, seconds, reduced = false) => { for (let i = 0; i < Math.ceil(seconds * 60); i++) routine.update(1 / 60, reduced); };
 // Advances until the routine reaches `state`, for at most `seconds`.
 const until = (routine, state, seconds = 60, reduced = false) => { for (let i = 0; i < seconds * 60 && routine.pose.state !== state; i++) routine.update(1 / 60, reduced); return routine.pose.state; };
@@ -92,6 +94,18 @@ test('at night an unlit lamp comes first: the companion switches it on once, the
   lamp.off = true; routine.setIntent('working'); assert.equal(until(routine, 'working', 40), 'working');
   routine.setIntent('break'); for (let i = 0; i < 60 * 60 && routine.pose.state !== 'resting'; i++) { routine.update(1 / 60, false); assert.notEqual(routine.pose.activity, 'lamp'); }
   assert.equal(uses.filter(use => use.kind === 'lamp').length, 1, 'no second switch-on');
+});
+test('a visit goes through every activity the room offers before it repeats one', () => {
+  const layout = createLayout('writers-loft'), routine = createCompanionRoutine(() => {}, { random: seeded(3) }), kinds = [];
+  routine.setLayout(layout); routine.setContext({ windowX: -2.7, pet: { x: 0.75, z: 1.5, yaw: 0, state: 'sleeping', moving: false, held: false } });
+  for (let i = 0; i < 6; i++) {
+    routine.setIntent('working'); until(routine, 'working', 60); routine.setIntent('break');
+    for (let j = 0; j < 60 * 60 && !['busy', 'resting'].includes(routine.pose.state); j++) routine.update(1 / 60, false);
+    kinds.push(routine.pose.activity);
+  }
+  const first = kinds.slice(0, new Set(kinds).size);
+  assert.equal(new Set(first).size, first.length, `no repeat before every choice is used: ${kinds}`);
+  assert.ok(new Set(kinds).size >= 3, `${kinds}`);
 });
 test('a night break reaches an unlit lamp from whichever side is open', () => {
   // The Cloud loft lamp stands in a corner: only its back side can be reached.

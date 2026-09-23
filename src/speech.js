@@ -66,16 +66,32 @@ export function createSpeech(layer, { anchor, reducedMotion = () => false }) {
       element.className = 'speech-bubble'; element.dataset.speaker = who; element.hidden = true;
       element.setAttribute('role', 'status'); element.setAttribute('aria-live', 'polite');
       const text = document.createElement('span'); text.className = 'speech-text'; element.appendChild(text);
-      layer.appendChild(element); bubbles.set(who, { element, text, timer: 0, shown: false, x: null, y: null, offstage: null });
+      layer.appendChild(element); bubbles.set(who, { element, text, timer: 0, shown: false, x: null, y: null, offstage: null, onstage: false, ax: 0, ay: 0, lift: 0, width: 0, height: 0 });
     }
     return bubbles.get(who);
   }
+  // Each shown bubble sits above its head. When two would overlap (the
+  // companion kneels beside the pet), the higher one rises clear of the other.
+  function layoutBubbles() {
+    const onstage = [];
+    for (const [who, entry] of bubbles) {
+      if (!entry.shown) continue;
+      const point = anchor(who); entry.onstage = Boolean(point?.visible); entry.lift = 0;
+      if (entry.onstage) { entry.ax = point.x; entry.ay = point.y; onstage.push(entry); }
+    }
+    if (onstage.length === 2) {
+      const [upper, lower] = onstage[0].ay <= onstage[1].ay ? onstage : [onstage[1], onstage[0]];
+      const apart = Math.abs(upper.ax - lower.ax) >= (upper.width + lower.width) / 2 + 6, overlap = upper.ay - (lower.ay - lower.height - 8);
+      if (!apart && overlap > 0) upper.lift = overlap;
+    }
+    for (const entry of bubbles.values()) if (entry.shown) write(entry);
+  }
   // The DOM is written only when the rounded spot or the visibility changes.
-  function place(who, entry) {
-    const point = anchor(who), offstage = !point?.visible;
+  function write(entry) {
+    const offstage = !entry.onstage;
     if (offstage !== entry.offstage) { entry.offstage = offstage; entry.element.classList.toggle('is-offstage', offstage); }
     if (offstage) return;
-    const x = Math.round(point.x), y = Math.round(point.y);
+    const x = Math.round(entry.ax), y = Math.round(entry.ay - entry.lift);
     if (x !== entry.x || y !== entry.y) { entry.x = x; entry.y = y; entry.element.style.transform = `translate3d(${x}px, ${y}px, 0)`; }
   }
   function hide(who) {
@@ -89,7 +105,9 @@ export function createSpeech(layer, { anchor, reducedMotion = () => false }) {
       const text = Array.isArray(lines) ? pickLine(lines, last.get(who)) : lines; if (!text) return null;
       const entry = bubble(who); last.set(who, text);
       clearTimeout(entry.timer); entry.text.textContent = text; entry.element.hidden = false; entry.shown = true;
-      place(who, entry);
+      // One size read per line, for stacking.
+      entry.width = entry.element.offsetWidth; entry.height = entry.element.offsetHeight;
+      layoutBubbles();
       // The next frame starts the fade and pop, after the bubble is placed.
       requestAnimationFrame(() => { if (entry.shown) entry.element.classList.add('is-visible'); });
       entry.timer = setTimeout(() => hide(who), duration ?? bubbleDuration(text));
@@ -97,7 +115,7 @@ export function createSpeech(layer, { anchor, reducedMotion = () => false }) {
     },
     hide, hideAll() { for (const who of bubbles.keys()) hide(who); },
     // Called after each rendered frame: bubbles follow the heads.
-    update() { for (const [who, entry] of bubbles) if (entry.shown) place(who, entry); },
+    update: layoutBubbles,
     showing(who) { return Boolean(bubbles.get(who)?.shown); },
   };
 }

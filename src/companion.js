@@ -232,7 +232,9 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   // One activity per break; `reduced` is the last reduced-motion setting,
   // which skips standing activities. A lamp or record player is switched on
   // at most once per visit (`switched`), so one switched off on purpose stays off.
-  let context = { night: false, windowX: -2.7, pet: null }, breakUsed = false, lastKind = null, used = false, reduced = false;
+  let context = { night: false, windowX: -2.7, pet: null }, breakUsed = false, used = false, reduced = false;
+  // How often each activity was done this visit: the least done comes first.
+  const done = new Map();
   const switched = new Set();
   function status(state) { if (pose.state !== state) { pose.state = state; onChange({ state, atDesk: pose.atDesk, activity: pose.activity }); } }
   const seatType = end => layout.items.find(item => item.id === end.itemId)?.type;
@@ -276,10 +278,10 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       const reached = !reduced && exits.length ? reachableFloor(layout, exits, obstacles) : null;
       const spots = reached ? activitySpots(layout, { ...context, canReach: point => reaches(reached, point, obstacles) }) : [], lamp = spots.find(spot => spot.kind === 'lamp' && !switched.has(spot.itemId));
       const choices = [...spots.filter(spot => spot.kind !== 'lamp'), ...(layout.items.some(item => item.type === 'lounge-chair') ? [{ kind: 'read' }] : [])]
-        .map(choice => ({ choice, score: random() + (choice.kind === lastKind ? 2 : 0) })).sort((a, b) => a.score - b.score).map(entry => entry.choice);
+        .map(choice => ({ choice, score: random() + (done.get(choice.kind) || 0) * 2 })).sort((a, b) => a.score - b.score).map(entry => entry.choice);
       for (const choice of lamp ? [lamp, ...choices] : choices) {
         const planned = choice.kind === 'read' ? planCompanionTrip(layout, null, false, ['lounge-chair']) : planActivityTrip(layout, null, choice);
-        if (planned && startTrip(null, false, planned)) { lastKind = choice.kind; return true; }
+        if (planned && startTrip(null, false, planned)) { done.set(choice.kind, (done.get(choice.kind) || 0) + 1); return true; }
       }
     }
     return startTrip(null, false);
