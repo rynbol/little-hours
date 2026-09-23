@@ -1392,7 +1392,9 @@ export function createRoom(container, options = {}) {
     const start = performance.now(); engine.beginFrame(); scene.render(); engine.endFrame(); reportStats(now, performance.now() - start); lastRenderedAt = now; outlineFrames--;
     options.onFrame?.();
     if (!readyReported && scene.isReady()) { readyReported = true; requestRender(true); options.onReady?.(); }
-    if (!reducedMotion || !scene.isReady() || downPosition || Math.abs(camera.inertialAlphaOffset) + Math.abs(camera.inertialBetaOffset) > 0.0001 || now - petStart < PET_REACTION * 1000 + 50 || outlinesPending()) if (!frame) frame = requestAnimationFrame(tick);
+    // Until the room reports ready, frames go on: shaders can finish between
+    // the two asks, and a still room would stop before it reports.
+    if (!reducedMotion || !readyReported || !scene.isReady() || downPosition || Math.abs(camera.inertialAlphaOffset) + Math.abs(camera.inertialBetaOffset) > 0.0001 || now - petStart < PET_REACTION * 1000 + 50 || outlinesPending()) if (!frame) frame = requestAnimationFrame(tick);
   }
   const onMotionChange = event => { reducedMotion = event.matches; requestRender(); }; motionQuery.addEventListener('change', onMotionChange);
   // Restart timing from scratch after a pause, so the gap never reads as a slow frame.

@@ -1119,6 +1119,25 @@ try {
     room30.dispose(); assert.equal(frames.size, 0);
     console.log('PASS capped displays: a 30 Hz screen keeps full resolution instead of reading as a slow GPU.');
   }
+  {
+    // With reduced motion, a frame asks twice whether the scene is ready. When
+    // the shaders finish between the two asks, the room must still report ready.
+    motion.matches = true;
+    const containerReady = { clientWidth: 800, clientHeight: 600, appendChild(child) { this.canvas = child; } };
+    let reported = 0;
+    const roomReady = createRoom(containerReady, { onReady: () => { reported++; }, engineFactory(surface) {
+      const still = new NullEngine({ renderWidth: 800, renderHeight: 600, textureSize: 512, deterministicLockstep: true, lockstepMaxSteps: 1 });
+      still._renderingCanvas = surface; const setSize = still.setSize.bind(still);
+      still.setSize = (w, h, force) => { still._options.renderWidth = w; still._options.renderHeight = h; return setSize(w, h, force); };
+      return still;
+    } });
+    let asks = 0; roomReady.diagnostics().scene.isReady = () => ++asks % 2 === 0;
+    advance(20);
+    assert.equal(reported, 1, 'a scene that turns ready within a frame still reports ready');
+    assert.equal(frames.size, 0, 'the ready room goes idle again');
+    roomReady.dispose(); motion.matches = false;
+    console.log('PASS ready race: a scene that turns ready between the two asks of a frame reports ready, and the room goes idle.');
+  }
   console.log('Babylon room checks passed. GPU appearance and native gestures require browser checks.');
 } catch (error) { room.dispose(); throw error; }
 finally { if (originalClockDescriptor) Object.defineProperty(performance, 'now', originalClockDescriptor); else delete performance.now; }

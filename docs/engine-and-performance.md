@@ -365,3 +365,9 @@ The head is smoother and has a face: large dark eyes with a white glint, pink ch
 Cost: the walking body has 3,486 vertices (2,491 before) and its per-frame posing takes 0.060 ms (0.042 ms before) in Node; the head is a static batch. In headless Chrome at 1440 × 900 and 2× density, against `main` (`d7ace6e`): during a break in Writer's loft the room ran 97.9 and 103.1 ms of script per second against 101.1 and 95.1, and idle 104.3 and 99.8 against 109.4 and 96.9. Both held 60 fps with the same draw calls (143 idle, 145 to 147 on a break); the smoother heads add about 10,000 triangles.
 
 Verification: the unit tests (83), the room checks and the build pass. In headless Chrome and Firefox, Part 2's end-to-end suite passed 106 of 106 on the merge with `main`. On the look alone, one Chrome run failed the check that the room turns after Escape sets a carried pet down, and three reruns of that group passed.
+
+## Ready with reduced motion
+
+With reduced motion, a frame asked twice whether the scene was ready: once to report the room ready, once to ask for the next frame. When the shaders finished between the two asks, the first said no and the second said yes, so no next frame came and the room never reported ready: "Making room for you…" stayed and Decorate stayed disabled. Frames now go on until the room reports ready, and after that the loop stops as before, with no new per-frame work.
+
+Verification: a room check makes the scene turn ready between the two asks of a frame; on the old code the room never reports, and now it reports once and goes idle. In headless Chrome, 30 room loads with reduced motion all became ready (one in 18 had stuck before), and the colors (52, 51 and 52 of 52; the miss was a 16 ms handler check), walls and floors (101) and Part 2's (106) checks passed, and the colors checks in Firefox (49).
