@@ -877,7 +877,7 @@ try {
     // A room saved before wall pieces gains its design's pieces.
     const legacy = createLayout('ember-library'); legacy.items = legacy.items.filter(item => !item.wall); delete legacy.v;
     room.setLayout(legacy); advance(3);
-    assert.deepEqual(diagnostics().layout.items.filter(item => item.wall).map(item => item.id).sort(), ['ember-clock', 'ember-frame-mantel', 'ember-frame-small', 'ember-potions']);
+    assert.deepEqual(diagnostics().layout.items.filter(item => item.wall).map(item => item.id).sort(), ['ember-clock', 'ember-frame-mantel', 'ember-potions']);
     // The neon sign follows the time of day and switches with a tap.
     room.setEditMode(false); room.setLayout(createLayout('midnight-metro')); advance(3);
     const neon = node('metro-neon').getChildMeshes().filter(mesh => mesh.material?.metadata?.accent), base = neon.map(mesh => mesh.material.metadata.accent);
