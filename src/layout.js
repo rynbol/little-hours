@@ -212,6 +212,8 @@ export function normalizeLayout(raw) {
       id, type: saved.type, x: snap(saved.x), z: snap(saved.z),
       rotation: Number.isInteger(saved.rotation) && saved.rotation >= 0 && saved.rotation <= 3 ? saved.rotation : 0,
     };
+    // A lamp, fire or record player that was switched off stays off.
+    if (saved.off === true && getFurniture(saved.type).use?.toggle) candidate.off = true;
     if (isPetBed(candidate) && items.some(isPetBed)) continue;
     if (validatePlacement(items, candidate).valid) { items.push(candidate); ids.add(id); }
   }

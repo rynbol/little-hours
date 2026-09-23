@@ -53,7 +53,7 @@ globalThis.IntersectionObserver = class {
 const { createRoom } = await import('../src/room.js');
 let engine;
 const container = { clientWidth: 800, clientHeight: 600, appendChild(canvas) { this.canvas = canvas; } };
-const changes = [], notices = [], stats = [], dragStates = [];
+const changes = [], notices = [], stats = [], dragStates = [], lightTaps = [];
 const room = createRoom(container, {
   engineFactory(canvas) {
     engine = new NullEngine({ renderWidth: 800, renderHeight: 600, textureSize: 512, deterministicLockstep: true, lockstepMaxSteps: 1 });
@@ -68,6 +68,7 @@ const room = createRoom(container, {
   onStats: value => stats.push(value),
   isCollectionDrop: (x, y) => x >= 0 && x <= canvas.clientWidth && y > canvas.clientHeight && y < canvas.clientHeight + 200,
   onDragState: value => dragStates.push(value),
+  onToggleLights: () => lightTaps.push(time),
 });
 const canvas = container.canvas;
 const particleNames = ['floating-fireflies', 'window-drifting-stars'];
@@ -88,23 +89,23 @@ try {
   const { scene, camera } = diagnostics();
   // NullEngine does not compile GPU effect-layer shaders. Simulate completed
   // warmup for render-scheduler checks; browser verification covers readiness.
-  scene.isReady = () => true; advance(2);
+  scene.isReady = () => true; scene.getOutlineRenderer().isReady = () => true; advance(2);
   assert.equal(camera.mode, Camera.ORTHOGRAPHIC_CAMERA);
   assert.ok(scene.meshes.length > 20);
   assert.equal(canvas.style.touchAction, 'pan-y');
   console.log(`PASS engine: native Babylon scene, orthographic camera, ${scene.meshes.length} meshes, mobile pan-y.`);
-  // Outside Decorate a hover only tests the pet's three soft spheres; count
-  // those tests with the scene picks.
-  const nativePick = scene.pickWithRay, petModel = diagnostics().petModel, nativeHitTest = petModel.hitTest; let hoverPicks = 0;
+  // Outside Decorate a hover picks once and tests the pet's three soft
+  // spheres once; the sphere test is plain math, counted apart.
+  const nativePick = scene.pickWithRay, petModel = diagnostics().petModel, nativeHitTest = petModel.hitTest; let hoverPicks = 0, petTests = 0;
   scene.pickWithRay = function (...args) { hoverPicks++; return nativePick.apply(this, args); };
-  petModel.hitTest = (...args) => { hoverPicks++; return nativeHitTest(...args); };
+  petModel.hitTest = (...args) => { petTests++; return nativeHitTest(...args); };
   for (let i = 0; i < 40; i++) canvas.emit('pointermove', { clientX: 150 + i, clientY: 180, pointerType: 'mouse' });
   assert.equal(hoverPicks, 0, 'raw pointer events only queue their latest coordinates');
   advance(); assert.equal(hoverPicks, 1, 'hover events coalesce into one pick per rendered frame');
   canvas.emit('pointerdown', { clientX: 200, clientY: 180, pointerType: 'mouse' });
   canvas.emit('pointermove', { clientX: 250, clientY: 180, pointerType: 'mouse' }); advance();
   canvas.emit('pointerup', { clientX: 250, clientY: 180, pointerType: 'mouse' });
-  assert.equal(hoverPicks, 2, 'orbit dragging skips hover raycasts; the press only asks whether it landed on the pet');
+  assert.equal(hoverPicks, 2, 'orbit dragging skips hover raycasts; the press asks once what it landed on'); assert.equal(petTests, 2);
   room.beginPlacement('plant'); canvas.emit('pointermove', { clientX: 330, clientY: 230, pointerType: 'mouse' }); advance();
   assert.equal(hoverPicks, 2, 'a placement preview only intersects the mathematical floor');
   room.cancelPlacement(); room.setEditMode(false); scene.pickWithRay = nativePick; petModel.hitTest = nativeHitTest;
@@ -212,7 +213,9 @@ try {
   assert.equal(rainMesh.isEnabled(), true); assert.equal(stars.isEnabled(), false); assert.equal(shootingStar.isEnabled(), false);
   room.setTheme('dusk'); advance(2);
   assert.equal(stars.isEnabled(), true); assert.equal(shootingStar.isEnabled(), true); assert.equal(rainMesh.isEnabled(), false);
-  assert.equal(scene.getTransformNodeByName('fairy-lights').isEnabled(), false, 'changing time of day preserves the fairy-light preference');
+  // Switched-off fairy lights stay on the wall, dark, like the accent lights of the other rooms.
+  const fairy = scene.getTransformNodeByName('fairy-lights'), dark = mesh => !mesh.isEnabled() || mesh.material.emissiveColor.r + mesh.material.emissiveColor.g + mesh.material.emissiveColor.b === 0;
+  assert.ok(fairy.isEnabled() && fairy.getChildMeshes().every(dark), 'changing time of day keeps switched-off fairy lights in place and dark');
   room.setDecor('lights', true); advance(2);
   assert.equal(keyLight.intensity, nightKeyIntensity); assert.equal(ambientLight.intensity, nightAmbientIntensity);
   assert.equal(keyLight.getShadowGenerator().getShadowMap().refreshRate, 0, 'lighting changes retain the cached shadow-map policy');
@@ -507,7 +510,7 @@ try {
     assert.equal(scene.getTransformNodeByName('architecture-retreat').isEnabled(), style === 'retreat');
     if (style !== 'retreat') {
       assert.ok(shell.getChildMeshes().length <= 6, 'architecture is batched into at most six meshes');
-      for (const mesh of shell.getChildMeshes()) { assert.equal(mesh.isPickable, false); for (const value of mesh.getVerticesData('position')) assert.ok(Number.isFinite(value)); }
+      for (const mesh of shell.getChildMeshes()) { assert.equal(mesh.isPickable, Boolean(mesh.metadata.lightSwitch), 'only accent lights take taps'); for (const value of mesh.getVerticesData('position')) assert.ok(Number.isFinite(value)); }
       assert.equal(scene.getTransformNodeByName('fairy-lights').isEnabled(), false, 'the original decor stays inside the retreat');
       // Accent lights switch off in place: fixtures stay, glow goes, so cords never hang empty.
       const accents = shell.getChildMeshes().filter(mesh => mesh.name.endsWith('-accent')), bloomList = () => scene.effectLayers.find(layer => layer.name === 'candlelight-bloom').mainTexture.renderList;
@@ -660,6 +663,91 @@ try {
     assert.deepEqual([turned.x, turned.z, turned.rotation], [3.75, -2.5, 1], 'the sofa turns and steps off the wall');
     room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
     console.log('PASS placement fixes: rugs stack in drop order, covered rugs flatten, the pet stands on its bed or rug, blocked drops and turns find a free spot, floor clicks only deselect.');
+  }
+  {
+    // Outside Decorate, a tap uses a piece: lamps, candles, fire and records
+    // switch and save; plants, books, cushions and tea play a short reaction.
+    const motionBefore = motion.matches; motion.matches = false; motion.emit('change', { matches: false });
+    room.setEditMode(false); room.setLayout(createLayout('ember-library')); advance(3);
+    const node = id => scene.transformNodes.find(item => item.metadata?.itemId === id && item.metadata.body);
+    const bloom = () => scene.effectLayers.find(layer => layer.name === 'candlelight-bloom').mainTexture.renderList;
+    const glow = mesh => mesh.material.emissiveColor.r + mesh.material.emissiveColor.g + mesh.material.emissiveColor.b;
+    // The first sample point on a piece that a tap would reach.
+    function tapPoint(id) {
+      const target = node(id); target.getChildMeshes().forEach(mesh => mesh.computeWorldMatrix(true));
+      const { min, max } = target.getHierarchyBoundingVectors(true, mesh => !mesh.metadata?.effect || mesh.metadata.effect === 'leaf-sway');
+      for (const fy of [0.75, 0.5, 0.9, 0.3]) for (const fx of [0.5, 0.3, 0.7]) for (const fz of [0.5, 0.7, 0.3, 0.9]) {
+        const pointer = pointerAt(min.x + (max.x - min.x) * fx, min.y + (max.y - min.y) * fy, min.z + (max.z - min.z) * fz);
+        canvas.emit('pointermove', pointer); advance(2);
+        if (diagnostics().playHover === id) return pointer;
+      }
+      assert.fail(`no tap point on ${id}`);
+    }
+    const tap = pointer => { canvas.emit('pointerdown', pointer); canvas.emit('pointerup', pointer); advance(2); };
+    const saved = id => diagnostics().layout.items.find(item => item.id === id);
+    // Hover shows what a tap will use.
+    const lampPoint = tapPoint('ember-lamp'), lamp = node('ember-lamp');
+    assert.equal(canvas.style.cursor, 'pointer');
+    assert.ok(lamp.getChildMeshes().filter(mesh => mesh.metadata?.effect !== 'contact-shadow').every(mesh => mesh.renderOutline), 'a hovered lamp is outlined');
+    canvas.emit('pointerleave'); assert.equal(diagnostics().playHover, null);
+    assert.ok(lamp.getChildMeshes().every(mesh => !mesh.renderOutline));
+    // Floor lamp: the shade stays, its glow goes, and the state saves without an Undo step.
+    const shade = lamp.getChildMeshes().find(mesh => !mesh.metadata?.effect && glow(mesh) > 0.1), litShade = shade.material, writes = changes.length;
+    tap(lampPoint);
+    assert.equal(saved('ember-lamp').off, true); assert.equal(changes.length, writes + 1, 'one save per switch');
+    assert.ok(shade.isEnabled() && glow(shade) === 0 && !bloom().includes(shade), 'a switched-off lamp keeps its shade without glow');
+    tap(lampPoint);
+    assert.equal(saved('ember-lamp').off, undefined); assert.equal(shade.material, litShade);
+    assert.ok(bloom().includes(shade), 'the lamp glows again');
+    // Fire: flames, embers, mantel candles and the hearth light all go out.
+    const hearthPoint = tapPoint('ember-hearth'), hearth = node('ember-hearth'), hearthLight = scene.getLightByName('hearth-lamplight');
+    const effect = kind => hearth.getChildMeshes().find(mesh => mesh.metadata?.effect === kind);
+    tap(hearthPoint); advance(3);
+    assert.ok(saved('ember-hearth').off && !effect('hearth-flames').isEnabled() && !effect('hearth-embers').isEnabled() && !hearthLight.isEnabled(), 'the fire goes out with its light');
+    tap(hearthPoint); advance(3);
+    assert.ok(effect('hearth-flames').isEnabled() && effect('hearth-embers').isEnabled() && hearthLight.isEnabled(), 'the fire lights again');
+    // Desk: the lamp and its warm light switch together.
+    const deskPoint = tapPoint('ember-desk'), deskLight = scene.getLightByName('window-lamplight');
+    tap(deskPoint); assert.ok(saved('ember-desk').off && !deskLight.isEnabled(), 'the desk lamp takes its light along');
+    tap(deskPoint); assert.ok(!saved('ember-desk').off && deskLight.isEnabled());
+    // Records: a stopped player keeps its record still.
+    const recordPoint = tapPoint('ember-records'), disc = node('ember-records').getChildren().find(child => child.metadata?.effect === 'record-spin');
+    tap(recordPoint); const stopped = disc.rotation.y; advance(20);
+    assert.equal(disc.rotation.y, stopped, 'the record stops while the player is off');
+    tap(recordPoint); advance(20); assert.notEqual(disc.rotation.y, stopped, 'the record turns again');
+    // Lanterns: the flames go out, the lanterns stay.
+    const lanternPoint = tapPoint('ember-lanterns'), flames = node('ember-lanterns').getChildMeshes().filter(mesh => !mesh.metadata?.effect && glow(mesh) > 0.1);
+    tap(lanternPoint); assert.ok(flames.length && flames.every(mesh => !mesh.isEnabled()), 'candle flames go out');
+    tap(lanternPoint); assert.ok(flames.every(mesh => mesh.isEnabled()));
+    // Reactions end exactly at the rest pose.
+    const plantPoint = tapPoint('ember-plant'); tap(plantPoint);
+    assert.ok(node('ember-plant').metadata.rustle > 0.5, 'leaves rustle after a tap'); advance(80);
+    assert.equal(node('ember-plant').metadata.rustle, 0, 'the rustle fades out');
+    const booksPoint = tapPoint('ember-books-right'), hinge = node('ember-books-right').metadata.book; tap(booksPoint); advance(15);
+    assert.ok(hinge.rotation.x > 0.2 && hinge.position.z > 0.225, 'a book tips out of the shelf'); advance(90);
+    assert.deepEqual([hinge.rotation.x, hinge.position.z], [0, 0.225], 'and slides back');
+    const sofaPoint = tapPoint('ember-sofa'), body = node('ember-sofa').metadata.body; tap(sofaPoint); advance(4);
+    assert.ok(body.scaling.y < 0.99, 'the cushions squash'); advance(60);
+    assert.deepEqual(body.scaling.asArray(), [1, 1, 1], 'and spring back');
+    const teaPoint = tapPoint('ember-table'); tap(teaPoint); advance(30);
+    assert.ok(node('ember-table').metadata.puff > 0.5, 'the tea puffs steam'); advance(80);
+    assert.equal(node('ember-table').metadata.puff, 0);
+    assert.equal(JSON.stringify(diagnostics().layout), JSON.stringify(createLayout('ember-library')), 'reactions save nothing');
+    // The fairy lights and lanterns switch through the room lights.
+    const lantern = scene.getTransformNodeByName('swaying-lantern-2').getChildMeshes()[0]; lantern.computeWorldMatrix(true);
+    const center = lantern.getBoundingInfo().boundingBox.centerWorld, lightsPoint = pointerAt(center.x, center.y, center.z);
+    canvas.emit('pointermove', lightsPoint); advance(2); assert.equal(diagnostics().playHover, 'room-lights');
+    const taps = lightTaps.length; tap(lightsPoint); assert.equal(lightTaps.length, taps + 1, 'a tap on the lights switches them');
+    // Reduced motion keeps switches working and skips reactions.
+    motion.matches = true; motion.emit('change', { matches: true }); advance(2);
+    tap(plantPoint); assert.equal(node('ember-plant').metadata.rustle ?? 0, 0, 'no rustle with reduced motion');
+    tap(lampPoint); assert.equal(saved('ember-lamp').off, true, 'switches still work with reduced motion'); tap(lampPoint);
+    motion.matches = false; motion.emit('change', { matches: false }); advance(2);
+    // Decorate mode: a tap selects the piece instead of switching it.
+    room.setEditMode(true); advance(2); tap(lampPoint);
+    assert.equal(diagnostics().selectedId, 'ember-lamp'); assert.equal(saved('ember-lamp').off, undefined, 'Decorate taps never switch');
+    room.setEditMode(false); room.setLayout(beforeDesignLayout); motion.matches = motionBefore; motion.emit('change', { matches: motionBefore }); advance(3);
+    console.log('PASS tap to use: hover outlines, saved switches for lamps, desk lamp, fire, records and candles, room lights, four reactions that end at rest, reduced motion and Decorate taps.');
   }
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);

@@ -145,7 +145,8 @@ export function createArchitecture(style, scene) {
   const bodyMaterial = new StandardMaterial(`${style}-batched-paint`, scene); bodyMaterial.diffuseColor = Color3.White(); bodyMaterial.specularColor.set(.035, .035, .035); materials.push(bodyMaterial);
   for (const [key, bucket] of buckets) {
     const data = bucket.data[0]; if (bucket.data.length > 1) data.merge(bucket.data.slice(1), true);
-    const mesh = new Mesh(`${style}-${key === 'paint' ? 'architecture' : 'accent'}`, scene); data.applyToMesh(mesh); mesh.parent = root; mesh.material = bucket.mat || bodyMaterial; mesh.useVertexColors = true; mesh.receiveShadows = !bucket.mat; mesh.isPickable = false; mesh.metadata = { architecture: style, castShadow: !bucket.mat }; mesh.freezeWorldMatrix();
+    // Accent lights take a tap outside Decorate, which switches them.
+    const mesh = new Mesh(`${style}-${key === 'paint' ? 'architecture' : 'accent'}`, scene); data.applyToMesh(mesh); mesh.parent = root; mesh.material = bucket.mat || bodyMaterial; mesh.useVertexColors = true; mesh.receiveShadows = !bucket.mat; mesh.isPickable = Boolean(bucket.mat); mesh.metadata = { architecture: style, castShadow: !bucket.mat, lightSwitch: Boolean(bucket.mat) }; mesh.freezeWorldMatrix();
   }
   parts.forEach(part => part.dispose(false, false));
   for (const mat of paint.values()) if (!glows.includes(mat)) { mat.dispose(); materials.splice(materials.indexOf(mat), 1); }

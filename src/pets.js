@@ -304,14 +304,15 @@ export function createPetModel(scene, species = 'cat') {
   // Taps test three soft spheres (head, chest, hips): the skinned mesh
   // itself is not pickable.
   const hitCentre = new Vector3(), hitOffset = new Vector3();
+  // Returns the distance along the ray to the nearest sphere, or null.
   function hitTest(ray) {
-    const world = root.computeWorldMatrix(true);
+    const world = root.computeWorldMatrix(true); let nearest = null;
     for (const [point, radius] of [[head, 0.2], [chest, 0.2], [hips, 0.19]]) {
       Vector3.TransformCoordinatesToRef(point, world, hitCentre); hitCentre.subtractToRef(ray.origin, hitOffset);
-      const along = Vector3.Dot(hitOffset, ray.direction), r = radius * spec.scale;
-      if (along > 0 && hitOffset.lengthSquared() - along * along <= r * r) return true;
+      const along = Vector3.Dot(hitOffset, ray.direction), r = radius * spec.scale, miss = hitOffset.lengthSquared() - along * along;
+      if (along > 0 && miss <= r * r) { const entry = along - Math.sqrt(r * r - miss); if (nearest === null || entry < nearest) nearest = entry; }
     }
-    return false;
+    return nearest;
   }
   return {
     root, body, contact, heart, sleepLetters, species, headPoint, hitTest,

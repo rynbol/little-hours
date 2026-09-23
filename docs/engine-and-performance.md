@@ -214,6 +214,20 @@ Catalog entries now record each model's `height`, and a unit test keeps it withi
 
 Verification: unit tests cover the nearest-spot search, rug overlap and catalog heights. A runtime check covers drop-order stacking, flattening, the cat height, blocked drops and turns that slide clear, and clicks that only deselect. Against `main`, pixel comparisons differ at the four flattened rugs; the scattered edge differences elsewhere also appear between two captures of `main` itself.
 
+## Tap to use
+
+Outside Decorate, a tap uses the piece under the pointer. Catalog entries declare it in `use`: `toggle` switches the floor lamp, the desk lamps, the lantern candles, the fire or the record player, and `react` plays a short motion for plants, bookcases, seats and the tea table. A switch saves `off: true` on the layout item, so each room keeps it, and the page saves it without an Undo step. The companion's routine ignores it, so a walking companion never restarts when a lamp changes.
+
+A switched-off lamp keeps its shade and swaps its glowing paint for an unlit twin material, which also leaves the bloom list. The desk lamp takes the desk's warm point light with it. A fire that is out hides its flames, embers and mantel candle flames, and the hearth light moves to the first fire that is still lit. Candles lose their flames. A stopped record stays where it stopped. Nothing else changes: with every switch on, frames at rest match `main` pixel for pixel, apart from the new hint text.
+
+The fairy lights, the retreat lanterns and the sill candles, and the ceiling lamps of the other rooms, switch the room lights with a tap. The retreat now does what the other shells do: switched-off lights stay in place, unlit, instead of hiding, and the sill candles lose their flames. The fireflies keep glowing, because they no longer share the bulb material.
+
+Reactions end exactly at the rest pose. Leaves rustle for 1.1 s, a book on the third shelf tips out on a hinge and slides back (1.5 s, one extra small mesh per bookcase), seat cushions squash and spring back (0.6 s), and the tea puffs a taller plume (1.6 s). Reduced motion skips reactions; switches still work.
+
+Hover outlines outside Decorate are thinner and softer than in Decorate. The outline shader compiles in the background, so the room keeps drawing for up to two seconds after an outline change until the shader is ready; before, a reduced-motion room could stop on a frame without the outline.
+
+Verification: a runtime check taps real pointer positions on each piece and covers hover outlines, saved switches, the desk and hearth lights, a stopped record, candle flames, the room lights, all four reactions returning to rest, reduced motion and Decorate taps. Real mouse taps in headless Chrome and Firefox 156 switched the lamp, desk, hearth, records and lanterns off and on again, with Undo untouched and no page errors.
+
 ## Pets
 
 Every room has one pet bed (`pet-bed`), a normal layout item that moves and turns in Decorate but cannot be removed and does not count toward the 32-piece budget. It replaces the old fixed cat spot: rooms saved before the bed get it at that spot, which older saves always kept clear, or at the first free spot. The companion's routes treat the bed as solid, as they treated the old spot.
