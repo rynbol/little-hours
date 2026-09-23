@@ -40,6 +40,9 @@ export function createRoom(container, options = {}) {
   scene.useRightHandedSystem = true;
   scene.clearColor = new Color4(0, 0, 0, 0);
   scene.skipPointerMovePicking = true;
+  // The room owns the cursor. Babylon resets it to the arrow on every pointer
+  // move, one frame before the room sets it again, so it flickered.
+  scene.doNotHandleCursors = true;
   scene.imageProcessingConfiguration.toneMappingEnabled = true;
   scene.imageProcessingConfiguration.toneMappingType = 1;
   scene.imageProcessingConfiguration.exposure = 1.08;
@@ -729,8 +732,8 @@ export function createRoom(container, options = {}) {
     companionRoutine?.setEditing(editing); syncCompanionVisibility(); refreshShadows();
     if (!options.engineFactory && wasEditing !== editing) { if (editing) camera.detachControl(); else camera.attachControl(canvas, false); }
     camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0;
-    canvas.style.touchAction = editing ? 'none' : 'pan-y'; canvas.style.cursor = editing ? 'crosshair' : 'grab';
-    canvas.setAttribute('aria-label', editing ? 'Room design canvas. Hover to outline furniture. Drag a piece to move it, or drop it over the bottom collection to return it. Escape cancels a drag.' : 'Your cozy miniature study room. Drag to look around; click the sleeping cat to pet it.');
+    canvas.style.touchAction = editing ? 'none' : 'pan-y'; canvas.style.cursor = 'grab';
+    canvas.setAttribute('aria-label', editing ? 'Room design canvas. Hover to outline furniture. Drag a piece to move it, or drop it over the bottom collection to return it. Drag empty space to look around. Escape cancels a drag.' : 'Your cozy miniature study room. Drag to look around; click the sleeping cat to pet it.');
     if (!editing) { cancelPlacement(); selectItem(null); } updateMarker(); updateOutline(); requestRender();
   }
   function setTheme(name) {
@@ -787,7 +790,7 @@ export function createRoom(container, options = {}) {
     if (wasDragging) {
       options.onDragState?.(null); updateMarker(); outlineKey = ''; updateOutline(); refreshShadows();
     }
-    canvas.style.cursor = editing ? 'crosshair' : 'grab';
+    canvas.style.cursor = placement ? 'crosshair' : 'grab';
     return wasDragging;
   }
   function startDrag() {
@@ -844,7 +847,7 @@ export function createRoom(container, options = {}) {
   const onPointerDown = event => {
     if (event.isPrimary === false || (event.button != null && event.button !== 0) || downPosition) return;
     const ray = editing && !placement ? castPointer(event) : null, floor = ray && floorPosition(ray);
-    downPosition = { x: event.clientX, y: event.clientY, pointerId: event.pointerId,
+    downPosition = { x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, pointerId: event.pointerId,
       itemId: ray ? hitItem(ray) : null, floor: floor ? { x: floor.x, z: floor.z } : null };
     if (editing && event.pointerId != null) canvas.setPointerCapture(event.pointerId);
     requestRender();
@@ -855,7 +858,10 @@ export function createRoom(container, options = {}) {
     const clicked = Math.hypot(event.clientX - downPosition.x, event.clientY - downPosition.y) < 7;
     if (editing && downPosition.itemId && !clicked && !drag) startDrag();
     if (drag) { finishDrag(event); return; }
-    const pointerId = downPosition.pointerId; downPosition = null; releasePointer(pointerId); requestRender(); if (!clicked) return;
+    const pointerId = downPosition.pointerId; downPosition = null; releasePointer(pointerId);
+    // The next frame sets the hover cursor again, so 'grabbing' ends with the gesture.
+    pendingPointer.clientX = event.clientX; pendingPointer.clientY = event.clientY; pendingPointer.pointerType = event.pointerType; hasPendingPointer = true;
+    requestRender(); if (!clicked) return;
     const ray = castPointer(event);
     if (!editing) { if (scene.pickWithRay(ray, mesh => mesh.metadata?.cat)?.hit) pet(); return; }
     const floor = floorPosition(ray);
@@ -875,6 +881,15 @@ export function createRoom(container, options = {}) {
   const onPointerMove = event => {
     if (downPosition && event.pointerId != null && downPosition.pointerId != null && event.pointerId !== downPosition.pointerId) return;
     if (!editing && downPosition) { canvas.style.cursor = 'grabbing'; requestRender(); return; }
+    if (editing && downPosition && !downPosition.itemId) {
+      // Decorate mode keeps Babylon's camera input detached, so a drag on a
+      // piece only moves the piece. A drag from empty space turns the room
+      // with the same math and inertia as the camera input.
+      camera.inertialAlphaOffset -= (event.clientX - downPosition.lastX) / camera.angularSensibilityX;
+      camera.inertialBetaOffset -= (event.clientY - downPosition.lastY) / camera.angularSensibilityY;
+      downPosition.lastX = event.clientX; downPosition.lastY = event.clientY;
+      canvas.style.cursor = 'grabbing'; requestRender(); return;
+    }
     pendingPointer.clientX = event.clientX; pendingPointer.clientY = event.clientY; pendingPointer.pointerType = event.pointerType; hasPendingPointer = true;
     // One closest-object pick per rendered frame; drag motion only intersects
     // the floor. Pointer capture keeps the same gesture alive over the tray.
@@ -891,7 +906,7 @@ export function createRoom(container, options = {}) {
       canvas.style.cursor = 'crosshair'; return;
     }
     if (pendingPointer.pointerType === 'mouse' || pendingPointer.pointerType === 'pen') {
-      if (editing) { const id = hitItem(ray); hoverItem(id); canvas.style.cursor = id ? 'grab' : 'crosshair'; }
+      if (editing) { hoverItem(hitItem(ray)); canvas.style.cursor = 'grab'; }
       else canvas.style.cursor = scene.pickWithRay(ray, mesh => mesh.metadata?.cat, true)?.hit ? 'pointer' : 'grab';
     }
   }

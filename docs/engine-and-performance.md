@@ -189,3 +189,13 @@ A code review of state, scene and UI (three independent passes, each finding con
 Not changed: a one-frame blank after a canvas resize, and cached self-shadow on the animated desk companion and swinging lanterns. Neither was visible in headless renders; both need a check in a visible browser first.
 
 Verification: 47 unit tests, all runtime groups (plus a separate 30 Hz room) and 16 headless-browser UI checks pass. The same UI checks fail 15 of 16 on the previous `main`; the one that passes guards unchanged Escape behavior. Undoing the ceiling, cadence or metro-moth fix makes its runtime check fail. A runtime pass in headless Chrome (three cycles through all six rooms, day/night, mini view and decorating) showed no console errors and stable mesh, material, texture and geometry counts.
+
+## Decorate controls
+
+Decorate mode keeps Babylon's camera input detached, so a drag that starts on a piece only ever moves that piece. A drag that starts on empty space turns the room instead: the room adds the same offsets as the camera input (`angularSensibility` 700, with the camera's inertia and angle limits), and it saves nothing. A drag while placing a new piece also turns the room and never places the preview. Empty space shows the grab cursor, as it does outside Decorate; the plus cursor is kept for placement.
+
+The room owns the canvas cursor (`scene.doNotHandleCursors`). Babylon reset it to the arrow on every pointer move, and the room set its own cursor one frame later, so the cursor flickered while moving over or dragging furniture. In a 41-step hover sweep, that reset showed the arrow 24 times in Firefox and 29 times in Chrome; with the fix, the cursor did not change. The cursor also leaves "grabbing" on release, before the next pointer move.
+
+The canvas no longer draws a focus ring. Babylon focuses the canvas on every press, and browsers can match `:focus-visible` for focus that a script moves, so a gold frame appeared after ordinary clicks (in Zen, and in headless Chrome captures). Keyboard shortcuts listen on the document and do not need canvas focus.
+
+Verification: a runtime check covers the owned cursor, the grab cursor over empty space, empty-space turns, piece drags that leave the camera still, and placement drags; undoing any of the four fixes makes it fail. Real-input drags in headless Firefox 156 and Chrome (1440 × 900, and 2960 × 1400 like a large monitor) moved every piece in the three preset rooms that has a free spot nearby (60 of 61; the Ember library tree has no free spot within 1.5 units).

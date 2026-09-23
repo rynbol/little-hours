@@ -324,7 +324,7 @@ function setEditMode(enabled) {
   $('#decorate-button').setAttribute('aria-label', enabled ? 'Done decorating' : 'Decorate');
   $('#decorate-button span').textContent = enabled ? 'Done decorating' : 'Decorate';
   $('#room-canvas').setAttribute('aria-label', enabled
-    ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Escape cancels.'
+    ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
     : 'Interactive 3D cutaway study room. Drag to turn the room, or click the ginger cat.');
   currentPanel = null;
   renderPanel();
@@ -509,7 +509,7 @@ function renderInspector() {
     return;
   }
   const rememberedFocus = rememberControlFocus(inspector);
-  $('#room-hint').textContent = pending ? `Click the floor to place ${pending.name.toLowerCase()}` : selected ? 'Drag to move · Drop over the collection to put away' : 'Hover to discover · Drag a piece to make it yours';
+  $('#room-hint').textContent = pending ? `Click the floor to place ${pending.name.toLowerCase()}` : selected ? 'Drag to move · Drop over the collection to put away' : 'Drag a piece to move it · Drag empty space to look around';
   if (!pending && !selected) {
     inspector.innerHTML = `<div class="selection-copy">${icon('build')}<span><strong>A room that feels like you</strong><small>Drag furniture around your room, or back here to put it away. Pick a piece below to add something new.</small></span></div>`;
     restoreControlFocus(inspector, rememberedFocus);

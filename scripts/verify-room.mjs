@@ -563,6 +563,45 @@ try {
     room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
     console.log('PASS review fixes: shade 2 mm above rugs and floor, grounded companion, no metro moths, unstretched stars, off-screen pause, keyboard placement.');
   }
+  {
+    // The room alone sets the cursor: Babylon's reset on every move made it flicker.
+    assert.equal(scene.doNotHandleCursors, true, 'Babylon never resets the room cursor');
+    room.setLayout(dragLayout); room.setEditMode(true); advance(3);
+    const still = () => { camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; advance(2); };
+    still();
+    const empty = pointerAt(-4, .22, 3), turned = { ...empty, clientX: empty.clientX + 60, clientY: empty.clientY + 20 };
+    canvas.emit('pointermove', empty); advance(2);
+    assert.equal(diagnostics().hoveredId, null);
+    assert.equal(canvas.style.cursor, 'grab', 'empty space in Decorate shows grab, not a plus');
+    // Decorate mode: a drag from empty space turns the room and moves no furniture.
+    const alpha = camera.alpha, beta = camera.beta, saved = JSON.stringify(diagnostics().layout), writes = changes.length;
+    canvas.emit('pointerdown', empty); canvas.emit('pointermove', turned);
+    assert.equal(canvas.style.cursor, 'grabbing');
+    assert.ok(camera.inertialAlphaOffset < 0 && camera.inertialBetaOffset < 0, 'an empty-space drag turns the room like the camera input');
+    assert.equal(diagnostics().dragging, null);
+    advance(6); assert.ok(camera.alpha !== alpha && camera.beta !== beta, 'the view turns');
+    canvas.emit('pointerup', turned); advance(2);
+    assert.equal(canvas.style.cursor, 'grab', 'grabbing ends with the gesture');
+    assert.equal(JSON.stringify(diagnostics().layout), saved); assert.equal(changes.length, writes, 'turning the room saves nothing');
+    // A drag that starts on a piece still moves only the piece.
+    still();
+    const dropped = beginPlantDrag();
+    assert.equal(camera.inertialAlphaOffset, 0, 'a piece drag never turns the room');
+    canvas.emit('pointerup', dropped); advance(2);
+    assert.equal(diagnostics().layout.items.find(item => item.id === dragPlant.id).x, 3);
+    // Placement keeps its plus cursor, and a drag turns the room without a placement.
+    still(); room.beginPlacement('plant');
+    const place = pointerAt(-4, .22, 3); canvas.emit('pointermove', place); advance(2);
+    assert.equal(canvas.style.cursor, 'crosshair');
+    const count = diagnostics().layout.items.length;
+    canvas.emit('pointerdown', place); canvas.emit('pointermove', { ...place, clientX: place.clientX - 50 });
+    assert.ok(camera.inertialAlphaOffset > 0, 'placement mode can turn the room too');
+    canvas.emit('pointerup', { ...place, clientX: place.clientX - 50 }); advance(2);
+    assert.equal(diagnostics().layout.items.length, count, 'a drag never places the preview');
+    assert.equal(canvas.style.cursor, 'crosshair');
+    room.cancelPlacement(); room.setEditMode(false); room.resetView(); room.setLayout(beforeDesignLayout); advance(3);
+    console.log('PASS decorate fixes: room-owned cursor, grab over empty space, empty-space drags turn the room, piece drags stay piece drags.');
+  }
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);
   room.dispose(); assert.equal(frames.size, 0); assert.equal(motion.listenerCount, 0); assert.equal(doc.listenerCount, 0); assert.equal(canvas.listenerCount, 0); assert.equal(win.listenerCount, 0);
