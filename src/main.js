@@ -6,6 +6,8 @@ import { FURNITURE, getFurniture } from './catalog.js';
 import { PRESETS, normalizeLayout, MAX_ITEMS, roomDesign } from './layout.js';
 import { companionIntent } from './companion.js';
 import { ARTWORKS, SLEEVES, artName } from './art.js';
+import { tintsFor } from './tints.js';
+import { designPaint } from './architecture.js';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -357,7 +359,7 @@ function rememberControlFocus(container) {
   const active = document.activeElement;
   if (!container.contains(active)) return null;
   if (active.id) return { id: active.id };
-  for (const key of ['category', 'furniture', 'preset', 'resetDesign', 'nudge', 'art']) {
+  for (const key of ['category', 'furniture', 'preset', 'resetDesign', 'nudge', 'art', 'tint']) {
     if (active.dataset?.[key] !== undefined) return { key, value: active.dataset[key] };
   }
   return null;
@@ -556,9 +558,13 @@ function renderInspector() {
   // instead of turning. Frames and records offer their pictures.
   const nudges = [['0,-0.25', wall ? 'Move up' : 'Move toward back wall', '↑'], ['-0.25,0', 'Move left', '←'], ['0.25,0', 'Move right', '→'], ['0,0.25', wall ? 'Move down' : 'Move toward front', '↓']];
   const arts = !pending && item.arts ? `<div class="art-picker" role="group" aria-label="${item.id === 'record-sleeve' ? 'Choose the sleeve' : 'Choose the picture'}">${item.arts.map(art => `<button data-art="${art}" aria-pressed="${selectedItem.art === art}" aria-label="${artName(art)}" title="${artName(art)}">${SLEEVES[art] ? `<span class="sleeve-swatch" style="--sleeve: ${SLEEVES[art].color}"></span>` : `<img src="${artThumb(art, item.id === 'wide-frame')}" alt="">`}</button>`).join('')}</div>` : '';
-  inspector.innerHTML = `<div class="selection-copy">${icon(pending ? 'plus' : 'build')}<span><strong>${pending ? 'Placing ' : ''}${item.name}${!pending && currentDesk ? '<span class="active-desk-tag">Study spot</span>' : ''}</strong><small>${hint}</small></span></div><div class="selection-actions">${arts}${wall ? '' : `<button class="small-button" id="rotate-item" aria-label="Rotate ${item.name}">${icon('rotate')}<span>Rotate</span></button>`}${!pending ? `<div class="nudge-buttons" aria-label="Move selected ${wall ? 'wall piece' : 'furniture'}">${nudges.map(([step, label, arrow]) => `<button data-nudge="${step}" aria-label="${label}">${arrow}</button>`).join('')}</div>${item.category === 'Study' ? `<button class="small-button study-here" id="study-here" aria-label="${currentDesk ? 'Studying here' : 'Study here'}" ${currentDesk ? 'disabled' : ''}>${icon('check')}<span>${currentDesk ? 'Studying here' : 'Study here'}</span></button>` : ''}<button class="small-button remove-item" id="remove-item" aria-label="Remove ${item.name}">${icon('trash')}</button>` : ''}<button class="small-button" id="cancel-item" aria-label="${pending ? 'Cancel placement' : 'Deselect furniture'}">${icon('close')}</button></div>`;
+  // Pieces with color choices list them after the room's own colors.
+  const tints = !pending && tintsFor(item.id), roomTint = tints && Object.keys(tints[0].paint)[0];
+  const colors = tints ? `<div class="art-picker" role="group" aria-label="Choose the color">${[{ id: '', name: 'Room colors', swatch: designPaint(roomDesign(state.layout).style).find(([hex]) => hex === roomTint)?.[1] || roomTint }, ...tints].map(tint => `<button data-tint="${tint.id}" aria-pressed="${(selectedItem.tint || '') === tint.id}" aria-label="${tint.name}" title="${tint.name}"><span class="tint-swatch" style="--tint: ${tint.swatch}"></span></button>`).join('')}</div>` : '';
+  inspector.innerHTML = `<div class="selection-copy">${icon(pending ? 'plus' : 'build')}<span><strong>${pending ? 'Placing ' : ''}${item.name}${!pending && currentDesk ? '<span class="active-desk-tag">Study spot</span>' : ''}</strong><small>${hint}</small></span></div><div class="selection-actions">${arts}${colors}${wall ? '' : `<button class="small-button" id="rotate-item" aria-label="Rotate ${item.name}">${icon('rotate')}<span>Rotate</span></button>`}${!pending ? `<div class="nudge-buttons" aria-label="Move selected ${wall ? 'wall piece' : 'furniture'}">${nudges.map(([step, label, arrow]) => `<button data-nudge="${step}" aria-label="${label}">${arrow}</button>`).join('')}</div>${item.category === 'Study' ? `<button class="small-button study-here" id="study-here" aria-label="${currentDesk ? 'Studying here' : 'Study here'}" ${currentDesk ? 'disabled' : ''}>${icon('check')}<span>${currentDesk ? 'Studying here' : 'Study here'}</span></button>` : ''}<button class="small-button remove-item" id="remove-item" aria-label="Remove ${item.name}">${icon('trash')}</button>` : ''}<button class="small-button" id="cancel-item" aria-label="${pending ? 'Cancel placement' : 'Deselect furniture'}">${icon('close')}</button></div>`;
   $('#rotate-item')?.addEventListener('click', () => room?.rotateSelection?.());
   inspector.querySelectorAll('[data-art]').forEach(button => button.addEventListener('click', () => room?.setArt?.(button.dataset.art)));
+  inspector.querySelectorAll('[data-tint]').forEach(button => button.addEventListener('click', () => room?.setTint?.(button.dataset.tint || null)));
   $('#remove-item')?.addEventListener('click', () => room?.removeSelection?.());
   $('#study-here')?.addEventListener('click', () => room?.setActiveDesk?.(selectedItem.id));
   $('#cancel-item').addEventListener('click', () => { room?.cancelPlacement?.(); room?.selectItem?.(null); });

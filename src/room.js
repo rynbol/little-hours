@@ -28,6 +28,7 @@ import { getFurniture } from './catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, rugsOverlap, footprintBounds, MAX_ITEMS, roomDesign, CAT_BOUNDS } from './layout.js';
 import { SHELLS, isWallPiece, snapWall, openings } from './walls.js';
 import { ARTWORKS, SLEEVES } from './art.js';
+import { tintPaint } from './tints.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -689,11 +690,12 @@ export function createRoom(container, options = {}) {
     let rugLayer = 0;
     for (const item of layout.items) {
       let object = placedObjects.get(item.id);
-      if (object && object.metadata.furnitureType !== item.type) { settlingPieces.delete(item.id); object.dispose(false, false); placedObjects.delete(item.id); object = null; }
+      // A new color builds the piece again from its model.
+      if (object && (object.metadata.furnitureType !== item.type || object.metadata.tint !== item.tint)) { settlingPieces.delete(item.id); object.dispose(false, false); placedObjects.delete(item.id); object = null; }
       if (!object) {
-        object = createFurniture(item.type, scene); styleFurniture(object, architectureStyle); object.parent = furnitureRoot;
+        object = createFurniture(item.type, scene); styleFurniture(object, architectureStyle, tintPaint(item.type, item.tint)); object.parent = furnitureRoot;
         if (getFurniture(item.type).category !== 'Rugs' && !isWallPiece(item)) groundPiece(object, item.type);
-        object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type;
+        object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type; object.metadata.tint = item.tint;
         object.getChildMeshes().forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = !mesh.metadata?.effect; });
         placedObjects.set(item.id, object);
         if (settleNew && !reducedMotion) { object.scaling.setAll(0.92); settlingPieces.set(item.id, { object, start: performance.now() }); }
@@ -891,6 +893,13 @@ export function createRoom(container, options = {}) {
     const item = layout.items.find(candidate => candidate.id === selectedId);
     if (!item || item.art === art || !getFurniture(item.type).arts?.includes(art)) return;
     cancelDrag(); item.art = art; commitLayout(); selectItem(item.id);
+  }
+  // A piece with color choices wears the chosen one; null gives it back the
+  // room's colors.
+  function setTint(tint) {
+    const item = layout.items.find(candidate => candidate.id === selectedId);
+    if (!item || (item.tint ?? null) === tint || (tint !== null && !tintPaint(item.type, tint))) return;
+    cancelDrag(); if (tint === null) delete item.tint; else item.tint = tint; commitLayout(); selectItem(item.id);
   }
   function setEditMode(value) {
     cancelDrag(); hoverItem(null); playHover = null;
@@ -1270,7 +1279,7 @@ export function createRoom(container, options = {}) {
   requestRender();
 
   return {
-    setTheme, setLayout, setEditMode, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setQuality,
+    setTheme, setLayout, setEditMode, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setQuality,
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },

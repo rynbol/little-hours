@@ -531,6 +531,21 @@ test('switched-off lamps, fires and record players stay off after a reload; othe
   for (const definition of FURNITURE) if (definition.use) assert.ok(['lamp', 'candles', 'fire', 'record'].includes(definition.use.toggle) || ['rustle', 'book', 'squish', 'steam'].includes(definition.use.react), definition.id);
 });
 
+test('a chosen color stays after a reload; unknown colors and colors for other pieces never save', () => {
+  const layout = createLayout('ember-library'), find = (items, id) => items.find(item => item.id === id);
+  find(layout.items, 'ember-lamp').tint = 'navy';
+  find(layout.items, 'ember-plant').tint = 'turquoise';
+  find(layout.items, 'ember-hearth').tint = 'navy';
+  const restored = normalizeLayout(JSON.parse(JSON.stringify(layout)));
+  assert.equal(find(restored.items, 'ember-lamp').tint, 'navy');
+  assert.equal('tint' in find(restored.items, 'ember-plant'), false);
+  assert.equal('tint' in find(restored.items, 'ember-hearth'), false);
+  for (const tint of [42, null, {}, ['navy'], '']) {
+    find(layout.items, 'ember-lamp').tint = tint;
+    assert.equal('tint' in find(normalizeLayout(JSON.parse(JSON.stringify(layout))).items, 'ember-lamp'), false, JSON.stringify(tint));
+  }
+});
+
 test('wall pieces hang inside their wall, clear of fixtures, each other and tall furniture', () => {
   const frame = (u, v, wall = 'back', id = 'frame') => ({ id, type: 'small-frame', wall, u, v, art: 'hills' });
   assert.deepEqual(validatePlacement([], frame(2.5, 3)), { valid: true, reason: '' });

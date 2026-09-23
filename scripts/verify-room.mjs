@@ -839,6 +839,52 @@ try {
     room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
     console.log('PASS windows: real openings in walls and facings, the room view behind, closed while dragged, moved on drop, reopened on cancel, closed on removal, walls cast shadows and views never.');
   }
+  {
+    // A chosen color builds only its own piece again: the piece wears the new
+    // paint, while other pieces and its other parts keep theirs. The room
+    // colors, a loaded layout and a room design follow the same rules.
+    room.setEditMode(true); room.setLayout(createLayout('ember-library')); advance(3);
+    const node = id => scene.transformNodes.find(item => item.metadata?.itemId === id);
+    const saved = id => diagnostics().layout.items.find(item => item.id === id);
+    const paint = id => {
+      const found = new Set();
+      for (const mesh of node(id).getChildMeshes()) {
+        if (mesh.metadata?.effect || mesh.metadata?.dynamic) continue;
+        const colors = mesh.getVerticesData('color') || [];
+        for (let i = 0; i < colors.length; i += 4) found.add([0, 1, 2].map(c => Math.round(colors[i + c] * 255).toString(16).padStart(2, '0')).join(''));
+      }
+      return found;
+    };
+    room.selectItem('ember-sofa'); const first = node('ember-sofa'), saves = changes.length;
+    const meshCount = scene.meshes.length, materialCount = scene.materials.length;
+    room.setTint('moss'); advance(2);
+    assert.equal(saved('ember-sofa').tint, 'moss'); assert.equal(changes.length, saves + 1, 'a color is one save');
+    assert.ok(first.isDisposed() && node('ember-sofa') !== first, 'the daybed is built again');
+    assert.ok(paint('ember-sofa').has('667a5f') && !paint('ember-sofa').has('785965') && paint('ember-sofa').has('654939'), 'the daybed wears moss velvet on walnut legs');
+    assert.ok(paint('ember-chair').has('83968a'), 'the lounge chair keeps its sage');
+    assert.equal(diagnostics().selectedId, 'ember-sofa', 'the daybed stays selected');
+    assert.equal(scene.meshes.length, meshCount); assert.equal(scene.materials.length, materialCount, 'no new meshes or materials');
+    const casters = () => scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList;
+    assert.ok(node('ember-sofa').getChildMeshes().filter(mesh => mesh.metadata?.castShadow !== false && !mesh.metadata?.effect).every(mesh => casters().includes(mesh)) && !casters().some(mesh => mesh.isDisposed()), 'the new daybed casts shadows');
+    // The same color again, an unknown color, and a piece without choices change nothing.
+    const moss = node('ember-sofa'), mossSaves = changes.length;
+    room.setTint('moss'); room.setTint('teal'); room.selectItem('ember-hearth'); room.setTint('moss'); advance(2);
+    assert.equal(changes.length, mossSaves); assert.equal(node('ember-sofa'), moss); assert.ok(!('tint' in saved('ember-hearth')));
+    // Room colors give the model paint back; a loaded layout builds its colors.
+    room.selectItem('ember-sofa'); room.setTint(null); advance(2);
+    assert.ok(!('tint' in saved('ember-sofa')) && paint('ember-sofa').has('785965'), 'room colors');
+    const loaded = createLayout('ember-library'); loaded.items.find(item => item.id === 'ember-sofa').tint = 'rose'; loaded.items.find(item => item.id === 'ember-lamp').tint = 'navy';
+    room.setLayout(loaded); advance(2);
+    assert.ok(paint('ember-sofa').has('a87478') && paint('ember-lamp').has('636c89'), 'a loaded layout wears its colors');
+    // A room design repaints the rest; the chosen color stays the same.
+    room.setLayout(createLayout('sakura-studio')); advance(3);
+    room.selectItem('sakura-studio-green-sofa'); room.setTint('moss'); advance(2);
+    const sakura = paint('sakura-studio-green-sofa');
+    assert.ok(sakura.has('667a5f') && sakura.has('9e8772') && !sakura.has('ba9595'), 'moss velvet in Sakura, on Sakura legs');
+    room.setTint(null); advance(2); assert.ok(paint('sakura-studio-green-sofa').has('ba9595'), 'Sakura velvet again');
+    room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
+    console.log('PASS colors: a chosen color rebuilds only its piece, keeps selection, shadows and asset counts, ignores repeats and unknown colors, and follows loaded layouts and room designs.');
+  }
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);
   room.dispose(); assert.equal(frames.size, 0); assert.equal(motion.listenerCount, 0); assert.equal(doc.listenerCount, 0); assert.equal(canvas.listenerCount, 0); assert.equal(win.listenerCount, 0);

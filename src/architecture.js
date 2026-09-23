@@ -239,11 +239,16 @@ const recolors = {
   metro: ['#8e766e', '#b29988', '#424557', '#8196a7', '#a7b3c4', '#cbbdb7', '#757899', '#a7a2be', '#464b69', '#9b8e9e'],
 };
 const originalPaint = ['#aa7954', '#bc9169', '#73533d', '#83968a', '#a0afa0', '#dfd1b2', '#785965', '#91707c', '#654939', '#baa07a'];
+// The model colors a room design repaints, as [model color, design color].
+export const designPaint = style => !recolors[style] ? []
+  : [...originalPaint.map((hex, i) => [hex, i]), ['#64483b', 2], ['#936c4e', 0], ['#c29c68', 1], ['#73533f', 2], ['#c6a16b', 1]].map(([hex, i]) => [hex, recolors[style][i]]);
 // Recolor only static furniture geometry, leaving the companion and animated
 // leaves/fire untouched. Source templates and other instances stay shared/safe.
-export function styleFurniture(root, style) {
-  if (!recolors[style]) return;
-  const replacements = [...originalPaint.map((hex, i) => [hex, i]), ['#64483b', 2], ['#936c4e', 0], ['#c29c68', 1], ['#73533f', 2], ['#c6a16b', 1]].map(([hex, i]) => ({ from: Color3.FromHexString(hex), to: Color3.FromHexString(recolors[style][i]) }));
+// A color chosen for the piece (`paint`, model color → new color) comes before
+// the design palette, so it looks the same in every room.
+export function styleFurniture(root, style, paint = null) {
+  const replacements = [...Object.entries(paint || {}), ...designPaint(style)].map(([from, to]) => ({ from: Color3.FromHexString(from), to: Color3.FromHexString(to) }));
+  if (!replacements.length) return;
   for (const mesh of root.getChildMeshes()) {
     if (mesh.metadata?.effect || (root.metadata.avatar && mesh.isDescendantOf(root.metadata.avatar)) || mesh.metadata?.dynamic) continue;
     const source = mesh.getVerticesData('color'); if (!source) continue;
