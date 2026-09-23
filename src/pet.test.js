@@ -21,6 +21,7 @@ test('favorite spots in every room are clear floor that never blocks a desk chai
     for (const spot of spots) {
       assert.ok(walkable(spot, obstacles), `${preset.id} ${spot.kind} is clear`);
       assert.ok(exits.every(exit => distance(exit, spot) > 0.65), `${preset.id} ${spot.kind} leaves the chair free`);
+      assert.ok(!insideBed(layout, spot) && distance(spot, petHome(layout)) > 0.85, `${preset.id} ${spot.kind} lies clear of the pet's bed, so it walks home`);
     }
     if (layout.items.some(item => item.type === 'fireplace')) assert.ok(spots.some(spot => spot.kind === 'fire'), `${preset.id} pet loves the fire`);
   }

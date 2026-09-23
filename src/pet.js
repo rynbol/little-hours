@@ -46,10 +46,12 @@ export function landingSpot(layout, point, home) {
 // Favorite places, most loved first. Spots stay clear of every desk-chair
 // exit and of the companion's own seat, so the pet never blocks its way.
 export function petSpots(layout, { windowX = -2.7, companion = null } = {}) {
-  const obstacles = petObstacles(layout), spots = [];
+  const obstacles = petObstacles(layout), spots = [], home = petHome(layout);
   const desks = layout.items.filter(item => getFurniture(item.type)?.category === 'Study');
   const exits = [...desks.flatMap(item => seatsFor(item)).flatMap(seat => [seat.portal, seat.side]), ...(companion?.portal ? [companion.portal] : [])];
-  const clear = point => walkable(point, obstacles) && exits.every(exit => distance(exit, point) > 0.65) && (!companion || distance(companion, point) > 0.7);
+  // A spot also lies clear of the pet's own bed, so every stroll ends with a
+  // walk home. A rug under the bed is no place to stroll to.
+  const clear = point => walkable(point, obstacles) && exits.every(exit => distance(exit, point) > 0.65) && (!companion || distance(companion, point) > 0.7) && (!home || distance(home, point) > 0.85);
   const add = (point, yaw, kind) => { if (clear(point)) spots.push({ x: point.x, z: point.z, yaw, kind }); };
   for (const fire of layout.items.filter(item => item.type === 'fireplace' && !item.off)) {
     for (const x of [0, -0.6, 0.6]) add(localPoint(fire, x, getFurniture('fireplace').footprint[1] / 2 + 0.5), fire.rotation * Math.PI / 2, 'fire');
