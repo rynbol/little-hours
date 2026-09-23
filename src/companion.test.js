@@ -11,7 +11,11 @@ test('companion intent distinguishes new visits, working, paused and completed s
   assert.equal(companionIntent({ running: false, remaining: 1500, duration: 1500 }), 'idle');
   assert.equal(companionIntent({ running: true, remaining: 1300, duration: 1500 }), 'working');
   assert.equal(companionIntent({ running: false, remaining: 1300, duration: 1500 }), 'break');
-  assert.equal(companionIntent({ running: false, remaining: 0, duration: 1500 }), 'break');
+  // A finished session is a short break, then an idle desk again.
+  const finished = { running: false, remaining: 0, duration: 1500, completedAt: 10_000 };
+  assert.equal(companionIntent(finished, 10_000 + 60_000), 'break');
+  assert.equal(companionIntent(finished, 10_000 + 16 * 60_000), 'idle', 'yesterday\'s finished session no longer keeps the companion on a break');
+  assert.equal(companionIntent({ running: false, remaining: 0, duration: 1500 }), 'idle', 'an old save without a finish time reads as idle');
 });
 test('every preset has a sofa route with clearance around solids and the sleeping cat', () => {
   for (const preset of PRESETS) {
@@ -86,4 +90,22 @@ test('walking and seated poses reuse two body/head meshes with grounded feet and
     avatar.animate(pose, 25, true); assert.deepEqual(Array.from(body.getVerticesData('position')), still);
     pose.atDesk = true; avatar.animate(pose, 26, false); assert.equal(avatar.root.isEnabled(), false); assert.equal(avatar.contact.isEnabled(), false);
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('a layout change elsewhere leaves a resting companion on its seat', () => {
+  const layout = createLayout('ember-library'), routine = createCompanionRoutine();
+  routine.setLayout(layout); routine.setIntent('break'); advance(routine, 40);
+  const rested = { ...routine.pose }, seatId = routine.diagnostics().destination;
+  assert.equal(rested.atDesk, false); assert.ok(['resting', 'sleeping'].includes(rested.state));
+  // Move the piece farthest from the seat, as another tab might.
+  const moved = structuredClone(layout), seat = moved.items.find(item => item.id === seatId);
+  const far = moved.items.filter(item => item.id !== seatId && item.id !== moved.activeDeskId).sort((a, b) => Math.hypot(b.x - seat.x, b.z - seat.z) - Math.hypot(a.x - seat.x, a.z - seat.z))[0];
+  far.x += far.x > 0 ? -0.25 : 0.25;
+  routine.setLayout(moved);
+  assert.equal(routine.pose.atDesk, false, 'no jump back to the desk');
+  assert.deepEqual([routine.pose.x, routine.pose.z, routine.pose.state], [rested.x, rested.z, rested.state], 'the companion keeps its seat, pose and doze');
+  // Moving the seat itself still sends the companion back to settle again.
+  const seatMoved = structuredClone(moved); seatMoved.items.find(item => item.id === seatId).x += 0.5;
+  routine.setLayout(seatMoved);
+  assert.notDeepEqual([routine.pose.x, routine.pose.z], [rested.x, rested.z]);
 });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSession, remainingAt, startSession, pauseSession, formatTime } from './session.js';
+import { createSession, remainingAt, startSession, pauseSession, formatTime, sessionPhase, displayedRemaining, BREAK_AFTER_FINISH } from './session.js';
 import { createStateStore, freshState, localDate, restoreState, storageKey } from './state.js';
 import { createLayout } from './layout.js';
 
@@ -117,11 +117,14 @@ test('restore rejects malformed session values and invalid JSON safely', () => {
   const valid = startSession(createSession(), 1000);
   for (const invalid of [
     { ...valid, duration: '1500000' }, { ...valid, remaining: -1 },
-    { ...valid, remaining: valid.duration + 1 }, { ...valid, running: 'yes' },
+    { ...valid, running: 'yes' },
     { ...valid, endsAt: null }, { ...valid, endsAt: 1e20 },
   ]) {
     assert.deepEqual(restoreState(JSON.stringify({ session: invalid })).session, createSession());
   }
+  // A clock moved backwards can leave more time than the duration: cap it and keep the session.
+  const ahead = { duration: 1_500_000, remaining: 1_560_000, endsAt: null, running: false };
+  assert.deepEqual(restoreState(JSON.stringify({ session: ahead })).session, { ...ahead, remaining: 1_500_000 });
   assert.deepEqual(restoreState('{broken json'), freshState());
 });
 
@@ -144,11 +147,11 @@ test('existing focus saves gain a furnished room without losing their session', 
 });
 
 test('restoring furniture drops invalid pieces while preserving the active study desk', () => {
-  const layout = createLayout('creative-corner');
+  const layout = createLayout('writers-loft');
   const deskId = layout.activeDeskId;
   layout.items.push(null, { id: 'unknown', type: 'not-in-the-collection', x: 0, z: 0, rotation: 0 }, { id: 'outside', type: 'plant', x: 100, z: 100, rotation: 0 });
   const restored = restoreState(JSON.stringify({ layout }));
-  assert.deepEqual(restored.layout, createLayout('creative-corner'));
+  assert.deepEqual(restored.layout, createLayout('writers-loft'));
   assert.equal(restored.layout.activeDeskId, deskId);
 });
 
@@ -157,11 +160,13 @@ test('furniture edits from a stale tab preserve the current timer and persist th
   const first = createStateStore(storage, () => 1000);
   const second = createStateStore(storage, () => 1000);
   first.setRunning(true);
-  second.update(draft => { draft.layout = createLayout('quiet-library'); });
+  second.update(draft => { draft.layout = createLayout('moonlit-greenhouse'); });
   const restored = first.refresh();
   assert.equal(restored.session.running, true);
-  assert.deepEqual(restored.layout, createLayout('quiet-library'));
-  assert.deepEqual(createStateStore(storage).state.layout, createLayout('quiet-library'));
+  // A real, non-default preset, so a lost layout write cannot pass unnoticed.
+  assert.notDeepEqual(createLayout('moonlit-greenhouse'), createLayout());
+  assert.deepEqual(restored.layout, createLayout('moonlit-greenhouse'));
+  assert.deepEqual(createStateStore(storage).state.layout, createLayout('moonlit-greenhouse'));
 });
 
 test('room visits preserve independent decorations, active desk and an ongoing focus session', () => {
@@ -195,4 +200,26 @@ test('old saves keep their current room and saved rooms are bounded and sanitize
   const storage = memoryStorage(), first = createStateStore(storage), second = createStateStore(storage);
   first.useRoom('cloud-loft'); second.useRoom('midnight-metro');
   assert.equal(second.state.rooms['cloud-loft'].presetId, 'cloud-loft', 'a stale tab keeps newly saved rooms');
+});
+
+test('a finished session is a short break, then reads as a fresh timer', () => {
+  let now = 1_000;
+  const storage = memoryStorage(), store = createStateStore(storage, () => now);
+  store.setRunning(true); now += 1_500_000;
+  const result = store.update();
+  assert.equal(result.completed, true);
+  assert.equal(result.state.session.completedAt, 1_501_000, 'completion records when the session ended');
+  assert.equal(createStateStore(storage, () => now).state.session.completedAt, 1_501_000, 'the finish time survives a reload');
+  const finished = result.state.session;
+  assert.equal(sessionPhase(finished, now + 60_000), 'break');
+  assert.equal(displayedRemaining(finished, now + 60_000), 0);
+  assert.equal(sessionPhase(finished, now + BREAK_AFTER_FINISH), 'idle', 'the break ends instead of lasting for days');
+  assert.equal(displayedRemaining(finished, now + BREAK_AFTER_FINISH), finished.duration, 'the timer reads as a fresh session');
+  assert.equal(sessionPhase(pauseSession(startSession(createSession(), 0), 60_000), 60_000), 'break', 'a paused session is still a break');
+});
+
+test('a clock moved backwards never shows more than the session duration', () => {
+  const running = startSession(createSession(25), 5_000_000);
+  assert.equal(remainingAt(running, 5_000_000 - 600_000), 1_500_000);
+  assert.equal(pauseSession(running, 5_000_000 - 600_000).remaining, 1_500_000);
 });

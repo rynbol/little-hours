@@ -31,13 +31,16 @@ export function restoreState(raw) {
   if (initial.layout.presetId) initial.rooms[initial.layout.presetId] = structuredClone(initial.layout);
   const session = saved.session;
   if (session && Number.isFinite(session.duration) && durations.includes(session.duration / 60_000)
-    && Number.isFinite(session.remaining) && session.remaining >= 0 && session.remaining <= session.duration
+    && Number.isFinite(session.remaining) && session.remaining >= 0
     && typeof session.running === 'boolean'
     && (!session.running || (Number.isSafeInteger(session.endsAt) && session.endsAt >= 0 && session.endsAt <= 8.64e15))) {
+    // A clock moved backwards can leave more time than the duration; keep the
+    // session and cap it rather than discarding the user's progress.
     initial.session = {
-      duration: session.duration, remaining: session.remaining, running: session.running,
+      duration: session.duration, remaining: Math.min(session.remaining, session.duration), running: session.running,
       endsAt: session.running ? session.endsAt : null,
     };
+    if (!session.running && session.remaining === 0 && Number.isSafeInteger(session.completedAt) && session.completedAt >= 0) initial.session.completedAt = session.completedAt;
   }
   if (Array.isArray(saved.history)) {
     initial.history = saved.history.filter(entry => entry && typeof entry === 'object'
@@ -51,7 +54,7 @@ function completeDueSession(state, now) {
   if (!state.session.running || remainingAt(state.session, now) > 0) return false;
   // A browser reopened tomorrow still credits the day this session ended.
   const { endsAt, duration } = state.session;
-  state.session = { ...state.session, remaining: 0, running: false, endsAt: null };
+  state.session = { ...state.session, remaining: 0, running: false, endsAt: null, completedAt: endsAt };
   state.history.push({ date: localDate(endsAt), minutes: duration / 60_000 });
   state.history = state.history.slice(-365);
   return true;

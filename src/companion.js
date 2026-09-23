@@ -1,13 +1,14 @@
 import { getFurniture } from './catalog.js';
 import { ROOM_BOUNDS, CAT_BOUNDS } from './layout.js';
+import { sessionPhase } from './session.js';
 
 export const COMPANION_RADIUS = 0.24;
 export const DOZE_AFTER = 30;
 const STEP = 0.2;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const ease = t => t * t * (3 - 2 * t);
-export function companionIntent(session) {
-  return session.running ? 'working' : session.remaining < session.duration ? 'break' : 'idle';
+export function companionIntent(session, now = Date.now()) {
+  return { focusing: 'working', break: 'break', idle: 'idle' }[sessionPhase(session, now)];
 }
 export function localPoint(item, x, z) {
   const angle = item.rotation * Math.PI / 2, c = Math.cos(angle), s = Math.sin(angle);
@@ -160,7 +161,16 @@ export function createCompanionRoutine(onChange = () => {}) {
   }
   return {
     pose,
-    setLayout(next) { layout = next; deskPose(); reconcile(); },
+    setLayout(next) {
+      layout = next;
+      // A resting companion stays put when its seat is unchanged and still
+      // clear, e.g. when another tab moves an unrelated plant.
+      if (!trip && !pose.atDesk && anchor && !editing) {
+        const seat = seatsFor(next.items.find(item => item.id === anchor.itemId)).find(candidate => distance(candidate.seat, anchor.seat) < 1e-6);
+        if (seat && usableSeat(next, seat)) { anchor = seat; reconcile(); return; }
+      }
+      deskPose(); reconcile();
+    },
     setIntent(next) { if (!['idle', 'working', 'break'].includes(next) || next === intent) return; intent = next; reconcile(); },
     setEditing(value) { if (editing === value) return; editing = value; if (editing) deskPose(); else reconcile(); },
     update(dt, reducedMotion) {
