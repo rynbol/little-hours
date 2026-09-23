@@ -257,6 +257,7 @@ function bookcase(parent) {
   box(parent, [1.68, 0.025, 0.025], [0, 3.385, 0.305], '#c6a16b', 0.007);
   for (let level = 0; level < 4; level++) {
     for (let i = 0; i < (level === 1 ? 4 : 7); i++) {
+      if (level === 2 && i === 2) continue; // The tipping book, built by tippingBook().
       const h = 0.34 + ((i * 7 + level * 3) % 5) * 0.041;
       const x = -0.71 + i * 0.16, bottom = [0.13, 0.87, 1.63, 2.41][level];
       box(parent, [0.13, h, 0.31], [x, bottom + h / 2, 0.07], bookColors[(i + level) % bookColors.length], 0.006);
@@ -268,6 +269,11 @@ function bookcase(parent) {
   box(parent, [0.43, 0.23, 0.39], [0.60, 0.245, 0.05], '#b8a17d', 0.024);
   for (let i = 0; i < 4; i++) box(parent, [0.42, 0.012, 0.005], [0.60, 0.17 + i * 0.046, 0.25], '#d4bd94', 0.002);
   book(parent, 0.4, 0.05, 0.28, 0.53, 1.66, 0.06, bookColors[2]);
+}
+// The third-shelf book, hinged at its bottom front edge so it can tip out.
+function tippingBook(parent) {
+  box(parent, [0.13, 0.34, 0.31], [0, 0.17, -0.155], bookColors[4], 0.006);
+  box(parent, [0.088, 0.013, 0.006], [0, 0.2652, 0.003], C.paper, 0.002);
 }
 function loungeChair(parent) {
   box(parent, [1.54, 0.32, 1.40], [0, 0.36, -0.03], C.sage, 0.14);
@@ -546,11 +552,14 @@ function createSwayingCanopy(parent, type) {
       resting = true; return;
     }
     resting = false;
+    // A tap rustles the leaves: `rustle` fades from 1 to 0 over a second.
+    const rustle = parent.metadata.rustle || 0;
     for (const { start, end, anchorY, height, phase } of template.metadata.ranges) {
       const wind = Math.sin(seconds * 0.82 + phaseOffset + phase * 0.3);
       const flutter = Math.sin(seconds * 1.63 + phaseOffset + phase);
-      const swayX = (wind * 0.82 + flutter * 0.18) * amplitude;
-      const swayZ = Math.sin(seconds * 0.67 + phaseOffset + phase * 0.4) * amplitude * 0.45;
+      const shiver = Math.sin(seconds * 19 + phase * 2.3) * rustle;
+      const swayX = (wind * 0.82 + flutter * 0.18 + shiver * 1.1) * amplitude;
+      const swayZ = (Math.sin(seconds * 0.67 + phaseOffset + phase * 0.4) * 0.45 + shiver * 0.6) * amplitude;
       for (let vertex = start; vertex < end; vertex++) {
         const index = vertex * 3;
         // Only the leaf above its attachment moves. The pot, trunk, branches,
@@ -593,7 +602,7 @@ function createSpinningRecord(parent) {
   record.position.set(-0.33, 1.006, -0.01); record.metadata = { dynamic: true, effect: 'record-spin' };
   for (const part of record.getChildMeshes()) { part.metadata = { dynamic: true, effect: 'record-spin' }; part.isPickable = false; }
   // Rigid rotation lets every record keep sharing the same geometry and material.
-  return (seconds, focused, reducedMotion) => { record.rotation.y = reducedMotion ? 0 : seconds * 1.25 % (Math.PI * 2); };
+  return (seconds, focused, reducedMotion) => { if (!parent.metadata.off) record.rotation.y = reducedMotion ? 0 : seconds * 1.25 % (Math.PI * 2); };
 }
 
 function createDancingFire(parent) {
@@ -622,6 +631,7 @@ function createDancingFire(parent) {
   const positions = new Float32Array(neutral);
   let resting = true;
   return (seconds, focused, reducedMotion) => {
+    if (parent.metadata.off) return;
     if (reducedMotion) {
       if (!resting) { positions.set(neutral); fire.updateVerticesData('position', positions, false, false); }
       resting = true; return;
@@ -661,7 +671,7 @@ function createTeaSteam(parent, origin, scale = 1) {
       if (point < segments) indices.push(first, first + 2, first + 1, first + 1, first + 2, first + 3);
     }
   }
-  function pose(seconds) {
+  function pose(seconds, puff = 0) {
     for (let ribbon = 0; ribbon < ribbons; ribbon++) {
       for (let point = 0; point <= segments; point++) {
         const height = point / segments, phase = seconds * 1.25 + ribbon * 2.7;
@@ -669,11 +679,11 @@ function createTeaSteam(parent, origin, scale = 1) {
         const centerX = (ribbon ? 0.023 : -0.023) + curl + Math.sin(phase * 0.6) * height * 0.028;
         const centerZ = Math.cos(height * 6.5 - phase) * height * 0.028;
         const width = (0.009 + Math.sin(height * Math.PI) * 0.010) * scale;
-        const opacity = Math.sin(height * Math.PI) ** 1.3 * (0.23 + 0.11 * Math.sin(height * 6.2 - phase));
+        const opacity = Math.min(1, Math.sin(height * Math.PI) ** 1.3 * (0.23 + 0.11 * Math.sin(height * 6.2 - phase)) * (1 + puff * 0.9));
         for (let side = 0; side < 2; side++) {
           const vertex = (ribbon * (segments + 1) + point) * 2 + side, sign = side ? 1 : -1;
-          positions[vertex * 3] = origin[0] + centerX * scale + sign * width;
-          positions[vertex * 3 + 1] = origin[1] + height * 0.57 * scale;
+          positions[vertex * 3] = origin[0] + centerX * scale + sign * width * (1 + puff * 0.5);
+          positions[vertex * 3 + 1] = origin[1] + height * 0.57 * scale * (1 + puff * 0.7);
           positions[vertex * 3 + 2] = origin[2] + centerZ * scale - sign * width;
           colors[vertex * 4] = 0.91; colors[vertex * 4 + 1] = 0.88; colors[vertex * 4 + 2] = 0.80; colors[vertex * 4 + 3] = opacity;
         }
@@ -686,13 +696,13 @@ function createTeaSteam(parent, origin, scale = 1) {
   const data = new VertexData(); Object.assign(data, { positions, normals, colors, indices }); data.applyToMesh(steam, true);
   steam.material = cache.batches.get('tea-steam'); steam.useVertexColors = true; steam.hasVertexAlpha = true;
   steam.isPickable = false; steam.receiveShadows = false; steam.metadata = { dynamic: true, effect: 'tea-steam' };
-  steam.setBoundingInfo(new BoundingInfo(new Vector3(origin[0] - 0.15 * scale, origin[1], origin[2] - 0.12 * scale), new Vector3(origin[0] + 0.15 * scale, origin[1] + 0.58 * scale, origin[2] + 0.12 * scale)));
+  steam.setBoundingInfo(new BoundingInfo(new Vector3(origin[0] - 0.15 * scale, origin[1], origin[2] - 0.12 * scale), new Vector3(origin[0] + 0.15 * scale, origin[1] + 0.99 * scale, origin[2] + 0.12 * scale)));
   let resting = true;
   return (seconds, focused, reducedMotion) => {
     if (reducedMotion) {
       if (resting) return;
       positions.set(neutralPositions); colors.set(neutralColors); resting = true;
-    } else { pose(seconds); resting = false; }
+    } else { pose(seconds, parent.metadata.puff || 0); resting = false; }
     steam.updateVerticesData('position', positions, false, false);
     steam.updateVerticesData('color', colors, false, false);
   };
@@ -753,6 +763,7 @@ function createHearthEmbers(parent) {
   embers.setBoundingInfo(new BoundingInfo(new Vector3(-0.54, 0.68, 0.1), new Vector3(0.54, 3.85, 0.565)));
   let resting = true;
   return (seconds, focused, reducedMotion) => {
+    if (parent.metadata.off) { embers.setEnabled(false); return; }
     if (reducedMotion) {
       embers.setEnabled(false);
       if (resting) return;
@@ -1131,6 +1142,15 @@ export function createFurniture(type, scene) {
     animations.push(createTeaSteam(result, writing ? [0.72, 1.445, -0.06] : [0.83, 1.465, -0.13], writing ? 0.9 : 1));
   }
   if (type === 'side-table') animations.push(createTeaSteam(result, [0.18, 0.846, 0.07], 0.72));
+  if (type === 'bookcase') {
+    if (!templates.has('tipping-book')) {
+      const source = new TransformNode('book-source', scene); tippingBook(source);
+      const template = batch(source); template.setEnabled(false); templates.set('tipping-book', template);
+    }
+    const hinge = group(result, [-0.39, 1.63, 0.225]); hinge.name = 'book-hinge';
+    templates.get('tipping-book').clone('tipping-book', hinge).setEnabled(true);
+    result.metadata.book = hinge;
+  }
   if (type === 'fireplace') { animations.push(createDancingFire(result)); animations.push(createHearthEmbers(result)); }
   if (type === 'plant' || type === 'moon-tree') animations.push(createSwayingCanopy(result, type));
   if (type === 'low-cabinet') animations.push(createSpinningRecord(result));

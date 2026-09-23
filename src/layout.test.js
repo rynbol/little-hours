@@ -505,3 +505,14 @@ test('rugs overlap by their woven outline: rectangles, and a circle for the roun
   const ember = createLayout('ember-library').items;
   assert.equal(rugsOverlap(ember.find(item => item.id === 'ember-moon-rug'), ember.find(item => item.id === 'ember-cat-rug')), true);
 });
+
+test('switched-off lamps, fires and record players stay off after a reload; other pieces never save it', () => {
+  const layout = createLayout('ember-library');
+  layout.items.find(item => item.id === 'ember-lamp').off = true;
+  layout.items.find(item => item.id === 'ember-plant').off = true;
+  const restored = normalizeLayout(JSON.parse(JSON.stringify(layout)));
+  assert.equal(restored.items.find(item => item.id === 'ember-lamp').off, true);
+  assert.equal('off' in restored.items.find(item => item.id === 'ember-plant'), false);
+  assert.equal('off' in restored.items.find(item => item.id === 'ember-hearth'), false);
+  for (const definition of FURNITURE) if (definition.use) assert.ok(['lamp', 'candles', 'fire', 'record'].includes(definition.use.toggle) || ['rustle', 'book', 'squish', 'steam'].includes(definition.use.react), definition.id);
+});

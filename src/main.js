@@ -72,7 +72,7 @@ document.querySelector('#app').innerHTML = `
           <div class="stage-presence" id="stage-presence" data-presence="idle" role="status" aria-live="polite" aria-atomic="true" aria-label="Your local focus status: In your room" title="Your focus status in this browser."><span id="presence-icon" aria-hidden="true">${icon('home')}</span><span id="room-status">In your room</span></div>
           <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
           <div class="mini-caption" id="mini-caption" hidden>Mini view preview · inside this page</div>
-          <div class="room-hint" id="room-hint">Drag to look around<span>·</span>Try petting the cat</div>
+          <div class="room-hint" id="room-hint">Drag to look around<span>·</span>Tap a lamp, the fire or the cat</div>
           <div class="pet-bubble" id="pet-bubble" hidden>Miso is happy you’re here.</div>
         </div>
         <div class="room-bottom">
@@ -193,10 +193,12 @@ try {
       $('#companion-status-text').textContent = `Companion · ${labels[activity] || 'In the room'}`;
       renderCompanionNote();
     },
-    onLayoutChange(layout) {
+    // A switched lamp or fire saves with the room, but it is not an Undo step.
+    onLayoutChange(layout, { remember = true } = {}) {
       roomLayoutSignature = JSON.stringify(layout);
-      commitLayout(layout);
+      commitLayout(layout, remember);
     },
+    onToggleLights() { acceptUpdate(store.update(draft => { draft.decor.lights = !draft.decor.lights; })); },
     onSelectionChange(item) { selectedItem = item; renderInspector(); },
     onPlacementState(next) { placement = next; renderInspector(); updateCatalogSelection(); },
     isCollectionDrop(x, y) {
@@ -325,7 +327,7 @@ function setEditMode(enabled) {
   $('#decorate-button span').textContent = enabled ? 'Done decorating' : 'Decorate';
   $('#room-canvas').setAttribute('aria-label', enabled
     ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
-    : 'Interactive 3D cutaway study room. Drag to turn the room, or click the ginger cat.');
+    : 'Interactive 3D cutaway study room. Drag to turn the room. Tap a lamp, the fire or the record player to switch it, or tap the ginger cat.');
   currentPanel = null;
   renderPanel();
   room?.setEditMode?.(enabled);
@@ -505,7 +507,7 @@ function renderInspector() {
   const selected = selectedItem && getFurniture(selectedItem.type);
   const pending = placement && getFurniture(placement.type);
   if (!editMode) {
-    $('#room-hint').innerHTML = 'Drag to look around<span>·</span>Try petting the cat';
+    $('#room-hint').innerHTML = 'Drag to look around<span>·</span>Tap a lamp, the fire or the cat';
     return;
   }
   const rememberedFocus = rememberControlFocus(inspector);
