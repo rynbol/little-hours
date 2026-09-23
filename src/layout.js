@@ -7,8 +7,9 @@ export const ROOM_BOUNDS = Object.freeze({ minX: -5.5, maxX: 5.5, minZ: -4.2, ma
 export const MAX_ITEMS = 32;
 const GRID = 0.25;
 const EPSILON = 1e-7;
-// The resident cat has a little permanent spot. A rug can sit underneath it.
-export const CAT_BOUNDS = Object.freeze({ minX: 0.15, maxX: 1.5, minZ: 1.1, maxZ: 2.15 });
+// The pet sleeps in its own movable bed. Rooms saved before the bed existed
+// kept this spot clear for the cat, so the bed moves in there.
+export const PET_HOME = Object.freeze({ x: 0.75, z: 1.5 });
 const item = (id, type, x, z, rotation = 0) => ({ id, type, x, z, rotation });
 const wallItem = (id, type, wall, u, v, art) => ({ id, type, wall, u, v, ...(art ? { art } : {}) });
 // Layouts saved before wall pieces existed gain their design's wall pieces once.
@@ -128,6 +129,10 @@ export function roomDesign(layout) { return PRESETS.find(preset => preset.id ===
 const styleOf = presetId => PRESETS.find(preset => preset.id === presetId)?.style || 'retreat';
 
 const isDesk = candidate => getFurniture(candidate?.type)?.category === 'Study';
+const isPetBed = candidate => candidate?.type === 'pet-bed';
+// The pet bed does not use up the room's piece budget.
+export function pieceCount(items) { return items.filter(entry => !getFurniture(entry?.type)?.unique).length; }
+export function petBed(layout) { return layout?.items?.find(isPetBed) || null; }
 const snap = value => Math.round(value / GRID) * GRID;
 export function footprintBounds(candidate) { return bounds(candidate); }
 function bounds(candidate) {
@@ -158,7 +163,7 @@ export function validatePlacement(items, candidate, style = 'retreat') {
   if (!definition) return { valid: false, reason: 'Choose a furniture item from the shop.' };
   if (definition.mount === 'wall') {
     const others = (Array.isArray(items) ? items : []).filter(existing => !candidate.id || existing.id !== candidate.id);
-    if (others.length >= MAX_ITEMS) return { valid: false, reason: `This room has space for ${MAX_ITEMS} items. Remove one to make room.` };
+    if (pieceCount(others) >= MAX_ITEMS) return { valid: false, reason: `This room has space for ${MAX_ITEMS} items. Remove one to make room.` };
     const reason = wallPlacementReason(others, candidate, style);
     return { valid: !reason, reason };
   }
@@ -166,12 +171,11 @@ export function validatePlacement(items, candidate, style = 'retreat') {
   if (!Number.isInteger(candidate.rotation) || candidate.rotation < 0 || candidate.rotation > 3) return { valid: false, reason: 'Turn furniture in quarter turns.' };
   if (Math.abs(snap(candidate.x) - candidate.x) > EPSILON || Math.abs(snap(candidate.z) - candidate.z) > EPSILON) return { valid: false, reason: 'Place furniture on the room grid.' };
   const otherItems = (Array.isArray(items) ? items : []).filter(existing => !candidate.id || existing.id !== candidate.id);
-  if (otherItems.length >= MAX_ITEMS) return { valid: false, reason: `This room has space for ${MAX_ITEMS} items. Remove one to make room.` };
+  if (!definition.unique && pieceCount(otherItems) >= MAX_ITEMS) return { valid: false, reason: `This room has space for ${MAX_ITEMS} items. Remove one to make room.` };
   const area = bounds(candidate);
   if (area.minX < ROOM_BOUNDS.minX - EPSILON || area.maxX > ROOM_BOUNDS.maxX + EPSILON || area.minZ < ROOM_BOUNDS.minZ - EPSILON || area.maxZ > ROOM_BOUNDS.maxZ + EPSILON) {
     return { valid: false, reason: 'Keep the whole piece inside the room.' };
   }
-  if (definition.blocking && overlaps(area, CAT_BOUNDS)) return { valid: false, reason: 'Leave a little room for the sleeping cat.' };
   if (definition.blocking) {
     const collision = otherItems.find(existing => getFurniture(existing.type)?.blocking && overlaps(area, bounds(existing)));
     if (collision) return { valid: false, reason: `That spot overlaps the ${getFurniture(collision.type).name.toLowerCase()}.` };
@@ -185,7 +189,7 @@ export function validatePlacement(items, candidate, style = 'retreat') {
 export function nearestValidPlacement(items, candidate, reach = 1, style = 'retreat') {
   if (isWallPiece(candidate)) {
     const others = items.filter(existing => !candidate.id || existing.id !== candidate.id);
-    return others.length >= MAX_ITEMS ? null : nearestWallSpot(others, candidate, style);
+    return pieceCount(others) >= MAX_ITEMS ? null : nearestWallSpot(others, candidate, style);
   }
   if (!getFurniture(candidate?.type) || !Number.isFinite(candidate.x) || !Number.isFinite(candidate.z)) return null;
   const x = snap(candidate.x), z = snap(candidate.z), steps = Math.floor(reach / GRID + EPSILON), spots = [];
@@ -201,11 +205,23 @@ export function nearestValidPlacement(items, candidate, reach = 1, style = 'retr
 export function createLayout(presetId = PRESETS[0].id) {
   const preset = PRESETS.find(entry => entry.id === presetId) || PRESETS[0];
   const items = preset.items.map(entry => ({ ...entry }));
+  addPetBed(items, styleOf(preset.id));
   return { presetId: preset.id, items, activeDeskId: items.find(isDesk)?.id ?? null, v: LAYOUT_VERSION };
 }
 
+// Every room has exactly one pet bed. A room without one gets it at the
+// pet's old spot, or at the first free spot when that is taken. It goes
+// after the floor pieces and before the wall pieces, the order a restore keeps.
+function addPetBed(items, style) {
+  if (items.some(isPetBed)) return;
+  const bed = { id: 'pet-bed', type: 'pet-bed', x: PET_HOME.x, z: PET_HOME.z, rotation: 0 };
+  if (!validatePlacement(items, bed, style).valid) Object.assign(bed, findFreePosition(items, 'pet-bed', 0, style) || {});
+  const wall = items.findIndex(isWallPiece);
+  if (validatePlacement(items, bed, style).valid) items.splice(wall < 0 ? items.length : wall, 0, bed);
+}
+
 export function findFreePosition(items, type, rotation = 0, style = 'retreat') {
-  if (getFurniture(type)?.mount === 'wall') return items.length >= MAX_ITEMS ? null : findFreeWallSpot(items, type, style);
+  if (getFurniture(type)?.mount === 'wall') return pieceCount(items) >= MAX_ITEMS ? null : findFreeWallSpot(items, type, style);
   if (!getFurniture(type) || !Number.isInteger(rotation) || rotation < 0 || rotation > 3) return null;
   // Search center-out in horizontal rows, beginning at the back of the room.
   const minX = Math.ceil(ROOM_BOUNDS.minX / GRID), maxX = Math.floor(ROOM_BOUNDS.maxX / GRID);
@@ -224,7 +240,7 @@ export function normalizeLayout(raw) {
   // Bound even malformed persisted input before doing collision checks.
   const saves = raw.items.slice(0, 100);
   for (const [index, saved] of saves.entries()) {
-    if (items.length >= MAX_ITEMS) break;
+    if (pieceCount(items) >= MAX_ITEMS && !getFurniture(saved?.type)?.unique) continue;
     if (!saved || typeof saved !== 'object' || !getFurniture(saved.type) || isWallPiece(saved) || !Number.isFinite(saved.x) || !Number.isFinite(saved.z)) continue;
     let id = typeof saved.id === 'string' && saved.id.length > 0 && saved.id.length <= 80 ? saved.id : `restored-${index}`;
     if (ids.has(id)) id = `restored-${index}`;
@@ -236,6 +252,7 @@ export function normalizeLayout(raw) {
     // A lamp, fire or record player that was switched off stays off, a piece
     // keeps the color chosen for it, and the easel its picture.
     if (saved.off === true && getFurniture(saved.type).use?.toggle) candidate.off = true;
+    if (isPetBed(candidate) && items.some(isPetBed)) continue;
     const arts = getFurniture(saved.type).arts; if (arts) candidate.art = arts.includes(saved.art) ? saved.art : arts[0];
     if (tintPaint(saved.type, saved.tint)) candidate.tint = saved.tint;
     if (validatePlacement(items, candidate, style).valid) { items.push(candidate); ids.add(id); }
@@ -245,7 +262,7 @@ export function normalizeLayout(raw) {
   // free spot, or is left out.
   const legacy = raw.v !== LAYOUT_VERSION && presetId ? PRESETS.find(preset => preset.id === presetId).items.filter(isWallPiece) : [];
   for (const [index, saved] of [...saves.map((entry, index) => [index, entry]), ...legacy.map(entry => [`design-${entry.id}`, entry])]) {
-    if (items.length >= MAX_ITEMS) break;
+    if (pieceCount(items) >= MAX_ITEMS) break;
     if (!saved || typeof saved !== 'object' || !isWallPiece(saved) || !['back', 'side'].includes(saved.wall) || !Number.isFinite(saved.u) || !Number.isFinite(saved.v)) continue;
     let id = typeof saved.id === 'string' && saved.id.length > 0 && saved.id.length <= 80 ? saved.id : `restored-${index}`;
     if (ids.has(id)) { if (typeof index === 'string') continue; id = `restored-${index}`; }
@@ -261,6 +278,7 @@ export function normalizeLayout(raw) {
   // A usable study station is the room's anchor. Recover a complete arrangement
   // when a malformed or older save has lost its last desk.
   if (!activeDeskId) return createLayout(presetId);
+  addPetBed(items, style);
   const layout = { presetId, items, activeDeskId, v: LAYOUT_VERSION };
   // A room keeps its wall and floor choices when its design offers them.
   for (const kind of ['walls', 'floor']) if (surfacePaint(style, kind, raw[kind])) layout[kind] = raw[kind];

@@ -5,7 +5,7 @@ export const storageKey = 'little-hours-v1';
 const durations = [25, 50, 90];
 
 export function freshState() {
-  return { theme: 'dusk', task: '', decor: { plants: true, lights: true, rug: true }, layout: createLayout(), rooms: {}, session: createSession(), history: [] };
+  return { theme: 'dusk', pet: 'cat', seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout: createLayout(), rooms: {}, session: createSession(), history: [] };
 }
 
 export function localDate(timestamp = Date.now()) {
@@ -20,6 +20,8 @@ export function restoreState(raw) {
   if (!saved || typeof saved !== 'object') return initial;
   if (['dusk', 'rain', 'day'].includes(saved.theme)) initial.theme = saved.theme;
   if (typeof saved.task === 'string') initial.task = saved.task.slice(0, 180);
+  if (['cat', 'dog'].includes(saved.pet)) initial.pet = saved.pet;
+  if (Number.isSafeInteger(saved.seenAt) && saved.seenAt > 0) initial.seenAt = saved.seenAt;
   for (const key of Object.keys(initial.decor)) {
     if (typeof saved.decor?.[key] === 'boolean') initial.decor[key] = saved.decor[key];
   }

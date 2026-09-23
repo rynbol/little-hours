@@ -27,6 +27,8 @@ export const FURNITURE = [
   { id: 'fish-tank', name: 'Little aquarium', category: 'Curios', description: 'Three bright fish, sea grass and a stone arch in a tank on an oak stand. Tap it to switch the lid lamp.', footprint: [1.7, 0.8], height: 1.58, use: { toggle: 'lamp' }, color: '#8fc3bf', blocking: true },
   { id: 'globe', name: 'Brass floor globe', category: 'Curios', description: 'A little painted world in a brass meridian, on a turned oak stand. Tap it to spin it.', footprint: [0.8, 0.8], height: 1.465, use: { react: 'spin' }, color: '#6f96ae', blocking: true },
   { id: 'easel', name: "Painter's easel", category: 'Curios', description: 'An oak easel with a canvas, a ledge and a jar of brushes. Pick the picture.', footprint: [1, 1], height: 2.1, arts: FRAME_ARTS, color: '#f1e6cf', blocking: true },
+  // The pet's own bed: one per room, always kept, never counted as a piece.
+  { id: 'pet-bed', name: 'Cozy pet bed', category: 'Pets', description: 'A soft, low cushion bed where your pet naps and comes home to.', footprint: [1.2, 0.8], height: 0.18, color: '#dfd1b2', blocking: true, unique: true },
   { id: 'moon-rug', name: 'Midnight constellation rug', category: 'Rugs', description: 'A round indigo rug with a woven moon, tiny stars and a warm tasseled border.', footprint: [3.6, 3.6], height: 0.08, color: '#676779', blocking: false },
   // Wall pieces hang on the back or side wall: `size` is their width and height
   // on the wall, `depth` how far they stand out, `arts` the pictures to choose.

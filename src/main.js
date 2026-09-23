@@ -3,8 +3,10 @@ import { createRoom } from './room.js';
 import { createSession, remainingAt, formatTime, sessionPhase, displayedRemaining } from './session.js';
 import { createStateStore, localDate, storageKey } from './state.js';
 import { FURNITURE, getFurniture } from './catalog.js';
-import { PRESETS, normalizeLayout, MAX_ITEMS, roomDesign } from './layout.js';
+import { PRESETS, normalizeLayout, MAX_ITEMS, pieceCount, roomDesign } from './layout.js';
 import { companionIntent } from './companion.js';
+import { PETS } from './pet.js';
+import { createSpeech, PET_LINES, AVATAR_LINES } from './speech.js';
 import { ARTWORKS, SLEEVES, artName } from './art.js';
 import { tintsFor } from './tints.js';
 import { surfaceChoices } from './surfaces.js';
@@ -43,7 +45,9 @@ let audioContext, noiseNode, gainNode;
 let soundEnabled = false;
 let storageWarningShown = false;
 let toastTimeout;
-let petTimeout;
+let speech = null;
+let lastAvatarLine = 0;
+let hiddenSince = 0;
 let editMode = false;
 let collectionTab = 'collection';
 let category = 'All';
@@ -71,20 +75,19 @@ document.querySelector('#app').innerHTML = `
       <section class="room-section" aria-labelledby="room-title">
         <div class="room-heading"><div><p class="eyebrow">YOUR QUIET LITTLE WORLD</p><h1 id="room-title">The twilight retreat</h1><p class="room-subtitle" id="room-subtitle">The fire is warm. The night is yours.</p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Choose a room" aria-controls="builder-panel">${icon('home')}<span>Rooms</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
         <div class="stage" id="stage">
-          <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a ginger cat. Drag to turn the room."></div>
+          <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a pet. Drag to turn the room."></div>
           <div class="loading-note" id="loading-note">Making room for you…</div>
           <div class="stage-presence" id="stage-presence" data-presence="idle" role="status" aria-live="polite" aria-atomic="true" aria-label="Your local focus status: In your room" title="Your focus status in this browser."><span id="presence-icon" aria-hidden="true">${icon('home')}</span><span id="room-status">In your room</span></div>
           <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
           <div class="mini-caption" id="mini-caption" hidden>Mini view preview · inside this page</div>
           <div class="room-hint" id="room-hint">Drag to look around<span>·</span>Tap a lamp, the fire or the cat</div>
-          <div class="pet-bubble" id="pet-bubble" hidden>Miso is happy you’re here.</div>
         </div>
         <div class="room-bottom">
-          <div class="room-company">${icon('cat')}<span>You & Miso</span></div>
+          <div class="room-company">${icon('cat')}<span id="pet-company">You & Miso</span></div>
           <nav class="room-tools" aria-label="Room controls">
             <button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Atmosphere</span></button>
             <button class="tool" data-panel="performance" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Performance</span></button>
-            <button class="tool" id="pet-button">${icon('cat')}<span>Miso</span></button>
+            <button class="tool" id="pet-button" data-panel="pet" aria-expanded="false" aria-controls="room-panel">${icon('cat')}<span id="pet-button-label">Miso</span></button>
             <button class="tool" id="mini-button" aria-pressed="false">${icon('mini')}<span>Mini view</span></button>
           </nav>
         </div>
@@ -147,6 +150,7 @@ function applyState(next, force = false) {
     $('#time-toggle').title = nextLabel;
   }
   if ($('#task').value !== state.task) $('#task').value = state.task;
+  if (force || previous.pet !== state.pet) { room?.setPet?.(state.pet); renderPetName(); renderInspector(); }
   for (const [key, visible] of Object.entries(state.decor)) {
     if (key === 'lights' && (force || previous.decor[key] !== visible)) room?.setDecor(key, visible);
   }
@@ -158,15 +162,23 @@ function applyState(next, force = false) {
     renderInspector();
     if (editMode && collectionTab === 'presets') renderCollection();
   }
-  $('#item-count').textContent = `${state.layout.items.length} / ${MAX_ITEMS} pieces`;
+  $('#item-count').textContent = `${pieceCount(state.layout.items)} / ${MAX_ITEMS} pieces`;
   syncCompanionIntent();
   document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', button.dataset.themeChoice === state.theme));
   document.querySelectorAll('[data-decor]').forEach(input => { input.checked = state.decor[input.dataset.decor]; });
 }
+// The companion speaks at the edges of focus and when tapped, never while
+// you focus, in Decorate or in the mini view, and not more than once every
+// twelve seconds on its own. An activity line may follow the pause line
+// sooner (`gap`), since it marks a new thing to see.
+function avatarSay(kind, { force = false, gap = 12_000 } = {}) {
+  if (!speech || editMode || compact || (!force && Date.now() - lastAvatarLine < gap)) return;
+  if (speech.say('avatar', Array.isArray(kind) ? kind : AVATAR_LINES[kind])) lastAvatarLine = Date.now();
+}
 function acceptUpdate(result) {
   applyState(result.state);
   if (result.completed) {
-    room?.pet();
+    room?.pet(); avatarSay('finish', { force: true });
     toast('A little progress, made. Stretch, breathe, and take a break.');
   }
   if (!result.persisted && !storageWarningShown) {
@@ -175,10 +187,23 @@ function acceptUpdate(result) {
   }
   renderSession();
 }
-function petFeedback() {
-  $('#pet-bubble').hidden = false;
-  clearTimeout(petTimeout);
-  petTimeout = setTimeout(() => { $('#pet-bubble').hidden = true; }, 2600);
+// A pet gets a cute line in a bubble just above its head.
+function petFeedback({ species = state.pet, state: mood, by = 'you' } = {}) {
+  const lines = PET_LINES[species] || PET_LINES.cat;
+  if (speech) speech.say('pet', by === 'companion' ? lines.friend : mood === 'sleeping' ? lines.sleepy : lines.pet);
+  else toast(`${PETS[species]?.name || 'Miso'} is happy you’re here.`);
+}
+// The room's accessible name says how to use it, with the current pet.
+function renderRoomLabel() {
+  const pet = state.pet === 'dog' ? 'Mochi the puppy' : 'Miso the ginger cat';
+  $('#room-canvas').setAttribute('aria-label', editMode
+    ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
+    : `Interactive 3D cutaway study room. Drag to turn the room. Tap a lamp, the fire or the record player to switch it, tap your companion, or tap ${pet}.`);
+}
+function renderPetName() {
+  const name = PETS[state.pet]?.name || PETS.cat.name; renderRoomLabel();
+  $('#pet-company').textContent = `You & ${name}`; $('#pet-button-label').textContent = name;
+  $('#pet-button').setAttribute('aria-label', `${name}: pet or choose your pet`);
 }
 // The decorator needs a ready room: both entry buttons wait for it.
 const setDecorEntry = enabled => { $('#decorate-button').disabled = !enabled; $('#rooms-button').disabled = !enabled; };
@@ -188,14 +213,29 @@ try {
     onReady() {
       $('#loading-note').hidden = true;
       setDecorEntry(true);
+      // Back after half an hour or more: a small hello.
+      if (state.seenAt && Date.now() - state.seenAt > 30 * 60_000) setTimeout(welcome, 1200);
     },
+    onCompanionTap({ state: activity, activity: doing }) {
+      const lines = (activity === 'busy' || (activity === 'resting' && doing === 'read')) ? AVATAR_LINES.activity[doing] : AVATAR_LINES.tap[activity];
+      if (speech && speech.say('avatar', lines || AVATAR_LINES.tap.idle)) lastAvatarLine = Date.now();
+    },
+    pet: state.pet,
     onPet: petFeedback,
-    onCompanionState({ state: activity }) {
+    onPetCarry({ species, held }) { if (held) speech?.say('pet', (PET_LINES[species] || PET_LINES.cat).carry); },
+    onFrame() { speech?.update(); },
+    onCompanionState({ state: activity, activity: doing }) {
       companionActivity = activity;
-      const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', 'resting-at-desk': 'Resting at the desk' };
+      const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', 'resting-at-desk': 'Resting at the desk', busy: 'Taking a little break' };
+      const pet = PETS[state.pet]?.name || PETS.cat.name;
+      const tasks = { warm: 'Warming up by the fire', window: 'Looking out of the window', water: 'Watering the plants', record: 'Putting on a record', pet: `Petting ${pet}`, lamp: 'Switching on a lamp', read: 'Reading in the armchair' };
+      const task = (activity === 'busy' || (activity === 'resting' && doing === 'read')) && tasks[doing];
       $('#companion-status').dataset.state = activity;
-      $('#companion-status-text').textContent = `Companion · ${labels[activity] || 'In the room'}`;
+      $('#companion-status-text').textContent = `Companion · ${task || labels[activity] || 'In the room'}`;
       renderCompanionNote();
+      if (activity === 'busy' && AVATAR_LINES.activity[doing]) avatarSay(AVATAR_LINES.activity[doing], { gap: 4000 });
+      else if (activity === 'resting') avatarSay(doing === 'read' ? AVATAR_LINES.activity.read : 'rest');
+      else if (activity === 'sleeping') avatarSay('doze');
     },
     // A switched lamp or fire saves with the room, but it is not an Undo step.
     onLayoutChange(layout, { remember = true } = {}) {
@@ -214,6 +254,9 @@ try {
     onNotice: toast,
     onStats(stats) { performanceStats = stats; renderPerformance(); },
   });
+  const speechLayer = document.createElement('div'); speechLayer.className = 'speech-layer';
+  $('#room-canvas').appendChild(speechLayer);
+  speech = createSpeech(speechLayer, { anchor: who => room?.anchor(who), reducedMotion: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
 } catch (error) {
   $('#loading-note').textContent = 'The room couldn’t load. Try reloading; your focus timer is still ready.';
   console.error('Could not create the room:', error);
@@ -230,7 +273,7 @@ function syncCompanionIntent() {
 }
 function renderCompanionNote() {
   const minutes = state.history.filter(h => h.date === localDate()).reduce((sum, h) => sum + h.minutes, 0);
-  const notes = { idle: 'Start focusing to work alongside your companion.', working: 'Your companion is working alongside you.', walking: 'A little stretch. Your companion is finding a cozy spot.', returning: 'Your companion is on the way back to the desk.', resting: 'A soft seat and a little breather. Take your time.', sleeping: 'Your companion has drifted off. Resume whenever you’re ready.', 'resting-at-desk': 'Your companion is taking a quiet break at the desk.' };
+  const notes = { idle: 'Start focusing to work alongside your companion.', working: 'Your companion is working alongside you.', walking: 'A little stretch. Your companion is finding a cozy spot.', returning: 'Your companion is on the way back to the desk.', resting: 'A soft seat and a little breather. Take your time.', sleeping: 'Your companion has drifted off. Resume whenever you’re ready.', 'resting-at-desk': 'Your companion is taking a quiet break at the desk.', busy: 'A little break. Your companion is tending to the room.' };
   $('#daily-note').textContent = minutes ? `${minutes} quiet minutes made today. Look at you go.` : notes[companionActivity];
 }
 function renderSession() {
@@ -273,8 +316,11 @@ function tick() {
   else renderSession();
 }
 $('#start-button').addEventListener('click', () => {
+  const resuming = !state.session.running && remainingAt(state.session) > 0 && remainingAt(state.session) < state.session.duration;
   // Preserve the action shown on the button if the deadline just passed.
   acceptUpdate(store.setRunning(!state.session.running));
+  if (state.session.running) avatarSay(resuming ? 'resume' : 'start', { force: true });
+  else if (remainingAt(state.session) > 0) avatarSay('pause', { force: true });
 });
 $('#reset-session').addEventListener('click', () => {
   acceptUpdate(store.update(draft => { draft.session = createSession(draft.session.duration / 60000); }));
@@ -303,7 +349,6 @@ $('#focus-toggle').addEventListener('click', () => {
 });
 $('#rooms-button').addEventListener('click', () => { collectionTab = 'presets'; setEditMode(true); });
 $('#decorate-button').addEventListener('click', () => setEditMode(!editMode));
-$('#pet-button').addEventListener('click', () => { if (room) room.pet(); else petFeedback(); });
 $('#mini-button').addEventListener('click', () => {
   if (editMode) setEditMode(false);
   compact = !compact;
@@ -329,9 +374,7 @@ function setEditMode(enabled) {
   $('#decorate-button').setAttribute('aria-pressed', enabled);
   $('#decorate-button').setAttribute('aria-label', enabled ? 'Done decorating' : 'Decorate');
   $('#decorate-button span').textContent = enabled ? 'Done decorating' : 'Decorate';
-  $('#room-canvas').setAttribute('aria-label', enabled
-    ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
-    : 'Interactive 3D cutaway study room. Drag to turn the room. Tap a lamp, the fire or the record player to switch it, or tap the ginger cat.');
+  renderRoomLabel();
   currentPanel = null;
   renderPanel();
   room?.setEditMode?.(enabled);
@@ -462,6 +505,14 @@ function artThumb(art, wide) {
   return artThumbs.get(key);
 }
 
+// Hand-drawn pet portraits for the pet panel.
+function petArt(species) {
+  const art = species === 'dog'
+    ? '<ellipse cx="50" cy="56" rx="30" ry="27" fill="#efddbd"/><path d="M22 38q-12 4-9 26 3 12 12 8 5-14 5-28z" fill="#a9683f"/><path d="M78 38q12 4 9 26-3 12-12 8-5-14-5-28z" fill="#a9683f"/><ellipse cx="50" cy="67" rx="15" ry="11" fill="#fcf6ea"/><ellipse cx="50" cy="61" rx="6" ry="4.5" fill="#352a26"/><path d="M44 71q3 3 6 0 3 3 6 0" fill="none" stroke="#6d4632" stroke-width="1.8" stroke-linecap="round"/><circle cx="38" cy="50" r="4.5" fill="#33241d"/><circle cx="62" cy="50" r="4.5" fill="#33241d"/><circle cx="36.6" cy="48.4" r="1.4" fill="#fffaf0"/><circle cx="60.6" cy="48.4" r="1.4" fill="#fffaf0"/><ellipse cx="30" cy="60" rx="4.5" ry="2.5" fill="#f3a698"/><ellipse cx="70" cy="60" rx="4.5" ry="2.5" fill="#f3a698"/><path d="M36 82q14 6 28 0" fill="none" stroke="#c8674f" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="86" r="3" fill="#e3bb5f"/>'
+    : '<path d="M24 44 28 16l17 16zM76 44 72 16 55 32z" fill="#d4904f"/><path d="M29 36 31 22l8 9zM71 36l-2-14-8 9z" fill="#eba99c"/><ellipse cx="50" cy="55" rx="30" ry="26" fill="#d4904f"/><path d="M43 32q7-4 14 0M45 38h10" fill="none" stroke="#b5703b" stroke-width="3" stroke-linecap="round"/><ellipse cx="44" cy="66" rx="9" ry="7" fill="#f5e6cb"/><ellipse cx="56" cy="66" rx="9" ry="7" fill="#f5e6cb"/><path d="M47 61h6l-3 3.5z" fill="#dc8a8a"/><path d="M44 69q3 3 6 0 3 3 6 0" fill="none" stroke="#7a4a36" stroke-width="1.8" stroke-linecap="round"/><circle cx="38" cy="52" r="4.5" fill="#3a2a22"/><circle cx="62" cy="52" r="4.5" fill="#3a2a22"/><circle cx="36.6" cy="50.4" r="1.4" fill="#fffaf0"/><circle cx="60.6" cy="50.4" r="1.4" fill="#fffaf0"/><ellipse cx="29" cy="62" rx="4.5" ry="2.5" fill="#f2a092"/><ellipse cx="71" cy="62" rx="4.5" ry="2.5" fill="#f2a092"/>';
+  return `<svg class="pet-art" viewBox="0 0 100 100" aria-hidden="true">${art}</svg>`;
+}
+
 function roomDesignArt(preset) {
   const style = preset.style || 'retreat';
   const [wall, side, floor, trim, sky, sofa] = ({ sakura: ['#ece1c9', '#f8ecd1', '#cbbb84', '#967650', '#eacbd0', '#a6b393'], cloud: ['#b8afd2', '#dec1d2', '#eeded7', '#f7e7db', '#becae3', '#b6a5cd'], metro: ['#424c65', '#956a6c', '#727b8c', '#293449', '#676080', '#8496ae'], retreat: ['#718572', '#c4b797', '#a77e57', '#674e3b', '#a1b6bd', '#876a79'] })[style];
@@ -497,12 +548,13 @@ function renderCollection() {
     restoreControlFocus(content, rememberedFocus);
     return;
   }
-  const categories = ['All', ...new Set(FURNITURE.map(item => item.category))];
-  const items = FURNITURE.filter(item => category === 'All' || item.category === category);
+  const collection = FURNITURE.filter(item => !item.unique);
+  const categories = ['All', ...new Set(collection.map(item => item.category))];
+  const items = collection.filter(item => category === 'All' || item.category === category);
   content.innerHTML = `<div class="category-list" aria-label="Furniture categories">${categories.map(name => `<button data-category="${name}" aria-pressed="${category === name}">${name}</button>`).join('')}</div><div class="furniture-grid">${items.map(item => `<button class="furniture-card" data-furniture="${item.id}" aria-pressed="${placement?.type === item.id}" aria-label="Place ${item.name}" title="${item.description}">${furnitureArt(item.id)}<span class="furniture-name">${item.name}</span><span class="furniture-detail">${item.category}<span class="furniture-add">${icon('plus')}</span></span></button>`).join('')}</div>`;
   content.querySelectorAll('[data-category]').forEach(button => button.addEventListener('click', () => { category = button.dataset.category; renderCollection(); }));
   content.querySelectorAll('[data-furniture]').forEach(button => button.addEventListener('click', () => {
-    if (state.layout.items.length >= MAX_ITEMS) { toast(`Your room has ${MAX_ITEMS} pieces. Remove one to make a little space.`); return; }
+    if (pieceCount(state.layout.items) >= MAX_ITEMS) { toast(`Your room has ${MAX_ITEMS} pieces. Remove one to make a little space.`); return; }
     room?.beginPlacement?.(button.dataset.furniture);
     revealRoomForPlacement();
   }));
@@ -533,8 +585,9 @@ function renderDragState(drag) {
   if (draggedItemId !== drag.id) {
     draggedItemId = drag.id;
     preview.innerHTML = furnitureArt(drag.type);
-    $('#return-label').textContent = drag.removable ? 'Return to your collection' : 'Every room needs a study spot';
-    $('#return-detail').textContent = drag.removable ? 'Release here to put this piece away · Undo brings it back' : 'Add another desk before putting this one away';
+    const bed = getFurniture(drag.type)?.unique, petName = PETS[state.pet]?.name || PETS.cat.name;
+    $('#return-label').textContent = drag.removable ? 'Return to your collection' : bed ? `${petName}’s bed stays` : 'Every room needs a study spot';
+    $('#return-detail').textContent = drag.removable ? 'Release here to put this piece away · Undo brings it back' : bed ? 'Drop it anywhere in the room instead' : 'Add another desk before putting this one away';
   }
   if (drag.overCollection) preview.style.transform = `translate3d(${drag.clientX - 44}px, ${drag.clientY - 76}px, 0)`;
   const hint = drag.overCollection ? (drag.removable ? 'Release to put it away · Undo brings it back' : drag.reason)
@@ -548,7 +601,7 @@ function renderInspector() {
   const selected = selectedItem && getFurniture(selectedItem.type);
   const pending = placement && getFurniture(placement.type);
   if (!editMode) {
-    $('#room-hint').innerHTML = 'Drag to look around<span>·</span>Tap a lamp, the fire or the cat';
+    $('#room-hint').innerHTML = `Drag to look around<span>·</span>Tap a lamp, the fire or ${PETS[state.pet]?.name || PETS.cat.name}`;
     return;
   }
   const rememberedFocus = rememberControlFocus(inspector);
@@ -564,7 +617,7 @@ function renderInspector() {
   }
   const item = pending || selected, wall = item.mount === 'wall';
   const currentDesk = selectedItem?.id === state.layout.activeDeskId;
-  const hint = pending ? (placement.valid === false && placement.reason ? placement.reason : `Move over ${wall ? 'a wall' : 'the floor'} to find a spot. Click to place.`) : 'Drag to move or put away. Arrow buttons work too.';
+  const hint = pending ? (placement.valid === false && placement.reason ? placement.reason : `Move over ${wall ? 'a wall' : 'the floor'} to find a spot. Click to place.`) : item.unique ? `Drag to move. ${PETS[state.pet]?.name || PETS.cat.name} will find it.` : 'Drag to move or put away. Arrow buttons work too.';
   // Wall pieces always face the room: they move up, down and along the wall
   // instead of turning. Frames and records offer their pictures.
   const nudges = [['0,-0.25', wall ? 'Move up' : 'Move toward back wall', '↑'], ['-0.25,0', 'Move left', '←'], ['0.25,0', 'Move right', '→'], ['0,0.25', wall ? 'Move down' : 'Move toward front', '↓']];
@@ -572,7 +625,7 @@ function renderInspector() {
   // Pieces with color choices list them after the room's own colors.
   const tints = !pending && tintsFor(item.id), roomTint = tints && Object.keys(tints[0].paint)[0];
   const colors = tints ? `<div class="art-picker" role="group" aria-label="Choose the color">${[{ id: '', name: 'Room colors', swatch: designPaint(roomDesign(state.layout).style).find(([hex]) => hex === roomTint)?.[1] || roomTint }, ...tints].map(tint => `<button data-tint="${tint.id}" aria-pressed="${(selectedItem.tint || '') === tint.id}" aria-label="${tint.name}" title="${tint.name}"><span class="tint-swatch" style="--tint: ${tint.swatch}"></span></button>`).join('')}</div>` : '';
-  inspector.innerHTML = `<div class="selection-copy">${icon(pending ? 'plus' : 'build')}<span><strong>${pending ? 'Placing ' : ''}${item.name}${!pending && currentDesk ? '<span class="active-desk-tag">Study spot</span>' : ''}</strong><small>${hint}</small></span></div><div class="selection-actions">${arts}${colors}${wall ? '' : `<button class="small-button" id="rotate-item" aria-label="Rotate ${item.name}">${icon('rotate')}<span>Rotate</span></button>`}${!pending ? `<div class="nudge-buttons" aria-label="Move selected ${wall ? 'wall piece' : 'furniture'}">${nudges.map(([step, label, arrow]) => `<button data-nudge="${step}" aria-label="${label}">${arrow}</button>`).join('')}</div>${item.category === 'Study' ? `<button class="small-button study-here" id="study-here" aria-label="${currentDesk ? 'Studying here' : 'Study here'}" ${currentDesk ? 'disabled' : ''}>${icon('check')}<span>${currentDesk ? 'Studying here' : 'Study here'}</span></button>` : ''}<button class="small-button remove-item" id="remove-item" aria-label="Remove ${item.name}">${icon('trash')}</button>` : ''}<button class="small-button" id="cancel-item" aria-label="${pending ? 'Cancel placement' : 'Deselect furniture'}">${icon('close')}</button></div>`;
+  inspector.innerHTML = `<div class="selection-copy">${icon(pending ? 'plus' : 'build')}<span><strong>${pending ? 'Placing ' : ''}${item.name}${!pending && currentDesk ? '<span class="active-desk-tag">Study spot</span>' : ''}</strong><small>${hint}</small></span></div><div class="selection-actions">${arts}${colors}${wall ? '' : `<button class="small-button" id="rotate-item" aria-label="Rotate ${item.name}">${icon('rotate')}<span>Rotate</span></button>`}${!pending ? `<div class="nudge-buttons" aria-label="Move selected ${wall ? 'wall piece' : 'furniture'}">${nudges.map(([step, label, arrow]) => `<button data-nudge="${step}" aria-label="${label}">${arrow}</button>`).join('')}</div>${item.category === 'Study' ? `<button class="small-button study-here" id="study-here" aria-label="${currentDesk ? 'Studying here' : 'Study here'}" ${currentDesk ? 'disabled' : ''}>${icon('check')}<span>${currentDesk ? 'Studying here' : 'Study here'}</span></button>` : ''}${item.unique ? '' : `<button class="small-button remove-item" id="remove-item" aria-label="Remove ${item.name}">${icon('trash')}</button>`}` : ''}<button class="small-button" id="cancel-item" aria-label="${pending ? 'Cancel placement' : 'Deselect furniture'}">${icon('close')}</button></div>`;
   $('#rotate-item')?.addEventListener('click', () => room?.rotateSelection?.());
   inspector.querySelectorAll('[data-art]').forEach(button => button.addEventListener('click', () => room?.setArt?.(button.dataset.art)));
   inspector.querySelectorAll('[data-tint]').forEach(button => button.addEventListener('click', () => room?.setTint?.(button.dataset.tint || null)));
@@ -597,7 +650,7 @@ function renderPanel() {
   panel.hidden = !currentPanel;
   document.querySelectorAll('[data-panel]').forEach(button => button.setAttribute('aria-expanded', button.dataset.panel === currentPanel));
   if (!currentPanel) return;
-  panel.innerHTML = `<div class="panel-heading"><span>${currentPanel === 'atmosphere' ? 'Find your kind of quiet' : 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
+  panel.innerHTML = `<div class="panel-heading"><span>${({ atmosphere: 'Find your kind of quiet', pet: 'Your little companion' })[currentPanel] || 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
   if (currentPanel === 'atmosphere') {
     panel.insertAdjacentHTML('beforeend', `<div class="theme-options">${[['day', 'sun', 'Daylight'], ['dusk', 'moon', 'Night'], ['rain', 'rain', 'Rainy afternoon']].map(([key, symbol, title]) => `<button class="theme-option ${key}" data-theme-choice="${key}" aria-pressed="${state.theme === key}">${icon(symbol)}<span>${title}</span></button>`).join('')}</div>`);
     panel.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click', () => {
@@ -605,6 +658,17 @@ function renderPanel() {
     }));
     panel.insertAdjacentHTML('beforeend', `<label class="fairy-lights"><span>${roomDesign(state.layout).style ? 'Accent lights' : 'Fairy lights'}</span><input type="checkbox" data-decor="lights" ${state.decor.lights ? 'checked' : ''}></label>`);
     panel.querySelector('[data-decor]').addEventListener('change', event => acceptUpdate(store.update(draft => { draft.decor.lights = event.target.checked; })));
+  } else if (currentPanel === 'pet') {
+    // Choose the pet; the bed, its spot and the room stay as they are.
+    const name = PETS[state.pet]?.name || PETS.cat.name;
+    panel.insertAdjacentHTML('beforeend', `<div class="pet-options">${Object.values(PETS).map(pet => `<button class="pet-option" data-pet-choice="${pet.id}" aria-pressed="${state.pet === pet.id}">${petArt(pet.id)}<span><strong>${pet.name}</strong><small>${pet.id === 'cat' ? 'A ginger tabby who loves the fire' : 'A floppy-eared puppy with a happy tail'}</small></span></button>`).join('')}</div><div class="pet-actions"><button class="quiet-button" id="pet-now">${icon('cat')} Give ${name} a pet</button><p class="performance-note">Tap ${name} in the room for a pet, or drag to carry ${name} somewhere new. Decorate moves the bed.</p></div>`);
+    panel.querySelectorAll('[data-pet-choice]').forEach(button => button.addEventListener('click', () => {
+      if (state.pet === button.dataset.petChoice) return;
+      acceptUpdate(store.update(draft => { draft.pet = button.dataset.petChoice; }));
+      renderPanel(); $(`[data-pet-choice="${state.pet}"]`)?.focus();
+      speech?.say('pet', (PET_LINES[state.pet] || PET_LINES.cat).hello);
+    }));
+    $('#pet-now').addEventListener('click', () => { if (room) room.pet(); else petFeedback(); });
   } else {
     panel.insertAdjacentHTML('beforeend', `<div class="quality-options" aria-label="Room rendering quality">${[['auto', 'Adaptive'], ['high', 'Crisp'], ['battery', 'Save energy']].map(([id, label]) => `<button data-quality="${id}" aria-pressed="${quality === id}">${label}</button>`).join('')}</div><p class="performance-note">Adaptive balances detail and motion. Save energy limits animation to 30 frames per second.</p><dl class="performance-metrics" id="performance-metrics"></dl><p class="performance-note">Babylon.js engine · live measurements while this tab is visible. CPU measurements exclude GPU time.</p>`);
     panel.querySelectorAll('[data-quality]').forEach(button => button.addEventListener('click', () => {
@@ -681,12 +745,22 @@ window.addEventListener('storage', event => {
   if (event.key === storageKey || event.key === null) refreshState();
 }, { signal: listeners.signal });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshState(); }, { signal: listeners.signal });
+// Remember the last visit, for a hello after a long time away.
+function markSeen() { store.update(draft => { draft.seenAt = Date.now(); }); }
+// A hello after a long time away, but never in the middle of focus.
+function welcome() { if (!state.session.running) avatarSay('welcome', { force: true }); }
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenSince = Date.now(); markSeen(); }
+  else if (hiddenSince && Date.now() - hiddenSince > 10 * 60_000) { hiddenSince = 0; setTimeout(welcome, 600); }
+}, { signal: listeners.signal });
+window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
+// Development builds expose the room to end-to-end checks; production strips it.
+if (import.meta.env.DEV) window.__littleHours = { get room() { return room; }, get state() { return state; }, get speech() { return speech; } };
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   clearInterval(tickInterval);
   clearTimeout(toastTimeout);
-  clearTimeout(petTimeout);
   room?.dispose?.();
   noiseNode?.stop();
   audioContext?.close();

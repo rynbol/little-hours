@@ -4,7 +4,7 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { FURNITURE, getFurniture } from './catalog.js';
-import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, createLayout, validatePlacement, normalizeLayout, findFreePosition, nearestValidPlacement, rugsOverlap } from './layout.js';
+import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, PET_HOME, createLayout, validatePlacement, normalizeLayout, findFreePosition, nearestValidPlacement, rugsOverlap, pieceCount, petBed } from './layout.js';
 import { createFurniture, disposeFurnitureAssets } from './furniture.js';
 import { cutRect, subtractRect, openings, OPENING_INSET } from './walls.js';
 import { SURFACES } from './surfaces.js';
@@ -53,10 +53,34 @@ test('solids cannot overlap, existing objects can move, and rugs can sit under f
   assert.equal(validatePlacement([desk, plant], { ...plant, x: -1.5, z: -1.5 }).valid, false);
 });
 
-test('the sleeping cat retains floor space while rugs remain allowed underneath', () => {
-  const result = validatePlacement([], placement('plant', 0.75, 1.5));
-  assert.equal(result.valid, false); assert.match(result.reason, /cat/);
-  assert.equal(validatePlacement([], placement('rug', 0.25, 1.25)).valid, true);
+test('the pet bed keeps its floor space, rugs lie under it, and it moves like any piece', () => {
+  const bed = placement('pet-bed', PET_HOME.x, PET_HOME.z, 0, 'bed');
+  const result = validatePlacement([bed], placement('plant', 0.75, 1.5));
+  assert.equal(result.valid, false); assert.match(result.reason, /pet bed/);
+  assert.equal(validatePlacement([bed], placement('rug', 0.25, 1.25)).valid, true);
+  assert.equal(validatePlacement([], placement('plant', 0.75, 1.5)).valid, true, 'the old fixed cat spot is ordinary floor once the bed moves');
+  assert.equal(validatePlacement([bed], { ...bed, x: -3, z: 2, rotation: 1 }).valid, true);
+});
+
+test('every room has exactly one pet bed, and older rooms gain it at the old cat spot', () => {
+  for (const preset of PRESETS) {
+    const layout = createLayout(preset.id), beds = layout.items.filter(item => item.type === 'pet-bed');
+    assert.equal(beds.length, 1, preset.id); assert.deepEqual([beds[0].x, beds[0].z], [PET_HOME.x, PET_HOME.z]);
+  }
+  // A save from before the bed: the cat's reserved spot is still clear.
+  const old = normalizeLayout({ presetId: 'ember-library', activeDeskId: 'desk', items: [placement('study-desk', -2, -3, 0, 'desk'), placement('rug', 0, 1.5, 0, 'rug')] });
+  assert.deepEqual(petBed(old), { id: 'pet-bed', type: 'pet-bed', x: PET_HOME.x, z: PET_HOME.z, rotation: 0 });
+  // When a piece already stands there, the bed takes the first free spot.
+  const crowded = normalizeLayout({ activeDeskId: 'desk', items: [placement('study-desk', -2, -3, 0, 'desk'), placement('plant', 0.75, 1.5, 0, 'plant')] });
+  assert.equal(validatePlacement(crowded.items, petBed(crowded)).valid, true); assert.equal(crowded.items.length, 3);
+  // A second bed is dropped, and a moved bed keeps its place and turn.
+  const doubled = normalizeLayout({ activeDeskId: 'desk', items: [placement('study-desk', -2, -3, 0, 'desk'), placement('pet-bed', -3, 2, 1, 'mine'), placement('pet-bed', 3, 2, 0, 'extra')] });
+  assert.deepEqual(doubled.items.filter(item => item.type === 'pet-bed').map(item => [item.id, item.x, item.z, item.rotation]), [['mine', -3, 2, 1]]);
+  // The bed never uses up the room's piece budget.
+  const full = [...Array.from({ length: MAX_ITEMS }, (_, index) => placement('rug', 0, 0, 0, `rug-${index}`))];
+  assert.equal(validatePlacement(full, placement('pet-bed', 3, 2)).valid, true);
+  assert.equal(pieceCount([...full, placement('pet-bed', 3, 2)]), MAX_ITEMS);
+  assert.equal(normalizeLayout({ activeDeskId: 'desk', items: [placement('study-desk', -2, -3, 0, 'desk'), ...full.slice(1)] }).items.length, MAX_ITEMS + 1);
 });
 
 test('the item budget blocks additions while allowing existing items to move', () => {
@@ -79,7 +103,8 @@ test('restore sanitizes positions and IDs, drops broken or overlapping objects, 
   });
   assert.equal(restored.presetId, null);
   assert.equal(restored.activeDeskId, 'desk');
-  assert.equal(restored.items.length, 3);
+  assert.equal(restored.items.length, 4);
+  assert.equal(restored.items.at(-1).type, 'pet-bed', 'a room without a bed gains one');
   assert.deepEqual([restored.items[0].x, restored.items[0].z], [-1.5, -1.5]);
   assert.equal(new Set(restored.items.map(item => item.id)).size, restored.items.length);
   restored.items.forEach(item => assert.equal(validatePlacement(restored.items, item).valid, true));
