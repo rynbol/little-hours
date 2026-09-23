@@ -372,6 +372,22 @@ With reduced motion, a frame asked twice whether the scene was ready: once to re
 
 Verification: a room check makes the scene turn ready between the two asks of a frame; on the old code the room never reports, and now it reports once and goes idle. In headless Chrome, 30 room loads with reduced motion all became ready (one in 18 had stuck before), and the colors (52, 51 and 52 of 52; the miss was a 16 ms handler check), walls and floors (101) and Part 2's (106) checks passed, and the colors checks in Firefox (49).
 
+## Wall clock
+
+The wall clock (`wall-clock`) is a round wall piece: a rim in the room's accent color (the plum that each design repaints, so it is dusty rose in Sakura studio, lilac in Cloud loft and violet in Midnight metro), a warm white face with twelve marks, and three hands. Sakura studio, Cloud loft and Midnight metro hang it by default, and a room of those designs saved before the clock (layout `v` 2) gains it once. A clock that was put away later stays away, and the other wall pieces are not added again.
+
+The hands show the real local time from the page's own clock, so a time zone or daylight-saving change shows at the next minute. The hour and minute hands turn at the turn of each minute, and the second hand ticks once a second. In full motion the room draws every frame anyway, so the clock adds no frames. With reduced motion the room draws only on change, so a clock (the wall clock or the Moon clock) sets one timer for the turn of the next minute, draws that frame and sets the next timer. The second hand is hidden, and a hidden tab sets no timer. The Moon clock now keeps the time with reduced motion too: before, its hands went back to their modeled angles.
+
+Verification: the unit tests (84) check the hands against the local time, the second hand with reduced motion, and the save rule for the clock. The browser checks read the hands against the page's time in Chrome and Firefox. With reduced motion, the room drew exactly one frame in 61 seconds, at the turn of the minute, in both browsers, and the full browser suite (116 checks) passed in each.
+
+## Button motion
+
+Every button eases its colors, border and shadow over 0.22 s. A press scales it to 95 % (98 % for wide buttons and the furniture cards) in 0.07 s, and on release it springs back over 0.34 s. Under a mouse, the room's own buttons (Rooms, Decorate, Night, the focus toggle, the tools, the round icon buttons and Start) lift by 1 px with a soft shadow. A button that turns on (`aria-pressed` or `aria-expanded` true) settles in from 93 %, so Done decorating, a chosen duration, a tab, a color or an open tool shows a small pop. The new Night or Daylight icon turns in and its label fades in, and the room and builder panels ease in from 8 px below.
+
+Only transforms, opacity and colors change, so the motion needs no layout and no script. The lift waits for `(hover: hover)`, so a touch screen does not keep a button lifted. No button lifts inside the scrolling Rooms strip. A furniture card settles and springs back without overshoot, so it never reaches past the edge of its strip: with the overshoot, Firefox made an exactly full strip one pixel wider for a moment. Reduced motion turns all of it off through the existing rule that stops every transition and animation.
+
+Verification: with classic scroll bars (15 px in both headless browsers, Firefox with `ui.useOverlayScrollbars` 0), a check hovers, presses and releases the buttons in each scrolling strip and panel with real input and reads each strip's size every frame. No scroll bar came in or out and no button was cut off, also with the furniture strip and the room panel made exactly as wide or as tall as their content (42 of 42 checks in Chrome and in Firefox). The browser suite (116 checks) passed in both browsers, and the unit tests, the room checks and the build pass.
+
 ## Pieces on rugs
 
 Every floor piece stood at floor height, so a rug hid its feet: 5.15 cm of a table foot, a chair's legs or a lamp's base went into the woven rug, and 6.75 to 8 cm into the moon rug. Each floor piece now stands on the woven layer of the rug under most of it. `standHeight` samples the middle of the footprint and the four corners set in by 15 %, and takes the highest layer under at least 3 of the 5 points. A piece that stands mostly on bare floor stays on the floor, and the rug's edge slips under its base.

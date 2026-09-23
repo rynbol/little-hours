@@ -4,7 +4,7 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Ray } from '@babylonjs/core/Culling/ray.js';
-import { createLayout, footprintBounds, pieceCount, rugStack, rugTouches, groundAt, standHeight } from '../src/layout.js';
+import { createLayout, footprintBounds, pieceCount, LAYOUT_VERSION, rugStack, rugTouches, groundAt, standHeight } from '../src/layout.js';
 import { SURFACES } from '../src/surfaces.js';
 
 class Surface {
@@ -976,7 +976,7 @@ try {
   {
     // A window cuts a real opening: a ray passes through it, its view hangs
     // behind it, a dragged window closes it, and it opens again where it lands.
-    const deskOnly = { presetId: 'ember-library', items: [desk], activeDeskId: desk.id, v: 2 };
+    const deskOnly = { presetId: 'ember-library', items: [desk], activeDeskId: desk.id, v: LAYOUT_VERSION };
     room.setEditMode(true); room.setLayout(deskOnly); advance(3);
     const node = id => scene.transformNodes.find(item => item.metadata?.itemId === id);
     const saved = id => diagnostics().layout.items.find(item => item.id === id);
@@ -1015,7 +1015,7 @@ try {
     // The other shells cut their facings too: Sakura's shoji and the metro bricks.
     for (const [presetId, style, wall] of [['sakura-studio', 'sakura', 'side'], ['midnight-metro', 'metro', 'side'], ['cloud-loft', 'cloud', 'back']]) {
       const round = { id: `round-${presetId}`, type: 'round-window', wall, u: wall === 'side' ? 2 : 1.4, v: 3 };
-      room.setLayout({ presetId, items: [desk, round], activeDeskId: desk.id, v: 2 }); advance(3);
+      room.setLayout({ presetId, items: [desk, round], activeDeskId: desk.id, v: LAYOUT_VERSION }); advance(3);
       // Every room also keeps its pet bed.
       assert.equal(diagnostics().layout.items.filter(item => item.type !== 'pet-bed').length, 2, `${presetId} takes the window`);
       assert.ok(!solid(style, round) && solid(style, { ...round, u: round.u + 1.2 }), `${presetId} cuts its wall and facing for a window`);
@@ -1092,7 +1092,7 @@ try {
     assert.equal(changes.length, saves + 2, 'repeats and unknown choices change nothing');
     // A window cuts the painted wall, and the rebuilt wall keeps its paint.
     const win = { id: 'paint-window', type: 'cottage-window', wall: 'side', u: 2, v: 3 };
-    room.setLayout({ presetId: 'ember-library', items: [desk, win], activeDeskId: desk.id, v: 2, walls: 'rose', floor: 'walnut' }); advance(3);
+    room.setLayout({ presetId: 'ember-library', items: [desk, win], activeDeskId: desk.id, v: LAYOUT_VERSION, walls: 'rose', floor: 'walnut' }); advance(3);
     assert.ok(through(side(), win) && hexOf(side().material) === '#ddcdb9' && casters().includes(side()), 'the window cuts the linen wall');
     room.setSurface('walls', null); room.setSurface('floor', null); advance(2);
     assert.ok(hexOf(back().material) === '#80917d' && hexOf(paintOf('#855b43')) === '#855b43' && !('walls' in diagnostics().layout), 'back to sage and honey oak');
@@ -1112,7 +1112,7 @@ try {
       assert.deepEqual([scene.meshes.length, scene.materials.length], shellAssets, `${style} adds no meshes or materials`);
       // A window cuts the painted walls, which keep their paint.
       const round = { id: `paint-${style}`, type: 'round-window', wall: style === 'cloud' ? 'back' : 'side', u: style === 'cloud' ? 1.4 : 2, v: 3 };
-      room.setLayout({ presetId, items: [desk, round], activeDeskId: desk.id, v: 2, walls, floor }); advance(3);
+      room.setLayout({ presetId, items: [desk, round], activeDeskId: desk.id, v: LAYOUT_VERSION, walls, floor }); advance(3);
       assert.ok(through(wallsMesh(), round) && [...Object.values(choice(style, 'walls', walls))].some(hex => counts(wallsMesh()).has(hex)), `${style} cuts its painted walls`);
       room.setSurface('walls', null); room.setSurface('floor', null); advance(2);
       assert.ok(counts(wallsMesh()).has(Object.keys(choice(style, 'walls', walls))[0]) && counts(body()).get(Object.keys(choice(style, 'floor', floor))[0]) === designBody.get(Object.keys(choice(style, 'floor', floor))[0]), `${style} as designed again`);
@@ -1130,7 +1130,7 @@ try {
     // globe spins one turn and comes to rest, the tea cart puffs steam, the
     // bean bag squishes and the monstera rustles; the easel shows its picture.
     const motionBefore = motion.matches; motion.matches = false; motion.emit('change', { matches: false });
-    room.setEditMode(true); room.setLayout({ presetId: 'ember-library', items: [desk], activeDeskId: desk.id, v: 2 }); advance(3);
+    room.setEditMode(true); room.setLayout({ presetId: 'ember-library', items: [desk], activeDeskId: desk.id, v: LAYOUT_VERSION }); advance(3);
     const node = id => scene.transformNodes.find(item => item.metadata?.itemId === id && item.metadata.body);
     const saved = type => diagnostics().layout.items.find(item => item.type === type);
     const glow = mesh => mesh.material.emissiveColor.r + mesh.material.emissiveColor.g + mesh.material.emissiveColor.b;

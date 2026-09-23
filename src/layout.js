@@ -12,8 +12,10 @@ const EPSILON = 1e-7;
 export const PET_HOME = Object.freeze({ x: 0.75, z: 1.5 });
 const item = (id, type, x, z, rotation = 0, extra = {}) => ({ id, type, x, z, rotation, ...extra });
 const wallItem = (id, type, wall, u, v, art) => ({ id, type, wall, u, v, ...(art ? { art } : {}) });
-// Layouts saved before wall pieces existed gain their design's wall pieces once.
-export const LAYOUT_VERSION = 2;
+// Layouts saved before wall pieces existed (below `v` 2) gain their design's
+// wall pieces once, and layouts saved before the wall clock (`v` 2) gain the
+// design's clock once.
+export const LAYOUT_VERSION = 3;
 // The timber retreat's wall pieces: a picture over the hearth, a small one by
 // the lanterns, the moon clock and the potion shelf above the side bookcases.
 // Design wall pieces sit on the 5 cm wall grid, so a drag never nudges them.
@@ -121,18 +123,20 @@ PRESETS.push(
   themedPreset('sakura-studio', 'Sakura studio', 'sakura', 'Shoji screens, woven tatami, paper lanterns and cherry blossoms beyond the window.', 'moonlit-greenhouse', ['green-tree-back', 'green-tree-window', 'green-tree-front', 'green-tree-right', 'green-hearth', 'green-records-side', 'green-lamp', 'green-moon-rug', 'green-window-rug', 'green-reading-rug', 'green-candles', 'green-globe'], [
     item('sakura-books', 'bookcase', 4.5, -3.75), item('sakura-plant', 'plant', -4.75, -3.5), item('sakura-lamp', 'floor-lamp', -5, 3.5),
     item('sakura-tea-cart', 'tea-cart', 1.75, -2.25), item('sakura-easel', 'easel', -4.5, -2.25, 0, { art: 'blossom' }),
-    wallItem('sakura-scroll', 'wall-scroll', 'back', 2.5, 3.45),
+    wallItem('sakura-scroll', 'wall-scroll', 'back', 2.5, 3.45), wallItem('sakura-clock', 'wall-clock', 'back', 1.25, 4.3),
   ]),
   themedPreset('cloud-loft', 'Cloud loft', 'cloud', 'A round sky window, blush checkerboard, lilac upholstery and shelves shaped like clouds.', 'ember-library', ['ember-hearth', 'ember-books-front', 'ember-books-right', 'ember-tree', 'ember-tree-right', 'ember-lanterns', 'ember-moon-rug', 'ember-tea-cart'], [
     item('cloud-books', 'bookcase', 4.5, -3.75), item('cloud-fern', 'plant', -4.75, -3.5), item('cloud-linen-rug', 'rug', 3, .5, 1),
     item('cloud-aquarium', 'fish-tank', 1.75, -3.75), item('cloud-bean-bag', 'bean-bag', 4, 2.5, 0, { tint: 'rose' }),
     wallItem('cloud-shelf-low', 'cloud-shelf', 'back', 1.75, 3.25), wallItem('cloud-shelf-high', 'small-cloud-shelf', 'back', 4.2, 4.55), wallItem('cloud-rainbow', 'felt-rainbow', 'side', 1.9, 3.75),
+    wallItem('cloud-clock', 'wall-clock', 'back', 1.75, 4.4),
   ]),
   themedPreset('midnight-metro', 'Midnight metro', 'metro', 'An exposed-brick listening loft, steel windows, soft neon and a city that stays up with you.', 'writers-loft', ['loft-hearth', 'loft-tree', 'loft-lanterns', 'loft-plant-front', 'loft-bookcase-right', 'loft-moon-rug', 'loft-easel', 'loft-bean-bag'], [
     item('metro-record-wall', 'low-cabinet', 4.75, -2.75, 3), item('metro-studio-rug', 'rug', 3.25, 2),
     item('metro-monstera', 'monstera', 2.75, -2.75, 0, { tint: 'indigo' }), item('metro-easel', 'easel', -1.75, 2.5, 0, { art: 'stars' }),
     item('metro-aquarium', 'fish-tank', -5, -2.5, 1),
     wallItem('metro-neon', 'neon-orbit', 'back', 4.4, 3.65), wallItem('metro-record-lilac', 'record-sleeve', 'side', 1.5, 4.3, 'lilac'), wallItem('metro-record-coral', 'record-sleeve', 'side', 3.1, 4.3, 'coral'),
+    wallItem('metro-clock', 'wall-clock', 'side', -1.6, 4.3),
   ]),
 );
 export function roomDesign(layout) { return PRESETS.find(preset => preset.id === layout?.presetId) || PRESETS[0]; }
@@ -322,7 +326,8 @@ export function normalizeLayout(raw) {
   // Wall pieces come after the floor, so a saved piece of furniture is never
   // lost to a picture: a wall piece that no longer fits moves to the closest
   // free spot, or is left out.
-  const legacy = raw.v !== LAYOUT_VERSION && presetId ? PRESETS.find(preset => preset.id === presetId).items.filter(isWallPiece) : [];
+  const design = presetId && raw.v !== LAYOUT_VERSION ? PRESETS.find(preset => preset.id === presetId).items.filter(isWallPiece) : [];
+  const legacy = raw.v === 2 ? design.filter(entry => entry.type === 'wall-clock') : design;
   for (const [index, saved] of [...saves.map((entry, index) => [index, entry]), ...legacy.map(entry => [`design-${entry.id}`, entry])]) {
     if (pieceCount(items) >= MAX_ITEMS) break;
     if (!saved || typeof saved !== 'object' || !isWallPiece(saved) || !['back', 'side'].includes(saved.wall) || !Number.isFinite(saved.u) || !Number.isFinite(saved.v)) continue;
