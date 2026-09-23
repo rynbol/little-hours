@@ -414,7 +414,7 @@ try {
     const again = petPoint(), away = { ...again, clientX: again.clientX + 40, clientY: again.clientY + 20 };
     canvas.emit('pointerdown', again); canvas.emit('pointermove', away); advance(6);
     assert.equal(diagnostics().pet.state, 'held');
-    room.cancelDrag(); advance(2);
+    assert.equal(room.cancelDrag(), true, 'Escape is used up by the carry'); advance(2);
     assert.ok(!diagnostics().pet.held && diagnostics().pet.state === 'sitting' && canvas.capturedPointer == null, 'a cancelled carry sets the pet down and frees the pointer');
   }
   for (let i = 0; i < 60 * 40 && diagnostics().pet.state !== 'sleeping'; i++) advance();

@@ -948,7 +948,7 @@ export function createRoom(container, options = {}) {
   }
   function cancelDrag() {
     // Escape, a hidden tab or a layout from another tab sets a carried pet down.
-    if (downPosition?.pet) releasePet();
+    const carried = downPosition?.pet ? releasePet() : false;
     const wasDragging = Boolean(drag), pointerId = downPosition?.pointerId;
     if (drag) {
       drag.object.position.copyFrom(drag.originalPosition); drag.object.rotation.y = drag.wallPiece ? drag.originalRotation : drag.original.rotation * Math.PI / 2;
@@ -960,7 +960,7 @@ export function createRoom(container, options = {}) {
       options.onDragState?.(null); updateMarker(); outlineKey = ''; updateOutline(); refreshShadows();
     }
     canvas.style.cursor = placement ? 'crosshair' : 'grab';
-    return wasDragging;
+    return wasDragging || carried;
   }
   function startDrag() {
     const item = layout.items.find(item => item.id === downPosition?.itemId), object = placedObjects.get(item?.id);
