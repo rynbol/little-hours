@@ -620,6 +620,31 @@ test('saved rooms keep their furniture and gain their wall pieces once', () => {
   assert.equal(odd.items.some(item => ['x', 'z'].includes(item.id)), false);
   assert.equal(odd.items.find(item => item.id === 'y').art, 'herbarium', 'an unknown picture falls back to the first one');
   assert.equal(normalizeLayout({ ...ember, items: ember.items.map(item => item.type === 'record-sleeve' ? { ...item, art: 'lilac' } : item) }).v, ember.v);
+  // A room saved before the wall clock gains its design's clock once, and
+  // nothing else: a piece put away before stays away.
+  const cloud = createLayout('cloud-loft'), older = { ...cloud, v: 2, items: cloud.items.filter(item => item.type !== 'wall-clock' && item.id !== 'cloud-rainbow') };
+  const updated = normalizeLayout(older);
+  assert.ok(updated.items.some(item => item.type === 'wall-clock'), 'an older Cloud loft gains its clock');
+  assert.ok(!updated.items.some(item => item.id === 'cloud-rainbow'), 'but not the rainbow that was put away');
+  assert.ok(!normalizeLayout({ ...updated, items: updated.items.filter(item => item.type !== 'wall-clock') }).items.some(item => item.type === 'wall-clock'), 'a clock put away later stays away');
+});
+
+test('the wall clock shows the real local time, and its second hand rests with reduced motion', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const clock = createFurniture('wall-clock', scene), nodes = clock.getChildTransformNodes(false), hand = name => nodes.find(node => node.name === `wall-clock-${name}-hand`);
+    const before = new Date(); clock.metadata.animate(0, false, false); const after = new Date();
+    // Clockwise from twelve, as the wall clock faces the room.
+    const angle = node => ((-node.rotation.z) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+    const near = (value, targets) => targets.some(target => Math.abs(Math.atan2(Math.sin(value - target), Math.cos(value - target))) < 1e-6);
+    const minuteAngles = [before, after].map(date => date.getMinutes() / 60 * Math.PI * 2), hourAngles = [before, after].map(date => (date.getHours() % 12 * 60 + date.getMinutes()) / 720 * Math.PI * 2);
+    assert.ok(near(angle(hand('minute')), minuteAngles), 'the minute hand shows the minute');
+    assert.ok(near(angle(hand('hour')), hourAngles), 'the hour hand shows the hour');
+    assert.equal(hand('second').isEnabled(), true);
+    clock.metadata.animate(1, false, true);
+    assert.equal(hand('second').isEnabled(), false, 'with reduced motion the second hand is away');
+    assert.ok(getFurniture('wall-clock').clock && getFurniture('moon-clock').clock, 'both clocks wake a still room once a minute');
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
 
 test('windows cut exact openings in their wall and follow the wall-piece rules', () => {

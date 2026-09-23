@@ -371,3 +371,12 @@ Verification: the unit tests (83), the room checks and the build pass. In headle
 With reduced motion, a frame asked twice whether the scene was ready: once to report the room ready, once to ask for the next frame. When the shaders finished between the two asks, the first said no and the second said yes, so no next frame came and the room never reported ready: "Making room for you…" stayed and Decorate stayed disabled. Frames now go on until the room reports ready, and after that the loop stops as before, with no new per-frame work.
 
 Verification: a room check makes the scene turn ready between the two asks of a frame; on the old code the room never reports, and now it reports once and goes idle. In headless Chrome, 30 room loads with reduced motion all became ready (one in 18 had stuck before), and the colors (52, 51 and 52 of 52; the miss was a 16 ms handler check), walls and floors (101) and Part 2's (106) checks passed, and the colors checks in Firefox (49).
+
+## Wall clock
+
+The wall clock (`wall-clock`) is a round wall piece: a rim in the room's accent color (the plum that each design repaints, so it is dusty rose in Sakura studio, lilac in Cloud loft and violet in Midnight metro), a warm white face with twelve marks, and three hands. Sakura studio, Cloud loft and Midnight metro hang it by default, and a room of those designs saved before the clock (layout `v` 2) gains it once. A clock that was put away later stays away, and the other wall pieces are not added again.
+
+The hands show the real local time from the page's own clock, so a time zone or daylight-saving change shows at the next minute. The hour and minute hands turn at the turn of each minute, and the second hand ticks once a second. In full motion the room draws every frame anyway, so the clock adds no frames. With reduced motion the room draws only on change, so a clock (the wall clock or the Moon clock) sets one timer for the turn of the next minute, draws that frame and sets the next timer. The second hand is hidden, and a hidden tab sets no timer. The Moon clock now keeps the time with reduced motion too: before, its hands went back to their modeled angles.
+
+Verification: the unit tests (84) check the hands against the local time, the second hand with reduced motion, and the save rule for the clock. The browser checks read the hands against the page's time in Chrome and Firefox. With reduced motion, the room drew exactly one frame in 61 seconds, at the turn of the minute, in both browsers, and the full browser suite (116 checks) passed in each.
+

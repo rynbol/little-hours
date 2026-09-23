@@ -689,6 +689,17 @@ function moonClockCase(parent) {
   box(parent, [0.31, 0.87, 0.065], [0, -0.38, 0.04], '#503d30', 0.035);
   for (let i = 0; i < 12; i++) { const angle = i / 12 * Math.PI * 2; sphere(parent, [0.018, 0.018, 0.008], [Math.cos(angle) * 0.31, 0.39 + Math.sin(angle) * 0.31, 0.107], '#503d30'); }
 }
+// A round wall clock: a soft rim in the room's accent color (plum, which each
+// design repaints), a warm white face with twelve marks and a centre cap.
+function wallClock(parent) {
+  const rim = cylinder(parent, 0.35, 0.35, 0.07, [0, 0, 0.035], '#785965', { segments: 40 }); rim.rotation.x = Math.PI / 2;
+  const face = cylinder(parent, 0.3, 0.3, 0.012, [0, 0, 0.074], C.paper, { segments: 40 }); face.rotation.x = Math.PI / 2;
+  for (let i = 0; i < 12; i++) {
+    const angle = i / 12 * Math.PI * 2, major = i % 3 === 0, radius = major ? 0.245 : 0.255;
+    box(parent, [major ? 0.022 : 0.012, major ? 0.06 : 0.035, 0.006], [Math.sin(angle) * radius, Math.cos(angle) * radius, 0.082], '#50453d', 0.003).rotation.z = -angle;
+  }
+  const cap = cylinder(parent, 0.022, 0.022, 0.03, [0, 0, 0.102], '#50453d', { segments: 16 }); cap.rotation.x = Math.PI / 2;
+}
 function apothecaryShelf(parent) {
   box(parent, [1.4, 0.11, 0.60], [0, -0.2975, 0.31], '#926747', 0.025);
   const colors = ['#768d77', '#b09572', '#95839d', '#b9795e'];
@@ -1519,7 +1530,7 @@ export function createFurniture(type, scene) {
       plant, rug, ottoman, 'low-cabinet': cabinet,
       fireplace, daybed, 'moon-tree': moonTree, 'lantern-cluster': lanternCluster, 'moon-rug': moonRug, 'pet-bed': petBed,
       'tall-frame': parent => frame(parent, [1.04, 1.4], '#503d30'), 'small-frame': parent => frame(parent, [0.74, 1.02], '#ac8357'), 'wide-frame': parent => frame(parent, [1.5, 1.04], '#6b4b3b'),
-      'moon-clock': moonClockCase, 'apothecary-shelf': apothecaryShelf, 'wall-shelf': wallShelf, 'hanging-plant': hangingPlant,
+      'moon-clock': moonClockCase, 'wall-clock': wallClock, 'apothecary-shelf': apothecaryShelf, 'wall-shelf': wallShelf, 'hanging-plant': hangingPlant,
       'cloud-shelf': parent => cloudShelf(parent, 2.5), 'small-cloud-shelf': parent => cloudShelf(parent, 2.1),
       'wall-scroll': wallScroll, 'neon-orbit': neonOrbit, 'record-sleeve': recordSleeve, 'felt-rainbow': feltRainbow,
       'cottage-window': cottageWindow, 'arched-window': archedWindow, 'round-window': roundWindow,
@@ -1634,10 +1645,34 @@ export function createFurniture(type, scene) {
     const rest = { hour: Math.atan2(0.13, 0.18), minute: Math.atan2(-0.25, 0.045), second: 0 };
     const localOffset = -new Date().getTimezoneOffset() * 60 + Date.now() / 1000 - performance.now() / 1000;
     animations.push((seconds, focused, reducedMotion) => {
-      if (reducedMotion) { for (const node of [hour, minute, second, pendulum]) node.rotation.z = 0; return; }
       const time = (seconds + localOffset) % 43200, turn = Math.PI * 2;
       hour.rotation.z = -(time / 43200 * turn - rest.hour); minute.rotation.z = -(time % 3600 / 3600 * turn - rest.minute);
-      second.rotation.z = -(Math.floor(time % 60) / 60 * turn - rest.second); pendulum.rotation.z = Math.sin(seconds * 2.8) * 0.17;
+      // With reduced motion the second hand and the pendulum rest; the room
+      // wakes once a minute, so the hour and minute hands still keep the time.
+      second.rotation.z = reducedMotion ? rest.second : -(Math.floor(time % 60) / 60 * turn - rest.second);
+      pendulum.rotation.z = reducedMotion ? 0 : Math.sin(seconds * 2.8) * 0.17;
+    });
+  }
+  if (type === 'wall-clock') {
+    // The hands keep the real local time. The hour and minute hands turn at
+    // the turn of each minute; the second hand ticks, and it is away with
+    // reduced motion, when the room draws only once a minute for the clock.
+    const hand = (name, length, tail, width, z, color) => {
+      const node = group(result, [0, 0, 0]); node.name = name;
+      box(node, [width, length + tail, 0.006], [0, (length - tail) / 2, z], color, width / 2).metadata = { dynamic: true };
+      return node;
+    };
+    const hour = hand('wall-clock-hour-hand', 0.15, 0.03, 0.026, 0.084, '#50453d'), minute = hand('wall-clock-minute-hand', 0.225, 0.035, 0.018, 0.09, '#50453d');
+    const second = hand('wall-clock-second-hand', 0.24, 0.06, 0.006, 0.096, '#c8674f');
+    let shown = -1;
+    animations.push((seconds, focused, reducedMotion) => {
+      const now = Date.now(), turn = Math.PI * 2;
+      if (Math.floor(now / 60000) !== shown) {
+        shown = Math.floor(now / 60000); const date = new Date(now);
+        hour.rotation.z = -((date.getHours() % 12 * 60 + date.getMinutes()) / 720 * turn); minute.rotation.z = -(date.getMinutes() / 60 * turn);
+      }
+      second.setEnabled(!reducedMotion);
+      if (!reducedMotion) second.rotation.z = -(Math.floor(now / 1000) % 60 / 60 * turn);
     });
   }
   if (type === 'bookcase') {
