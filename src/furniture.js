@@ -107,8 +107,8 @@ function mesh(parent, shape, color, position, extra) {
 function box(parent, size, position, color, radius = 0.025) {
   return mesh(parent, createRoundedBox('joinery', size, Math.min(radius, 0.055), parent.getScene()), color, position);
 }
-function sphere(parent, size, position, color) {
-  const result = mesh(parent, CreateSphere('soft-form', { diameter: 2, segments: 6 }, parent.getScene()), color, position);
+function sphere(parent, size, position, color, segments = 6) {
+  const result = mesh(parent, CreateSphere('soft-form', { diameter: 2, segments }, parent.getScene()), color, position);
   result.scaling.set(...size); return result;
 }
 function cylinder(parent, top, bottom, height, position, color, { segments = 12, ...extra } = {}) {
@@ -117,6 +117,13 @@ function cylinder(parent, top, bottom, height, position, color, { segments = 12,
 function rod(parent, a, b, radius, color, extra = {}) {
   const start = new Vector3(...a), end = new Vector3(...b), delta = end.subtract(start);
   const result = mesh(parent, CreateCylinder('stem', { diameter: radius * 2, height: delta.length(), tessellation: 8 }, parent.getScene()), color, start.add(end).scale(0.5).asArray(), extra);
+  result.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), delta.normalize(), new Quaternion());
+  return result;
+}
+// A limb that narrows from `a` to `b`.
+function taper(parent, a, b, radiusA, radiusB, color) {
+  const start = new Vector3(...a), end = new Vector3(...b), delta = end.subtract(start);
+  const result = mesh(parent, CreateCylinder('limb', { diameterTop: radiusB * 2, diameterBottom: radiusA * 2, height: delta.length(), tessellation: 12 }, parent.getScene()), color, start.add(end).scale(0.5).asArray());
   result.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), delta.normalize(), new Quaternion());
   return result;
 }
@@ -1187,6 +1194,11 @@ function createArticulatedUpperBody(avatar, template) {
   };
 }
 
+// The companion's trousers meet the sweater in soft hips, and its shoes are
+// rounded, on a darker sole. The desk and walking companions share them.
+const TROUSERS = '#777e72';
+function hips(parent) { return sphere(parent, [.255, .135, .215], [0, .79, -.08], TROUSERS, 8); }
+function shoe(parent, x) { return [sphere(parent, [.1, .072, .175], [x, .102, -.77], C.cream, 8), sphere(parent, [.106, .028, .182], [x, .048, -.768], '#b39c80', 6)]; }
 function sweater(parent) {
   // Elliptical rings give the knit a soft waist and sloping shoulders, rather
   // than reusing the sharp furniture-box silhouette for a person.
@@ -1220,11 +1232,12 @@ function avatarTemplate(scene) {
   const templates = cacheFor(scene).templates;
   if (templates.has('avatar')) return templates.get('avatar');
   const body = new TransformNode('avatar-part', scene);
-  box(body, [0.51, 0.22, 0.43], [0, 0.77, -0.08], '#777e72', 0.08);
+  hips(body);
   for (const x of [-0.15, 0.15]) {
-    rod(body, [x, 0.75, -0.08], [x, 0.65, -0.57], 0.115, '#777e72');
-    rod(body, [x, 0.65, -0.57], [x, 0.17, -0.67], 0.08, '#777e72');
-    box(body, [0.20, 0.12, 0.34], [x, 0.09, -0.75], C.cream, 0.05);
+    taper(body, [x, 0.75, -0.08], [x, 0.65, -0.57], 0.118, 0.1, TROUSERS);
+    sphere(body, [0.1, 0.1, 0.1], [x, 0.65, -0.57], TROUSERS);
+    taper(body, [x, 0.65, -0.57], [x, 0.17, -0.67], 0.098, 0.082, TROUSERS);
+    shoe(body, x);
   }
   const upperSource = new TransformNode('avatar-upper-body-source', scene);
   sweater(upperSource);
@@ -1258,13 +1271,26 @@ function avatarTemplate(scene) {
   }
   upper.metadata = { ranges };
   const head = new TransformNode('avatar-part', scene);
-  sphere(head, [0.232, 0.245, 0.22], [0, 0, 0], C.skin);
-  for (const x of [-.072, .072]) sphere(head, [.012, .015, .009], [x, -.025, -.209], '#51443a');
-  sphere(head, [.031, .033, .035], [0, -.070, -.215], C.skin);
-  sphere(head, [0.24, 0.237, 0.22], [0, 0.061, 0.058], '#674d3b');
-  sphere(head, [0.12, 0.12, 0.10], [0, 0.19, 0.20], '#674d3b');
+  sphere(head, [0.232, 0.245, 0.22], [0, 0, 0], C.skin, 14);
+  // A soft face: big dark eyes with a glint, rosy cheeks and a small smile.
+  for (const x of [-.08, .08]) {
+    sphere(head, [.026, .034, .02], [x, -.03, -.196], '#3a2b24', 10);
+    sphere(head, [.008, .009, .006], [x + .009, -.017, -.2145], '#fff4e6');
+    sphere(head, [.042, .026, .03], [x * 1.62, -.088, -.152], '#e59b85', 10);
+  }
+  sphere(head, [.02, .017, .016], [0, -.062, -.214], C.skin, 8);
+  torus(head, .022, .0055, [0, -.082, -.203], '#7a4a3c', Math.PI).rotation.z = Math.PI;
+  // The hair: a smooth crown, a fringe over the forehead, a lock beside each
+  // cheek and a bun.
+  const hair = '#674d3b';
+  sphere(head, [0.24, 0.237, 0.23], [0, 0.066, 0.05], hair, 14);
+  // The fringe is three soft scallops that follow the forehead.
+  sphere(head, [.095, .085, .05], [0, .14, -.18], hair, 10).rotation.x = .55;
+  for (const side of [-1, 1]) { const lock = sphere(head, [.09, .08, .05], [side * .105, .125, -.16], hair, 10); lock.rotation.set(.5, side * -.55, side * .25); }
+  for (const x of [-.212, .212]) sphere(head, [.038, .1, .048], [x, -.01, -.055], hair, 10);
+  sphere(head, [0.12, 0.12, 0.10], [0, 0.19, 0.20], hair, 12);
   torus(head, 0.25, 0.026, [0, 0.017, 0.014], C.dark, Math.PI);
-  for (const x of [-0.244, 0.244]) sphere(head, [0.044, 0.091, 0.08], [x, 0.022, 0.014], C.sage);
+  for (const x of [-0.244, 0.244]) sphere(head, [0.044, 0.091, 0.08], [x, 0.022, 0.014], C.sage, 10);
   const hand = new TransformNode('avatar-part', scene); sphere(hand, [0.074, 0.044, 0.10], [0, 0, 0], C.skin);
   const writingHand = new TransformNode('avatar-part', scene);
   sphere(writingHand, [0.074, 0.044, 0.10], [0, 0, 0], C.skin);
@@ -1280,20 +1306,21 @@ function avatarTemplate(scene) {
 export function createMobileCompanion(scene) {
   const root = new TransformNode('Walking companion', scene), source = new TransformNode('companion-rig-source', scene);
   sweater(source); cylinder(source, .10, .12, .14, [0, 1.565, -.14], C.skin);
-  box(source, [.51, .22, .43], [0, .77, -.08], '#777e72', .08);
+  hips(source);
   source.getChildMeshes().forEach(part => { part.metadata = { bone: 'torso' }; });
   const joints = {}, bones = {};
   for (const side of [-1, 1]) {
     const key = side < 0 ? 'L' : 'R';
     const anchors = { shoulder: [side * .255, 1.43, -.12], elbow: [side * .34, 1.10, -.14], wrist: [side * .30, .89, -.18], hip: [side * .15, .76, -.08], knee: [side * .15, .65, -.57], ankle: [side * .15, .17, -.67] };
     for (const [name, point] of Object.entries(anchors)) joints[name + key] = new Vector3(...point);
-    for (const [name, a, b, radius, tint] of [['upperArm', 'shoulder', 'elbow', .092, '#b88770'], ['forearm', 'elbow', 'wrist', .075, '#b88770'], ['thigh', 'hip', 'knee', .108, '#777e72'], ['shin', 'knee', 'ankle', .078, '#777e72']]) {
-      const bone = name + key, part = rod(source, anchors[a], anchors[b], radius, tint);
+    // Limbs narrow toward the hands and feet, with a round joint at the top of each.
+    for (const [name, a, b, radius, end, tint] of [['upperArm', 'shoulder', 'elbow', .092, .082, '#b88770'], ['forearm', 'elbow', 'wrist', .08, .068, '#b88770'], ['thigh', 'hip', 'knee', .118, .1, TROUSERS], ['shin', 'knee', 'ankle', .1, .082, TROUSERS]]) {
+      const bone = name + key, part = taper(source, anchors[a], anchors[b], radius, end, tint);
       part.metadata = { bone }; bones[bone] = { a: a + key, b: b + key, start: new Vector3(...anchors[a]), end: new Vector3(...anchors[b]) };
       const joint = sphere(source, [radius, radius, radius], anchors[a], tint); joint.metadata = { joint: a + key };
     }
-    const hand = sphere(source, [.074, .082, .066], anchors.wrist, C.skin); hand.metadata = { joint: 'wrist' + key };
-    const shoe = box(source, [.20, .12, .34], [side * .15, .09, -.75], C.cream, .05); shoe.metadata = { joint: 'ankle' + key };
+    const hand = sphere(source, [.074, .082, .066], anchors.wrist, C.skin, 8); hand.metadata = { joint: 'wrist' + key };
+    for (const part of shoe(source, side * .15)) part.metadata = { joint: 'ankle' + key, pitch: key };
   }
   const ranges = []; let vertex = 0;
   for (const part of source.getChildMeshes()) { ranges.push({ start: vertex, end: vertex + part.getTotalVertices(), ...part.metadata }); vertex += part.getTotalVertices(); }
@@ -1339,6 +1366,10 @@ export function createMobileCompanion(scene) {
   // Break activities blend in and out. A negative lean bends forward, and a
   // negative head pitch looks down.
   const act = { kind: null, weight: 0 }; let lastSeconds = null;
+  // The walk: each foot stays planted for most of a stride (`STANCE`) and
+  // swings forward in a low arc, the knee bending over the swing. A stride
+  // is `STRIDE` long; `gait` eases it in and out, so a stop never snaps.
+  const STRIDE = .9, STANCE = .6, REACH = STRIDE * STANCE / 2, pitch = { L: 0, R: 0 }; let gait = 0;
   const LEAN = { record: -.68, water: -.12, pet: -.55, lamp: .04, warm: -.04 }, HIP = { pet: .36 };
   const LOOK = { read: -.34, water: -.3, record: -.32, pet: -.22, lamp: .3, window: .1, warm: -.06 };
   // Two-bone arm IK: the hand goes to its target, or as close as the arm allows.
@@ -1362,7 +1393,7 @@ export function createMobileCompanion(scene) {
     animate(pose, seconds, reducedMotion) {
       const visible = !pose.atDesk;
       root.setEnabled(visible); contact.setEnabled(visible);
-      if (!visible) { act.kind = null; act.weight = 0; lastSeconds = null; return; }
+      if (!visible) { act.kind = null; act.weight = 0; lastSeconds = null; gait = 0; return; }
       const dt = lastSeconds === null ? 0 : Math.min(.1, Math.max(0, seconds - lastSeconds)); lastSeconds = seconds;
       if (pose.activity !== act.kind && (act.weight < .02 || reducedMotion)) act.kind = pose.activity;
       const goal = pose.activity && pose.activity === act.kind ? 1 : 0;
@@ -1372,20 +1403,36 @@ export function createMobileCompanion(scene) {
       sleepLetters.setEnabled(pose.doze > .25 && !reducedMotion);
       if (sleepLetters.isEnabled()) { const drift = seconds / 3 % 1; sleepLetters.position.set(.12, 2.08 + drift * .20, 0); sleepLetters.alpha = Math.sin(drift * Math.PI) * .70; }
       contact.position.x = pose.x; contact.position.z = pose.z;
-      const sit = pose.sit, phase = pose.moving && !reducedMotion ? pose.step : 0;
+      const sit = pose.sit;
+      gait = reducedMotion ? 0 : gait + ((pose.moving ? 1 : 0) - gait) * (1 - Math.exp(-dt * (pose.moving ? 9 : 7)));
+      // `cycle` counts strides walked (the routine adds 8 to `step` a metre).
+      // The hips bob twice a stride, highest over a planted foot, and the
+      // body rolls a little toward that foot.
+      const g = gait * (1 - sit), cycle = pose.step / 8 / STRIDE, mid = cycle - Math.floor(cycle) - STANCE / 2;
       const breath = reducedMotion ? 0 : Math.sin(seconds * (pose.doze > 0 ? 1.05 : 1.4)) * .007;
-      let hip = 1.10 * (1 - sit) + pose.seatHeight * sit + (pose.moving && !reducedMotion ? Math.cos(phase * 2) * .016 : 0);
-      let lean = sit * (.08 + pose.doze * .11);
-      const roll = reducedMotion ? 0 : Math.sin(phase) * .025 * (1 - sit);
+      let hip = 1.10 * (1 - sit) + pose.seatHeight * sit + Math.cos(mid * Math.PI * 4) * .018 * g;
+      let lean = sit * (.08 + pose.doze * .11) - .05 * g;
+      const roll = Math.cos(mid * Math.PI * 2) * .03 * g;
       if (w) { hip += ((HIP[kind] ?? hip) - hip) * w; lean += (LEAN[kind] ?? 0) * w; }
       for (const side of [-1, 1]) {
-        const key = side < 0 ? 'L' : 'R', stride = Math.sin(phase + (side < 0 ? 0 : Math.PI)), lift = pose.moving && !reducedMotion ? Math.max(0, Math.cos(phase + (side < 0 ? 0 : Math.PI))) * .10 : 0;
+        const key = side < 0 ? 'L' : 'R', u = cycle + (side < 0 ? 0 : .5) - Math.floor(cycle + (side < 0 ? 0 : .5));
+        // Planted, the foot moves back as fast as the body goes forward.
+        let foot = -REACH + 2 * REACH * u / STANCE, lift = 0, bend = 0; pitch[key] = 0;
+        if (u >= STANCE) {
+          const q = (u - STANCE) / (1 - STANCE), arc = Math.sin(q * Math.PI);
+          foot = REACH - 2 * REACH * q * q * (3 - 2 * q); lift = arc * .11; bend = arc * .13; pitch[key] = -Math.sin(q * Math.PI * 2) * (q < .5 ? .18 : .3) * g;
+        }
+        // Each arm swings against the leg on its side.
+        const swing = Math.cos(u * Math.PI * 2) * g;
         torsoPoint(side * .255, .65, -.04, hip + breath, lean, roll, joints['shoulder' + key]);
-        joints['elbow' + key].set(side * (.32 + sit * .01), hip + .31 + sit * .06, -.10 + stride * .12 * (1 - sit));
-        joints['wrist' + key].set(side * (.30 - sit * .10), hip + .08 + sit * .13, -.16 - sit * .25 + stride * .22 * (1 - sit));
+        joints['elbow' + key].set(side * (.32 + sit * .01), hip + .31 + sit * .06, -.10 + swing * .07);
+        joints['wrist' + key].set(side * (.30 - sit * .10), hip + .08 + sit * .13 + (g - swing) * .012, -.16 - sit * .25 + swing * .15);
         joints['hip' + key].set(side * .15, hip - .02, -.08);
-        joints['knee' + key].set(side * .15, .56 * (1 - sit) + (pose.seatHeight - .13) * sit, -.57 * sit - .06 + stride * .14 * (1 - sit));
-        joints['ankle' + key].set(side * .15, .17 * sit + .15 * (1 - sit) + lift * (1 - sit), -.67 * sit - stride * .29 * (1 - sit));
+        // Standing, the knee sits between hip and ankle, a little forward; it
+        // bends further as the foot swings through.
+        const ankleY = .15 + lift * g, ankleZ = foot * g;
+        joints['knee' + key].set(side * .15, (hip - .02 + ankleY) / 2 * (1 - sit) + (pose.seatHeight - .13) * sit, ((-.08 + ankleZ) / 2 - .035 - bend * g) * (1 - sit) - .63 * sit);
+        joints['ankle' + key].set(side * .15, ankleY * (1 - sit) + .17 * sit, ankleZ * (1 - sit) - .67 * sit);
         if (!w) continue;
         const shoulder = joints['shoulder' + key], H = hip;
         // The right hand does the work; the left one helps or rests.
@@ -1423,6 +1470,11 @@ export function createMobileCompanion(scene) {
             const axial = Vector3.Dot(normal, bone.direction) * (bone.length / length - 1);
             normal.addInPlaceFromFloats(bone.direction.x * axial, bone.direction.y * axial, bone.direction.z * axial).normalize().rotateByQuaternionToRef(rotation, rotated);
             normals[i] = rotated.x; normals[i + 1] = rotated.y; normals[i + 2] = rotated.z;
+          } else if (range.pitch) {
+            // A shoe tips about its ankle: toe down as it lifts, toe up to land.
+            const joint = joints[range.joint], c = Math.cos(pitch[range.pitch]), s = Math.sin(pitch[range.pitch]), y = neutral[i + 1] - range.center.y, z = neutral[i + 2] - range.center.z;
+            positions[i] = neutral[i] + joint.x - range.center.x; positions[i + 1] = joint.y + y * c - z * s; positions[i + 2] = joint.z + y * s + z * c;
+            normals[i + 1] = neutralNormals[i + 1] * c - neutralNormals[i + 2] * s; normals[i + 2] = neutralNormals[i + 1] * s + neutralNormals[i + 2] * c;
           } else if (range.joint) {
             const joint = joints[range.joint];
             positions[i] = neutral[i] + joint.x - range.center.x; positions[i + 1] = neutral[i + 1] + joint.y - range.center.y; positions[i + 2] = neutral[i + 2] + joint.z - range.center.z;
@@ -1437,7 +1489,8 @@ export function createMobileCompanion(scene) {
       body.updateVerticesData('position', positions, false, false); body.updateVerticesData('normal', normals, false, false);
       torsoPoint(0, 1.02, -.09, hip + breath, lean, roll, head.position);
       const look = w * (LOOK[kind] ?? 0), glance = kind === 'window' ? w * calm * Math.sin(seconds * .31) * .3 : 0;
-      head.rotation.set(lean - pose.doze * .36 * (kind === 'read' ? .5 : 1) + look, (reducedMotion ? 0 : Math.sin(seconds * .45) * .055 * sit) + glance, roll + pose.doze * .09);
+      // The head stays steadier than the body under it.
+      head.rotation.set(lean * (1 - g * .6) - pose.doze * .36 * (kind === 'read' ? .5 : 1) + look, (reducedMotion ? 0 : Math.sin(seconds * .45) * .055 * sit) + glance, roll * .4 + pose.doze * .09);
       // The book sits between the hands; the can hangs from the right hand
       // and tips to pour in the middle of the watering.
       book.setEnabled(kind === 'read' && w > .02); can.setEnabled(kind === 'water' && w > .02);
