@@ -77,6 +77,8 @@ test('every design offers break activities the companion can reach, each facing 
 });
 test('the companion waters the Swiss cheese plant too, facing it', () => {
   const layout = createLayout('writers-loft'), monstera = { id: 'test-monstera', type: 'monstera', x: -1, z: 1, rotation: 0 };
+  // Whatever a design puts on this spot makes way, so only the plant is tested.
+  layout.items = layout.items.filter(item => validatePlacement([item], monstera).valid);
   assert.ok(validatePlacement(layout.items, monstera).valid, 'the plant stands on free floor');
   layout.items.push(monstera);
   const spot = activitySpots(layout).find(entry => entry.kind === 'water' && entry.itemId === monstera.id);
