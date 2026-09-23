@@ -167,6 +167,58 @@ export function rugsOverlap(a, b) {
   return Math.abs(p.x - q.x) < p.hx + q.hx && Math.abs(p.z - q.z) < p.hz + q.hz;
 }
 
+// Rugs lie in the order they were put down, each 6 mm above the one before,
+// and a rug that another rug covers lies flat, so the one on top keeps its
+// weave. `top` is the height of a rug's highest thread. The lowest rug lies
+// on `floor`: the sakura tatami stands higher than a flat rug's weave.
+export const FLOOR_Y = 0.22, RUG_STEP = 0.006, FLAT_RUG = 0.0055;
+const isRug = candidate => getFurniture(candidate?.type)?.category === 'Rugs';
+// The woven layers of each rug as its model in furniture.js builds them:
+// [x, z, half width, half depth, top] in the rug's own space, round on the
+// moon rug. A piece stands on the layers and sinks into the thin motifs.
+const WEAVE = {
+  rug: [[0, 0, 1.62, 1.10, 0.031], [0, 0, 1.54, 1.015, 0.040], [0, 0, 1.415, 0.885, 0.046], [0, 0, 1.35, 0.82, 0.0515]],
+  'moon-rug': [[0, 0, 1.67, 1.67, 0.045], [0, 0, 1.59, 1.59, 0.0535], [0, 0, 1.48, 1.48, 0.0605], [0, 0, 1.36, 1.36, 0.0675], [-0.09, -0.10, 0.47, 0.47, 0.075], [0.09, -0.16, 0.42, 0.42, 0.08]],
+};
+export function rugStack(items, floor = FLOOR_Y) {
+  const rugs = (Array.isArray(items) ? items : []).filter(isRug);
+  return rugs.map((item, index) => {
+    const { height, footprint } = getFurniture(item.type), y = floor + index * RUG_STEP, angle = item.rotation * Math.PI / 2;
+    const flat = rugs.slice(index + 1).some(upper => rugsOverlap(item, upper)), scale = flat ? FLAT_RUG / height : 1;
+    return { item, y, flat, scale, top: y + height * scale, round: item.type === 'moon-rug', cos: Math.cos(angle), sin: Math.sin(angle),
+      weave: WEAVE[item.type] || [[0, 0, footprint[0] / 2, footprint[1] / 2, height]], ...bounds(item) };
+  });
+}
+// Whether a rug of `rugStack` reaches into an area; a point is an area whose
+// edges meet.
+export function rugTouches(rug, area) {
+  const hx = (rug.maxX - rug.minX) / 2 - 0.01, hz = (rug.maxZ - rug.minZ) / 2 - 0.01, { x, z } = rug.item;
+  const dx = Math.max(area.minX - x, x - area.maxX, 0), dz = Math.max(area.minZ - z, z - area.maxZ, 0);
+  return rug.round ? Math.hypot(dx, dz) < hx : dx < hx && dz < hz;
+}
+// The height of the highest woven layer of `stack` over a floor point, or of the floor.
+export function groundAt(stack, x, z, floor = FLOOR_Y) {
+  let ground = floor;
+  for (const rug of stack) {
+    const dx = x - rug.item.x, dz = z - rug.item.z, u = dx * rug.cos - dz * rug.sin, v = dx * rug.sin + dz * rug.cos;
+    for (const layer of rug.weave) {
+      const y = rug.y + layer[4] * rug.scale, du = u - layer[0], dv = v - layer[1];
+      if (y > ground && (rug.round ? Math.hypot(du, dv) < layer[2] : Math.abs(du) < layer[2] && Math.abs(dv) < layer[3])) ground = y;
+    }
+  }
+  return ground;
+}
+// A floor piece stands on the rug that lies under most of it: the highest
+// layer under at least 3 of 5 points, the middle of its footprint and its
+// corners set in by 15 %. Otherwise it stands on the floor, and a rug's edge
+// slips under its base.
+export function standHeight(item, stack) {
+  if (isRug(item) || getFurniture(item?.type)?.mount === 'wall') return FLOOR_Y;
+  const { minX, maxX, minZ, maxZ } = bounds(item), ix = (maxX - minX) * 0.15, iz = (maxZ - minZ) * 0.15;
+  const points = [[(minX + maxX) / 2, (minZ + maxZ) / 2], [minX + ix, minZ + iz], [maxX - ix, minZ + iz], [minX + ix, maxZ - iz], [maxX - ix, maxZ - iz]];
+  return points.map(([x, z]) => groundAt(stack, x, z)).sort((a, b) => b - a)[2];
+}
+
 // `style` is the room shell (see walls.js): it places the walls and their fixtures.
 export function validatePlacement(items, candidate, style = 'retreat') {
   const definition = getFurniture(candidate?.type);

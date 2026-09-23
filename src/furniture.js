@@ -1381,16 +1381,17 @@ export function createMobileCompanion(scene) {
     elbow.set(shoulder.x + aim.x * along + bend.x * out, shoulder.y + aim.y * along + bend.y * out, shoulder.z + aim.z * along + bend.z * out);
     wrist.set(shoulder.x + aim.x * d, shoulder.y + aim.y * d, shoulder.z + aim.z * d);
   }
-  // The pose's hand target, from room space into the companion's own space.
-  function reachLocal(pose, out) {
+  // The pose's hand target, from room space into the companion's own space;
+  // its height counts from the floor, and the companion stands at `ground`.
+  function reachLocal(pose, ground, out) {
     const dx = pose.reach.x - pose.x, dz = pose.reach.z - pose.z, c = Math.cos(pose.yaw), s = Math.sin(pose.yaw);
-    return out.set(dx * c - dz * s, pose.reach.y, dx * s + dz * c);
+    return out.set(dx * c - dz * s, pose.reach.y + .22 - ground, dx * s + dz * c);
   }
   const blendJoint = (name, x, y, z, w) => { const joint = joints[name]; joint.x += (x - joint.x) * w; joint.y += (y - joint.y) * w; joint.z += (z - joint.z) * w; };
   const blendArm = (key, w) => { blendJoint('elbow' + key, elbow.x, elbow.y, elbow.z, w); blendJoint('wrist' + key, wrist.x, wrist.y, wrist.z, w); };
   return {
     root, contact, head, book, can,
-    animate(pose, seconds, reducedMotion) {
+    animate(pose, seconds, reducedMotion, ground = .22) {
       const visible = !pose.atDesk;
       root.setEnabled(visible); contact.setEnabled(visible);
       if (!visible) { act.kind = null; act.weight = 0; lastSeconds = null; gait = 0; return; }
@@ -1399,7 +1400,7 @@ export function createMobileCompanion(scene) {
       const goal = pose.activity && pose.activity === act.kind ? 1 : 0;
       act.weight = reducedMotion ? goal : act.weight + (goal - act.weight) * (1 - Math.exp(-dt * 6));
       const kind = act.kind, w = kind ? act.weight : 0, calm = reducedMotion ? 0 : 1, doze = pose.doze;
-      root.position.set(pose.x, .22, pose.z); root.rotation.y = pose.yaw;
+      root.position.set(pose.x, ground, pose.z); root.rotation.y = pose.yaw;
       sleepLetters.setEnabled(pose.doze > .25 && !reducedMotion);
       if (sleepLetters.isEnabled()) { const drift = seconds / 3 % 1; sleepLetters.position.set(.12, 2.08 + drift * .20, 0); sleepLetters.alpha = Math.sin(drift * Math.PI) * .70; }
       contact.position.x = pose.x; contact.position.z = pose.z;
@@ -1414,6 +1415,11 @@ export function createMobileCompanion(scene) {
       let lean = sit * (.08 + pose.doze * .11) - .05 * g;
       const roll = Math.cos(mid * Math.PI * 2) * .03 * g;
       if (w) { hip += ((HIP[kind] ?? hip) - hip) * w; lean += (LEAN[kind] ?? 0) * w; }
+      // A piece on lower ground than the companion, such as bare floor beside
+      // the rug that it stands on: the knees bend by the difference, so the
+      // arm meets the piece as it does on bare floor.
+      const drop = pose.reach && (kind === 'record' || kind === 'lamp' || kind === 'pet') ? Math.max(0, ground - .22 - (pose.reach.lift ?? 0)) * w : 0;
+      hip -= drop;
       for (const side of [-1, 1]) {
         const key = side < 0 ? 'L' : 'R', u = cycle + (side < 0 ? 0 : .5) - Math.floor(cycle + (side < 0 ? 0 : .5));
         // Planted, the foot moves back as fast as the body goes forward.
@@ -1431,7 +1437,7 @@ export function createMobileCompanion(scene) {
         // Standing, the knee sits between hip and ankle, a little forward; it
         // bends further as the foot swings through.
         const ankleY = .15 + lift * g, ankleZ = foot * g;
-        joints['knee' + key].set(side * .15, (hip - .02 + ankleY) / 2 * (1 - sit) + (pose.seatHeight - .13) * sit, ((-.08 + ankleZ) / 2 - .035 - bend * g) * (1 - sit) - .63 * sit);
+        joints['knee' + key].set(side * .15, (hip - .02 + ankleY) / 2 * (1 - sit) + (pose.seatHeight - .13) * sit, ((-.08 + ankleZ) / 2 - .035 - bend * g - drop * 1.5) * (1 - sit) - .63 * sit);
         joints['ankle' + key].set(side * .15, ankleY * (1 - sit) + .17 * sit, ankleZ * (1 - sit) - .67 * sit);
         if (!w) continue;
         const shoulder = joints['shoulder' + key], H = hip;
@@ -1442,7 +1448,7 @@ export function createMobileCompanion(scene) {
         else if (kind === 'water') { reachArm(shoulder, side > 0 ? target.set(.18, H + .12, -.52) : target.set(-.24, H + .02, -.12), side, -.7, .3); blendArm(key, w); }
         else if (kind === 'record' || kind === 'lamp' || kind === 'pet') {
           if (side > 0 && pose.reach) {
-            reachLocal(pose, local);
+            reachLocal(pose, ground, local);
             // A light tap on the switch or the record; slow strokes for the pet.
             if (kind === 'pet') local.z += calm * Math.sin(seconds * 2.4) * .06;
             else { const click = pose.activityTime - (pose.useAt ?? 0); local.y -= calm * (Math.abs(click) < .3 ? Math.cos(click / .3 * Math.PI / 2) * .04 : 0); }

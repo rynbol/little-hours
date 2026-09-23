@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
+import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { FURNITURE, getFurniture } from './catalog.js';
-import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, PET_HOME, createLayout, validatePlacement, normalizeLayout, findFreePosition, nearestValidPlacement, rugsOverlap, pieceCount, petBed } from './layout.js';
+import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, PET_HOME, createLayout, validatePlacement, normalizeLayout, findFreePosition, nearestValidPlacement, rugsOverlap, pieceCount, petBed, rugStack, rugTouches, groundAt, standHeight, footprintBounds, FLOOR_Y, RUG_STEP, FLAT_RUG } from './layout.js';
 import { createFurniture, disposeFurnitureAssets } from './furniture.js';
 import { cutRect, subtractRect, openings, OPENING_INSET } from './walls.js';
 import { SURFACES } from './surfaces.js';
@@ -544,6 +545,91 @@ test('rugs overlap by their woven outline: rectangles, and a circle for the roun
   assert.equal(rugsOverlap(rug(0, 0, 0, 'moon-rug'), rug(2.5, 0)), true);
   const ember = createLayout('ember-library').items;
   assert.equal(rugsOverlap(ember.find(item => item.id === 'ember-moon-rug'), ember.find(item => item.id === 'ember-cat-rug')), true);
+});
+
+test('pieces stand on the woven layers that the rug models build, in every quarter turn', () => {
+  // A ray straight down finds each model's top. Away from the rounded layer
+  // edges, a piece never floats over the weave and sinks at most into a thin
+  // motif: the diamonds of the woven rug or the stars of the moon rug.
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    for (const [type, sink, edges] of [['rug', 0.0046, [[1.62, 1.10], [1.54, 1.015], [1.415, 0.885], [1.35, 0.82]]], ['moon-rug', 0.0125, [[1.67], [1.59], [1.48], [1.36], [0.47, -0.09, -0.10], [0.42, 0.09, -0.16]]]]) {
+      const model = createFurniture(type, scene), parts = new Set(model.getChildMeshes());
+      for (let rotation = 0; rotation < 4; rotation++) {
+        const item = { id: type, type, x: 0.5, z: -0.25, rotation }, stack = rugStack([item]), angle = rotation * Math.PI / 2;
+        model.position.set(item.x, FLOOR_Y, item.z); model.rotation.y = angle; model.getChildMeshes().forEach(part => part.computeWorldMatrix(true));
+        let checked = 0;
+        for (let u = -1.6; u <= 1.6; u += 0.1) for (let v = -1.6; v <= 1.6; v += 0.1) {
+          // The rug's own space, then the room.
+          const nearEdge = edges.some(([a, b, c]) => type === 'moon-rug' ? Math.abs(Math.hypot(u - (b ?? 0), v - (c ?? 0)) - a) < 0.07 : Math.abs(Math.abs(u) - a) < 0.07 && Math.abs(v) < b + 0.07 || Math.abs(Math.abs(v) - b) < 0.07 && Math.abs(u) < a + 0.07);
+          const inside = type === 'moon-rug' ? Math.hypot(u, v) < 1.6 : Math.abs(u) < 1.55 && Math.abs(v) < 1.03;
+          if (nearEdge || !inside) continue;
+          const x = item.x + u * Math.cos(angle) + v * Math.sin(angle), z = item.z - u * Math.sin(angle) + v * Math.cos(angle);
+          const hit = scene.pickWithRay(new Ray(new Vector3(x, 1, z), new Vector3(0, -1, 0), 2), mesh => parts.has(mesh));
+          assert.ok(hit.hit, `${type} ${rotation}: the model is under ${u.toFixed(2)},${v.toFixed(2)}`);
+          const ground = groundAt(stack, x, z), top = hit.pickedPoint.y;
+          assert.ok(ground <= top + 0.001 && top - ground <= sink, `${type} ${rotation} at ${u.toFixed(2)},${v.toFixed(2)}: stands at ${ground.toFixed(4)}, the weave is at ${top.toFixed(4)}`);
+          checked++;
+        }
+        assert.ok(checked > 300, `${type}: ${checked} points`);
+      }
+      model.dispose();
+    }
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('rugs stack in layout order, a covered rug lies flat, and a floor piece stands on the rug under most of it', () => {
+  const rug = (id, x, z, rotation = 0, type = 'rug') => ({ id, type, x, z, rotation }), piece = (type, x, z, rotation = 0) => ({ id: type, type, x, z, rotation });
+  const near = (value, goal, label) => assert.ok(Math.abs(value - goal) < 1e-9, `${label}: ${value}, not ${goal}`);
+  const field = FLOOR_Y + 0.0515, moonField = FLOOR_Y + 0.0675;
+  // One rug: its field, its border layers, then bare floor.
+  let stack = rugStack([rug('a', 0, 0)]);
+  assert.deepEqual(stack.map(({ y, flat }) => [y, flat]), [[FLOOR_Y, false]]);
+  near(groundAt(stack, 0, 0), field, 'the middle');
+  near(groundAt(stack, 1.5, 0), FLOOR_Y + 0.040, 'the border');
+  near(groundAt(stack, 1.7, 0), FLOOR_Y, 'past the woven base, the fringe is floor');
+  near(groundAt(stack, 3, 3), FLOOR_Y, 'away from the rug');
+  near(groundAt([], 0, 0, 0.2275), 0.2275, 'a raised floor counts when no rug is there');
+  // A quarter turn swaps the long and the short side.
+  stack = rugStack([rug('a', 0, 0, 1)]);
+  near(groundAt(stack, 0, 1.3), field, 'along the long side of the turned rug');
+  near(groundAt(stack, 1.3, 0), FLOOR_Y, 'past its short side');
+  // The round rug: the moon motif, the field, and bare floor in the corners of its square.
+  stack = rugStack([rug('m', 0, 0, 0, 'moon-rug')]);
+  near(groundAt(stack, 0.09, -0.16), FLOOR_Y + 0.08, 'on the moon');
+  near(groundAt(stack, 0.9, 0.5), moonField, 'on the field');
+  near(groundAt(stack, 1.7, 1.7), FLOOR_Y, 'in a corner of its square');
+  assert.equal(rugTouches(stack[0], footprintBounds(piece('plant', 1.9, 1.9))), false, 'a pot in the corner is off the round rug');
+  assert.equal(rugTouches(stack[0], footprintBounds(piece('plant', 1.5, 0))), true, 'a pot at its edge touches it');
+  // A later rug lies on top; the one it covers lies flat.
+  stack = rugStack([rug('a', 0, 0), rug('b', 1.5, 0), rug('c', 6, 0), piece('side-table', 0, 0)]);
+  assert.deepEqual(stack.map(({ item, flat }) => [item.id, flat]), [['a', true], ['b', false], ['c', false]], 'only rugs stack');
+  near(stack[1].y, FLOOR_Y + RUG_STEP, 'the second rug'); near(stack[0].top, FLOOR_Y + FLAT_RUG, 'the flat rug');
+  near(groundAt(stack, -1, 0), FLOOR_Y + 0.0515 * FLAT_RUG / 0.056, 'the flat rug keeps a thin field');
+  near(groundAt(stack, 1.5, 0), FLOOR_Y + RUG_STEP + 0.0515, 'the rug on top');
+  // Pieces: on the field, mostly off, half on, on the upper rug, and pieces that never rise.
+  stack = rugStack([rug('a', 0, 0)]);
+  near(standHeight(piece('side-table', 0, 0), stack), field, 'a table on the rug');
+  near(standHeight(piece('plant', 1.6, 1.0), stack), FLOOR_Y, 'a pot over one corner of the rug');
+  near(standHeight(piece('ottoman', 1.4, 0), stack), FLOOR_Y + 0.046, 'an ottoman over the edge stands on the layer under 3 of its 5 points');
+  near(standHeight(piece('floor-lamp', 0.9, 0.5, 1), stack), field, 'turned pieces too');
+  near(standHeight(piece('rug', 0, 0), stack), FLOOR_Y, 'a rug is not lifted by the rug under it');
+  near(standHeight(piece('cottage-window', 0, 0), stack), FLOOR_Y, 'nor a wall piece');
+  near(standHeight(piece('side-table', 5, 0), []), FLOOR_Y, 'no rugs, the floor');
+});
+
+test('on the sakura tatami the rugs lie on its stripes, and a covered rug stays above them', () => {
+  // architecture.js: the tatami stripes stand at 0.2275, above a flat rug's weave on FLOOR_Y.
+  const tatami = 0.2275, rug = (id, type, x) => ({ id, type, x, z: 0, rotation: 0 });
+  const stack = rugStack([rug('a', 'rug', 0), rug('b', 'moon-rug', 1.2), rug('c', 'rug', 2.4)], tatami);
+  assert.deepEqual(stack.map(({ item, flat }) => [item.id, flat]), [['a', true], ['b', true], ['c', false]]);
+  stack.forEach((layer, index) => {
+    assert.ok(Math.abs(layer.y - (tatami + index * RUG_STEP)) < 1e-9, `${layer.item.id} lies at ${layer.y}`);
+    const lowest = layer.y + Math.min(...layer.weave.map(weave => weave[4])) * layer.scale;
+    assert.ok(lowest > tatami + 0.002, `${layer.item.id}: its lowest weave at ${lowest.toFixed(4)} clears the stripes`);
+    if (layer.flat) assert.ok(layer.top < stack[index + 1].y, `${layer.item.id} lies flat under the next rug`);
+  });
+  assert.ok(Math.abs(groundAt(stack, 3, 0) - (tatami + 2 * RUG_STEP + 0.0515)) < 1e-9, 'a piece on the top rug stands on its field');
 });
 
 test('switched-off lamps, fires and record players stay off after a reload; other pieces never save it', () => {

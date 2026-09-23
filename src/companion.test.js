@@ -263,6 +263,52 @@ test('walking and seated poses reuse two body/head meshes with grounded feet and
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
 
+test('a piece or a pet on a rug raises the point that the hand reaches for', () => {
+  const desk = { id: 'desk', type: 'study-desk', x: -2, z: -3, rotation: 0 }, cabinet = { id: 'cabinet', type: 'low-cabinet', x: 1.5, z: 0, rotation: 0 };
+  const lamp = { id: 'lamp', type: 'floor-lamp', x: 3, z: 0, rotation: 0, off: true }, rug = { id: 'rug', type: 'rug', x: 2, z: 0.5, rotation: 0 }, field = 0.0515;
+  const reaches = (items, pet, floor) => Object.fromEntries(activitySpots({ presetId: null, items, activeDeskId: desk.id }, { night: true, pet, floor }).filter(spot => spot.reach).map(spot => {
+    assert.ok(Math.abs(spot.reach.y - { record: 1.05, lamp: 1.5, pet: 0.4 }[spot.kind] - spot.reach.lift) < 1e-9, `${spot.kind}: the reach says how high its piece stands`);
+    return [spot.kind, spot.reach.y];
+  }));
+  const near = (value, goal, label) => assert.ok(Math.abs(value - goal) < 1e-9, `${label}: ${value}, not ${goal}`);
+  // The cabinet, the lamp and the sitting pet all stand on the rug's field.
+  const onFloor = { x: 2, z: 1, yaw: 0, state: 'sitting', moving: false, held: false }, bed = { id: 'pet-bed', type: 'pet-bed', x: -3.5, z: 2, rotation: 0 };
+  const low = reaches([desk, cabinet, lamp, bed], onFloor), high = reaches([desk, rug, cabinet, lamp, bed], onFloor);
+  assert.deepEqual(Object.keys(high).sort(), ['lamp', 'pet', 'record']);
+  near(high.record, low.record + field, 'the record player'); near(high.lamp, low.lamp + field, 'the lamp switch'); near(high.pet, low.pet + field, 'the pet');
+  // A pet asleep in its bed is as high as the bed stands.
+  const inBed = { ...onFloor, state: 'sleeping' }, raisedBed = { ...bed, x: 2, z: 1 };
+  near(reaches([desk, rug, cabinet, lamp, raisedBed], inBed).pet, reaches([desk, cabinet, lamp, raisedBed], inBed).pet + field, 'the pet in a raised bed');
+  // On the sakura tatami the rugs lie 7.5 mm higher (see rugStack), and so does a pet on bare tatami.
+  const tatami = reaches([desk, rug, cabinet, lamp, bed], onFloor, 0.2275);
+  near(tatami.record, high.record + 0.0075, 'the record player on the tatami'); near(tatami.lamp, high.lamp + 0.0075, 'the lamp switch on the tatami'); near(tatami.pet, high.pet + 0.0075, 'the pet on the tatami');
+  near(reaches([desk, cabinet, lamp, bed], onFloor, 0.2275).pet, low.pet + 0.0075, 'the pet on bare tatami');
+});
+test('from the floor or a rug, the right hand reaches a record, switch or pet as well as on bare floor', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const avatar = createMobileCompanion(scene), body = scene.getMeshByName('companion-articulated-body'), hand = body.metadata.rig.joints.wristR;
+    const targets = { record: { x: 0, z: -0.52, y: 1.05 }, lamp: { x: 0.05, z: -0.55, y: 1.5 }, pet: { x: 0.05, z: -0.55, y: 0.4 } };
+    // The joints are in the companion's own space; the goal counts from the floor.
+    const miss = (activity, ground, lift) => {
+      const goal = { ...targets[activity], y: targets[activity].y + lift, lift };
+      avatar.animate({ atDesk: false, x: 0, z: 0, yaw: 0, sit: 0, seatHeight: .80, doze: 0, step: 0, moving: false, activity, activityTime: 4, useAt: 1.6, reach: goal }, 40, true, ground);
+      assert.equal(avatar.root.position.y, ground, 'the companion stands where it is told');
+      const positions = body.getVerticesData('position');
+      for (let j = 1; j < positions.length; j += 3) assert.ok(positions[j] >= -.0001, `${activity}: feet and knees stay above the ground`);
+      return Math.hypot(hand.x - goal.x, ground + hand.y - (0.22 + goal.y), hand.z - goal.z);
+    };
+    for (const activity of Object.keys(targets)) {
+      const bare = miss(activity, 0.22, 0);
+      assert.ok(bare < 0.06, `${activity}: the hand reaches on bare floor (${bare.toFixed(3)})`);
+      // Standing higher than the piece, the knees bend; lower, the arm reaches up.
+      for (const ground of [0.22, 0.22 + 0.0515, 0.22 + 0.08]) for (const lift of [0, 0.0515, 0.08]) {
+        const off = miss(activity, ground, lift);
+        assert.ok(off < bare + 0.002, `${activity}, the piece ${lift} and the companion ${(ground - 0.22).toFixed(4)} above the floor: the hand is ${off.toFixed(3)} away, ${bare.toFixed(3)} on bare floor`);
+      }
+    }
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
 test('a layout change elsewhere leaves a resting companion on its seat', () => {
   const layout = createLayout('ember-library'), routine = createCompanionRoutine();
   routine.setLayout(layout); routine.setIntent('break'); advance(routine, 40);

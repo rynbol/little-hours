@@ -1,5 +1,5 @@
 import { getFurniture } from './catalog.js';
-import { ROOM_BOUNDS } from './layout.js';
+import { ROOM_BOUNDS, FLOOR_Y, rugStack, standHeight, groundAt, footprintBounds, petBed } from './layout.js';
 import { sessionPhase } from './session.js';
 
 export const COMPANION_RADIUS = 0.24;
@@ -229,9 +229,10 @@ export function planActivityTrip(layout, source, spot, obstacles = navigationObs
 // Where the companion can stand for each activity: before a lit fire, beside
 // a plant, at the record player, at the window, beside a still pet, and at
 // night beside an unlit floor lamp. `reach` is where its hand goes (y above
-// the floor), for the pieces it touches.
-export function activitySpots(layout, { night = false, windowX = -2.7, pet = null, canReach = null } = {}) {
-  const obstacles = navigationObstacles(layout), spots = [];
+// the floor), for the pieces it touches; a piece or pet on a rug is higher.
+// `floor` is where the lowest rug lies (see rugStack).
+export function activitySpots(layout, { night = false, windowX = -2.7, pet = null, canReach = null, floor = FLOOR_Y } = {}) {
+  const obstacles = navigationObstacles(layout), spots = [], rugs = rugStack(layout.items, floor), lift = item => standHeight(item, rugs) - FLOOR_Y;
   // Nothing is done standing on the pet, or where it is going.
   const clearOfPet = point => !pet || pet.held || (distance(point, pet) > 0.6 && (!pet.to || distance(point, pet.to) > 0.6));
   const add = (kind, point, look, itemId = null, reach = null) => {
@@ -245,25 +246,29 @@ export function activitySpots(layout, { night = false, windowX = -2.7, pet = nul
   };
   // A point `by` from `from` toward `to`, at height `y`.
   const toward = (from, to, by, y) => { const d = Math.max(distance(from, to), 1e-6); return { x: from.x + (to.x - from.x) / d * by, z: from.z + (to.z - from.z) / d * by, y }; };
+  // `lift` is how much higher than the floor the piece or the pet stands.
+  const raised = (reach, lift) => ({ ...reach, y: reach.y + lift, lift });
   for (const item of layout.items) {
     // Wall pieces have no floor footprint.
     const depth = getFurniture(item.type)?.footprint?.[1] ?? 0;
     // Before the hearth, or beside the middle when the pet has the warm spot.
     if (item.type === 'fireplace' && !item.off) [0, -0.7, 0.7].some(x => add('warm', localPoint(item, x, depth / 2 + 0.75), localPoint(item, x, 0), item.id));
     else if (item.type === 'plant' || item.type === 'moon-tree' || item.type === 'monstera') around(item, 'water', 0.45);
-    else if (item.type === 'low-cabinet') add('record', localPoint(item, -0.25, depth / 2 + 0.26), localPoint(item, -0.25, 0), item.id, { ...localPoint(item, -0.25, 0.14), y: 1.05 });
-    else if (item.type === 'floor-lamp' && item.off && night) around(item, 'lamp', 0.27, spot => toward(item, spot, 0.07, 1.5));
+    else if (item.type === 'low-cabinet') add('record', localPoint(item, -0.25, depth / 2 + 0.26), localPoint(item, -0.25, 0), item.id, raised({ ...localPoint(item, -0.25, 0.14), y: 1.05 }, lift(item)));
+    else if (item.type === 'floor-lamp' && item.off && night) around(item, 'lamp', 0.27, spot => raised(toward(item, spot, 0.07, 1.5), lift(item)));
   }
   [0.85, 1.3].some(gap => [0, -0.6, 0.6, -1.2, 1.2].some(dx => add('window', { x: windowX + dx, z: ROOM_BOUNDS.minZ + gap }, { x: windowX + dx, z: ROOM_BOUNDS.minZ - 1 })));
   // Beside the pet while it naps or sits, never while it walks or is carried.
   if (pet && !pet.moving && !pet.held && ['sleeping', 'sitting'].includes(pet.state)) {
-    [0.75, 0.95].some(gap => [0, 1, -1, 2, -2, 3, -3, 4].some(k => add('pet', { x: pet.x - Math.sin(pet.yaw + k * Math.PI / 4) * gap, z: pet.z - Math.cos(pet.yaw + k * Math.PI / 4) * gap }, pet, null, spot => toward(pet, spot, 0.2, 0.4))));
+    const bed = petBed(layout), box = bed && footprintBounds(bed), onBed = box && pet.x > box.minX && pet.x < box.maxX && pet.z > box.minZ && pet.z < box.maxZ;
+    const petLift = onBed ? lift(bed) : groundAt(rugs, pet.x, pet.z, floor) - FLOOR_Y;
+    [0.75, 0.95].some(gap => [0, 1, -1, 2, -2, 3, -3, 4].some(k => add('pet', { x: pet.x - Math.sin(pet.yaw + k * Math.PI / 4) * gap, z: pet.z - Math.cos(pet.yaw + k * Math.PI / 4) * gap }, pet, null, spot => raised(toward(pet, spot, 0.2, 0.4), petLift))));
   }
   return spots;
 }
 
 export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, random = Math.random } = {}) {
-  const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null, goal: null, seated: false, portal: null, to: null };
+  const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null, goal: null, seated: false, portal: null, to: null, seatId: null };
   let layout, intent = 'idle', editing = false, anchor = null, trip = null, legs = [], legIndex = 0, elapsed = 0, restTime = 0;
   // One activity per break; `reduced` is the last reduced-motion setting,
   // which skips standing activities. A lamp or record player is switched on
@@ -310,7 +315,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     const desk = layout?.items.find(item => item.id === layout.activeDeskId);
     if (!desk) return;
     const seat = seatsFor(desk)[0];
-    Object.assign(pose, { x: seat.seat.x, z: seat.seat.z, yaw: seat.yaw, atDesk: true, sit: 1, seatHeight: .80, doze: 0, moving: false, activity: null, goal: null, seated: false, portal: null, to: null });
+    Object.assign(pose, { x: seat.seat.x, z: seat.seat.z, yaw: seat.yaw, atDesk: true, sit: 1, seatHeight: .80, doze: 0, moving: false, activity: null, goal: null, seated: false, portal: null, to: null, seatId: desk.id });
     anchor = null; trip = null; legs = []; restTime = 0;
     status(intent === 'working' ? 'working' : intent === 'break' ? 'resting-at-desk' : 'idle');
   }
@@ -360,7 +365,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     if (!startTrip(here, false) && !startTrip(here, true)) deskPose();
   }
   function arrive(end) {
-    anchor = end; trip = null; legs = []; pose.atDesk = end.desk; pose.moving = false; pose.yaw = end.yaw; pose.goal = null; pose.to = null;
+    anchor = end; trip = null; legs = []; pose.atDesk = end.desk; pose.moving = false; pose.yaw = end.yaw; pose.goal = null; pose.to = null; pose.seatId = end.activity ? null : end.itemId;
     // Seated away from the desk, the pet may curl up at its feet, clear of its way out.
     pose.seated = !end.desk && !end.activity; pose.portal = pose.seated ? end.portal : null;
     pose.activity = end.activity || (!end.desk && seatType(end) === 'lounge-chair' ? 'read' : null); pose.activityTime = 0; pose.reach = end.reach || null; pose.useAt = ACTIVITIES[end.activity]?.useAt ?? null; used = false;
@@ -425,6 +430,8 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
         if (leg.kind === 'walk') pose.step += Math.hypot(x - pose.x, z - pose.z) * 8;
         pose.x = x; pose.z = z; pose.sit = leg.sitFrom + (leg.sitTo - leg.sitFrom) * amount;
         pose.seatHeight = leg.kind === 'sit' ? trip.end.seatHeight || .80 : trip.start.seatHeight || .80;
+        // The seat that `sit` blends onto: its piece may stand on a rug.
+        pose.seatId = leg.kind === 'sit' ? trip.end.itemId : leg.kind === 'rise' ? trip.start.itemId : null;
         const yaw = leg.yaw ?? Math.atan2(-(leg.b.x - leg.a.x), -(leg.b.z - leg.a.z));
         const turn = Math.atan2(Math.sin(yaw - pose.yaw), Math.cos(yaw - pose.yaw));
         pose.yaw += turn * Math.min(1, dt * 10); pose.moving = leg.kind === 'walk';

@@ -4,7 +4,7 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Ray } from '@babylonjs/core/Culling/ray.js';
-import { createLayout, footprintBounds, pieceCount } from '../src/layout.js';
+import { createLayout, footprintBounds, pieceCount, rugStack, rugTouches, groundAt, standHeight } from '../src/layout.js';
 import { SURFACES } from '../src/surfaces.js';
 
 class Surface {
@@ -619,20 +619,34 @@ try {
   room.setLayout(beforeDesignLayout); advance(3);
   console.log('PASS designs: four distinct shells, all new rooms usable, batched geometry, preserved decor, day/night/rain and stable assets across repeated visits.');
   {
-    // Contact shade sits 2 mm above the highest rug under each piece, or the floor.
+    // Contact shade sits 2 mm above the highest rug under each piece (a round
+    // rug only under its circle), or the floor. Each floor piece stands on
+    // the rug under most of it.
     for (const id of ['ember-library', 'moonlit-greenhouse', 'sakura-studio']) {
       room.setLayout(createLayout(id)); advance(3);
-      const floor = id === 'sakura-studio' ? .2275 : .219, items = diagnostics().layout.items;
+      const floor = id === 'sakura-studio' ? .2275 : .219, items = diagnostics().layout.items, stack = rugStack(items, Math.max(.22, floor));
       const nodes = new Map(scene.transformNodes.filter(node => node.metadata?.itemId).map(node => [node.metadata.itemId, node]));
-      const rugs = items.filter(item => ['rug', 'moon-rug'].includes(item.type)).map(item => ({ area: footprintBounds(item), top: nodes.get(item.id).getHierarchyBoundingVectors(true).max.y }));
+      const rugs = stack.map(rug => ({ rug, top: nodes.get(rug.item.id).getHierarchyBoundingVectors(true).max.y }));
       let onRug = 0;
       for (const item of items) {
+        if (!item.wall && !stack.some(rug => rug.item.id === item.id)) assert.ok(Math.abs(nodes.get(item.id).position.y - standHeight(item, stack)) < 1e-6, `${id} ${item.id} stands on the rug under it`);
         const shade = nodes.get(item.id)?.metadata.shade; if (!shade) continue;
-        const a = footprintBounds(item), under = rugs.filter(r => a.minX < r.area.maxX && a.maxX > r.area.minX && a.minZ < r.area.maxZ && a.maxZ > r.area.minZ);
+        const under = rugs.filter(r => rugTouches(r.rug, footprintBounds(item)));
         const top = Math.max(floor, ...under.map(r => r.top)), y = shade.getAbsolutePosition().y; onRug += under.length > 0;
         assert.ok(Math.abs(y - (top + .002)) < 1e-4, `${id} ${item.id}: shade ${y.toFixed(4)} sits 2 mm above ${top.toFixed(4)}`);
       }
       assert.ok(onRug > 0, `${id} has pieces standing on rugs`);
+    }
+    // The sakura tatami stripes stand 7.5 mm above FLOOR_Y, higher than a
+    // covered rug's flat weave on the usual floor. Seen from above, the
+    // uncovered part of that rug shows its weave, not the tatami through it.
+    const sakura = createLayout('sakura-studio'), low = sakura.items.find(item => item.type === 'rug');
+    room.setLayout({ ...sakura, items: [...sakura.items, { id: 'test-top-rug', type: 'rug', x: low.x + 1.6, z: low.z, rotation: 0 }] }); advance(3);
+    const lowMeshes = scene.transformNodes.find(node => node.metadata?.itemId === low.id).getChildMeshes(), tatami = scene.meshes.filter(mesh => mesh.metadata?.architecture === 'sakura');
+    assert.ok(diagnostics().layout.items.some(item => item.id === 'test-top-rug') && tatami.length, 'sakura: the second rug is down');
+    for (const [dx, dz] of [[-1.58, 0], [-1.2, 0.3], [-0.5, -0.95], [-0.3, 1.05], [-1.0, -0.6]]) {
+      const hit = scene.pickWithRay(new Ray(new Vector3(low.x + dx, 2, low.z + dz), new Vector3(0, -1, 0), 3), mesh => lowMeshes.includes(mesh) || tatami.includes(mesh));
+      assert.ok(hit?.hit && lowMeshes.includes(hit.pickedMesh), `sakura: the covered rug shows at ${dx},${dz}, not ${hit?.pickedMesh?.name}`);
     }
     // The walking companion's shade follows the same rule.
     room.setLayout(createLayout('ember-library')); advance(3); room.setActivity('break'); advance(90);
@@ -712,7 +726,10 @@ try {
     assert.ok(node('rug-under').getHierarchyBoundingVectors(true).max.y < node('rug-over').getHierarchyBoundingVectors(true).min.y, 'the flat rug stays below the rug on top');
     const from = pointerAt(-3.2, .23, 1.5), to = pointerAt(-2.95, .23, 1.5);
     canvas.emit('pointerdown', from); canvas.emit('pointermove', to); advance(2);
-    assert.equal(diagnostics().dragging?.id, 'rug-under'); canvas.emit('pointerup', to); advance(2);
+    assert.equal(diagnostics().dragging?.id, 'rug-under');
+    assert.ok(node('rug-over').metadata.body.scaling.y < 0.2 && node('rug-under').metadata.body.scaling.y === 1, 'a carried rug already lies on top');
+    assert.ok(node('rug-over').getHierarchyBoundingVectors(true).max.y < node('rug-under').getHierarchyBoundingVectors(true).min.y, 'and the rug under it lies flat below it');
+    canvas.emit('pointerup', to); advance(2);
     assert.equal(diagnostics().layout.items.at(-1).id, 'rug-under', 'the rug put down last goes to the top of the stack');
     assert.ok(node('rug-over').metadata.body.scaling.y < 0.2 && node('rug-under').metadata.body.scaling.y === 1, 'the stack follows the new order');
     // The pet stands on what is under it: its bed's cushion, then a rug top
@@ -725,9 +742,9 @@ try {
     const start = lift(), press = { clientX: start.x, clientY: start.y, pointerId: 4, pointerType: 'mouse', button: 0 };
     canvas.emit('pointerdown', press); canvas.emit('pointermove', { ...press, clientX: above.x, clientY: above.y }); advance(2); canvas.emit('pointerup', { ...press, clientX: above.x, clientY: above.y }); advance(40);
     assert.equal(diagnostics().pet.state, 'sitting'); assert.ok(Math.hypot(pet.position.x - 3, pet.position.z - 2) < 0.05, 'set down on the rug');
-    assert.ok(Math.abs(pet.position.y - (0.22 + 0.056)) < 1e-3, `on the rug top (${pet.position.y.toFixed(4)})`);
+    assert.ok(Math.abs(pet.position.y - (0.22 + 0.0515)) < 1e-3, `on the rug's woven field (${pet.position.y.toFixed(4)})`);
     room.setLayout({ presetId: null, items: [desk, soloRug, { id: 'cover-rug', type: 'rug', x: 0, z: 2, rotation: 0 }], activeDeskId: desk.id }); advance(40);
-    assert.ok(Math.abs(pet.position.y - (0.22 + 0.0055)) < 1e-3, 'a flattened rug lowers the pet with it');
+    assert.ok(Math.abs(pet.position.y - (0.22 + 0.0515 * 0.0055 / 0.056)) < 1e-3, 'a flattened rug lowers the pet with it');
     room.setEditMode(true);
     // A drop that overlaps a neighbor lands on the closest free spot.
     room.setLayout(dragLayout); advance(3);
@@ -751,6 +768,73 @@ try {
     assert.deepEqual([turned.x, turned.z, turned.rotation], [3.75, -2.5, 1], 'the sofa turns and steps off the wall');
     room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
     console.log('PASS placement fixes: rugs stack in drop order, covered rugs flatten, the pet stands on its bed or rug, blocked drops and turns find a free spot, floor clicks only deselect.');
+  }
+  {
+    // A piece stands on the woven field of the rug under most of it, never
+    // sunk in its weave nor floating over bare floor. Previews, drags and a
+    // carried rug show pieces where they will land.
+    const node = id => scene.transformNodes.find(item => item.metadata?.itemId === id && item.metadata.body);
+    const near = (value, goal, label, within = 1e-6) => assert.ok(Math.abs(value - goal) < within, `${label} (${value.toFixed(4)}, not ${goal.toFixed(4)})`);
+    const field = 0.22 + 0.0515, rug = { id: 'field-rug', type: 'rug', x: 2, z: 1.5, rotation: 0 };
+    const table = { id: 'rug-table', type: 'side-table', x: 1, z: 1.25, rotation: 0 }, bed = { id: 'pet-bed', type: 'pet-bed', x: 3, z: 1, rotation: 0 };
+    const seat = { id: 'bare-ottoman', type: 'ottoman', x: -3.5, z: 2, rotation: 0 }, corner = { id: 'corner-plant', type: 'plant', x: 0.5, z: 0.25, rotation: 0 };
+    room.setEditMode(false); room.setLayout({ presetId: null, items: [desk, rug, table, bed, seat, corner], activeDeskId: desk.id }); advance(60);
+    near(node('rug-table').position.y, field, 'a table on a rug stands on its woven field');
+    near(node('pet-bed').position.y, field, 'so does the pet bed');
+    near(diagnostics().petModel.root.position.y, field + 0.095, 'and the pet lies on the cushion of the raised bed', 1e-4);
+    near(node('bare-ottoman').position.y, 0.22, 'a piece on bare floor stands on the floor');
+    near(node('corner-plant').position.y, 0.22, 'a rug corner slips under a pot that stands mostly on the floor');
+    // A carried piece stands where it will land, and its footprint shows above the rug.
+    room.setEditMode(true); advance(2);
+    canvas.emit('pointerdown', pointerAt(-3.5, .3, 2)); canvas.emit('pointermove', pointerAt(2, .3, 2)); advance(2);
+    assert.equal(diagnostics().dragging?.id, 'bare-ottoman');
+    assert.deepEqual([diagnostics().dragging.candidate.x, diagnostics().dragging.candidate.z], [2, 2]);
+    near(node('bare-ottoman').position.y, field, 'a carried piece stands on the rug under it');
+    const marker = scene.meshes.find(mesh => mesh.name === 'selected-footprint' && !mesh.isDisposed());
+    assert.ok(marker.isEnabled() && marker.position.y > 0.22 + 0.056, `its footprint shows above the rug (${marker.position.y.toFixed(3)})`);
+    room.cancelDrag(); advance(2);
+    near(node('bare-ottoman').position.y, 0.22, 'a cancelled drag puts it back on the floor');
+    // A carried rug lies on top, and the pieces it leaves stand on the floor.
+    canvas.emit('pointerdown', pointerAt(3.3, .27, 2.3)); canvas.emit('pointermove', pointerAt(-1, .27, 2.3)); advance(2);
+    assert.equal(diagnostics().dragging?.id, 'field-rug');
+    near(node('rug-table').position.y, 0.22, 'a table stays on the floor when its rug is carried away');
+    near(node('pet-bed').position.y, 0.22, 'so does the pet bed');
+    room.cancelDrag(); advance(2);
+    near(node('rug-table').position.y, field, 'a cancelled rug drag puts the table back on its rug');
+    near(node('pet-bed').position.y, field, 'and the pet bed');
+    // A new piece previews where it will stand; a new rug previews on top.
+    const ghostOf = type => scene.transformNodes.find(item => item.metadata?.sharedAssets && item.metadata.type === type && !item.metadata.itemId);
+    room.beginPlacement('ottoman'); canvas.emit('pointermove', pointerAt(2, .22, 2)); advance(2);
+    assert.deepEqual([diagnostics().placement.x, diagnostics().placement.z], [2, 2]);
+    near(ghostOf('ottoman').position.y, field, 'the preview of a new piece stands on the rug');
+    room.cancelPlacement(); room.beginPlacement('moon-rug'); advance(2);
+    near(ghostOf('moon-rug').position.y, 0.22 + 0.006, 'a new rug previews on top of the rug already down');
+    room.cancelPlacement(); room.setEditMode(false);
+    // The companion sits as high as its chair stands.
+    const chair = { id: 'rug-chair', type: 'lounge-chair', x: 2, z: 1.75, rotation: 0 }, root = diagnostics().companionModel.root;
+    room.setLayout({ presetId: null, items: [desk, rug, chair], activeDeskId: desk.id }); room.setActivity('working'); advance(3);
+    near(node('rug-chair').position.y, field, 'the reading chair stands on the rug');
+    motion.matches = true; motion.emit('change', { matches: true }); room.setActivity('break'); advance(3);
+    assert.equal(diagnostics().companion.state, 'resting'); assert.equal(diagnostics().companion.destination, 'rug-chair');
+    near(root.position.y, field, 'the companion sits on the raised chair');
+    room.setActivity('working'); advance(3);
+    // Walking and standing, the companion steps up onto each rug and down again.
+    motion.matches = false; motion.emit('change', { matches: false });
+    room.setLayout(createLayout('ember-library')); advance(3);
+    const stack = rugStack(diagnostics().layout.items); let settled = 0, onRugs = 0, heights = [];
+    room.setActivity('break');
+    for (let i = 0; i < 3000; i++) {
+      advance(); const pose = diagnostics().companion;
+      if (pose.atDesk || pose.sit > 0) { heights = []; continue; }
+      heights.push(groundAt(stack, pose.x, pose.z)); if (heights.length > 20) heights.shift();
+      if (heights.length === 20 && heights.every(y => y === heights[0])) {
+        settled++; onRugs += heights[0] > 0.22;
+        near(root.position.y, heights[0], `the companion stands on what is under it at ${pose.x.toFixed(2)},${pose.z.toFixed(2)}`, 0.002);
+      }
+    }
+    assert.ok(settled > 100 && onRugs > 20, `the walk crosses rugs (${onRugs} of ${settled} settled frames)`);
+    room.setActivity('idle'); room.setLayout(beforeDesignLayout); advance(3);
+    console.log(`PASS rug heights: pieces, previews, drags, a carried rug, the pet bed and the companion stand on the rug under them (${onRugs} of ${settled} walk frames on rugs).`);
   }
   {
     // Outside Decorate, a tap uses a piece: lamps, candles, fire and records

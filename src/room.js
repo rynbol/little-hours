@@ -27,7 +27,7 @@ import { createPetRoutine, insideBed, PETS, PET_REACTION } from './pet.js';
 import { createCompanionRoutine } from './companion.js';
 import { createArchitecture, styleFurniture, buildWallMesh } from './architecture.js';
 import { getFurniture } from './catalog.js';
-import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, rugsOverlap, footprintBounds, MAX_ITEMS, pieceCount, petBed, roomDesign } from './layout.js';
+import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, footprintBounds, MAX_ITEMS, pieceCount, petBed, roomDesign, rugStack, rugTouches, groundAt, standHeight, FLOOR_Y, RUG_STEP, FLAT_RUG } from './layout.js';
 import { SHELLS, isWallPiece, snapWall, openings } from './walls.js';
 import { ARTWORKS, SLEEVES } from './art.js';
 import { tintPaint } from './tints.js';
@@ -413,14 +413,19 @@ export function createRoom(container, options = {}) {
   // rug top or floats over bare floor and darkens the base of each piece.
   const rugSurfaces = [], pointArea = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
   let floorTop = 0.219;
+  // Rugs lie on the floor's top where it stands above FLOOR_Y (the tatami).
+  const rugFloor = () => Math.max(FLOOR_Y, floorTop);
   function surfaceBelow(area) {
     let top = floorTop;
-    for (const rug of rugSurfaces) if (area.minX < rug.maxX && area.maxX > rug.minX && area.minZ < rug.maxZ && area.maxZ > rug.minZ) top = Math.max(top, rug.top);
+    for (const rug of rugSurfaces) if (rug.top > top && rugTouches(rug, area)) top = rug.top;
     return top + 0.002;
   }
   function liftShade(object, item) { const shade = object?.metadata.shade; if (shade) shade.position.y = surfaceBelow(footprintBounds(item)) - object.position.y; }
+  // The footprint marker floats a little above the highest rug under it.
+  const markerY = item => Math.max(0.30, surfaceBelow(footprintBounds(item)) + 0.03);
+  // A new piece shows where it will stand: a new rug lies on every other rug.
+  const floorY = item => getFurniture(item.type).category === 'Rugs' ? rugFloor() + rugStack(layout.items).length * RUG_STEP : standHeight(item, rugSurfaces);
   for (const mesh of wallShades) mesh.position.y = floorTop + 0.002;
-  const FLAT_RUG = 0.0055;
   // Each piece gets baked ambient shade under it. The cached sun map cannot
   // darken floor that the walls already shade, so without it pieces float.
   // Once per type, every surface below knee height is projected onto a floor
@@ -486,7 +491,7 @@ export function createRoom(container, options = {}) {
   const decorVisible = { plants: true, lights: true, rug: true };
   let layout = createLayout(), selectedId = null, editing = false, placement = null, ghost = null, marker = null, lastPlacementState = '';
   let hoveredId = null, drag = null, outlineKey = '';
-  let companionRoutine, mobileCompanion, companionTime = 0, companionLayoutKey = '';
+  let companionRoutine, mobileCompanion, companionTime = 0, companionLayoutKey = '', companionY = null;
   let petRoutine, petModel = null, petSpecies = options.pet === 'dog' ? 'dog' : 'cat', petY = null, petCasts = null, petMoving = false, petKey = '', petTime = 0, petWake = 0, petShadowAt = 0;
   const outlinedMeshes = [];
   const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782'), playOutline = color('#d9b98a');
@@ -650,7 +655,22 @@ export function createRoom(container, options = {}) {
     if (!editing || !item || placement || isWallPiece(item)) return;
     const [width, depth] = getFurniture(item.type).footprint, w = width / 2 + 0.035, d = depth / 2 + 0.035;
     marker = MeshBuilder.CreateLines('selected-footprint', { points: [new Vector3(-w, 0, -d), new Vector3(w, 0, -d), new Vector3(w, 0, d), new Vector3(-w, 0, d), new Vector3(-w, 0, -d)] }, scene);
-    marker.color = color('#b77d38'); marker.position.set(item.x, 0.30, item.z); marker.rotation.y = item.rotation * Math.PI / 2; marker.isPickable = false; marker.metadata = { castShadow: false };
+    marker.color = color('#b77d38'); marker.position.set(item.x, markerY(item), item.z); marker.rotation.y = item.rotation * Math.PI / 2; marker.isPickable = false; marker.metadata = { castShadow: false };
+  }
+  // A rug lies fully on every rug put down before it. Rugs are several
+  // centimeters thick, so a covered rug flattens to a few millimeters instead
+  // of pushing its raised weave up through the rug on top. A floor piece
+  // stands on the rug under most of it, not sunk in its weave.
+  function settleOnRugs(items) {
+    rugSurfaces.length = 0;
+    const stack = rugStack(items, rugFloor()), rugs = new Set(stack.map(rug => rug.item.id));
+    for (const rug of stack) {
+      const object = placedObjects.get(rug.item.id), height = getFurniture(rug.item.type).height;
+      object.position.y = rug.y; object.metadata.body.scaling.y = rug.scale;
+      if (object.isEnabled()) rugSurfaces.push({ ...rug, lost: rug.flat ? height - FLAT_RUG : 0 });
+    }
+    for (const item of items) if (!isWallPiece(item) && !rugs.has(item.id)) placedObjects.get(item.id).position.y = standHeight(item, rugSurfaces);
+    for (const item of items) liftShade(placedObjects.get(item.id), item);
   }
   function syncFurniture(settleNew = false) {
     const nextStyle = roomDesign(layout).style || 'retreat';
@@ -682,7 +702,6 @@ export function createRoom(container, options = {}) {
     if (!settleNew) { for (const { object } of settlingPieces.values()) object.scaling.setAll(1); settlingPieces.clear(); }
     const ids = new Set(layout.items.map(item => item.id));
     for (const [id, object] of placedObjects) if (!ids.has(id)) { settlingPieces.delete(id); object.dispose(false, false); placedObjects.delete(id); }
-    let rugLayer = 0;
     for (const item of layout.items) {
       let object = placedObjects.get(item.id);
       // A new color builds the piece again from its model.
@@ -702,23 +721,11 @@ export function createRoom(container, options = {}) {
         if (object.metadata.view) showView(object.metadata.view, item);
       }
       else {
-        object.position.y = getFurniture(item.type).category === 'Rugs' ? 0.22 + rugLayer++ * 0.006 : 0.22;
         object.position.x = item.x; object.position.z = item.z; object.rotation.y = item.rotation * Math.PI / 2;
       }
       object.setEnabled(item.type === 'plant' ? decorVisible.plants : getFurniture(item.type).category === 'Rugs' ? decorVisible.rug : true);
     }
-    // A rug lies fully on every rug put down before it. Rugs are several
-    // centimeters thick, so a covered rug flattens to a few millimeters instead
-    // of pushing its raised weave up through the rug on top.
-    rugSurfaces.length = 0;
-    const rugs = layout.items.filter(item => getFurniture(item.type).category === 'Rugs' && placedObjects.get(item.id).isEnabled());
-    rugs.forEach((item, index) => {
-      const object = placedObjects.get(item.id), height = getFurniture(item.type).height;
-      const flat = rugs.slice(index + 1).some(upper => rugsOverlap(item, upper));
-      object.metadata.body.scaling.y = flat ? FLAT_RUG / height : 1;
-      rugSurfaces.push({ ...footprintBounds(item), top: object.position.y + (flat ? FLAT_RUG : height), lost: flat ? height - FLAT_RUG : 0 });
-    });
-    for (const item of layout.items) liftShade(placedObjects.get(item.id), item);
+    settleOnRugs(layout.items);
     applySurfaces(); syncOpenings();
     if (selectedId && !ids.has(selectedId)) { selectedId = null; options.onSelectionChange?.(null); }
     animatedObjects.length = 0;
@@ -727,7 +734,7 @@ export function createRoom(container, options = {}) {
     placeRoomLights(); applyAccents();
     if (hoveredId && !ids.has(hoveredId)) hoveredId = null;
     const layoutKey = JSON.stringify([layout.activeDeskId, layout.items.map(item => [item.id, item.type, item.x, item.z, item.rotation])]);
-    companionRoutine?.setContext({ windowX: architecture?.window.x ?? archCenter });
+    companionRoutine?.setContext({ windowX: architecture?.window.x ?? archCenter, floor: rugFloor() });
     if (companionLayoutKey !== layoutKey) { companionLayoutKey = layoutKey; companionRoutine?.setLayout(layout); }
     else companionRoutine?.useLayout(layout);
     // The pet also sees switched fires, so it keeps the full layout.
@@ -832,7 +839,7 @@ export function createRoom(container, options = {}) {
     const candidate = wall ? { ...placement, wall: point.wall, u: snapWall(point.u), v: snapWall(point.v) } : { ...placement, x: snap(point.x), z: snap(point.z) };
     const { spot, verdict } = resolveSpot(candidate, placement.valid ? placement : null);
     Object.assign(placement, candidate, spot || {}); placement.valid = Boolean(spot); placement.reason = spot ? '' : verdict.reason || '';
-    if (wall) placeOnWall(ghost, placement); else { ghost.position.x = placement.x; ghost.position.z = placement.z; ghost.rotation.y = placement.rotation * Math.PI / 2; }
+    if (wall) placeOnWall(ghost, placement); else { ghost.position.set(placement.x, floorY(placement), placement.z); ghost.rotation.y = placement.rotation * Math.PI / 2; }
     ghostMaterial.diffuseColor = color(placement.valid ? '#85ac80' : '#cf7868'); ghostMaterial.emissiveColor = color(placement.valid ? '#42653f' : '#8a4238');
     const key = `${placement.type}:${placement.valid}:${placement.reason}`;
     if (key !== lastPlacementState) { lastPlacementState = key; options.onPlacementState?.({ type: placement.type, valid: placement.valid, reason: placement.reason }); }
@@ -1024,6 +1031,7 @@ export function createRoom(container, options = {}) {
     const wasDragging = Boolean(drag), pointerId = downPosition?.pointerId;
     if (drag) {
       drag.object.position.copyFrom(drag.originalPosition); drag.object.rotation.y = drag.wallPiece ? drag.originalRotation : drag.original.rotation * Math.PI / 2;
+      if (getFurniture(drag.original.type).category === 'Rugs') settleOnRugs(layout.items);
       for (const [mesh, visibility] of drag.visibility) if (!mesh.isDisposed()) mesh.visibility = visibility;
       liftShade(drag.object, drag.original); drag.object.metadata.shade?.setEnabled(true);
       if (drag.object.metadata.view) drag.object.metadata.view.position.z = WINDOW_VIEW_DEPTH;
@@ -1076,13 +1084,17 @@ export function createRoom(container, options = {}) {
         const { spot, verdict } = resolveSpot(candidate, drag.shown);
         drag.candidate = spot ? { ...candidate, ...spot } : candidate; drag.shown = spot; drag.valid = Boolean(spot); drag.reason = spot ? '' : verdict.reason || '';
         drag.object.position.x = drag.candidate.x; drag.object.position.z = drag.candidate.z;
+        // A carried rug lies on top, as it will once dropped, and the pieces
+        // stand on the rugs under them as they will then.
+        if (getFurniture(drag.original.type).category === 'Rugs') settleOnRugs([...layout.items.filter(item => item.id !== drag.id), drag.candidate]);
+        else drag.object.position.y = standHeight(drag.candidate, rugSurfaces);
         drag.object.rotation.y = drag.rotation * Math.PI / 2; liftShade(drag.object, drag.candidate);
       } else { drag.valid = false; drag.reason = 'Drop inside the room, or return this piece to the collection.'; }
     }
     for (const [mesh, visibility] of drag.visibility) mesh.visibility = overCollection && drag.removable ? visibility * 0.13 : visibility;
     if (marker) {
       marker.setEnabled(!overCollection); marker.color = drag.valid ? selectedOutline : invalidOutline;
-      marker.position.set(drag.candidate.x, 0.30, drag.candidate.z); marker.rotation.y = drag.rotation * Math.PI / 2;
+      marker.position.set(drag.candidate.x, markerY(drag.candidate), drag.candidate.z); marker.rotation.y = drag.rotation * Math.PI / 2;
     }
     canvas.style.cursor = overCollection ? drag.removable ? 'alias' : 'not-allowed' : drag.valid ? 'grabbing' : 'not-allowed';
     updateOutline();
@@ -1284,7 +1296,14 @@ export function createRoom(container, options = {}) {
     const companionDelta = companionTime ? Math.max(0, Math.min(.1, (now - companionTime) / 1000)) : 0;
     companionTime = now;
     const companionPose = companionRoutine.update(companionDelta, reducedMotion);
-    mobileCompanion.animate(companionPose, seconds, reducedMotion);
+    // The companion stands on the rug under it and sits as high as its seat
+    // stands. Its height eases, so a step onto a rug reads.
+    if (!companionPose.atDesk) {
+      const floor = groundAt(rugSurfaces, companionPose.x, companionPose.z), seat = placedObjects.get(companionPose.seatId)?.position.y ?? floor;
+      const goal = floor + (seat - floor) * companionPose.sit;
+      companionY = companionY === null || reducedMotion ? goal : companionY + (goal - companionY) * Math.min(1, companionDelta * 12);
+    } else companionY = null;
+    mobileCompanion.animate(companionPose, seconds, reducedMotion, companionY ?? FLOOR_Y);
     if (!companionPose.atDesk) {
       pointArea.minX = pointArea.maxX = companionPose.x; pointArea.minZ = pointArea.maxZ = companionPose.z;
       mobileCompanion.contact.position.y = surfaceBelow(pointArea);
@@ -1331,13 +1350,14 @@ export function createRoom(container, options = {}) {
     // The pet stands on its bed, on the rug under it or on the floor; a
     // carried pet hangs below the pointer. Heights ease, so a hop reads.
     pointArea.minX = pointArea.maxX = pose.x; pointArea.minZ = pointArea.maxZ = pose.z;
-    const bed = petBed(layout), onBed = !pose.held && insideBed(layout, pose), ground = onBed ? 0.22 + PET_BED_SURFACE : surfaceBelow(pointArea) - 0.002;
+    const bed = petBed(layout), onBed = !pose.held && insideBed(layout, pose), bedTop = (placedObjects.get(bed?.id)?.position.y ?? FLOOR_Y) + PET_BED_SURFACE;
+    const ground = onBed ? bedTop : groundAt(rugSurfaces, pose.x, pose.z, floorTop);
     const goalY = pose.held ? 0.22 + HOLD_HEIGHT - 0.62 : ground;
     petY = petY === null || reducedMotion ? goalY : petY + (goalY - petY) * Math.min(1, companionDelta * 12);
     const carriedBed = drag?.active && bed && drag.id === bed.id ? drag.object : null;
-    if (carriedBed) petModel.root.position.set(carriedBed.position.x, 0.22 + PET_BED_SURFACE, carriedBed.position.z), petModel.root.rotation.y = carriedBed.rotation.y - Math.PI / 2 - 0.35;
+    if (carriedBed) petModel.root.position.set(carriedBed.position.x, bedTop, carriedBed.position.z), petModel.root.rotation.y = carriedBed.rotation.y - Math.PI / 2 - 0.35;
     else petModel.root.position.set(pose.x, petY, pose.z), petModel.root.rotation.y = pose.yaw;
-    petModel.contact.position.set(petModel.root.position.x, (bed && (onBed || carriedBed) ? 0.22 + PET_BED_SURFACE + 0.002 : surfaceBelow(pointArea)), petModel.root.position.z); petModel.contact.rotation.y = petModel.root.rotation.y;
+    petModel.contact.position.set(petModel.root.position.x, (bed && (onBed || carriedBed) ? bedTop + 0.002 : surfaceBelow(pointArea)), petModel.root.position.z); petModel.contact.rotation.y = petModel.root.rotation.y;
     petModel.animate(pose, companionDelta, seconds, reducedMotion);
     for (const [id, reaction] of reactions) {
       const object = placedObjects.get(id), t = (now - reaction.start) / 1000 / reactionSeconds[reaction.kind];

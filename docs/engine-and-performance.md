@@ -371,3 +371,25 @@ Verification: the unit tests (83), the room checks and the build pass. In headle
 With reduced motion, a frame asked twice whether the scene was ready: once to report the room ready, once to ask for the next frame. When the shaders finished between the two asks, the first said no and the second said yes, so no next frame came and the room never reported ready: "Making room for you…" stayed and Decorate stayed disabled. Frames now go on until the room reports ready, and after that the loop stops as before, with no new per-frame work.
 
 Verification: a room check makes the scene turn ready between the two asks of a frame; on the old code the room never reports, and now it reports once and goes idle. In headless Chrome, 30 room loads with reduced motion all became ready (one in 18 had stuck before), and the colors (52, 51 and 52 of 52; the miss was a 16 ms handler check), walls and floors (101) and Part 2's (106) checks passed, and the colors checks in Firefox (49).
+
+## Pieces on rugs
+
+Every floor piece stood at floor height, so a rug hid its feet: 5.15 cm of a table foot, a chair's legs or a lamp's base went into the woven rug, and 6.75 to 8 cm into the moon rug. Each floor piece now stands on the woven layer of the rug under most of it. `standHeight` samples the middle of the footprint and the four corners set in by 15 %, and takes the highest layer under at least 3 of the 5 points. A piece that stands mostly on bare floor stays on the floor, and the rug's edge slips under its base.
+
+`WEAVE` in `layout.js` lists the layers of each rug as its model in `furniture.js` builds them: the woven rug's base (3.1 cm), border bands (4.0 and 4.6 cm) and field (5.15 cm), and the moon rug's rings (4.5 to 6.05 cm), field (6.75 cm) and moon (7.5 and 8.0 cm). Pieces sink into the thin motifs above a layer, the diamonds and the stars, by 1.2 cm at most. A flattened rug scales its layers with its weave. A unit test casts rays straight down onto both models in all four turns and keeps the table within 1 mm of the geometry, so a change to a rug model must also change the table.
+
+The same rule places these:
+
+- The preview of a new piece. A new rug previews on top of the others.
+- A carried piece, while it moves, with its footprint outline above the rug.
+- A carried rug. It lies on top, as it will after the drop, and the pieces stand on the rugs as they will then. A cancel puts everything back.
+- The pet, on the layer under it or on its bed, which the rug lifts with the bed.
+- The companion, on the layer under it, eased at 12 per second (at once with reduced motion). Seated, it blends onto its chair's height with `sit`, and the routine names the seat in `pose.seatId`.
+
+The routine adds the piece's lift to the hand targets of the record player, the lamp switch and the pet, and names it in `reach.lift`. When the companion stands higher than the piece, for example on a rug beside a cabinet on bare floor, its knees bend by the difference, so the arm meets the piece as it does on bare floor. The hand then misses by 3.2 cm at most at the record player (3.2 cm on bare floor), 0.3 cm at the lamp and 0 at the pet. Without the bend, it stopped up to 10.5 cm short.
+
+In the sakura studio the tatami stripes stand at 22.75 cm (`floorTop` in `architecture.js`), 7.5 mm above floor height. A covered rug flattens to 5.5 mm, so on floor height its weave lay under the stripes and the mats, and the tatami showed through its uncovered part. There the rugs lie on the stripes: `rugStack` takes the floor, and the room gives the companion routine the same floor through `setContext`, so the hand targets match. Pieces on bare tatami still stand at floor height, 4.5 mm into the mats, as before.
+
+Cost: a layout change settles the rugs in 5 to 19 µs in Node, across the six designs. Per frame, the companion and the pet each find the layer under them, in 0.1 µs with four rugs, as the pet found the rug top before.
+
+Verification: the unit tests (88), the room checks and the build pass; a room check casts rays onto a covered rug on the tatami, and without the sakura fix that check fails. In headless Chrome and Firefox, real input passed a rug check (21 each): heights at rest, a piece carried onto a rug, a rug carried away and put back with Escape, a new piece put down on a rug, the pet in a raised bed and the companion in a chair on a rug. The other checks passed 359 of 361 in Chrome and 352 of 353 in Firefox; the misses were 16 ms handler checks, and reruns passed them (walls and floors 101, windows 63), while the same walls and floors run on `main` missed three. Part 2's suite passed 106 in Chrome. Against `main` (`43cc963`) in all six rooms, Chrome drew the same calls at 60 fps with a median 95th % CPU render of 2.05 against 1.9 ms and 28.8 against 28.75 % CPU, and an idle room drew no frames.
