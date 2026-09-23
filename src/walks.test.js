@@ -45,6 +45,13 @@ test('the companion and the pet keep out of the places where the other is going'
   assert.ok(!activitySpots(layout, { pet: { ...pet, to: { x: target.x, z: target.z } } }).some(entry => distance(entry, target) < 0.6), 'the companion does not stand where the pet is going');
 });
 
+test('a pet set down on the standing companion lands beside it', () => {
+  const layout = createLayout('writers-loft'), spot = petSpots(layout)[0], pet = createPetRoutine({ random: () => 0.5 });
+  pet.setLayout(layout); pet.setCompanion({ x: spot.x, z: spot.z, atDesk: false, moving: false, seated: false, to: null });
+  pet.pickUp(); pet.moveHeld(spot.x, spot.z); pet.drop();
+  assert.equal(pet.pose.state, 'sitting'); assert.ok(distance(pet.pose, spot) > 0.4 && distance(pet.pose, spot) < 1, `${distance(pet.pose, spot).toFixed(2)} m away`);
+});
+
 test('the companion walks around a pet that sits down in its way', () => {
   const layout = createLayout('writers-loft'), routine = createCompanionRoutine(() => {}, { random: () => 0.5 });
   routine.setLayout(layout); routine.setIntent('working'); routine.setIntent('break');

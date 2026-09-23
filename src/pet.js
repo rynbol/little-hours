@@ -32,9 +32,10 @@ export function insideBed(layout, point) {
 }
 
 // The closest spot to `point` that can still walk home: the point itself
-// when it can, or the nearest reachable grid spot.
-export function landingSpot(layout, point, home) {
-  const obstacles = petObstacles(layout), reached = reachableFloor(layout, home, obstacles);
+// when it can, or the nearest reachable grid spot. `extra` boxes (where the
+// companion stands) are kept clear.
+export function landingSpot(layout, point, home, extra = []) {
+  const obstacles = petObstacles(layout, extra), reached = reachableFloor(layout, home, obstacles);
   let best = null, bestDistance = Infinity;
   for (let i = 0; i < reached.length; i++) {
     if (!reached[i]) continue;
@@ -95,12 +96,15 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
     trip = null; target = null; visits = 0; goHome = false; stall = 0;
     timer = wait(first ? [14, 26] : [32, 62]); status('sleeping', 'sleep');
   }
-  // The walk goes around the companion where it stands or is going, unless
-  // that closes the only way.
-  function walkTo(point, kind) {
-    const obstacles = petObstacles(layout), start = walkable(pose, obstacles) ? { x: pose.x, z: pose.z } : null, end = { x: point.x, z: point.z }, boxes = [];
-    const box = spot => ({ minX: spot.x - COMPANION_CLEARANCE, maxX: spot.x + COMPANION_CLEARANCE, minZ: spot.z - COMPANION_CLEARANCE, maxZ: spot.z + COMPANION_CLEARANCE });
+  // Where the companion stands, or is walking to.
+  function companionBoxes() {
+    const boxes = [], box = spot => ({ minX: spot.x - COMPANION_CLEARANCE, maxX: spot.x + COMPANION_CLEARANCE, minZ: spot.z - COMPANION_CLEARANCE, maxZ: spot.z + COMPANION_CLEARANCE });
     if (companion && !companion.atDesk) { if (!companion.moving && !companion.seated) boxes.push(box(companion)); if (companion.to) boxes.push(box(companion.to)); }
+    return boxes;
+  }
+  // The walk goes around the companion, unless that closes the only way.
+  function walkTo(point, kind) {
+    const obstacles = petObstacles(layout), start = walkable(pose, obstacles) ? { x: pose.x, z: pose.z } : null, end = { x: point.x, z: point.z }, boxes = companionBoxes();
     const path = start && ((boxes.length && findWalkingPath(layout, start, end, petObstacles(layout, boxes))) || findWalkingPath(layout, start, end, obstacles));
     if (!path) return false;
     trip = { path, kind, end: point }; legIndex = 1; waited = 0; target = point; pose.to = end;
@@ -173,13 +177,14 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
       pose.x = Math.max(ROOM_BOUNDS.minX + PET_RADIUS, Math.min(ROOM_BOUNDS.maxX - PET_RADIUS, x));
       pose.z = Math.max(ROOM_BOUNDS.minZ + PET_RADIUS, Math.min(ROOM_BOUNDS.maxZ - PET_RADIUS, z));
     },
-    // The pet lands on the closest clear floor near the drop, sits a moment
-    // to look around, then walks home. Dropped on its bed, it settles there.
+    // The pet lands on the closest clear floor near the drop, beside the
+    // companion rather than on it, sits a moment to look around, then walks
+    // home. Dropped on its bed, it settles there.
     drop(x = pose.x, z = pose.z) {
       if (!pose.held) return;
       this.moveHeld(x, z); pose.held = false;
       if (insideBed(layout, pose)) { goHomeNow(); return; }
-      const spot = landingSpot(layout, pose, petHome(layout));
+      const home = petHome(layout), spot = landingSpot(layout, pose, home, companionBoxes()) || landingSpot(layout, pose, home);
       if (!spot) { sleepAtHome(); return; }
       pose.x = spot.x; pose.z = spot.z; goHome = true; timer = wait(AFTER_DROP); status('sitting', 'sit');
     },
