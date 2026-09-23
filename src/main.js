@@ -81,7 +81,7 @@ document.querySelector('#app').innerHTML = `
           <nav class="room-tools" aria-label="Room controls">
             <button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Atmosphere</span></button>
             <button class="tool" data-panel="performance" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Performance</span></button>
-            <button class="tool" id="pet-button">${icon('cat')}<span id="pet-button-label">Miso</span></button>
+            <button class="tool" id="pet-button" data-panel="pet" aria-expanded="false" aria-controls="room-panel">${icon('cat')}<span id="pet-button-label">Miso</span></button>
             <button class="tool" id="mini-button" aria-pressed="false">${icon('mini')}<span>Mini view</span></button>
           </nav>
         </div>
@@ -182,7 +182,7 @@ function petFeedback({ species = state.pet, state: mood } = {}) {
 function renderPetName() {
   const name = PETS[state.pet]?.name || PETS.cat.name;
   $('#pet-company').textContent = `You & ${name}`; $('#pet-button-label').textContent = name;
-  $('#pet-button').setAttribute('aria-label', `Pet ${name}`);
+  $('#pet-button').setAttribute('aria-label', `${name}: pet or choose your pet`);
 }
 // The decorator needs a ready room: both entry buttons wait for it.
 const setDecorEntry = enabled => { $('#decorate-button').disabled = !enabled; $('#rooms-button').disabled = !enabled; };
@@ -313,7 +313,6 @@ $('#focus-toggle').addEventListener('click', () => {
 });
 $('#rooms-button').addEventListener('click', () => { collectionTab = 'presets'; setEditMode(true); });
 $('#decorate-button').addEventListener('click', () => setEditMode(!editMode));
-$('#pet-button').addEventListener('click', () => { if (room) room.pet(); else petFeedback(); });
 $('#mini-button').addEventListener('click', () => {
   if (editMode) setEditMode(false);
   compact = !compact;
@@ -433,6 +432,14 @@ function furnitureArt(type) {
     'moon-rug': '<path fill="#685971" d="m9 58 46-30 38 24-46 31z"/><path fill="none" stroke="#c6a66f" stroke-width="2" d="m16 57 39-24 31 19-39 26z"/><path fill="#ddc18a" d="M54 42q-15 1-18 13 9 12 26 3-16 3-16-6 0-6 8-10z"/><path fill="#e4cda0" d="m69 43 1 3 4 1-4 2-1 3-2-3-4-1 4-2zm-43 9 1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/><path stroke="#b99971" stroke-width="2" d="m12 62-4 3m11 1-4 3m11 1-4 3m11 1-4 3m11 1-4 3m11 1-4 3"/>',
   };
   return `<svg class="furniture-art" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="87" rx="35" ry="6" fill="#8c765714"/>${pieces[type] || pieces.plant}</svg>`;
+}
+
+// Hand-drawn pet portraits for the pet panel.
+function petArt(species) {
+  const art = species === 'dog'
+    ? '<ellipse cx="50" cy="56" rx="30" ry="27" fill="#efddbd"/><path d="M22 38q-12 4-9 26 3 12 12 8 5-14 5-28z" fill="#a9683f"/><path d="M78 38q12 4 9 26-3 12-12 8-5-14-5-28z" fill="#a9683f"/><ellipse cx="50" cy="67" rx="15" ry="11" fill="#fcf6ea"/><ellipse cx="50" cy="61" rx="6" ry="4.5" fill="#352a26"/><path d="M44 71q3 3 6 0 3 3 6 0" fill="none" stroke="#6d4632" stroke-width="1.8" stroke-linecap="round"/><circle cx="38" cy="50" r="4.5" fill="#33241d"/><circle cx="62" cy="50" r="4.5" fill="#33241d"/><circle cx="36.6" cy="48.4" r="1.4" fill="#fffaf0"/><circle cx="60.6" cy="48.4" r="1.4" fill="#fffaf0"/><ellipse cx="30" cy="60" rx="4.5" ry="2.5" fill="#f3a698"/><ellipse cx="70" cy="60" rx="4.5" ry="2.5" fill="#f3a698"/><path d="M36 82q14 6 28 0" fill="none" stroke="#c8674f" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="86" r="3" fill="#e3bb5f"/>'
+    : '<path d="M24 44 28 16l17 16zM76 44 72 16 55 32z" fill="#d4904f"/><path d="M29 36 31 22l8 9zM71 36l-2-14-8 9z" fill="#eba99c"/><ellipse cx="50" cy="55" rx="30" ry="26" fill="#d4904f"/><path d="M43 32q7-4 14 0M45 38h10" fill="none" stroke="#b5703b" stroke-width="3" stroke-linecap="round"/><ellipse cx="44" cy="66" rx="9" ry="7" fill="#f5e6cb"/><ellipse cx="56" cy="66" rx="9" ry="7" fill="#f5e6cb"/><path d="M47 61h6l-3 3.5z" fill="#dc8a8a"/><path d="M44 69q3 3 6 0 3 3 6 0" fill="none" stroke="#7a4a36" stroke-width="1.8" stroke-linecap="round"/><circle cx="38" cy="52" r="4.5" fill="#3a2a22"/><circle cx="62" cy="52" r="4.5" fill="#3a2a22"/><circle cx="36.6" cy="50.4" r="1.4" fill="#fffaf0"/><circle cx="60.6" cy="50.4" r="1.4" fill="#fffaf0"/><ellipse cx="29" cy="62" rx="4.5" ry="2.5" fill="#f2a092"/><ellipse cx="71" cy="62" rx="4.5" ry="2.5" fill="#f2a092"/>';
+  return `<svg class="pet-art" viewBox="0 0 100 100" aria-hidden="true">${art}</svg>`;
 }
 
 function roomDesignArt(preset) {
@@ -559,7 +566,7 @@ function renderPanel() {
   panel.hidden = !currentPanel;
   document.querySelectorAll('[data-panel]').forEach(button => button.setAttribute('aria-expanded', button.dataset.panel === currentPanel));
   if (!currentPanel) return;
-  panel.innerHTML = `<div class="panel-heading"><span>${currentPanel === 'atmosphere' ? 'Find your kind of quiet' : 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
+  panel.innerHTML = `<div class="panel-heading"><span>${({ atmosphere: 'Find your kind of quiet', pet: 'Your little companion' })[currentPanel] || 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
   if (currentPanel === 'atmosphere') {
     panel.insertAdjacentHTML('beforeend', `<div class="theme-options">${[['day', 'sun', 'Daylight'], ['dusk', 'moon', 'Night'], ['rain', 'rain', 'Rainy afternoon']].map(([key, symbol, title]) => `<button class="theme-option ${key}" data-theme-choice="${key}" aria-pressed="${state.theme === key}">${icon(symbol)}<span>${title}</span></button>`).join('')}</div>`);
     panel.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click', () => {
@@ -567,6 +574,17 @@ function renderPanel() {
     }));
     panel.insertAdjacentHTML('beforeend', `<label class="fairy-lights"><span>${roomDesign(state.layout).style ? 'Accent lights' : 'Fairy lights'}</span><input type="checkbox" data-decor="lights" ${state.decor.lights ? 'checked' : ''}></label>`);
     panel.querySelector('[data-decor]').addEventListener('change', event => acceptUpdate(store.update(draft => { draft.decor.lights = event.target.checked; })));
+  } else if (currentPanel === 'pet') {
+    // Choose the pet; the bed, its spot and the room stay as they are.
+    const name = PETS[state.pet]?.name || PETS.cat.name;
+    panel.insertAdjacentHTML('beforeend', `<div class="pet-options">${Object.values(PETS).map(pet => `<button class="pet-option" data-pet-choice="${pet.id}" aria-pressed="${state.pet === pet.id}">${petArt(pet.id)}<span><strong>${pet.name}</strong><small>${pet.id === 'cat' ? 'A ginger tabby who loves the fire' : 'A floppy-eared puppy with a happy tail'}</small></span></button>`).join('')}</div><div class="pet-actions"><button class="quiet-button" id="pet-now">${icon('cat')} Give ${name} a pet</button><p class="performance-note">Tap ${name} in the room for a pet, or drag to carry ${name} somewhere new. Decorate moves the bed.</p></div>`);
+    panel.querySelectorAll('[data-pet-choice]').forEach(button => button.addEventListener('click', () => {
+      if (state.pet === button.dataset.petChoice) return;
+      acceptUpdate(store.update(draft => { draft.pet = button.dataset.petChoice; }));
+      renderPanel(); $(`[data-pet-choice="${state.pet}"]`)?.focus();
+      speech?.say('pet', (PET_LINES[state.pet] || PET_LINES.cat).hello);
+    }));
+    $('#pet-now').addEventListener('click', () => { if (room) room.pet(); else petFeedback(); });
   } else {
     panel.insertAdjacentHTML('beforeend', `<div class="quality-options" aria-label="Room rendering quality">${[['auto', 'Adaptive'], ['high', 'Crisp'], ['battery', 'Save energy']].map(([id, label]) => `<button data-quality="${id}" aria-pressed="${quality === id}">${label}</button>`).join('')}</div><p class="performance-note">Adaptive balances detail and motion. Save energy limits animation to 30 frames per second.</p><dl class="performance-metrics" id="performance-metrics"></dl><p class="performance-note">Babylon.js engine · live measurements while this tab is visible. CPU measurements exclude GPU time.</p>`);
     panel.querySelectorAll('[data-quality]').forEach(button => button.addEventListener('click', () => {

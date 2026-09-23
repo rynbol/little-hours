@@ -383,7 +383,7 @@ try {
   room.setEditMode(true); room.setEditMode(false); advance(3);
   const bed = diagnostics().layout.items.find(item => item.type === 'pet-bed');
   const petBone = name => petModel.body.skeleton.bones.find(bone => bone.name === name).getLocalMatrix();
-  const petRig = () => petModel.body.skeleton.bones.map(bone => Array.from(bone.getLocalMatrix().m));
+  const petRig = () => diagnostics().petModel.body.skeleton.bones.map(bone => Array.from(bone.getLocalMatrix().m));
   const petCasts = () => scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList.includes(petModel.body);
   assert.deepEqual([petModel.root.position.x, petModel.root.position.z], [bed.x, bed.z], 'the pet naps in its bed');
   assert.ok(Math.abs(petModel.root.position.y - (0.22 + 0.095)) < 1e-6, 'on its cushion');
@@ -411,6 +411,13 @@ try {
   assert.deepEqual([petModel.root.position.x, petModel.root.position.z], [bed.x, bed.z]);
   const writesBeforeTap = changes.length; canvas.emit('pointerdown', petPoint()); canvas.emit('pointerup', petPoint()); advance(2);
   assert.ok(petModel.heart.isEnabled() && changes.length === writesBeforeTap, 'a tap pets it and saves nothing');
+  // Choosing the other pet swaps the model in place and leaks nothing.
+  const petAssets = () => [scene.meshes.length, scene.materials.length, scene.skeletons.length, scene.textures.length];
+  const assetsBefore = petAssets();
+  room.setPet('dog'); advance(2);
+  assert.ok(diagnostics().petSpecies === 'dog' && scene.getMeshByName('pet-dog-body') && !scene.getMeshByName('pet-cat-body'), 'the dog takes the bed');
+  room.setPet('cat'); advance(2); room.setPet('dog'); advance(2); room.setPet('cat'); advance(2);
+  assert.deepEqual(petAssets(), assetsBefore, 'switching pets keeps meshes, materials, skeletons and textures stable');
   room.beginPlacement('side-table'); clickFloor(3, 0);
   const pendingSettle = diagnostics().layout.items.find(item => item.type === 'side-table');
   const pendingNode = scene.transformNodes.find(node => node.metadata?.itemId === pendingSettle.id);

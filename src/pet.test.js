@@ -125,3 +125,11 @@ test('cat and dog models: one mesh, finite poses, paws on the floor, eyes that c
     }
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
+
+test('the chosen pet is saved, and only known pets are restored', async () => {
+  const { restoreState, freshState } = await import('./state.js');
+  assert.equal(freshState().pet, 'cat');
+  assert.equal(restoreState(JSON.stringify({ pet: 'dog' })).pet, 'dog');
+  assert.equal(restoreState(JSON.stringify({ pet: 'dragon' })).pet, 'cat');
+  assert.equal(restoreState('{').pet, 'cat');
+});

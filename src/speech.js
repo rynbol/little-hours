@@ -6,11 +6,13 @@ export const PET_LINES = {
     pet: ['prrrr… ♡', 'Mrrp!', 'Miso leans into your hand.', '*slow blink* ♡', 'Miso purrs like a tiny engine.', 'Mrow ♡', 'Miso nuzzles your fingers.'],
     sleepy: ['*sleepy purr* ♡', 'Mm… five more minutes.', 'Miso stretches one paw, then purrs.'],
     carry: ['Mrrow?', 'Mrrp! Where are we going?', '*dangles politely*'],
+    hello: ['Miso curls up in the bed. ♡', 'Mrrp! Miso is home.'],
   },
   dog: {
     pet: ['Wag wag wag! ♡', '*happy snuffle*', 'Mochi melts into your hand.', 'Boop! ♡', 'Mochi’s tail won’t stop.', 'Arf! ♡', 'Mochi gives your hand a lick.'],
     sleepy: ['*sleepy tail thump* ♡', 'Mm… belly rubs…', 'Mochi yawns and wiggles closer.'],
     carry: ['Wheee!', 'Arf? An adventure!', '*wiggles happily*'],
+    hello: ['Mochi hops into the bed and wags! ♡', 'Arf! Mochi is home.'],
   },
 };
 

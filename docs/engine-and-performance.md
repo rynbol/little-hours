@@ -238,6 +238,8 @@ The cat and the dog (`src/pets.js`) are each one vertex-colored mesh on a small 
 
 A still pet (asleep, sitting, settling) casts into the cached sun shadow, which then redraws once; a walking or carried pet keeps only its soft contact shade, so the cached map never shows a stale pose. The pet never receives the cached shadow. It stands on its bed's cushion, on the top rug under it (a flattened rug lowers it) or on the floor.
 
+The pet panel on the room toolbar chooses the cat or the dog. The choice saves with the user (like the atmosphere), not with a room, and the new pet takes the same bed; the old model, its skeleton and its effects are released.
+
 A pet shows a flat, billboarded heart and a short line in a DOM bubble just above its head. `src/speech.js` owns the bubbles; the room reports each head's screen position after every rendered frame (`anchor`, `onFrame`), so the bubble follows a walking or carried pet.
 
 Verification: unit tests cover the bed rules and migration, favorite spots in every design, a full nap-to-nap day in all six rooms, carrying and dropping (including a closed-off corner), petting, editing, reduced motion, and both models in every pose (finite, on the floor, inside the picking box, still in reduced motion). The runtime harness checks the nap in the bed, breathing, the heart, a real-pointer carry that never turns the room, the walk home, taps that save nothing, rug heights and reduced-motion stillness. Headless Chrome checked both pets in every pose, petting and carrying in Ember library, and moving the bed in Decorate.
