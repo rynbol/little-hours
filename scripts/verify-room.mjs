@@ -53,7 +53,7 @@ globalThis.IntersectionObserver = class {
 const { createRoom } = await import('../src/room.js');
 let engine;
 const container = { clientWidth: 800, clientHeight: 600, appendChild(canvas) { this.canvas = canvas; } };
-const changes = [], notices = [], stats = [], dragStates = [], lightTaps = [];
+const changes = [], notices = [], stats = [], dragStates = [], lightTaps = [], companionTaps = [];
 const room = createRoom(container, {
   engineFactory(canvas) {
     engine = new NullEngine({ renderWidth: 800, renderHeight: 600, textureSize: 512, deterministicLockstep: true, lockstepMaxSteps: 1 });
@@ -68,6 +68,7 @@ const room = createRoom(container, {
   onStats: value => stats.push(value),
   isCollectionDrop: (x, y) => x >= 0 && x <= canvas.clientWidth && y > canvas.clientHeight && y < canvas.clientHeight + 200,
   onDragState: value => dragStates.push(value),
+  onCompanionTap: value => companionTaps.push(value),
   onToggleLights: () => lightTaps.push(time),
 });
 const canvas = container.canvas;
@@ -411,6 +412,17 @@ try {
   assert.deepEqual([petModel.root.position.x, petModel.root.position.z], [bed.x, bed.z]);
   const writesBeforeTap = changes.length; canvas.emit('pointerdown', petPoint()); canvas.emit('pointerup', petPoint()); advance(2);
   assert.ok(petModel.heart.isEnabled() && changes.length === writesBeforeTap, 'a tap pets it and saves nothing');
+  // A tap on the companion at its desk asks it to speak: it never switches
+  // the desk lamp or saves anything.
+  {
+    const deskItem = diagnostics().layout.items.find(item => item.id === diagnostics().layout.activeDeskId);
+    const head = scene.transformNodes.find(node => node.metadata?.itemId === deskItem.id).metadata.avatarHead;
+    advance(2); scene.render(); const pixel = Vector3.Project(head.getAbsolutePosition(), Matrix.Identity(), scene.getTransformMatrix(), { x: 0, y: 0, width: canvas.clientWidth, height: canvas.clientHeight });
+    const tap = { clientX: pixel.x, clientY: pixel.y, pointerId: 5, pointerType: 'mouse', button: 0 }, writes = changes.length;
+    canvas.emit('pointerdown', tap); canvas.emit('pointerup', tap); advance(2);
+    assert.equal(companionTaps.length, 1, 'the companion answers a tap'); assert.ok(companionTaps[0].state);
+    assert.equal(changes.length, writes, 'a tap on the companion saves nothing'); assert.ok(!diagnostics().layout.items.find(item => item.id === deskItem.id).off, 'and leaves the desk lamp on');
+  }
   // Choosing the other pet swaps the model in place and leaks nothing.
   const petAssets = () => [scene.meshes.length, scene.materials.length, scene.skeletons.length, scene.textures.length];
   const assetsBefore = petAssets();
@@ -430,7 +442,29 @@ try {
   assert.equal(moths.isEnabled(), false); assert.equal(shootingStar.isEnabled(), false);
   assert.deepEqual(Array.from(mothBuffer), restingMothPositions);
   room.selectItem(pendingSettle.id); room.removeSelection();
-  console.log('PASS animations: the pet naps in its bed and breathes, a pet brings a heart that ends, a carry sets it down and it walks home; settling keeps the saved layout; reduced motion holds still.');
+  // Outside Decorate, so the pet can be carried.
+  const decorating = diagnostics().editing; room.setEditMode(false); advance(3);
+  // With reduced motion, a dropped pet sits while the room is idle; one timed
+  // frame then puts it back in its bed, and the cached shadow redraws there.
+  {
+    // The pet switch above built a new model: read the live one.
+    const model = diagnostics().petModel, shadowMap = scene.getLightByName('window-sun').getShadowGenerator().getShadowMap(), realTimeout = globalThis.setTimeout, timers = [];
+    const grab = petPoint(), carry = { ...grab, clientX: grab.clientX - 90, clientY: grab.clientY + 30 };
+    globalThis.setTimeout = (callback, ms) => { timers.push({ callback, ms }); return 0; };
+    try { canvas.emit('pointerdown', grab); canvas.emit('pointermove', carry); advance(12); canvas.emit('pointerup', carry); advance(12); }
+    finally { globalThis.setTimeout = realTimeout; }
+    const wake = timers.find(timer => timer.ms > 3000);
+    assert.ok(diagnostics().pet.state === 'sitting' && frames.size === 0 && wake && wake.ms <= 5050, 'reduced motion: set down, it sits and the room goes idle');
+    // NullEngine never compiles shaders, so Babylon keeps resetting the
+    // shadow counter itself; a new caster list is the room's own redraw.
+    time += wake.ms; const casters = shadowMap.renderList; wake.callback(); advance(12);
+    const home = diagnostics().layout.items.find(item => item.type === 'pet-bed');
+    assert.equal(diagnostics().pet.state, 'sleeping', 'reduced motion: the timed frame sends it home');
+    assert.deepEqual([model.root.position.x, model.root.position.z], [home.x, home.z], 'reduced motion: it naps in its bed again, with no walk');
+    assert.ok(shadowMap.renderList !== casters && shadowMap.renderList.includes(model.body) && frames.size === 0, 'its shadow redraws at the bed, then the room is idle');
+  }
+  room.setEditMode(decorating); advance(3);
+  console.log('PASS animations: the pet naps in its bed and breathes, a pet brings a heart that ends, a carry sets it down and it walks home; settling keeps the saved layout; reduced motion holds still and sends a dropped pet home.');
   const savedRoutineLayout = diagnostics().layout;
   motion.matches = false; motion.emit('change', { matches: false });
   room.setEditMode(false); room.setLayout(createLayout('writers-loft')); room.setActivity('working'); advance(3);

@@ -276,7 +276,7 @@ export function createPetModel(scene, species = 'cat') {
   const anchor = new Vector3(), knee = new Vector3(), foot = new Vector3(), pole = new Vector3(), dir = new Vector3(), one = new Vector3(1, 1, 1), stretch = new Vector3(1, 1, 1);
   const joints = Array.from({ length: spec.tail.count + 1 }, () => new Vector3());
   const breathChest = new Vector3(1, 1, 1), breathHips = new Vector3(1, 1, 1);
-  let gait = 0, lastWalked = 0, eyesShown = 'open', mouthShown = false, blinkAt = 3;
+  let gait = 0, lastWalked = 0, eyesShown = 'open', mouthShown = false, blinkAt = 3, skipped = false;
   const place = (name, rotation, at, scaling = one) => Matrix.ComposeToRef(scaling, rotation, at, bones.get(name));
   function segment(name, a, b) {
     b.subtractToRef(a, dir); const length = dir.length(); dir.scaleInPlace(1 / Math.max(length, 1e-6));
@@ -317,7 +317,13 @@ export function createPetModel(scene, species = 'cat') {
   return {
     root, body, contact, heart, sleepLetters, species, headPoint, hitTest,
     animate(pose, dt, seconds, reducedMotion) {
-      const action = goals[pose.action] ? pose.action : 'sleep', goal = goals[action], rate = reducedMotion ? 1 : 1 - Math.exp(-dt * 5.5);
+      const action = goals[pose.action] ? pose.action : 'sleep';
+      // A settled nap only breathes, slowly: the rig updates at half rate
+      // and keeps its bones (and the GPU's copy) in between.
+      const napping = action === 'sleep' && !pose.moving && pose.petAge === Infinity && !reducedMotion && current.eyes < 0.02;
+      if (napping && (skipped = !skipped)) { updateEffects(pose, seconds, reducedMotion); return; }
+      dt = napping ? dt * 2 : dt;
+      const goal = goals[action], rate = reducedMotion ? 1 : 1 - Math.exp(-dt * 5.5);
       for (const key of KEYS) current[key] += (goal[key] - current[key]) * rate;
       for (const key of PAWS) { const g = goal[key]; paws[key].x += (g[0] - paws[key].x) * rate; paws[key].y += (g[1] - paws[key].y) * rate; paws[key].z += (g[2] - paws[key].z) * rate; }
       const still = reducedMotion ? 0 : 1, awake = action !== 'sleep';
@@ -391,25 +397,28 @@ export function createPetModel(scene, species = 'cat') {
         else entry.bone.getLocalMatrix().copyFrom(bones.get(entry.source));
       }
       skin[0].bone.markAsDirty();
-      // The nap letters and the heart float above the head.
-      const napping = action === 'sleep' && pose.petAge === Infinity && !reducedMotion;
-      sleepLetters.setEnabled(napping);
-      if (napping) {
-        headPoint(w); sleepLetters.position.set(w.x, w.y + 0.12, w.z);
-        for (let i = 0; i < 3; i++) {
-          const life = (seconds / 3.6 + i / 3) % 1, size = Math.sin(life * Math.PI) * (0.035 + life * 0.035), x = 0.06 + life * 0.1 + Math.sin(life * 5 + i) * 0.02, y = life * 0.34;
-          for (let k = 0; k < 4; k++) { const o = (i * 4 + k) * 3; letterPositions[o] = x + letter[k][0] * size; letterPositions[o + 1] = y + letter[k][1] * size; letterPositions[o + 2] = 0; }
-        }
-        sleepLetters.updateVerticesData('position', letterPositions, false, false);
-      }
-      const showHeart = pose.petAge < PET_REACTION;
-      heart.setEnabled(showHeart);
-      if (showHeart) {
-        const t = pose.petAge, pop = reducedMotion ? 1 : smooth(t / 0.22) * (1 + Math.sin(Math.min(1, t / 0.5) * Math.PI) * 0.25);
-        headPoint(w); heart.position.set(w.x, w.y + 0.3 + (reducedMotion ? 0 : t * 0.16), w.z); heart.scaling.setAll(pop * (1 - smooth((t - 2.1) / 0.5) * 0.4));
-        heart.visibility = 1 - smooth((t - 2.1) / 0.5);
-      }
+      updateEffects(pose, seconds, reducedMotion);
     },
     dispose() { for (const node of [root, sleepLetters, heart, contact]) node.dispose(false, false); skeleton.dispose(); },
   };
+  // The nap letters and the heart float above the head.
+  function updateEffects(pose, seconds, reducedMotion) {
+    const napping = pose.action === 'sleep' && pose.petAge === Infinity && !reducedMotion;
+    sleepLetters.setEnabled(napping);
+    if (napping) {
+      headPoint(w); sleepLetters.position.set(w.x, w.y + 0.12, w.z);
+      for (let i = 0; i < 3; i++) {
+        const life = (seconds / 3.6 + i / 3) % 1, size = Math.sin(life * Math.PI) * (0.035 + life * 0.035), x = 0.06 + life * 0.1 + Math.sin(life * 5 + i) * 0.02, y = life * 0.34;
+        for (let k = 0; k < 4; k++) { const o = (i * 4 + k) * 3; letterPositions[o] = x + letter[k][0] * size; letterPositions[o + 1] = y + letter[k][1] * size; letterPositions[o + 2] = 0; }
+      }
+      sleepLetters.updateVerticesData('position', letterPositions, false, false);
+    }
+    const showHeart = pose.petAge < PET_REACTION;
+    heart.setEnabled(showHeart);
+    if (showHeart) {
+      const t = pose.petAge, pop = reducedMotion ? 1 : smooth(t / 0.22) * (1 + Math.sin(Math.min(1, t / 0.5) * Math.PI) * 0.25);
+      headPoint(w); heart.position.set(w.x, w.y + 0.3 + (reducedMotion ? 0 : t * 0.16), w.z); heart.scaling.setAll(pop * (1 - smooth((t - 2.1) / 0.5) * 0.4));
+      heart.visibility = 1 - smooth((t - 2.1) / 0.5);
+    }
+  }
 }

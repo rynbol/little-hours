@@ -510,7 +510,7 @@ export function createRoom(container, options = {}) {
   let layout = createLayout(), selectedId = null, editing = false, placement = null, ghost = null, marker = null, lastPlacementState = '';
   let hoveredId = null, drag = null, outlineKey = '';
   let companionRoutine, mobileCompanion, companionTime = 0, companionLayoutKey = '';
-  let petRoutine, petModel = null, petSpecies = options.pet === 'dog' ? 'dog' : 'cat', petY = null, petCasts = null, petMoving = false, petKey = '';
+  let petRoutine, petModel = null, petSpecies = options.pet === 'dog' ? 'dog' : 'cat', petY = null, petCasts = null, petMoving = false, petKey = '', petTime = 0, petWake = 0;
   const outlinedMeshes = [];
   const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782'), playOutline = color('#d9b98a');
   const ghostMaterial = new StandardMaterial('placement-preview', scene); ghostMaterial.diffuseColor = color('#85ac80'); ghostMaterial.emissiveColor = color('#42653f'); ghostMaterial.alpha = 0.43; ghostMaterial.disableLighting = true;
@@ -536,7 +536,7 @@ export function createRoom(container, options = {}) {
     if (visible && onScreen && !frame) frame = requestAnimationFrame(tick);
   }
   function refreshShadows() {
-    shadow.getShadowMap().renderList = scene.meshes.filter(mesh => mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && (!drag?.active || itemAncestor(mesh)?.metadata.itemId !== drag.id) && mesh !== rain && mesh !== marker && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
+    shadow.getShadowMap().renderList = scene.meshes.filter(mesh => !(drag?.active && mesh === petModel?.body && drag.id === petBed(layout)?.id) && mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && (!drag?.active || itemAncestor(mesh)?.metadata.itemId !== drag.id) && mesh !== rain && mesh !== marker && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
     for (const mesh of glowingMeshes) bloom.removeIncludedOnlyMesh(mesh); glowingMeshes.clear();
     for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && !mesh.metadata?.companion && mesh.metadata?.effect !== 'tea-steam' && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
     bloom.mainTexture.renderList = [...glowingMeshes];
@@ -841,10 +841,28 @@ export function createRoom(container, options = {}) {
   // What a tap outside Decorate reaches: the cat, a piece with a use, or the
   // room's own lights. The closest of them wins.
   const usable = mesh => mesh.isEnabled() && mesh.isPickable && (mesh.metadata?.cat || mesh.metadata?.lightSwitch || Boolean(getFurniture(itemAncestor(mesh)?.metadata.furnitureType)?.use));
+  // Distance along a ray to where it enters a sphere, or null.
+  const sphereOffset = new Vector3();
+  function raySphere(ray, centre, radius) {
+    centre.subtractToRef(ray.origin, sphereOffset);
+    const along = Vector3.Dot(sphereOffset, ray.direction), miss = sphereOffset.lengthSquared() - along * along;
+    return along > 0 && miss <= radius * radius ? along - Math.sqrt(radius * radius - miss) : null;
+  }
+  // The companion answers taps on its head or body, at the desk or away.
+  const companionHead = new Vector3(), companionBody = new Vector3();
+  function companionDistance(ray) {
+    const head = companionRoutine.pose.atDesk ? placedObjects.get(layout.activeDeskId)?.metadata.avatarHead : mobileCompanion.head;
+    if (!head?.isEnabled()) return null;
+    companionHead.copyFrom(head.getAbsolutePosition()); companionBody.copyFrom(companionHead); companionBody.y -= 0.55;
+    const a = raySphere(ray, companionHead, 0.3), b = raySphere(ray, companionBody, 0.36);
+    return a === null ? b : b === null ? a : Math.min(a, b);
+  }
   function playTarget(ray) {
-    const hit = scene.pickWithRay(ray, usable), petDistance = petModel?.root.isEnabled() ? petModel.hitTest(ray) : null;
-    // The pet wins when it is in front of whatever else the ray meets.
-    if (petDistance !== null && (!hit?.hit || petDistance <= hit.distance)) return { cat: true };
+    const hit = scene.pickWithRay(ray, usable), petDistance = petModel?.root.isEnabled() ? petModel.hitTest(ray) : null, companion = companionDistance(ray);
+    // The pet and the companion win when they are in front of whatever else
+    // the ray meets.
+    if (petDistance !== null && (!hit?.hit || petDistance <= hit.distance) && (companion === null || petDistance <= companion)) return { cat: true };
+    if (companion !== null && (!hit?.hit || companion <= hit.distance)) return { avatar: true };
     if (!hit?.hit) return null;
     const mesh = hit.pickedMesh; return mesh.metadata?.lightSwitch ? { lights: true } : { id: itemAncestor(mesh).metadata.itemId };
   }
@@ -935,7 +953,7 @@ export function createRoom(container, options = {}) {
     if (event.isPrimary === false || (event.button != null && event.button !== 0) || downPosition) return;
     const ray = editing && !placement ? castPointer(event) : null, floor = ray && floorPosition(ray);
     downPosition = { x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, pointerId: event.pointerId,
-      itemId: ray ? hitItem(ray) : null, floor: floor ? { x: floor.x, z: floor.z } : null, pet: !editing && hitPet(castPointer(event)) };
+      itemId: ray ? decorHit(ray) : null, floor: floor ? { x: floor.x, z: floor.z } : null, pet: !editing && hitPet(castPointer(event)) };
     // A press on the pet can become a carry, so the room does not turn.
     if (downPosition.pet && !options.engineFactory) camera.detachControl();
     if ((editing || downPosition.pet) && event.pointerId != null) canvas.setPointerCapture(event.pointerId);
@@ -953,7 +971,7 @@ export function createRoom(container, options = {}) {
     pendingPointer.clientX = event.clientX; pendingPointer.clientY = event.clientY; pendingPointer.pointerType = event.pointerType; hasPendingPointer = true;
     requestRender(); if (!clicked) return;
     const ray = castPointer(event);
-    if (!editing) { const target = playTarget(ray); if (target?.cat) pet(); else if (target?.id) useItem(target.id); else if (target?.lights) options.onToggleLights?.(); return; }
+    if (!editing) { const target = playTarget(ray); if (target?.cat) pet(); else if (target?.avatar) options.onCompanionTap?.({ state: companionRoutine.pose.state }); else if (target?.id) useItem(target.id); else if (target?.lights) options.onToggleLights?.(); return; }
     const floor = floorPosition(ray);
     if (placement) {
       if (!floor) { options.onNotice?.(placement.reason || 'Choose a clear spot inside the room.'); return; }
@@ -997,9 +1015,17 @@ export function createRoom(container, options = {}) {
       canvas.style.cursor = 'crosshair'; return;
     }
     if (pendingPointer.pointerType === 'mouse' || pendingPointer.pointerType === 'pen') {
-      if (editing) { hoverItem(hitItem(ray)); canvas.style.cursor = 'grab'; }
+      if (editing) { hoverItem(decorHit(ray)); canvas.style.cursor = 'grab'; }
       else { const target = playTarget(ray); hoverPlay(target); canvas.style.cursor = target ? 'pointer' : 'grab'; }
     }
+  }
+  // In Decorate the napping pet covers most of its bed, so a press on the
+  // pet takes hold of the bed.
+  function decorHit(ray) {
+    const hit = scene.pickWithRay(ray, mesh => mesh.isEnabled() && mesh.isPickable && Boolean(itemAncestor(mesh))), bed = petBed(layout);
+    const petDistance = bed && petModel?.root.isEnabled() ? petModel.hitTest(ray) : null;
+    if (petDistance !== null && (!hit?.hit || petDistance <= hit.distance)) return bed.id;
+    return hit?.hit ? itemAncestor(hit.pickedMesh)?.metadata.itemId : null;
   }
   function hitPet(ray) { return Boolean(petModel?.root.isEnabled()) && playTarget(ray)?.cat === true; }
   // Carry: the pet's scruff follows the pointer on a plane above the floor.
@@ -1018,7 +1044,11 @@ export function createRoom(container, options = {}) {
     const pointerId = downPosition?.pointerId, carried = petRoutine.pose.held;
     downPosition = null; releasePointer(pointerId);
     if (!options.engineFactory && !editing) camera.attachControl(canvas, false);
-    if (carried) { petRoutine.drop(); options.onPetCarry?.({ species: petSpecies, name: PETS[petSpecies].name, held: false }); updatePetShadow(); }
+    if (carried) {
+      petRoutine.drop(); options.onPetCarry?.({ species: petSpecies, name: PETS[petSpecies].name, held: false }); updatePetShadow();
+      // With reduced motion, one more frame sends the sitting pet home.
+      clearTimeout(petWake); if (reducedMotion && petRoutine.pose.state === 'sitting') petWake = setTimeout(requestRender, petRoutine.diagnostics().timer * 1000 + 50);
+    }
     if (event) { pendingPointer.clientX = event.clientX; pendingPointer.clientY = event.clientY; pendingPointer.pointerType = event.pointerType; hasPendingPointer = true; }
     requestRender(); return carried;
   }
@@ -1078,13 +1108,15 @@ export function createRoom(container, options = {}) {
     petModel?.dispose(); petModel = createPetModel(scene, petSpecies); petModel.root.parent = world;
     petRoutine.setSpecies(petSpecies); petY = null; petCasts = null; updatePetShadow();
   }
-  // A still pet casts into the cached sun shadow, which then redraws once.
-  // A walking or carried pet keeps only its soft contact shade.
+  // A still pet casts into the cached sun shadow, which then redraws once
+  // for each new resting place. A walking or carried pet keeps only its soft
+  // contact shade.
   function updatePetShadow() {
     if (!petModel) return;
     const pose = petRoutine.pose, casts = !pose.held && !pose.moving && ['sleeping', 'sitting', 'settling'].includes(pose.state);
-    if (casts === petCasts) return;
-    petCasts = casts; petModel.body.metadata.castShadow = casts; refreshShadows();
+    const key = casts ? `${pose.x.toFixed(2)},${pose.z.toFixed(2)},${pose.yaw.toFixed(1)}` : '';
+    if (key === petCasts) return;
+    petCasts = key; petModel.body.metadata.castShadow = casts; refreshShadows();
   }
   buildPet();
   syncFurniture(); setTheme(theme); resize();
@@ -1136,7 +1168,9 @@ export function createRoom(container, options = {}) {
     const streakProgress = streakVisible ? streakPhase / shootingStar.metadata.durationSeconds : 0;
     shootingStar.position.set(-3.52 + streakProgress * 1.04, 4.63 - streakProgress * 0.48, -4.57); streakMaterial.alpha = streakVisible ? Math.sin(streakProgress * Math.PI) * 0.9 : 0;
     hearthGlow.intensity = (theme === 'day' ? 0.30 : theme === 'dusk' ? 1.0 : 0.65) + (reducedMotion ? 0 : Math.sin(seconds * 2.1) * 0.07 + Math.sin(seconds * 4.1) * 0.04);
-    const pose = petRoutine.update(companionDelta, reducedMotion);
+    // Reduced motion draws only on change, so the pet counts real time
+    // between those frames.
+    const pose = petRoutine.update(reducedMotion && petTime ? (now - petTime) / 1000 : companionDelta, reducedMotion); petTime = now;
     if (pose.moving !== petMoving) { petMoving = pose.moving; updatePetShadow(); }
     // The pet stands on its bed, on the rug under it or on the floor; a
     // carried pet hangs below the pointer. Heights ease, so a hop reads.
@@ -1144,8 +1178,10 @@ export function createRoom(container, options = {}) {
     const bed = petBed(layout), onBed = !pose.held && insideBed(layout, pose), ground = onBed ? 0.22 + PET_BED_SURFACE : surfaceBelow(pointArea) - 0.002;
     const goalY = pose.held ? 0.22 + HOLD_HEIGHT - 0.62 : ground;
     petY = petY === null || reducedMotion ? goalY : petY + (goalY - petY) * Math.min(1, companionDelta * 12);
-    petModel.root.position.set(pose.x, petY, pose.z); petModel.root.rotation.y = pose.yaw;
-    petModel.contact.position.set(pose.x, (bed && onBed ? 0.22 + PET_BED_SURFACE + 0.002 : surfaceBelow(pointArea)), pose.z); petModel.contact.rotation.y = pose.yaw;
+    const carriedBed = drag?.active && bed && drag.id === bed.id ? drag.object : null;
+    if (carriedBed) petModel.root.position.set(carriedBed.position.x, 0.22 + PET_BED_SURFACE, carriedBed.position.z), petModel.root.rotation.y = carriedBed.rotation.y - Math.PI / 2 - 0.35;
+    else petModel.root.position.set(pose.x, petY, pose.z), petModel.root.rotation.y = pose.yaw;
+    petModel.contact.position.set(petModel.root.position.x, (bed && (onBed || carriedBed) ? 0.22 + PET_BED_SURFACE + 0.002 : surfaceBelow(pointArea)), petModel.root.position.z); petModel.contact.rotation.y = petModel.root.rotation.y;
     petModel.animate(pose, companionDelta, seconds, reducedMotion);
     for (const [id, reaction] of reactions) {
       const object = placedObjects.get(id), t = (now - reaction.start) / 1000 / reactionSeconds[reaction.kind];
@@ -1217,7 +1253,7 @@ export function createRoom(container, options = {}) {
     anchor,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, architectureStyle, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
-    dispose() { if (disposed) return; cancelDrag(); disposed = true; cancelAnimationFrame(frame); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; petModel?.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    diagnostics() { return { scene, engine, camera, architectureStyle, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    dispose() { if (disposed) return; cancelDrag(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; petModel?.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

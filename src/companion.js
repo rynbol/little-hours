@@ -58,14 +58,33 @@ export function findWalkingPath(layout, start, end, obstacles = navigationObstac
   if (clearSegment(start, end, obstacles)) return [start, end];
   const width = 56, height = 43, total = width * height;
   const point = index => ({ x: -5.5 + index % width * STEP, z: -4.2 + Math.floor(index / width) * STEP });
-  const open = [], costs = new Float32Array(total).fill(Infinity), parent = new Int32Array(total).fill(-1), closed = new Uint8Array(total), allowed = new Uint8Array(total);
+  const costs = new Float32Array(total).fill(Infinity), parent = new Int32Array(total).fill(-1), closed = new Uint8Array(total), allowed = new Uint8Array(total);
+  // The open set is a binary heap on cost plus distance to go, so each step
+  // is logarithmic instead of a scan of every open cell.
+  const heap = [], rank = [];
+  const push = index => {
+    let i = heap.length; heap.push(index); rank.push(costs[index] + distance(point(index), end));
+    while (i > 0) { const up = (i - 1) >> 1; if (rank[up] <= rank[i]) break; [heap[up], heap[i], rank[up], rank[i]] = [heap[i], heap[up], rank[i], rank[up]]; i = up; }
+  };
+  const pop = () => {
+    const top = heap[0], lastIndex = heap.pop(), lastRank = rank.pop();
+    if (heap.length) {
+      heap[0] = lastIndex; rank[0] = lastRank;
+      for (let i = 0; ;) {
+        const left = i * 2 + 1, right = left + 1; let low = i;
+        if (left < heap.length && rank[left] < rank[low]) low = left;
+        if (right < heap.length && rank[right] < rank[low]) low = right;
+        if (low === i) break;
+        [heap[low], heap[i], rank[low], rank[i]] = [heap[i], heap[low], rank[i], rank[low]]; i = low;
+      }
+    }
+    return top;
+  };
   for (let i = 0; i < total; i++) allowed[i] = walkable(point(i), obstacles) ? 1 : 0;
-  for (let i = 0; i < total; i++) if (allowed[i] && distance(start, point(i)) < .43 && clearSegment(start, point(i), obstacles)) { costs[i] = distance(start, point(i)); open.push(i); }
+  for (let i = 0; i < total; i++) if (allowed[i] && distance(start, point(i)) < .43 && clearSegment(start, point(i), obstacles)) { costs[i] = distance(start, point(i)); push(i); }
   let found = -1;
-  while (open.length) {
-    let best = 0;
-    for (let i = 1; i < open.length; i++) if (costs[open[i]] + distance(point(open[i]), end) < costs[open[best]] + distance(point(open[best]), end)) best = i;
-    const current = open.splice(best, 1)[0];
+  while (heap.length) {
+    const current = pop();
     if (closed[current]) continue;
     closed[current] = 1;
     const here = point(current);
@@ -76,7 +95,7 @@ export function findWalkingPath(layout, start, end, obstacles = navigationObstac
       const next = current + dx + dz * width;
       if (!allowed[next] || closed[next] || !clearSegment(here, point(next), obstacles)) continue;
       const cost = costs[current] + Math.hypot(dx, dz) * STEP;
-      if (cost < costs[next]) { costs[next] = cost; parent[next] = current; open.push(next); }
+      if (cost < costs[next]) { costs[next] = cost; parent[next] = current; push(next); }
     }
   }
   if (found < 0) return null;

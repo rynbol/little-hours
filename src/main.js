@@ -6,7 +6,7 @@ import { FURNITURE, getFurniture } from './catalog.js';
 import { PRESETS, normalizeLayout, MAX_ITEMS, pieceCount, roomDesign } from './layout.js';
 import { companionIntent } from './companion.js';
 import { PETS } from './pet.js';
-import { createSpeech, PET_LINES } from './speech.js';
+import { createSpeech, PET_LINES, AVATAR_LINES } from './speech.js';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -42,6 +42,8 @@ let soundEnabled = false;
 let storageWarningShown = false;
 let toastTimeout;
 let speech = null;
+let lastAvatarLine = 0;
+let hiddenSince = 0;
 let editMode = false;
 let collectionTab = 'collection';
 let category = 'All';
@@ -69,7 +71,7 @@ document.querySelector('#app').innerHTML = `
       <section class="room-section" aria-labelledby="room-title">
         <div class="room-heading"><div><p class="eyebrow">YOUR QUIET LITTLE WORLD</p><h1 id="room-title">The twilight retreat</h1><p class="room-subtitle" id="room-subtitle">The fire is warm. The night is yours.</p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Choose a room" aria-controls="builder-panel">${icon('home')}<span>Rooms</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
         <div class="stage" id="stage">
-          <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a ginger cat. Drag to turn the room."></div>
+          <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a pet. Drag to turn the room."></div>
           <div class="loading-note" id="loading-note">Making room for you…</div>
           <div class="stage-presence" id="stage-presence" data-presence="idle" role="status" aria-live="polite" aria-atomic="true" aria-label="Your local focus status: In your room" title="Your focus status in this browser."><span id="presence-icon" aria-hidden="true">${icon('home')}</span><span id="room-status">In your room</span></div>
           <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
@@ -161,10 +163,17 @@ function applyState(next, force = false) {
   document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', button.dataset.themeChoice === state.theme));
   document.querySelectorAll('[data-decor]').forEach(input => { input.checked = state.decor[input.dataset.decor]; });
 }
+// The companion speaks at the edges of focus and when tapped, never while
+// you focus, in Decorate or in the mini view, and not more than once every
+// twelve seconds on its own.
+function avatarSay(kind, { force = false } = {}) {
+  if (!speech || editMode || compact || (!force && Date.now() - lastAvatarLine < 12_000)) return;
+  if (speech.say('avatar', AVATAR_LINES[kind])) lastAvatarLine = Date.now();
+}
 function acceptUpdate(result) {
   applyState(result.state);
   if (result.completed) {
-    room?.pet();
+    room?.pet(); avatarSay('finish', { force: true });
     toast('A little progress, made. Stretch, breathe, and take a break.');
   }
   if (!result.persisted && !storageWarningShown) {
@@ -179,8 +188,15 @@ function petFeedback({ species = state.pet, state: mood } = {}) {
   if (speech) speech.say('pet', mood === 'sleeping' ? lines.sleepy : lines.pet);
   else toast(`${PETS[species]?.name || 'Miso'} is happy you’re here.`);
 }
+// The room's accessible name says how to use it, with the current pet.
+function renderRoomLabel() {
+  const pet = state.pet === 'dog' ? 'Mochi the puppy' : 'Miso the ginger cat';
+  $('#room-canvas').setAttribute('aria-label', editMode
+    ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
+    : `Interactive 3D cutaway study room. Drag to turn the room. Tap a lamp, the fire or the record player to switch it, tap your companion, or tap ${pet}.`);
+}
 function renderPetName() {
-  const name = PETS[state.pet]?.name || PETS.cat.name;
+  const name = PETS[state.pet]?.name || PETS.cat.name; renderRoomLabel();
   $('#pet-company').textContent = `You & ${name}`; $('#pet-button-label').textContent = name;
   $('#pet-button').setAttribute('aria-label', `${name}: pet or choose your pet`);
 }
@@ -192,7 +208,10 @@ try {
     onReady() {
       $('#loading-note').hidden = true;
       setDecorEntry(true);
+      // Back after half an hour or more: a small hello.
+      if (state.seenAt && Date.now() - state.seenAt > 30 * 60_000) setTimeout(() => avatarSay('welcome', { force: true }), 1200);
     },
+    onCompanionTap({ state: activity }) { if (speech && speech.say('avatar', AVATAR_LINES.tap[activity] || AVATAR_LINES.tap.idle)) lastAvatarLine = Date.now(); },
     pet: state.pet,
     onPet: petFeedback,
     onPetCarry({ species, held }) { if (held) speech?.say('pet', (PET_LINES[species] || PET_LINES.cat).carry); },
@@ -203,6 +222,7 @@ try {
       $('#companion-status').dataset.state = activity;
       $('#companion-status-text').textContent = `Companion · ${labels[activity] || 'In the room'}`;
       renderCompanionNote();
+      if (activity === 'resting') avatarSay('rest'); else if (activity === 'sleeping') avatarSay('doze');
     },
     // A switched lamp or fire saves with the room, but it is not an Undo step.
     onLayoutChange(layout, { remember = true } = {}) {
@@ -283,8 +303,11 @@ function tick() {
   else renderSession();
 }
 $('#start-button').addEventListener('click', () => {
+  const resuming = !state.session.running && remainingAt(state.session) > 0 && remainingAt(state.session) < state.session.duration;
   // Preserve the action shown on the button if the deadline just passed.
   acceptUpdate(store.setRunning(!state.session.running));
+  if (state.session.running) avatarSay(resuming ? 'resume' : 'start', { force: true });
+  else if (remainingAt(state.session) > 0) avatarSay('pause', { force: true });
 });
 $('#reset-session').addEventListener('click', () => {
   acceptUpdate(store.update(draft => { draft.session = createSession(draft.session.duration / 60000); }));
@@ -338,9 +361,7 @@ function setEditMode(enabled) {
   $('#decorate-button').setAttribute('aria-pressed', enabled);
   $('#decorate-button').setAttribute('aria-label', enabled ? 'Done decorating' : 'Decorate');
   $('#decorate-button span').textContent = enabled ? 'Done decorating' : 'Decorate';
-  $('#room-canvas').setAttribute('aria-label', enabled
-    ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
-    : 'Interactive 3D cutaway study room. Drag to turn the room. Tap a lamp, the fire or the record player to switch it, or tap the ginger cat.');
+  renderRoomLabel();
   currentPanel = null;
   renderPanel();
   room?.setEditMode?.(enabled);
@@ -661,7 +682,16 @@ window.addEventListener('storage', event => {
   if (event.key === storageKey || event.key === null) refreshState();
 }, { signal: listeners.signal });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshState(); }, { signal: listeners.signal });
+// Remember the last visit, for a hello after a long time away.
+function markSeen() { store.update(draft => { draft.seenAt = Date.now(); }); }
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenSince = Date.now(); markSeen(); }
+  else if (hiddenSince && Date.now() - hiddenSince > 10 * 60_000) { hiddenSince = 0; setTimeout(() => avatarSay('welcome', { force: true }), 600); }
+}, { signal: listeners.signal });
+window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
+// Development builds expose the room to end-to-end checks; production strips it.
+if (import.meta.env.DEV) window.__littleHours = { get room() { return room; }, get state() { return state; }, get speech() { return speech; } };
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   clearInterval(tickInterval);

@@ -46,6 +46,11 @@ export function reachableFloor(layout, from, obstacles = petObstacles(layout)) {
   }
   return reached;
 }
+// One of the four grid cells around a point (k = 0..3), or -1 off the grid.
+function cellNear(point, k) {
+  const gx = Math.floor((point.x - GRID.x) / GRID.step) + (k & 1), gz = Math.floor((point.z - GRID.z) / GRID.step) + (k >> 1);
+  return gx < 0 || gz < 0 || gx >= GRID.width || gz >= GRID.height ? -1 : gz * GRID.width + gx;
+}
 // The closest spot to `point` that can still walk home: the point itself
 // when it can, or the nearest reachable grid spot.
 export function landingSpot(layout, point, home) {
@@ -125,7 +130,11 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
     trip = null; target = null; timer = SETTLE; settleFrom = pose.yaw; status('settling', 'settle');
   }
   function wander() {
-    const spots = petSpots(layout, { windowX, companion }).filter(spot => !target || distance(spot, target) > 0.8);
+    // One flood fill finds which spots the pet can reach, so the path search
+    // runs once, for a spot that it can reach, and never fails.
+    const obstacles = petObstacles(layout), reached = walkable(pose, obstacles) ? reachableFloor(layout, pose, obstacles) : null;
+    const reachable = spot => reached && [0, 1, 2, 3].some(k => { const i = cellNear(spot, k); return i >= 0 && reached[i] && clearSegment(spot, cellPoint(i), obstacles); });
+    const spots = petSpots(layout, { windowX, companion }).filter(spot => (!target || distance(spot, target) > 0.8) && reachable(spot));
     // Loved spots first, with a little chance so a visit is never the same.
     const ordered = spots.map((spot, index) => ({ spot, score: index + random() * 3 })).sort((a, b) => a.score - b.score).map(entry => entry.spot);
     for (const spot of ordered) if (walkTo(spot, spot.kind)) { visits++; return; }
@@ -183,7 +192,8 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
     },
     update(dt, reducedMotion) {
       if (!layout || editing) return pose;
-      dt = Math.min(dt, 0.1);
+      // Frames are steady in full motion; reduced motion may pass a long gap.
+      if (!reducedMotion) dt = Math.min(dt, 0.1);
       if (pose.petAge < PET_REACTION) pose.petAge += dt; else pose.petAge = Infinity;
       if (pose.held) return pose;
       if (reducedMotion) {

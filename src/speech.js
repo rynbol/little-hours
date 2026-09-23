@@ -16,6 +16,26 @@ export const PET_LINES = {
   },
 };
 
+// The companion speaks at the edges of focus, never during it.
+export const AVATAR_LINES = {
+  start: ['Okay. One little thing at a time.', 'Let’s do this. ✎', 'Deep breath. Here we go.', 'I’ll be right here with you.'],
+  resume: ['Back to it.', 'Okay, where were we?', 'Refreshed. Let’s go.'],
+  pause: ['A little break? Good idea.', 'Stretching my legs. Back soon.', 'Tea break!'],
+  finish: ['We did it! ✧', 'That was a good one.', 'Look at us go. Time for a break.', 'Well done, you.'],
+  welcome: ['Welcome back! ✧', 'Oh, hi! I kept your seat warm.', 'There you are. The room missed you.'],
+  rest: ['Ahh, cozy.', 'This is the best seat in the room.', 'Mm, just a quiet minute.'],
+  doze: ['(yawns) Just resting my eyes…', 'Zzz… five more minutes…'],
+  tap: {
+    working: ['Mm-hm, focusing… ✎', 'Almost done with this bit.', '(quietly typing)'],
+    idle: ['Ready when you are.', 'Pick one thing, and we’ll start.', 'Hi there!', 'What are we working on today?'],
+    resting: ['Ahh, cozy.', 'Five more minutes?', 'Breaks are part of the work.'],
+    sleeping: ['Zzz… mm… chapter three…', 'Mmh… five more minutes…'],
+    walking: ['Just finding a comfy spot.', 'Back in a moment!'],
+    returning: ['On my way!', 'Coming back to the desk.'],
+    'resting-at-desk': ['Just a little pause here.', 'Resting my eyes at the desk.'],
+  },
+};
+
 // A line from the list, never the same one twice in a row.
 export function pickLine(lines, last, random = Math.random) {
   const choices = lines.length > 1 ? lines.filter(line => line !== last) : lines;
