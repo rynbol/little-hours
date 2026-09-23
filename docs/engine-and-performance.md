@@ -201,3 +201,15 @@ The room owns the canvas cursor (`scene.doNotHandleCursors`). Babylon reset it t
 The canvas no longer draws a focus ring. Babylon focuses the canvas on every press, and browsers can match `:focus-visible` for focus that a script moves, so a gold frame appeared after ordinary clicks (in Zen, and in headless Chrome captures). Keyboard shortcuts listen on the document and do not need canvas focus.
 
 Verification: a runtime check covers the owned cursor, the grab cursor over empty space, empty-space turns, piece drags that leave the camera still, and placement drags; undoing any of the four fixes makes it fail. Real-input drags in headless Firefox 156 and Chrome (1440 × 900, and 2960 × 1400 like a large monitor) moved every piece in the three preset rooms that has a free spot nearby (60 of 61; the Ember library tree has no free spot within 1.5 units).
+
+## Placement fixes
+
+Rugs are modelled with several centimetres of layered weave but were stacked only 6 mm apart, so a covered rug's raised rings showed through the rug on top: the moon rug under the cat rug in Ember library, Moonlit greenhouse and Writer's loft, and the cat rug under the studio rug in Midnight metro. Now the rug put down last moves to the end of the layout and lies on top, and any rug that a later rug overlaps flattens to 5.5 mm, below the next layer. Overlap follows the woven outline: a circle for the round rug, a rectangle for the others. The cat rests on the top rug at its spot and sinks with that rug if it flattens. Contact shades and the walking companion use the flattened heights.
+
+A blocked drop, placement preview or turn now resolves to the closest free grid spot within four steps, preferring the spot shown last on near-ties so that a piece does not flicker from side to side across an obstacle. The piece and its footprint show where it will land. When nothing is free that close, the piece turns red and a drop still returns it to its start.
+
+A click on empty floor only deselects. Before, it moved the selected piece to the click point, which read as a random jump after a drag.
+
+Catalog entries now record each model's `height`, and a unit test keeps it within 1 cm of the geometry. The wall pieces and fixtures of later steps use it.
+
+Verification: unit tests cover the nearest-spot search, rug overlap and catalog heights. A runtime check covers drop-order stacking, flattening, the cat height, blocked drops and turns that slide clear, and clicks that only deselect. Against `main`, pixel comparisons differ at the four flattened rugs; the scattered edge differences elsewhere also appear between two captures of `main` itself.

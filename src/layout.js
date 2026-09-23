@@ -119,6 +119,19 @@ function overlaps(a, b) {
   return a.minX < b.maxX - EPSILON && a.maxX > b.minX + EPSILON && a.minZ < b.maxZ - EPSILON && a.maxZ > b.minZ + EPSILON;
 }
 
+// Rugs meet when their woven outlines overlap: a rounded rug is a circle,
+// the others are rectangles. Touching edges do not count.
+export function rugsOverlap(a, b) {
+  const outline = item => { const area = bounds(item); return { x: item.x, z: item.z, hx: (area.maxX - area.minX) / 2 - 0.01, hz: (area.maxZ - area.minZ) / 2 - 0.01, round: item.type === 'moon-rug' }; };
+  const p = outline(a), q = outline(b);
+  if (p.round && q.round) return Math.hypot(p.x - q.x, p.z - q.z) < p.hx + q.hx;
+  if (p.round || q.round) {
+    const [circle, rect] = p.round ? [p, q] : [q, p];
+    return Math.hypot(Math.max(Math.abs(circle.x - rect.x) - rect.hx, 0), Math.max(Math.abs(circle.z - rect.z) - rect.hz, 0)) < circle.hx;
+  }
+  return Math.abs(p.x - q.x) < p.hx + q.hx && Math.abs(p.z - q.z) < p.hz + q.hz;
+}
+
 export function validatePlacement(items, candidate) {
   const definition = getFurniture(candidate?.type);
   if (!definition) return { valid: false, reason: 'Choose a furniture item from the shop.' };
@@ -137,6 +150,20 @@ export function validatePlacement(items, candidate) {
     if (collision) return { valid: false, reason: `That spot overlaps the ${getFurniture(collision.type).name.toLowerCase()}.` };
   }
   return { valid: true, reason: '' };
+}
+
+// The closest free grid spot to a blocked candidate, searched in rings of
+// grid steps out to `reach`, so a drop beside an obstacle lands next to it.
+export function nearestValidPlacement(items, candidate, reach = 1) {
+  if (!getFurniture(candidate?.type) || !Number.isFinite(candidate.x) || !Number.isFinite(candidate.z)) return null;
+  const x = snap(candidate.x), z = snap(candidate.z), steps = Math.floor(reach / GRID + EPSILON), spots = [];
+  for (let i = -steps; i <= steps; i++) for (let j = -steps; j <= steps; j++) {
+    const distance = Math.hypot(i, j) * GRID;
+    if (distance <= reach + EPSILON) spots.push({ x: x + i * GRID, z: z + j * GRID, distance });
+  }
+  spots.sort((a, b) => a.distance - b.distance || a.z - b.z || a.x - b.x);
+  for (const spot of spots) if (validatePlacement(items, { ...candidate, x: spot.x, z: spot.z }).valid) return { x: spot.x, z: spot.z };
+  return null;
 }
 
 export function createLayout(presetId = PRESETS[0].id) {

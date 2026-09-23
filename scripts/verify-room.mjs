@@ -606,6 +606,48 @@ try {
     room.cancelPlacement(); room.setEditMode(false); room.resetView(); room.setLayout(beforeDesignLayout); advance(3);
     console.log('PASS decorate fixes: room-owned cursor, grab over empty space, empty-space drags turn the room, piece drags stay piece drags.');
   }
+  {
+    const node = id => scene.transformNodes.find(item => item.metadata?.itemId === id && item.metadata.body);
+    // Rugs stack in the order they are put down. A covered rug flattens, so
+    // its raised weave never shows through the rug on top.
+    const under = { id: 'rug-under', type: 'rug', x: -2, z: 1.5, rotation: 0 }, over = { id: 'rug-over', type: 'rug', x: -0.5, z: 1.75, rotation: 0 };
+    room.setLayout({ presetId: null, items: [desk, under, over], activeDeskId: desk.id }); room.setEditMode(true); advance(3);
+    assert.ok(node('rug-under').metadata.body.scaling.y < 0.2 && node('rug-over').metadata.body.scaling.y === 1, 'the earlier rug flattens under the later one');
+    assert.ok(node('rug-under').getHierarchyBoundingVectors(true).max.y < node('rug-over').getHierarchyBoundingVectors(true).min.y, 'the flat rug stays below the rug on top');
+    const from = pointerAt(-3.2, .23, 1.5), to = pointerAt(-2.95, .23, 1.5);
+    canvas.emit('pointerdown', from); canvas.emit('pointermove', to); advance(2);
+    assert.equal(diagnostics().dragging?.id, 'rug-under'); canvas.emit('pointerup', to); advance(2);
+    assert.equal(diagnostics().layout.items.at(-1).id, 'rug-under', 'the rug put down last goes to the top of the stack');
+    assert.ok(node('rug-over').metadata.body.scaling.y < 0.2 && node('rug-under').metadata.body.scaling.y === 1, 'the stack follows the new order');
+    // Miso sinks with a flattened rug and keeps the authored height on the top rug.
+    const miso = scene.getTransformNodeByName('sleeping-cat');
+    room.setLayout(createLayout('midnight-metro')); advance(3);
+    assert.ok(Math.abs(miso.position.y - (0.29 - (0.056 - 0.0055))) < 1e-9, 'the cat lies on its flattened rug');
+    room.setLayout(createLayout('ember-library')); advance(3);
+    assert.equal(miso.position.y, 0.29, 'on the top rug, the cat keeps its height');
+    // A drop that overlaps a neighbour lands on the closest free spot.
+    room.setLayout(dragLayout); advance(3);
+    const slide = beginPlantDrag(-0.25, -2.5);
+    assert.equal(diagnostics().dragging.valid, true, 'a free spot beside the desk replaces the refusal');
+    assert.deepEqual([diagnostics().dragging.candidate.x, diagnostics().dragging.candidate.z], [0, -2.5]);
+    assert.deepEqual([node(dragPlant.id).position.x, node(dragPlant.id).position.z], [0, -2.5], 'the piece shows where it will land');
+    canvas.emit('pointerup', slide); advance(2);
+    const slid = diagnostics().layout.items.find(item => item.id === dragPlant.id);
+    assert.deepEqual([slid.x, slid.z], [0, -2.5]);
+    // A click on empty floor deselects and never moves the selected piece.
+    room.selectItem(dragPlant.id); const beforeClick = JSON.stringify(diagnostics().layout), writes = changes.length;
+    clickFloor(-4, 3); advance(2);
+    assert.equal(diagnostics().selectedId, null, 'empty floor deselects');
+    assert.equal(JSON.stringify(diagnostics().layout), beforeClick); assert.equal(changes.length, writes, 'a click on the floor saves nothing');
+    // A turn that would cross the wall slides the piece clear.
+    const sofa = { id: 'wall-sofa', type: 'daybed', x: 3.75, z: -3.25, rotation: 0 };
+    room.setLayout({ presetId: null, items: [desk, sofa], activeDeskId: desk.id }); advance(3);
+    room.selectItem('wall-sofa'); room.rotateSelection();
+    const turned = diagnostics().layout.items.find(item => item.id === 'wall-sofa');
+    assert.deepEqual([turned.x, turned.z, turned.rotation], [3.75, -2.5, 1], 'the sofa turns and steps off the wall');
+    room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
+    console.log('PASS placement fixes: rugs stack in drop order, covered rugs flatten, the cat follows its rug, blocked drops and turns find a free spot, floor clicks only deselect.');
+  }
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);
   room.dispose(); assert.equal(frames.size, 0); assert.equal(motion.listenerCount, 0); assert.equal(doc.listenerCount, 0); assert.equal(canvas.listenerCount, 0); assert.equal(win.listenerCount, 0);

@@ -1067,6 +1067,7 @@ export function createFurniture(type, scene) {
   result.position.y = 0.22; result.metadata = { type, sharedAssets: true };
   const animations = [];
   const staticParts = templates.get(type).clone(`${type}-details`, result); staticParts.setEnabled(true);
+  result.metadata.body = staticParts;
   if (definition.category === 'Study') {
     const parts = avatarTemplate(scene);
     const avatar = group(result, [0, 0, 0.52]); avatar.metadata = { dynamic: true }; avatar.name = 'Study companion';

@@ -25,7 +25,7 @@ import { createFurniture, createRoundedBox, createContactShadow, createMobileCom
 import { createCompanionRoutine } from './companion.js';
 import { createArchitecture, styleFurniture } from './architecture.js';
 import { getFurniture } from './catalog.js';
-import { createLayout, normalizeLayout, validatePlacement, findFreePosition, footprintBounds, MAX_ITEMS, roomDesign } from './layout.js';
+import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, rugsOverlap, footprintBounds, MAX_ITEMS, roomDesign, CAT_BOUNDS } from './layout.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -449,7 +449,7 @@ export function createRoom(container, options = {}) {
   // Shade sits 2 mm above whatever is under it: the highest rug it overlaps,
   // or the floor. Rugs stack 6 mm apart, so one fixed height either z-fights a
   // rug top or floats over bare floor and darkens the base of each piece.
-  const rugTops = new Map(), rugSurfaces = [], pointArea = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+  const rugSurfaces = [], pointArea = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
   let floorTop = 0.219;
   function surfaceBelow(area) {
     let top = floorTop;
@@ -459,6 +459,7 @@ export function createRoom(container, options = {}) {
   function liftShade(object, item) { const shade = object?.metadata.shade; if (shade) shade.position.y = surfaceBelow(footprintBounds(item)) - object.position.y; }
   for (const mesh of wallShades) mesh.position.y = floorTop + 0.002;
   const catShade = createContactShadow('miso-contact-shadow', 0.95, 0.5, scene, { soft: 0.32, strength: 0.34 });
+  const FLAT_RUG = 0.0055; let catLift = 0;
   catShade.parent = cat; catShade.position.set(-0.02, 0.006, 0.06);
   // Each piece gets baked ambient shade under it. The cached sun map cannot
   // darken floor that the walls already shade, so without it pieces float.
@@ -639,13 +640,22 @@ export function createRoom(container, options = {}) {
       object.position.x = item.x; object.position.z = item.z; object.rotation.y = item.rotation * Math.PI / 2;
       object.setEnabled(item.type === 'plant' ? decorVisible.plants : getFurniture(item.type).category === 'Rugs' ? decorVisible.rug : true);
     }
+    // A rug lies fully on every rug put down before it. Rugs are several
+    // centimetres thick, so a covered rug flattens to a few millimetres instead
+    // of pushing its raised weave up through the rug on top.
     rugSurfaces.length = 0;
-    for (const item of layout.items) {
-      const object = placedObjects.get(item.id);
-      if (getFurniture(item.type).category !== 'Rugs' || !object.isEnabled()) continue;
-      if (!rugTops.has(item.type)) rugTops.set(item.type, object.getHierarchyBoundingVectors(true).max.y - object.position.y);
-      rugSurfaces.push({ ...footprintBounds(item), top: object.position.y + rugTops.get(item.type) });
-    }
+    const rugs = layout.items.filter(item => getFurniture(item.type).category === 'Rugs' && placedObjects.get(item.id).isEnabled());
+    rugs.forEach((item, index) => {
+      const object = placedObjects.get(item.id), height = getFurniture(item.type).height;
+      const flat = rugs.slice(index + 1).some(upper => rugsOverlap(item, upper));
+      object.metadata.body.scaling.y = flat ? FLAT_RUG / height : 1;
+      rugSurfaces.push({ ...footprintBounds(item), top: object.position.y + (flat ? FLAT_RUG : height), lost: flat ? height - FLAT_RUG : 0 });
+    });
+    // Miso sleeps on the top rug at the resting spot and sinks with it when
+    // another rug flattens it.
+    const catX = (CAT_BOUNDS.minX + CAT_BOUNDS.maxX) / 2, catZ = (CAT_BOUNDS.minZ + CAT_BOUNDS.maxZ) / 2;
+    const catRug = rugSurfaces.findLast(rug => catX > rug.minX && catX < rug.maxX && catZ > rug.minZ && catZ < rug.maxZ);
+    catLift = -(catRug?.lost || 0); cat.position.y = 0.29 + catLift;
     for (const item of layout.items) liftShade(placedObjects.get(item.id), item);
     if (selectedId && !ids.has(selectedId)) { selectedId = null; options.onSelectionChange?.(null); }
     animatedObjects.length = 0;
@@ -670,18 +680,32 @@ export function createRoom(container, options = {}) {
     selectedId = layout.items.some(item => item.id === id) ? id : null; updateMarker(); updateOutline();
     const item = layout.items.find(candidate => candidate.id === selectedId); options.onSelectionChange?.(item ? { ...item } : null); requestRender();
   }
+  // A blocked spot resolves to the closest free one, up to four grid steps
+  // away. The spot shown last wins near-ties, so a piece dragged across an
+  // obstacle does not flicker between its two sides.
+  function resolveSpot(candidate, previous) {
+    const verdict = validatePlacement(layout.items, candidate);
+    if (verdict.valid) return { spot: { x: candidate.x, z: candidate.z }, verdict };
+    const spot = nearestValidPlacement(layout.items, candidate);
+    if (!spot) return { spot: null, verdict };
+    const reach = point => Math.hypot(point.x - candidate.x, point.z - candidate.z);
+    const keep = previous && reach(previous) <= reach(spot) + 0.3 && validatePlacement(layout.items, { ...candidate, x: previous.x, z: previous.z }).valid;
+    return { spot: keep ? { x: previous.x, z: previous.z } : spot, verdict: { valid: true, reason: '' } };
+  }
+  // The rug put down last lies on top of the others.
+  function raiseRug(item) { if (getFurniture(item.type).category === 'Rugs') layout.items = [...layout.items.filter(other => other !== item), item]; }
   function cancelPlacement() {
     placement = null; if (ghost) { ghost.dispose(false, false); ghost = null; }
     if (lastPlacementState) options.onPlacementState?.(null); lastPlacementState = ''; updateMarker(); updateOutline(); requestRender();
   }
   function updatePlacement(x, z) {
     if (!placement) return;
-    placement.x = snap(x); placement.z = snap(z);
-    const verdict = validatePlacement(layout.items, placement); placement.valid = verdict.valid; placement.reason = verdict.reason || '';
+    const candidate = { ...placement, x: snap(x), z: snap(z) }, { spot, verdict } = resolveSpot(candidate, placement.valid ? placement : null);
+    Object.assign(placement, spot || { x: candidate.x, z: candidate.z }); placement.valid = Boolean(spot); placement.reason = spot ? '' : verdict.reason || '';
     ghost.position.x = placement.x; ghost.position.z = placement.z; ghost.rotation.y = placement.rotation * Math.PI / 2;
-    ghostMaterial.diffuseColor = color(verdict.valid ? '#85ac80' : '#cf7868'); ghostMaterial.emissiveColor = color(verdict.valid ? '#42653f' : '#8a4238');
-    const key = `${placement.type}:${verdict.valid}:${placement.reason}`;
-    if (key !== lastPlacementState) { lastPlacementState = key; options.onPlacementState?.({ type: placement.type, valid: verdict.valid, reason: placement.reason }); }
+    ghostMaterial.diffuseColor = color(placement.valid ? '#85ac80' : '#cf7868'); ghostMaterial.emissiveColor = color(placement.valid ? '#42653f' : '#8a4238');
+    const key = `${placement.type}:${placement.valid}:${placement.reason}`;
+    if (key !== lastPlacementState) { lastPlacementState = key; options.onPlacementState?.({ type: placement.type, valid: placement.valid, reason: placement.reason }); }
     requestRender();
   }
   function beginPlacement(type) {
@@ -707,15 +731,16 @@ export function createRoom(container, options = {}) {
     const item = layout.items.find(candidate => candidate.id === selectedId); if (!item) return;
     const candidate = { ...item, x: snap(item.x + dx), z: snap(item.z + dz) }, verdict = validatePlacement(layout.items, candidate);
     if (!verdict.valid) { options.onNotice?.(verdict.reason); return; }
-    Object.assign(item, candidate); commitLayout(); selectItem(item.id);
+    Object.assign(item, candidate); raiseRug(item); commitLayout(); selectItem(item.id);
   }
   function rotateSelection() {
     if (drag) { drag.rotation = (drag.rotation + 1) % 4; updateDrag(pendingPointer); return; }
     if (placement) { placement.rotation = (placement.rotation + 1) % 4; updatePlacement(placement.x, placement.z); return; }
     const item = layout.items.find(candidate => candidate.id === selectedId); if (!item) return;
-    const candidate = { ...item, rotation: (item.rotation + 1) % 4 }, verdict = validatePlacement(layout.items, candidate);
-    if (!verdict.valid) { options.onNotice?.(verdict.reason); return; }
-    Object.assign(item, candidate); commitLayout(); selectItem(item.id);
+    // A turn that would touch a wall or a neighbour slides the piece clear.
+    const candidate = { ...item, rotation: (item.rotation + 1) % 4 }, { spot, verdict } = resolveSpot(candidate);
+    if (!spot) { options.onNotice?.(verdict.reason); return; }
+    Object.assign(item, candidate, spot); raiseRug(item); commitLayout(); selectItem(item.id);
   }
   function removeSelection() {
     cancelDrag();
@@ -803,7 +828,7 @@ export function createRoom(container, options = {}) {
       originalPosition: object.position.clone(), rotation: item.rotation,
       offsetX: downPosition.floor.x - item.x, offsetZ: downPosition.floor.z - item.z,
       visibility: object.getChildMeshes().map(mesh => [mesh, mesh.visibility]),
-      removable: canRemove(item), overCollection: false, valid: true, reason: '' };
+      removable: canRemove(item), overCollection: false, valid: true, reason: '', shown: { x: item.x, z: item.z } };
     hoveredId = null; selectItem(item.id); refreshShadows();
   }
   function updateDrag(event) {
@@ -818,8 +843,9 @@ export function createRoom(container, options = {}) {
       const inside = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
       const floor = inside ? floorPosition(castPointer(event)) : null;
       if (floor) {
-        drag.candidate = { ...drag.original, x: snap(floor.x - drag.offsetX), z: snap(floor.z - drag.offsetZ), rotation: drag.rotation };
-        const verdict = validatePlacement(layout.items, drag.candidate); drag.valid = verdict.valid; drag.reason = verdict.reason || '';
+        const candidate = { ...drag.original, x: snap(floor.x - drag.offsetX), z: snap(floor.z - drag.offsetZ), rotation: drag.rotation };
+        const { spot, verdict } = resolveSpot(candidate, drag.shown);
+        drag.candidate = spot ? { ...candidate, ...spot } : candidate; drag.shown = spot; drag.valid = Boolean(spot); drag.reason = spot ? '' : verdict.reason || '';
         drag.object.position.x = drag.candidate.x; drag.object.position.z = drag.candidate.z;
         drag.object.rotation.y = drag.rotation * Math.PI / 2; liftShade(drag.object, drag.candidate);
       } else { drag.valid = false; drag.reason = 'Drop inside the room, or return this piece to the collection.'; }
@@ -842,7 +868,7 @@ export function createRoom(container, options = {}) {
     else if (completed.valid && !completed.overCollection) {
       const item = layout.items.find(item => item.id === completed.id);
       if (item && (item.x !== completed.candidate.x || item.z !== completed.candidate.z || item.rotation !== completed.candidate.rotation)) {
-        Object.assign(item, completed.candidate); commitLayout(); selectItem(item.id);
+        Object.assign(item, completed.candidate); raiseRug(item); commitLayout(); selectItem(item.id);
       }
     } else options.onNotice?.(completed.reason || 'That spot is occupied. Your piece is back where it started.');
   }
@@ -871,9 +897,9 @@ export function createRoom(container, options = {}) {
       if (!floor) { options.onNotice?.(placement.reason || 'Choose a clear spot inside the room.'); return; }
       updatePlacement(floor.x, floor.z); confirmPlacement(); return;
     }
-    const id = hitItem(ray), hit = layout.items.find(item => item.id === id);
-    if (id && !(selectedId && getFurniture(hit?.type)?.category === 'Rugs' && selectedId !== id)) { selectItem(id); return; }
-    if (selectedId && floor) { const item = layout.items.find(candidate => candidate.id === selectedId); moveSelection(snap(floor.x) - item.x, snap(floor.z) - item.z); } else selectItem(null);
+    // A click selects the piece under the pointer. Empty floor only deselects,
+    // so a stray click never moves the selected piece.
+    selectItem(hitItem(ray));
   };
   const onPointerCancel = event => {
     if (event?.pointerId != null && downPosition?.pointerId != null && event.pointerId !== downPosition.pointerId) return;
@@ -1022,7 +1048,7 @@ export function createRoom(container, options = {}) {
       else entry.object.scaling.setAll(0.92 + 0.08 * (1 - (1 - progress) ** 3));
     }
     if (settled) requestRender(true);
-    if (beingPet) { heart.setEnabled(true); heart.position.y = 1.12 + (reducedMotion ? 0 : petAge * 0.48); heartMaterial.alpha = Math.min(1, (1.6 - petAge) * 2.6); }
+    if (beingPet) { heart.setEnabled(true); heart.position.y = 1.12 + catLift + (reducedMotion ? 0 : petAge * 0.48); heartMaterial.alpha = Math.min(1, (1.6 - petAge) * 2.6); }
     else heart.setEnabled(false);
     if (rain.isEnabled()) {
       for (let i = 0; i < rainSeeds.length; i++) { const seed = rainSeeds[i], top = seed.top, y = 1.62 + ((seed.y - (reducedMotion ? 0 : seconds * seed.speed) % 1 + 1) % 1) * (top - 1.62); rainPositions[i * 6 + 1] = y; rainPositions[i * 6 + 4] = Math.min(y + 0.20, top); }

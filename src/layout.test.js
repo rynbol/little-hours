@@ -4,7 +4,7 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { FURNITURE, getFurniture } from './catalog.js';
-import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, createLayout, validatePlacement, normalizeLayout, findFreePosition } from './layout.js';
+import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, createLayout, validatePlacement, normalizeLayout, findFreePosition, nearestValidPlacement, rugsOverlap } from './layout.js';
 import { createFurniture, disposeFurnitureAssets } from './furniture.js';
 
 const placement = (type, x, z, rotation = 0, id = 'test-item') => ({ id, type, x, z, rotation });
@@ -118,6 +118,8 @@ test('native Babylon furniture meshes fit declared footprints and the room heigh
         assert.ok(bounds.min.z >= -depth / 2 - epsilon && bounds.max.z <= depth / 2 + epsilon, `${definition.id} depth at ${rotation}`);
         assert.ok(bounds.min.y >= 0.22 - epsilon, `${definition.id} rests on the floor`);
         assert.ok(bounds.max.y < 5.3, `${definition.id} fits below the walls`);
+        const model = furniture.getHierarchyBoundingVectors(true, mesh => !['tea-steam', 'hearth-embers'].includes(mesh.metadata?.effect));
+        assert.ok(Math.abs(model.max.y - 0.22 - definition.height) < 0.011, `${definition.id} height matches its model`);
       }
       furniture.dispose();
     }
@@ -473,4 +475,33 @@ test('crossed ember faces remain visible in every fireplace orientation and acro
       }
     }
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('a blocked spot resolves to the closest free spot nearby, and only nearby', () => {
+  const desk = placement('study-desk', -1.5, -1.5, 0, 'desk');
+  // A plant dropped on the desk edge slides just clear of it.
+  const edge = nearestValidPlacement([desk], placement('plant', 0, -1.5));
+  assert.deepEqual(edge, { x: 0.5, z: -1.5 });
+  assert.equal(validatePlacement([desk], { ...placement('plant', 0, -1.5), ...edge }).valid, true);
+  // Deep inside the desk, nothing free lies within reach, so the drop fails.
+  assert.equal(nearestValidPlacement([desk], placement('plant', -1.5, -1.5)), null);
+  // A sofa pushed past the wall comes back inside the room.
+  const wall = nearestValidPlacement([], placement('daybed', 4.5, 0));
+  assert.deepEqual(wall, { x: 3.75, z: 0 });
+  // The piece being moved never blocks itself.
+  assert.deepEqual(nearestValidPlacement([desk], { ...desk, x: -1.25 }), { x: -1.25, z: -1.5 });
+  assert.equal(nearestValidPlacement([], placement('missing', 0, 0)), null);
+});
+
+test('rugs overlap by their woven outline: rectangles, and a circle for the round rug', () => {
+  const rug = (x, z, rotation = 0, type = 'rug') => ({ id: `${type}-${x}-${z}`, type, x, z, rotation });
+  assert.equal(rugsOverlap(rug(0, 0), rug(3.25, 0)), true);
+  assert.equal(rugsOverlap(rug(0, 0), rug(3.5, 0)), false, 'touching edges do not count');
+  assert.equal(rugsOverlap(rug(0, 0), rug(0, 0, 1)), true);
+  assert.equal(rugsOverlap(rug(0, 0, 0, 'moon-rug'), rug(3.5, 0, 0, 'moon-rug')), true);
+  // The corner of the round rug's square footprint is bare floor.
+  assert.equal(rugsOverlap(rug(0, 0, 0, 'moon-rug'), rug(3, 2.75)), false);
+  assert.equal(rugsOverlap(rug(0, 0, 0, 'moon-rug'), rug(2.5, 0)), true);
+  const ember = createLayout('ember-library').items;
+  assert.equal(rugsOverlap(ember.find(item => item.id === 'ember-moon-rug'), ember.find(item => item.id === 'ember-cat-rug')), true);
 });
