@@ -995,7 +995,12 @@ export function createRoom(container, options = {}) {
     if (petDistance !== null && (!hit?.hit || petDistance <= hit.distance) && (companion === null || petDistance <= companion)) return { cat: true };
     if (companion !== null && (!hit?.hit || companion <= hit.distance)) return { avatar: true };
     if (!hit?.hit) return null;
-    const mesh = hit.pickedMesh; return mesh.metadata?.lightSwitch ? { lights: true } : { id: itemAncestor(mesh).metadata.itemId };
+    // The seated companion's body is part of its desk piece, but a tap on it
+    // (its legs too, outside the spheres) is for the companion, not the lamp.
+    const mesh = hit.pickedMesh, owner = itemAncestor(mesh);
+    if (mesh.metadata?.lightSwitch) return { lights: true };
+    if (owner.metadata.avatar && mesh.isDescendantOf(owner.metadata.avatar)) return { avatar: true };
+    return { id: owner.metadata.itemId };
   }
   let playHover = null;
   function hoverPlay(target) { const next = target?.id || (target?.lights ? 'room-lights' : null); if (next === playHover) return; playHover = next; updateOutline(); }

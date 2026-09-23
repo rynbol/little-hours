@@ -434,6 +434,21 @@ try {
     canvas.emit('pointerdown', tap); canvas.emit('pointerup', tap); advance(2);
     assert.equal(companionTaps.length, 1, 'the companion answers a tap'); assert.ok(companionTaps[0].state);
     assert.equal(changes.length, writes, 'a tap on the companion saves nothing'); assert.ok(!diagnostics().layout.items.find(item => item.id === deskItem.id).off, 'and leaves the desk lamp on');
+    // Its shoes lie far below the tap spheres, and a tap there is still for
+    // the companion, never for the desk lamp.
+    const shoes = head.parent.getChildMeshes().find(mesh => mesh.name.startsWith('grounded-trousers-and-shoes')), owner = mesh => { for (let node = mesh; node; node = node.parent) if (node.metadata?.itemId) return node; return null; };
+    const { minimumWorld: low, maximumWorld: high } = shoes.getBoundingInfo().boundingBox, scale = engine.getRenderWidth() * engine.getHardwareScalingLevel() / canvas.clientWidth;
+    let shoeTap = null;
+    for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) for (const fz of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+      if (shoeTap) break;
+      const point = Vector3.Project(new Vector3(low.x + (high.x - low.x) * fx, low.y + (high.y - low.y) * 0.08, low.z + (high.z - low.z) * fz), Matrix.Identity(), scene.getTransformMatrix(), { x: 0, y: 0, width: canvas.clientWidth, height: canvas.clientHeight });
+      const hit = scene.pickWithRay(scene.createPickingRay(point.x * scale, point.y * scale, Matrix.Identity(), scene.activeCamera), mesh => mesh.isEnabled() && mesh.isPickable && Boolean(owner(mesh)));
+      if (hit?.pickedMesh === shoes) shoeTap = { clientX: point.x, clientY: point.y, pointerId: 6, pointerType: 'mouse', button: 0 };
+    }
+    assert.ok(shoeTap, 'a point on screen shows the seated companion\'s shoes');
+    canvas.emit('pointerdown', shoeTap); canvas.emit('pointerup', shoeTap); advance(2);
+    assert.equal(companionTaps.length, 2, 'the companion answers a tap on its shoes');
+    assert.equal(changes.length, writes, 'which saves nothing'); assert.ok(!diagnostics().layout.items.find(item => item.id === deskItem.id).off, 'and leaves the desk lamp on');
   }
   // Choosing the other pet swaps the model in place and leaks nothing.
   const petAssets = () => [scene.meshes.length, scene.materials.length, scene.skeletons.length, scene.textures.length];
