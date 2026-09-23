@@ -1006,6 +1006,16 @@ export function createMobileCompanion(scene) {
     return [new Vector3(x, y + size, 0), new Vector3(x + size, y + size, 0), new Vector3(x, y, 0), new Vector3(x + size, y, 0)];
   }) }, scene);
   sleepLetters.parent = root; sleepLetters.billboardMode = Mesh.BILLBOARDMODE_ALL; sleepLetters.color = Color3.FromHexString('#eadac3'); sleepLetters.setEnabled(false);
+  // Two small props for breaks: an open book and a watering can.
+  const bookSource = new TransformNode('companion-book-source', scene);
+  box(bookSource, [.40, .018, .28], [0, 0, 0], '#8a4b3c', .008);
+  for (const side of [-1, 1]) box(bookSource, [.185, .026, .26], [side * .097, .02, 0], '#efe3c8', .008).rotation.z = side * -.14;
+  const book = batch(bookSource); book.name = 'companion-book'; book.parent = root; book.setEnabled(false);
+  const canSource = new TransformNode('companion-can-source', scene);
+  cylinder(canSource, .085, .095, .19, [0, 0, 0], '#6f8f86');
+  rod(canSource, [0, .03, -.08], [0, .13, -.28], .016, '#6f8f86');
+  rod(canSource, [0, .09, .065], [0, .15, .105], .014, '#5a766e'); rod(canSource, [0, .15, .105], [0, .045, .115], .014, '#5a766e');
+  const can = batch(canSource); can.name = 'companion-watering-can'; can.parent = root; can.setEnabled(false);
   root.getChildMeshes().forEach(part => { part.isPickable = false; part.receiveShadows = false; part.metadata = { ...part.metadata, castShadow: false, companion: true }; });
   // The same soft pool as the furniture, raised above the thickest rug.
   const contact = createContactShadow('companion-contact-shadow', .26, .26, scene, { soft: .30, strength: .36 });
@@ -1015,20 +1025,48 @@ export function createMobileCompanion(scene) {
     const ry = x * Math.sin(roll) + y * Math.cos(roll);
     out.set(x * Math.cos(roll) - y * Math.sin(roll), hip + ry * Math.cos(lean) - z * Math.sin(lean), -.08 + ry * Math.sin(lean) + z * Math.cos(lean));
   };
+  // Break activities blend in and out. A negative lean bends forward, and a
+  // negative head pitch looks down.
+  const act = { kind: null, weight: 0 }; let lastSeconds = null;
+  const LEAN = { record: -.68, water: -.12, pet: -.55, lamp: .04, warm: -.04 }, HIP = { pet: .36 };
+  const LOOK = { read: -.34, water: -.3, record: -.32, pet: -.22, lamp: .3, window: .1, warm: -.06 };
+  // Two-bone arm IK: the hand goes to its target, or as close as the arm allows.
+  const UPPER = .341, FORE = .218, aim = new Vector3(), bend = new Vector3(), target = new Vector3(), pole = new Vector3(), elbow = new Vector3(), wrist = new Vector3(), local = new Vector3();
+  function reachArm(shoulder, goal, poleX, poleY, poleZ) {
+    goal.subtractToRef(shoulder, aim); const span = aim.length(); aim.scaleInPlace(1 / Math.max(span, 1e-6));
+    const d = Math.min(Math.max(span, .12), UPPER + FORE - .003), along = (UPPER * UPPER - FORE * FORE + d * d) / (2 * d), out = Math.sqrt(Math.max(0, UPPER * UPPER - along * along));
+    pole.set(poleX, poleY, poleZ); const dot = Vector3.Dot(pole, aim); bend.set(pole.x - aim.x * dot, pole.y - aim.y * dot, pole.z - aim.z * dot).normalize();
+    elbow.set(shoulder.x + aim.x * along + bend.x * out, shoulder.y + aim.y * along + bend.y * out, shoulder.z + aim.z * along + bend.z * out);
+    wrist.set(shoulder.x + aim.x * d, shoulder.y + aim.y * d, shoulder.z + aim.z * d);
+  }
+  // The pose's hand target, from room space into the companion's own space.
+  function reachLocal(pose, out) {
+    const dx = pose.reach.x - pose.x, dz = pose.reach.z - pose.z, c = Math.cos(pose.yaw), s = Math.sin(pose.yaw);
+    return out.set(dx * c - dz * s, pose.reach.y, dx * s + dz * c);
+  }
+  const blendJoint = (name, x, y, z, w) => { const joint = joints[name]; joint.x += (x - joint.x) * w; joint.y += (y - joint.y) * w; joint.z += (z - joint.z) * w; };
+  const blendArm = (key, w) => { blendJoint('elbow' + key, elbow.x, elbow.y, elbow.z, w); blendJoint('wrist' + key, wrist.x, wrist.y, wrist.z, w); };
   return {
-    root, contact, head,
+    root, contact, head, book, can,
     animate(pose, seconds, reducedMotion) {
       const visible = !pose.atDesk;
       root.setEnabled(visible); contact.setEnabled(visible);
-      if (!visible) return;
+      if (!visible) { act.kind = null; act.weight = 0; lastSeconds = null; return; }
+      const dt = lastSeconds === null ? 0 : Math.min(.1, Math.max(0, seconds - lastSeconds)); lastSeconds = seconds;
+      if (pose.activity !== act.kind && (act.weight < .02 || reducedMotion)) act.kind = pose.activity;
+      const goal = pose.activity && pose.activity === act.kind ? 1 : 0;
+      act.weight = reducedMotion ? goal : act.weight + (goal - act.weight) * (1 - Math.exp(-dt * 6));
+      const kind = act.kind, w = kind ? act.weight : 0, calm = reducedMotion ? 0 : 1, doze = pose.doze;
       root.position.set(pose.x, .22, pose.z); root.rotation.y = pose.yaw;
       sleepLetters.setEnabled(pose.doze > .25 && !reducedMotion);
       if (sleepLetters.isEnabled()) { const drift = seconds / 3 % 1; sleepLetters.position.set(.12, 2.08 + drift * .20, 0); sleepLetters.alpha = Math.sin(drift * Math.PI) * .70; }
       contact.position.x = pose.x; contact.position.z = pose.z;
       const sit = pose.sit, phase = pose.moving && !reducedMotion ? pose.step : 0;
       const breath = reducedMotion ? 0 : Math.sin(seconds * (pose.doze > 0 ? 1.05 : 1.4)) * .007;
-      const hip = 1.10 * (1 - sit) + pose.seatHeight * sit + (pose.moving && !reducedMotion ? Math.cos(phase * 2) * .016 : 0);
-      const lean = sit * (.08 + pose.doze * .11), roll = reducedMotion ? 0 : Math.sin(phase) * .025 * (1 - sit);
+      let hip = 1.10 * (1 - sit) + pose.seatHeight * sit + (pose.moving && !reducedMotion ? Math.cos(phase * 2) * .016 : 0);
+      let lean = sit * (.08 + pose.doze * .11);
+      const roll = reducedMotion ? 0 : Math.sin(phase) * .025 * (1 - sit);
+      if (w) { hip += ((HIP[kind] ?? hip) - hip) * w; lean += (LEAN[kind] ?? 0) * w; }
       for (const side of [-1, 1]) {
         const key = side < 0 ? 'L' : 'R', stride = Math.sin(phase + (side < 0 ? 0 : Math.PI)), lift = pose.moving && !reducedMotion ? Math.max(0, Math.cos(phase + (side < 0 ? 0 : Math.PI))) * .10 : 0;
         torsoPoint(side * .255, .65, -.04, hip + breath, lean, roll, joints['shoulder' + key]);
@@ -1037,6 +1075,27 @@ export function createMobileCompanion(scene) {
         joints['hip' + key].set(side * .15, hip - .02, -.08);
         joints['knee' + key].set(side * .15, .56 * (1 - sit) + (pose.seatHeight - .13) * sit, -.57 * sit - .06 + stride * .14 * (1 - sit));
         joints['ankle' + key].set(side * .15, .17 * sit + .15 * (1 - sit) + lift * (1 - sit), -.67 * sit - stride * .29 * (1 - sit));
+        if (!w) continue;
+        const shoulder = joints['shoulder' + key], H = hip;
+        // The right hand does the work; the left one helps or rests.
+        if (kind === 'warm') { reachArm(shoulder, target.set(side * (.13 + calm * Math.sin(seconds * 4 + side) * .02), H + .47, -.5), side, -.6, .4); blendArm(key, w); }
+        else if (kind === 'window') { reachArm(shoulder, target.set(side * .07, H + .12, .19), side, -.2, .5); blendArm(key, w); }
+        else if (kind === 'read') { reachArm(shoulder, target.set(side * .13, H + .36 - doze * .22, -.4 + doze * .06), side, -.8, .2); blendArm(key, w); }
+        else if (kind === 'water') { reachArm(shoulder, side > 0 ? target.set(.18, H + .12, -.52) : target.set(-.24, H + .02, -.12), side, -.7, .3); blendArm(key, w); }
+        else if (kind === 'record' || kind === 'lamp' || kind === 'pet') {
+          if (side > 0 && pose.reach) {
+            reachLocal(pose, local);
+            // A light tap on the switch or the record; slow strokes for the pet.
+            if (kind === 'pet') local.z += calm * Math.sin(seconds * 2.4) * .06;
+            else { const click = pose.activityTime - (pose.useAt ?? 0); local.y -= calm * (Math.abs(click) < .3 ? Math.cos(click / .3 * Math.PI / 2) * .04 : 0); }
+            reachArm(shoulder, local, .9, -.6, .3);
+          } else if (kind === 'pet') reachArm(shoulder, target.set(-.18, H + .14, -.3), -1, -.5, .3);
+          else reachArm(shoulder, target.set(-.22, H + .06, -.24), -1, -.6, .3);
+          blendArm(key, w);
+        }
+        // Kneeling beside the pet: sitting back on the heels, knees forward.
+        // For the record player the companion bends at the waist, legs straight.
+        if (kind === 'pet') { blendJoint('knee' + key, side * .16, .115, -.45, w); blendJoint('ankle' + key, side * .15, .15, .04, w); }
       }
       for (const range of ranges) {
         const bone = bones[range.bone];
@@ -1066,7 +1125,19 @@ export function createMobileCompanion(scene) {
       }
       body.updateVerticesData('position', positions, false, false); body.updateVerticesData('normal', normals, false, false);
       torsoPoint(0, 1.02, -.09, hip + breath, lean, roll, head.position);
-      head.rotation.set(lean - pose.doze * .36, reducedMotion ? 0 : Math.sin(seconds * .45) * .055 * sit, roll + pose.doze * .09);
+      const look = w * (LOOK[kind] ?? 0), glance = kind === 'window' ? w * calm * Math.sin(seconds * .31) * .3 : 0;
+      head.rotation.set(lean - pose.doze * .36 * (kind === 'read' ? .5 : 1) + look, (reducedMotion ? 0 : Math.sin(seconds * .45) * .055 * sit) + glance, roll + pose.doze * .09);
+      // The book sits between the hands; the can hangs from the right hand
+      // and tips to pour in the middle of the watering.
+      book.setEnabled(kind === 'read' && w > .02); can.setEnabled(kind === 'water' && w > .02);
+      if (book.isEnabled()) {
+        const l = joints.wristL, r = joints.wristR;
+        book.position.set((l.x + r.x) / 2, (l.y + r.y) / 2 + .07, (l.z + r.z) / 2 - .03); book.rotation.set(.95 - doze * .75, 0, 0); book.scaling.setAll(w);
+      }
+      if (can.isEnabled()) {
+        const r = joints.wristR, t = pose.activityTime, pour = calm * Math.min(1, Math.max(0, (t - 1.6) / .6), Math.max(0, (6.4 - t) / .6));
+        can.position.set(r.x, r.y - .1, r.z - .03); can.rotation.set(-pour * .75, 0, 0); can.scaling.setAll(w);
+      }
     },
   };
 }

@@ -69,6 +69,8 @@ const room = createRoom(container, {
   isCollectionDrop: (x, y) => x >= 0 && x <= canvas.clientWidth && y > canvas.clientHeight && y < canvas.clientHeight + 200,
   onDragState: value => dragStates.push(value),
   onCompanionTap: value => companionTaps.push(value),
+  // Break activities are chosen in a fixed order here.
+  random: () => 0.5,
   onToggleLights: () => lightTaps.push(time),
 });
 const canvas = container.canvas;
@@ -479,7 +481,10 @@ try {
   assert.equal(frames.size, 0); assert.deepEqual(roaming.position.asArray(), walkPosition);
   doc.hidden = false; doc.emit('visibilitychange'); advance();
   assert.deepEqual(roaming.position.asArray(), walkPosition, 'returning from a hidden tab never jumps along the path');
-  advance(800); assert.equal(diagnostics().companion.state, 'resting'); assert.equal(visibleCompanions(), 1);
+  const advanceUntil = (state, frames) => { for (let i = 0; i < frames && diagnostics().companion.state !== state; i++) advance(); return diagnostics().companion.state; };
+  assert.equal(advanceUntil('busy', 1200), 'busy', 'a break starts with one small activity');
+  assert.ok(['warm', 'window', 'water', 'record', 'pet', 'lamp'].includes(diagnostics().companion.activity)); assert.equal(visibleCompanions(), 1);
+  assert.equal(advanceUntil('resting', 2400), 'resting'); assert.equal(visibleCompanions(), 1);
   advance(1900); assert.equal(diagnostics().companion.state, 'sleeping');
   assert.equal(scene.getMeshByName('companion-sleep-letters').isEnabled(), true);
   assert.equal(scene.meshes.length, routineMeshes); assert.equal(scene.materials.length, routineMaterials, 'a complete routine allocates no new scene assets');
@@ -491,8 +496,24 @@ try {
   assert.equal(diagnostics().companion.state, 'resting'); assert.equal(frames.size, 0);
   assert.equal(scene.getMeshByName('companion-sleep-letters').isEnabled(), false);
   room.setActivity('working'); advance(5); assert.equal(diagnostics().companion.state, 'working'); assert.equal(frames.size, 0);
+  // At night the companion switches on an unlit lamp before it sits down:
+  // one saved change, the lamp lit, and no new scene assets.
+  {
+    motion.matches = false; motion.emit('change', { matches: false });
+    const night = createLayout('moonlit-greenhouse'), lamp = night.items.find(item => item.type === 'floor-lamp'); lamp.off = true;
+    room.setTheme('dusk'); room.setLayout(night); room.setActivity('working'); advance(3);
+    const writes = changes.length, assets = [scene.meshes.length, scene.materials.length];
+    room.setActivity('break');
+    assert.equal(advanceUntil('busy', 1200), 'busy'); assert.equal(diagnostics().companion.activity, 'lamp', 'an unlit lamp comes first at night');
+    advance(150);
+    assert.ok(!diagnostics().layout.items.find(item => item.id === lamp.id).off, 'the companion switched the lamp on');
+    assert.equal(changes.length, writes + 1, 'one saved change'); assert.ok(!changes.at(-1).items.find(item => item.id === lamp.id).off);
+    assert.equal(advanceUntil('resting', 2400), 'resting');
+    assert.deepEqual([scene.meshes.length, scene.materials.length], assets, 'activities add no scene assets');
+    room.setActivity('working'); advance(1000); assert.equal(diagnostics().companion.state, 'working');
+  }
   room.setLayout(savedRoutineLayout); room.setActivity('idle');
-  console.log('PASS companion routine: exactly one avatar, working/walking/resting/sleeping/returning, hidden-tab continuity, editing, static reduced motion and retained scene assets.');
+  console.log('PASS companion routine: exactly one avatar, working/walking/busy/resting/sleeping/returning, a lamp switched on at night, hidden-tab continuity, editing, static reduced motion and retained scene assets.');
   room.setEditMode(false); room.setTheme('rain'); motion.matches = true; motion.emit('change', { matches: true }); advance(10);
   const snapshot = () => scene.transformNodes.concat(scene.meshes).map(n => [...n.position.asArray(), ...n.rotation.asArray(), ...n.scaling.asArray()]);
   const still = snapshot(); advance(120); assert.deepEqual(snapshot(), still);

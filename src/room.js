@@ -655,6 +655,7 @@ export function createRoom(container, options = {}) {
     placeRoomLights();
     if (hoveredId && !ids.has(hoveredId)) hoveredId = null;
     const layoutKey = JSON.stringify([layout.activeDeskId, layout.items.map(item => [item.id, item.type, item.x, item.z, item.rotation])]);
+    companionRoutine?.setContext({ windowX: architecture?.window.x ?? archCenter });
     if (companionLayoutKey !== layoutKey) { companionLayoutKey = layoutKey; companionRoutine?.setLayout(layout); }
     // The pet also sees switched fires, so it keeps the full layout.
     const petLayoutKey = JSON.stringify(layout);
@@ -807,6 +808,7 @@ export function createRoom(container, options = {}) {
   function setTheme(name) {
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
     const daylight = theme === 'day', night = theme === 'dusk';
+    companionRoutine?.setContext({ night });
     paintSky(theme); architecture?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
     if (!night) { shootingStar.setEnabled(false); streakMaterial.alpha = 0; }
     sun.diffuse = color(daylight ? '#fff1d2' : night ? '#c5ccec' : '#d5dfeb');
@@ -823,10 +825,20 @@ export function createRoom(container, options = {}) {
     // Light direction changes only here, so the shadow map remains cached.
     requestRender(true);
   }
-  // A pet: the pet wakes, leans into your hand, and a heart floats up.
-  function pet() {
+  // A pet: the pet wakes, leans into your hand, and a heart floats up. The
+  // companion pets it too, on a break (`by`).
+  function pet({ by = 'you' } = {}) {
     petStart = performance.now(); petRoutine.pet();
-    options.onPet?.({ species: petSpecies, name: PETS[petSpecies].name, state: petRoutine.pose.state }); requestRender();
+    options.onPet?.({ species: petSpecies, name: PETS[petSpecies].name, state: petRoutine.pose.state, by }); requestRender();
+  }
+  // On a break the companion uses a piece: it switches on an unlit lamp or
+  // the record player (saved like a tap, with no Undo step), rustles the
+  // plant it waters, or pets the pet.
+  function companionUse({ kind, itemId }) {
+    const item = layout.items.find(entry => entry.id === itemId);
+    if ((kind === 'lamp' || kind === 'record') && item?.off) useItem(itemId);
+    else if (kind === 'water' && item && !reducedMotion) { reactions.set(itemId, { kind: 'rustle', start: performance.now() }); requestRender(); }
+    else if (kind === 'pet' && !petRoutine.pose.held) pet({ by: 'companion' });
   }
   function castPointer(event) {
     const rect = canvas.getBoundingClientRect();
@@ -971,7 +983,7 @@ export function createRoom(container, options = {}) {
     pendingPointer.clientX = event.clientX; pendingPointer.clientY = event.clientY; pendingPointer.pointerType = event.pointerType; hasPendingPointer = true;
     requestRender(); if (!clicked) return;
     const ray = castPointer(event);
-    if (!editing) { const target = playTarget(ray); if (target?.cat) pet(); else if (target?.avatar) options.onCompanionTap?.({ state: companionRoutine.pose.state }); else if (target?.id) useItem(target.id); else if (target?.lights) options.onToggleLights?.(); return; }
+    if (!editing) { const target = playTarget(ray); if (target?.cat) pet(); else if (target?.avatar) options.onCompanionTap?.({ state: companionRoutine.pose.state, activity: companionRoutine.pose.activity }); else if (target?.id) useItem(target.id); else if (target?.lights) options.onToggleLights?.(); return; }
     const floor = floorPosition(ray);
     if (placement) {
       if (!floor) { options.onNotice?.(placement.reason || 'Choose a clear spot inside the room.'); return; }
@@ -1101,9 +1113,9 @@ export function createRoom(container, options = {}) {
   mobileCompanion = createMobileCompanion(scene);
   companionRoutine = createCompanionRoutine(status => {
     syncCompanionVisibility(); refreshShadows(); options.onCompanionState?.(status);
-  });
+  }, { onUse: companionUse, random: options.random });
   petRoutine = createPetRoutine({ onChange: ({ state }) => { updatePetShadow(); options.onPetState?.({ state, species: petSpecies, name: PETS[petSpecies].name }); } });
-  petRoutine.setCompanion(companionRoutine.pose);
+  petRoutine.setCompanion(companionRoutine.pose); companionRoutine.setContext({ pet: petRoutine.pose });
   function buildPet() {
     petModel?.dispose(); petModel = createPetModel(scene, petSpecies); petModel.root.parent = world;
     petRoutine.setSpecies(petSpecies); petY = null; petCasts = null; updatePetShadow();

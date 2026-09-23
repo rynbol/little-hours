@@ -165,10 +165,11 @@ function applyState(next, force = false) {
 }
 // The companion speaks at the edges of focus and when tapped, never while
 // you focus, in Decorate or in the mini view, and not more than once every
-// twelve seconds on its own.
-function avatarSay(kind, { force = false } = {}) {
-  if (!speech || editMode || compact || (!force && Date.now() - lastAvatarLine < 12_000)) return;
-  if (speech.say('avatar', AVATAR_LINES[kind])) lastAvatarLine = Date.now();
+// twelve seconds on its own. An activity line may follow the pause line
+// sooner (`gap`), since it marks a new thing to see.
+function avatarSay(kind, { force = false, gap = 12_000 } = {}) {
+  if (!speech || editMode || compact || (!force && Date.now() - lastAvatarLine < gap)) return;
+  if (speech.say('avatar', Array.isArray(kind) ? kind : AVATAR_LINES[kind])) lastAvatarLine = Date.now();
 }
 function acceptUpdate(result) {
   applyState(result.state);
@@ -183,9 +184,9 @@ function acceptUpdate(result) {
   renderSession();
 }
 // A pet gets a cute line in a bubble just above its head.
-function petFeedback({ species = state.pet, state: mood } = {}) {
+function petFeedback({ species = state.pet, state: mood, by = 'you' } = {}) {
   const lines = PET_LINES[species] || PET_LINES.cat;
-  if (speech) speech.say('pet', mood === 'sleeping' ? lines.sleepy : lines.pet);
+  if (speech) speech.say('pet', by === 'companion' ? lines.friend : mood === 'sleeping' ? lines.sleepy : lines.pet);
   else toast(`${PETS[species]?.name || 'Miso'} is happy you’re here.`);
 }
 // The room's accessible name says how to use it, with the current pet.
@@ -211,18 +212,26 @@ try {
       // Back after half an hour or more: a small hello.
       if (state.seenAt && Date.now() - state.seenAt > 30 * 60_000) setTimeout(() => avatarSay('welcome', { force: true }), 1200);
     },
-    onCompanionTap({ state: activity }) { if (speech && speech.say('avatar', AVATAR_LINES.tap[activity] || AVATAR_LINES.tap.idle)) lastAvatarLine = Date.now(); },
+    onCompanionTap({ state: activity, activity: doing }) {
+      const lines = (activity === 'busy' || (activity === 'resting' && doing === 'read')) ? AVATAR_LINES.activity[doing] : AVATAR_LINES.tap[activity];
+      if (speech && speech.say('avatar', lines || AVATAR_LINES.tap.idle)) lastAvatarLine = Date.now();
+    },
     pet: state.pet,
     onPet: petFeedback,
     onPetCarry({ species, held }) { if (held) speech?.say('pet', (PET_LINES[species] || PET_LINES.cat).carry); },
     onFrame() { speech?.update(); },
-    onCompanionState({ state: activity }) {
+    onCompanionState({ state: activity, activity: doing }) {
       companionActivity = activity;
-      const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', 'resting-at-desk': 'Resting at the desk' };
+      const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', 'resting-at-desk': 'Resting at the desk', busy: 'Taking a little break' };
+      const pet = PETS[state.pet]?.name || PETS.cat.name;
+      const tasks = { warm: 'Warming up by the fire', window: 'Looking out of the window', water: 'Watering the plants', record: 'Putting on a record', pet: `Petting ${pet}`, lamp: 'Switching on a lamp', read: 'Reading in the armchair' };
+      const task = (activity === 'busy' || (activity === 'resting' && doing === 'read')) && tasks[doing];
       $('#companion-status').dataset.state = activity;
-      $('#companion-status-text').textContent = `Companion · ${labels[activity] || 'In the room'}`;
+      $('#companion-status-text').textContent = `Companion · ${task || labels[activity] || 'In the room'}`;
       renderCompanionNote();
-      if (activity === 'resting') avatarSay('rest'); else if (activity === 'sleeping') avatarSay('doze');
+      if (activity === 'busy' && AVATAR_LINES.activity[doing]) avatarSay(AVATAR_LINES.activity[doing], { gap: 4000 });
+      else if (activity === 'resting') avatarSay(doing === 'read' ? AVATAR_LINES.activity.read : 'rest');
+      else if (activity === 'sleeping') avatarSay('doze');
     },
     // A switched lamp or fire saves with the room, but it is not an Undo step.
     onLayoutChange(layout, { remember = true } = {}) {
@@ -260,7 +269,7 @@ function syncCompanionIntent() {
 }
 function renderCompanionNote() {
   const minutes = state.history.filter(h => h.date === localDate()).reduce((sum, h) => sum + h.minutes, 0);
-  const notes = { idle: 'Start focusing to work alongside your companion.', working: 'Your companion is working alongside you.', walking: 'A little stretch. Your companion is finding a cozy spot.', returning: 'Your companion is on the way back to the desk.', resting: 'A soft seat and a little breather. Take your time.', sleeping: 'Your companion has drifted off. Resume whenever you’re ready.', 'resting-at-desk': 'Your companion is taking a quiet break at the desk.' };
+  const notes = { idle: 'Start focusing to work alongside your companion.', working: 'Your companion is working alongside you.', walking: 'A little stretch. Your companion is finding a cozy spot.', returning: 'Your companion is on the way back to the desk.', resting: 'A soft seat and a little breather. Take your time.', sleeping: 'Your companion has drifted off. Resume whenever you’re ready.', 'resting-at-desk': 'Your companion is taking a quiet break at the desk.', busy: 'A little break. Your companion is tending to the room.' };
   $('#daily-note').textContent = minutes ? `${minutes} quiet minutes made today. Look at you go.` : notes[companionActivity];
 }
 function renderSession() {

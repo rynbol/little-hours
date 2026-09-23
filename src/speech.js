@@ -7,12 +7,14 @@ export const PET_LINES = {
     sleepy: ['*sleepy purr* ♡', 'Mm… five more minutes.', 'Miso stretches one paw, then purrs.'],
     carry: ['Mrrow?', 'Mrrp! Where are we going?', '*dangles politely*'],
     hello: ['Miso curls up in the bed. ♡', 'Mrrp! Miso is home.'],
+    friend: ['prrr… ♡', '*content purr*', 'Mrrp. ♡'],
   },
   dog: {
     pet: ['Wag wag wag! ♡', '*happy snuffle*', 'Mochi melts into your hand.', 'Boop! ♡', 'Mochi’s tail won’t stop.', 'Arf! ♡', 'Mochi gives your hand a lick.'],
     sleepy: ['*sleepy tail thump* ♡', 'Mm… belly rubs…', 'Mochi yawns and wiggles closer.'],
     carry: ['Wheee!', 'Arf? An adventure!', '*wiggles happily*'],
     hello: ['Mochi hops into the bed and wags! ♡', 'Arf! Mochi is home.'],
+    friend: ['*tail thump* ♡', '*happy sigh*', 'Wag wag. ♡'],
   },
 };
 
@@ -25,6 +27,16 @@ export const AVATAR_LINES = {
   welcome: ['Welcome back! ✧', 'Oh, hi! I kept your seat warm.', 'There you are. The room missed you.'],
   rest: ['Ahh, cozy.', 'This is the best seat in the room.', 'Mm, just a quiet minute.'],
   doze: ['(yawns) Just resting my eyes…', 'Zzz… five more minutes…'],
+  // One small thing in the room at the start of a break.
+  activity: {
+    warm: ['Mm, the fire feels lovely.', 'Warming my hands a minute.', 'Toasty. ✧'],
+    window: ['Look at that sky.', 'Watching the world a minute.', 'What a view.'],
+    water: ['A little drink for you, plant.', 'There you go, little leaves.', 'Grow, grow, grow.'],
+    record: ['Something soft to listen to. ♪', 'This one is my favorite. ♪', 'A little music. ♪'],
+    pet: ['Who is a good friend? ♡', 'So soft. ♡', 'Hello, sleepyhead.'],
+    lamp: ['A little more light.', 'There. Cozier already.', 'Click. ✧'],
+    read: ['Just one more chapter.', 'Where was I…', 'Ooh, this part is good.'],
+  },
   tap: {
     working: ['Mm-hm, focusing… ✎', 'Almost done with this bit.', '(quietly typing)'],
     idle: ['Ready when you are.', 'Pick one thing, and we’ll start.', 'Hi there!', 'What are we working on today?'],
