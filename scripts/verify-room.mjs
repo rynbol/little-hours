@@ -941,6 +941,64 @@ try {
     room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
     console.log('PASS walls and floors: retreat paint materials, shell walls built again and floor paint in place, real design colors, windows through painted walls, shadows, asset counts and rooms that keep their own.');
   }
+  {
+    // The new pieces go down from the collection with a click and work with a
+    // tap: the aquarium's lid lamp switches and saves while its fish swim, the
+    // globe spins one turn and comes to rest, the tea cart puffs steam, the
+    // bean bag squishes and the monstera rustles; the easel shows its picture.
+    const motionBefore = motion.matches; motion.matches = false; motion.emit('change', { matches: false });
+    room.setEditMode(true); room.setLayout({ presetId: 'ember-library', items: [desk], activeDeskId: desk.id, v: 2 }); advance(3);
+    const node = id => scene.transformNodes.find(item => item.metadata?.itemId === id && item.metadata.body);
+    const saved = type => diagnostics().layout.items.find(item => item.type === type);
+    const glow = mesh => mesh.material.emissiveColor.r + mesh.material.emissiveColor.g + mesh.material.emissiveColor.b;
+    const casters = () => scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList;
+    for (const [type, x, z] of [['fish-tank', 3, -3.25], ['globe', 4.75, 0], ['easel', 3, 1.5], ['bean-bag', 0.75, 3.25], ['monstera', -4.5, 3.25], ['tea-cart', 3.5, 3.5]]) {
+      room.beginPlacement(type); clickFloor(x, z); advance(2);
+      assert.ok(saved(type), `a click puts down the ${type}`);
+    }
+    const tank = node(saved('fish-tank').id), water = tank.getChildMeshes().find(mesh => mesh.material?.alpha < 1), fish = tank.getChildMeshes().find(mesh => mesh.name === 'aquarium-fish');
+    assert.ok(water && !casters().includes(water) && !casters().includes(fish) && casters().some(mesh => mesh.isDescendantOf(tank)), 'the stand casts shadows; water and fish never do');
+    room.selectItem(saved('easel').id); room.setArt('sea'); advance(2);
+    assert.equal(saved('easel').art, 'sea'); assert.match(node(saved('easel').id).metadata.picture.material.name, /upright:sea/, 'the easel shows the chosen picture');
+    room.selectItem(null); room.setEditMode(false); advance(2);
+    function tapPoint(id) {
+      const target = node(id); target.getChildMeshes().forEach(mesh => mesh.computeWorldMatrix(true));
+      const { min, max } = target.getHierarchyBoundingVectors(true, mesh => !mesh.metadata?.effect || mesh.metadata.effect === 'leaf-sway');
+      for (const fy of [0.75, 0.5, 0.9, 0.3]) for (const fx of [0.5, 0.3, 0.7]) for (const fz of [0.5, 0.7, 0.3, 0.9]) {
+        const pointer = pointerAt(min.x + (max.x - min.x) * fx, min.y + (max.y - min.y) * fy, min.z + (max.z - min.z) * fz);
+        canvas.emit('pointermove', pointer); advance(2);
+        if (diagnostics().playHover === id) return pointer;
+      }
+      assert.fail(`no tap point on ${id}`);
+    }
+    const tap = pointer => { canvas.emit('pointerdown', pointer); canvas.emit('pointerup', pointer); advance(2); };
+    // Aquarium: the lid lamp switches and saves; the fish keep swimming.
+    const tankPoint = tapPoint(saved('fish-tank').id), strip = tank.getChildMeshes().find(mesh => !mesh.metadata?.effect && glow(mesh) > 0.1), lit = strip.material;
+    tap(tankPoint); assert.ok(saved('fish-tank').off === true && glow(strip) === 0, 'the lid lamp switches off');
+    const swim = Array.from(fish._thinInstanceDataStorage.matrixData); advance(12);
+    assert.notDeepEqual(Array.from(fish._thinInstanceDataStorage.matrixData), swim, 'the fish swim with the lamp off');
+    tap(tankPoint); assert.ok(!saved('fish-tank').off && strip.material === lit, 'and on again');
+    // Reactions end exactly at the rest pose.
+    const globe = node(saved('globe').id).metadata.globe; tap(tapPoint(saved('globe').id)); advance(30);
+    assert.ok(globe.rotation.y > 1, 'a tap spins the globe'); advance(100);
+    assert.equal(globe.rotation.y, 0, 'the globe comes to rest');
+    tap(tapPoint(saved('tea-cart').id)); advance(30);
+    assert.ok(node(saved('tea-cart').id).metadata.puff > 0.5, 'the teapot puffs steam'); advance(80);
+    assert.equal(node(saved('tea-cart').id).metadata.puff, 0);
+    const bag = node(saved('bean-bag').id).metadata.body; tap(tapPoint(saved('bean-bag').id)); advance(4);
+    assert.ok(bag.scaling.y < 0.99, 'the bean bag squashes'); advance(60);
+    assert.deepEqual(bag.scaling.asArray(), [1, 1, 1], 'and springs back');
+    tap(tapPoint(saved('monstera').id));
+    assert.ok(node(saved('monstera').id).metadata.rustle > 0.5, 'the monstera rustles'); advance(80);
+    assert.equal(node(saved('monstera').id).metadata.rustle, 0);
+    // Reduced motion: the fish keep still and the bubbles hide; the lamp still switches.
+    motion.matches = true; motion.emit('change', { matches: true }); advance(3);
+    const bubbles = tank.getChildMeshes().find(mesh => mesh.name === 'aquarium-bubble'), still = Array.from(fish._thinInstanceDataStorage.matrixData); advance(12);
+    assert.deepEqual(Array.from(fish._thinInstanceDataStorage.matrixData), still, 'still fish'); assert.equal(bubbles.isEnabled(), false, 'no bubbles');
+    tap(tankPoint); assert.equal(saved('fish-tank').off, true, 'the lamp switches with reduced motion'); tap(tankPoint);
+    room.setLayout(beforeDesignLayout); motion.matches = motionBefore; motion.emit('change', { matches: motionBefore }); advance(3);
+    console.log('PASS new pieces: aquarium, globe, easel, bean bag, monstera and tea cart go down with a click; lamp, spin, steam, squish and rustle end at rest; shadows and reduced motion.');
+  }
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);
   room.dispose(); assert.equal(frames.size, 0); assert.equal(motion.listenerCount, 0); assert.equal(doc.listenerCount, 0); assert.equal(canvas.listenerCount, 0); assert.equal(win.listenerCount, 0);

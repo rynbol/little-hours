@@ -19,6 +19,14 @@ export const FURNITURE = [
   { id: 'daybed', name: 'Velvet dreaming sofa', category: 'Seating', description: 'A deep plum daybed with moss velvet pillows, carved feet and a draped golden throw.', footprint: [3.1, 1.65], height: 1.34, use: { react: 'squish' }, color: '#795765', blocking: true },
   { id: 'moon-tree', name: 'Moonleaf tree', category: 'Plants', description: 'A branching indoor tree with hand-shaped leaves, a brass pot and tiny hanging stars.', footprint: [1.8, 1.8], height: 3.22, use: { react: 'rustle' }, color: '#68816a', blocking: true },
   { id: 'lantern-cluster', name: 'Wandering lanterns', category: 'Lighting', description: 'Three little brass lanterns, beeswax candles and glowing stars for the quiet hours.', footprint: [1.05, 1.05], height: 1.03, use: { toggle: 'candles' }, color: '#d1a458', blocking: true },
+  { id: 'bean-bag', name: 'Cloud bean bag', category: 'Seating', description: 'A deep, soft bean bag with a sunk-in seat and a raised back.', footprint: [1.3, 1.25], height: 0.92, use: { react: 'squish' }, color: '#c9a27e', blocking: true },
+  { id: 'monstera', name: 'Swiss cheese plant', category: 'Plants', description: 'Big split leaves on tall stems, in a cream ceramic pot.', footprint: [1.3, 1.3], height: 1.93, use: { react: 'rustle' }, color: '#5f7d4f', blocking: true },
+  { id: 'tea-cart', name: 'Brass tea cart', category: 'Storage', description: 'Two oak trays on little wheels: a teapot, cups and biscuits on top, books below. Tap it for a puff of steam.', footprint: [1.25, 0.75], height: 1.045, use: { react: 'steam' }, color: '#bf9762', blocking: true },
+  // Curios: a tap switches the aquarium's lid lamp and spins the globe; the
+  // easel shows a picture of your choice, like the frames.
+  { id: 'fish-tank', name: 'Little aquarium', category: 'Curios', description: 'Three bright fish, sea grass and a stone arch in a tank on an oak stand. Tap it to switch the lid lamp.', footprint: [1.7, 0.8], height: 1.58, use: { toggle: 'lamp' }, color: '#8fc3bf', blocking: true },
+  { id: 'globe', name: 'Brass floor globe', category: 'Curios', description: 'A little painted world in a brass meridian, on a turned oak stand. Tap it to spin it.', footprint: [0.8, 0.8], height: 1.465, use: { react: 'spin' }, color: '#6f96ae', blocking: true },
+  { id: 'easel', name: "Painter's easel", category: 'Curios', description: 'An oak easel with a canvas, a ledge and a jar of brushes. Pick the picture.', footprint: [1, 1], height: 2.1, arts: FRAME_ARTS, color: '#f1e6cf', blocking: true },
   { id: 'moon-rug', name: 'Midnight constellation rug', category: 'Rugs', description: 'A round indigo rug with a woven moon, tiny stars and a warm tasseled border.', footprint: [3.6, 3.6], height: 0.08, color: '#676779', blocking: false },
   // Wall pieces hang on the back or side wall: `size` is their width and height
   // on the wall, `depth` how far they stand out, `arts` the pictures to choose.

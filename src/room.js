@@ -572,7 +572,7 @@ export function createRoom(container, options = {}) {
       const tint = !editing ? playOutline : drag && !drag.valid ? invalidOutline : hoveredId === id ? hoverOutline : selectedOutline, width = editing ? 0.04 : 0.022;
       if (isWallPiece(item)) showBand(object, item, tint, width);
       else for (const mesh of object.getChildMeshes()) {
-        if (!mesh.isEnabled() || !isFurnitureSurface(mesh) || (object.metadata.avatar && mesh.isDescendantOf(object.metadata.avatar))) continue;
+        if (!mesh.isEnabled() || !isFurnitureSurface(mesh) || mesh.metadata?.outline === false || (object.metadata.avatar && mesh.isDescendantOf(object.metadata.avatar))) continue;
         mesh.outlineColor = tint; mesh.outlineWidth = width; mesh.renderOutline = true; outlinedMeshes.push(mesh);
       }
     } else if (id === 'room-lights') for (const mesh of scene.meshes) if (mesh.metadata?.lightSwitch && mesh.isEnabled()) { mesh.outlineColor = playOutline; mesh.outlineWidth = 0.014; mesh.renderOutline = true; outlinedMeshes.push(mesh); }
@@ -642,8 +642,10 @@ export function createRoom(container, options = {}) {
   // Pictures are painted once per artwork and frame shape; records take a
   // sleeve color. Both are shared by every piece that shows them.
   const artMaterials = new Map();
+  // Upright frames and the easel share each picture, drawn once; the wide
+  // frame draws its own landscape shape.
   function artMaterial(type, art) {
-    const key = `${type === 'wide-frame' ? 'wide' : type}:${art}`;
+    const key = `${type === 'wide-frame' ? 'wide' : SLEEVES[art] ? type : 'upright'}:${art}`;
     if (!artMaterials.has(key)) {
       let mat;
       if (SLEEVES[art]) { mat = new StandardMaterial(`sleeve-${art}`, scene); mat.diffuseColor = color(SLEEVES[art].color); mat.specularColor.set(0.035, 0.035, 0.035); }
@@ -713,9 +715,10 @@ export function createRoom(container, options = {}) {
         placedObjects.set(item.id, object);
         if (settleNew && !reducedMotion) { object.scaling.setAll(0.92); settlingPieces.set(item.id, { object, start: performance.now() }); }
       }
+      // Frames, framed records and the easel show the picture chosen for them.
+      if (object.metadata.picture) object.metadata.picture.material = artMaterial(item.type, item.art);
       if (isWallPiece(item)) {
         placeOnWall(object, item);
-        if (object.metadata.picture) object.metadata.picture.material = artMaterial(item.type, item.art);
         if (object.metadata.view) showView(object.metadata.view, item);
       }
       else {
@@ -795,8 +798,10 @@ export function createRoom(container, options = {}) {
     else if (kind === 'steam') object.metadata.puff = t < 1 ? wave : 0;
     else if (kind === 'squish') { const squash = t < 1 ? Math.sin(t * Math.PI * 2.2) * Math.exp(-3 * t) : 0; object.metadata.body.scaling.set(1 + squash * 0.03, 1 - squash * 0.07, 1 + squash * 0.03); }
     else if (kind === 'book') { const hinge = object.metadata.book, out = t < 1 ? Math.min(1, t / 0.25, (1 - t) / 0.35) : 0, ease = out * out * (3 - 2 * out); hinge.rotation.x = ease * 0.35; hinge.position.z = 0.225 + ease * 0.04; }
+    // A globe spins one turn and slows to its rest pose.
+    else if (kind === 'spin') object.metadata.globe.rotation.y = t < 1 ? (1 - (1 - t) ** 3) * Math.PI * 2 : 0;
   }
-  const reactionSeconds = { rustle: 1.1, steam: 1.6, squish: 0.6, book: 1.5 };
+  const reactionSeconds = { rustle: 1.1, steam: 1.6, squish: 0.6, book: 1.5, spin: 1.8 };
   function setLayout(next) {
     cancelDrag(); layout = normalizeLayout(next); syncFurniture();
     if (selectedId) options.onSelectionChange?.({ ...layout.items.find(item => item.id === selectedId) });

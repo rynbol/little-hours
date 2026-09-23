@@ -46,6 +46,16 @@ export const TINTS = {
     choice('rose', 'Rose shade', { '#e2d2ab': '#e6c0b7', '#c9b78f': '#cfa39a' }),
     choice('navy', 'Navy shade', { '#e2d2ab': '#636c89', '#c9b78f': '#4e5670' }),
   ],
+  'bean-bag': [
+    choice('sage', 'Sage', { '#c9a27e': '#8fa08e', '#b58f6c': '#7d8f7c', '#d3ae8a': '#a0b09e' }),
+    choice('rose', 'Rose', { '#c9a27e': '#c7938c', '#b58f6c': '#b3807a', '#d3ae8a': '#d4a39c' }),
+    choice('navy', 'Navy', { '#c9a27e': '#5c6782', '#b58f6c': '#4c5670', '#d3ae8a': '#6c7792' }),
+  ],
+  monstera: [
+    choice('terracotta', 'Terracotta pot', { '#ded4c1': '#bd8469' }),
+    choice('sage', 'Sage glaze', { '#ded4c1': '#8fa08e' }),
+    choice('indigo', 'Indigo glaze', { '#ded4c1': '#5f6784' }),
+  ],
   plant: [
     choice('cream', 'Cream glaze', { '#bd8469': '#e6dcc8' }),
     choice('sage', 'Sage glaze', { '#bd8469': '#8fa08e' }),

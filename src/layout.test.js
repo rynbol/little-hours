@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
-import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, createLayout, validatePlacement, normalizeLayout, findFreePosition, nearestValidPlacement, rugsOverlap } from './layout.js';
 import { createFurniture, disposeFurnitureAssets } from './furniture.js';
@@ -529,7 +529,7 @@ test('switched-off lamps, fires and record players stay off after a reload; othe
   assert.equal(restored.items.find(item => item.id === 'ember-lamp').off, true);
   assert.equal('off' in restored.items.find(item => item.id === 'ember-plant'), false);
   assert.equal('off' in restored.items.find(item => item.id === 'ember-hearth'), false);
-  for (const definition of FURNITURE) if (definition.use) assert.ok(['lamp', 'candles', 'fire', 'record'].includes(definition.use.toggle) || ['rustle', 'book', 'squish', 'steam'].includes(definition.use.react), definition.id);
+  for (const definition of FURNITURE) if (definition.use) assert.ok(['lamp', 'candles', 'fire', 'record'].includes(definition.use.toggle) || ['rustle', 'book', 'squish', 'steam', 'spin'].includes(definition.use.react), definition.id);
 });
 
 test('a chosen color stays after a reload; unknown colors and colors for other pieces never save', () => {
@@ -649,4 +649,40 @@ test('every design offers its own walls and floor and three more of each; a room
     const dropped = keep(retreat, value, value);
     assert.ok(!('walls' in dropped) && !('floor' in dropped), JSON.stringify(value));
   }
+});
+
+test('aquarium fish swim to and fro inside the water and turn around; with reduced motion they keep still', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const tank = createFurniture('fish-tank', scene), part = name => tank.getChildMeshes().find(mesh => mesh.name === name);
+    const fish = part('aquarium-fish'), bubbles = part('aquarium-bubble');
+    // Babylon keeps the matrices it first returns, so read the live buffer.
+    const matrices = mesh => Array.from({ length: mesh.thinInstanceCount }, (_, i) => Matrix.FromArray(mesh._thinInstanceDataStorage.matrixData, i * 16));
+    const spots = mesh => matrices(mesh).map(matrix => matrix.getTranslation());
+    const rest = spots(fish);
+    assert.equal(rest.length, 3); assert.equal(spots(bubbles).length, 6);
+    assert.equal(fish.metadata.castShadow, false); assert.equal(fish.isPickable, false);
+    tank.metadata.animate(2.4, false, true);
+    assert.deepEqual(spots(fish), rest, 'reduced motion keeps the fish still'); assert.equal(bubbles.isEnabled(), false, 'and hides the bubbles');
+    const headings = new Set();
+    for (let seconds = 0.2; seconds < 30; seconds += 0.37) {
+      tank.metadata.animate(seconds, false, false);
+      for (const at of [...spots(fish), ...spots(bubbles)]) assert.ok(Math.abs(at.x) <= 0.7 && at.y >= 0.88 && at.y <= 1.48 && Math.abs(at.z) <= 0.24, `inside the water at ${seconds}`);
+      matrices(fish).forEach((matrix, i) => headings.add(`${i}:${Math.sign(matrix.m[0])}`));
+    }
+    assert.ok(bubbles.isEnabled(), 'bubbles rise with motion');
+    for (let i = 0; i < 3; i++) assert.ok(headings.has(`${i}:1`) && headings.has(`${i}:-1`), `fish ${i} turns around`);
+    assert.notDeepEqual(spots(fish), rest, 'the fish swim');
+    tank.metadata.animate(31, false, true);
+    assert.deepEqual(spots(fish), rest, 'reduced motion returns them to rest');
+    tank.dispose();
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('the easel keeps its chosen picture after a reload, and a new easel starts with the first', () => {
+  const layout = createLayout('ember-library');
+  for (const [id, art] of [['test-easel', 'sea'], ['test-easel-2', 'nonsense']]) layout.items.push({ id, type: 'easel', ...findFreePosition(layout.items, 'easel'), art });
+  const restored = normalizeLayout(JSON.parse(JSON.stringify(layout))), easels = restored.items.filter(item => item.type === 'easel');
+  assert.deepEqual(easels.map(item => item.art), ['sea', getFurniture('easel').arts[0]]);
+  assert.ok(restored.items.filter(item => item.type !== 'easel' && !getFurniture(item.type).arts).every(item => !('art' in item)), 'other floor pieces never save a picture');
 });

@@ -233,9 +233,10 @@ export function normalizeLayout(raw) {
       id, type: saved.type, x: snap(saved.x), z: snap(saved.z),
       rotation: Number.isInteger(saved.rotation) && saved.rotation >= 0 && saved.rotation <= 3 ? saved.rotation : 0,
     };
-    // A lamp, fire or record player that was switched off stays off, and a
-    // piece keeps the color chosen for it.
+    // A lamp, fire or record player that was switched off stays off, a piece
+    // keeps the color chosen for it, and the easel its picture.
     if (saved.off === true && getFurniture(saved.type).use?.toggle) candidate.off = true;
+    const arts = getFurniture(saved.type).arts; if (arts) candidate.art = arts.includes(saved.art) ? saved.art : arts[0];
     if (tintPaint(saved.type, saved.tint)) candidate.tint = saved.tint;
     if (validatePlacement(items, candidate, style).valid) { items.push(candidate); ids.add(id); }
   }

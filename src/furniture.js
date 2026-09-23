@@ -8,9 +8,10 @@ import { CreateLineSystem } from '@babylonjs/core/Meshes/Builders/linesBuilder.j
 import { CreateTube } from '@babylonjs/core/Meshes/Builders/tubeBuilder.js';
 import { CreatePlane } from '@babylonjs/core/Meshes/Builders/planeBuilder.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
-import { Vector3, Quaternion } from '@babylonjs/core/Maths/math.vector.js';
+import { Vector3, Vector4, Quaternion, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
+import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import { getFurniture } from './catalog.js';
 
 // Hand-built forms, real joinery, small deliberate details. No downloaded models,
@@ -92,7 +93,8 @@ function material(scene, color, extra = {}) {
     result.specularColor = new Color3(extra.metalness ? 0.32 : 0.045, extra.metalness ? 0.27 : 0.045, extra.metalness ? 0.18 : 0.045);
     result.specularPower = extra.metalness ? 48 : 20;
     result.emissiveColor = extra.emissive ? Color3.FromHexString(extra.emissive).scale(extra.emissiveIntensity ?? 1) : Color3.Black();
-    result.metadata = { batchKey: JSON.stringify({ metal: Boolean(extra.metalness), emissive: extra.emissive || null, intensity: extra.emissiveIntensity || 0, ...(extra.accent ? { accent: true } : {}) }) };
+    if (extra.alpha) result.alpha = extra.alpha;
+    result.metadata = { batchKey: JSON.stringify({ metal: Boolean(extra.metalness), emissive: extra.emissive || null, intensity: extra.emissiveIntensity || 0, ...(extra.accent ? { accent: true } : {}), ...(extra.alpha ? { alpha: extra.alpha } : {}), ...(extra.part ? { part: extra.part } : {}) }) };
     cache.materials.set(key, result);
   }
   return cache.materials.get(key);
@@ -149,7 +151,7 @@ function batch(source) {
       // An accent keeps its color on the material too, so its whole light is
       // tinted like the rooms' own glowing parts.
       result.diffuseColor = JSON.parse(key).accent ? mat.diffuseColor.clone() : Color3.White(); result.specularColor = mat.specularColor.clone();
-      result.specularPower = mat.specularPower; result.emissiveColor = mat.emissiveColor.clone();
+      result.specularPower = mat.specularPower; result.emissiveColor = mat.emissiveColor.clone(); result.alpha = mat.alpha;
       if (JSON.parse(key).accent) result.metadata = { accent: mat.emissiveColor.clone() };
       cache.batches.set(key, result);
     }
@@ -170,8 +172,11 @@ function batch(source) {
     object.material = cache.batches.get(key); object.parent = result;
     object.useVertexColors = true; object.hasVertexAlpha = false;
     object.receiveShadows = true; object.isPickable = true;
-    // Glowing accents cast no shadows, like the rooms' own.
-    if (JSON.parse(key).accent) object.metadata = { castShadow: false };
+    // Glowing accents and see-through water cast no shadows, like the rooms' own.
+    // The easel's canvas is never outlined: an outline around it would hide the
+    // picture in front of it, which has its own outline.
+    if (JSON.parse(key).accent || JSON.parse(key).alpha) object.metadata = { castShadow: false };
+    if (JSON.parse(key).part === 'canvas') object.metadata = { outline: false };
   }
   source.dispose(false, false); return result;
 }
@@ -530,6 +535,120 @@ function moonRug(parent) {
   }
 }
 
+// A little aquarium on an oak stand. The water is see-through and casts no
+// shadow; the fish and bubbles are instances of one small mesh each, moved in
+// the room's animation loop (see createAquariumLife). The lid lamp switches.
+function fishTank(parent) {
+  const scene = parent.getScene();
+  box(parent, [1.6, 0.66, 0.66], [0, 0.37, 0], C.wood, 0.03);
+  box(parent, [1.66, 0.06, 0.72], [0, 0.73, 0], C.edge, 0.02);
+  for (const x of [-0.39, 0.39]) {
+    box(parent, [0.74, 0.5, 0.03], [x, 0.37, 0.345], '#c29b71', 0.01);
+    sphere(parent, [0.022, 0.022, 0.018], [x + (x < 0 ? 0.3 : -0.3), 0.4, 0.37], C.brass);
+  }
+  for (const x of [-0.72, 0.72]) for (const z of [-0.26, 0.26]) cylinder(parent, 0.035, 0.03, 0.04, [x, 0.02, z], C.darkWood);
+  // Sand, pebbles, a stone arch and sea grass.
+  box(parent, [1.5, 0.05, 0.58], [0, 0.785, 0], C.darkWood, 0.012);
+  box(parent, [1.42, 0.07, 0.5], [0, 0.845, 0], '#dccb9f', 0.012);
+  for (const [x, z, size, color] of [[-0.5, 0.12, 0.05, '#9c958a'], [-0.38, -0.1, 0.04, '#b9876a'], [0.18, 0.15, 0.045, '#8f8a82'], [0.46, -0.08, 0.055, '#a7a092'], [0.58, 0.14, 0.035, '#c39a76'], [-0.12, 0.02, 0.03, '#9c958a']]) sphere(parent, [size * 1.3, size * 0.7, size], [x, 0.885, z], color);
+  sphere(parent, [0.12, 0.1, 0.09], [0.28, 0.93, -0.12], '#8e8a80'); sphere(parent, [0.09, 0.14, 0.08], [0.4, 0.95, -0.14], '#9a958a');
+  for (const [x, z, h, lean, color] of [[-0.58, -0.14, 0.42, 0.12, '#6f8d58'], [-0.5, -0.17, 0.3, -0.18, '#809a62'], [-0.26, -0.18, 0.36, 0.08, '#5f7d4f'], [0.06, -0.16, 0.26, -0.1, '#809a62'], [0.62, -0.1, 0.38, -0.14, '#6f8d58']]) {
+    const blade = sphere(parent, [0.028, h / 2, 0.01], [x, 0.88 + h / 2, z], color); blade.rotation.z = lean;
+  }
+  // The water, and the glass edges and lid around it.
+  box(parent, [1.42, 0.6, 0.5], [0, 1.18, 0], '#a7d3cc', 0.006).material = material(scene, '#a7d3cc', { alpha: 0.36 });
+  for (const x of [-0.725, 0.725]) for (const z of [-0.265, 0.265]) box(parent, [0.03, 0.66, 0.03], [x, 1.14, z], C.darkWood, 0.008);
+  for (const z of [-0.265, 0.265]) box(parent, [1.48, 0.035, 0.035], [0, 1.49, z], C.darkWood, 0.008);
+  for (const x of [-0.725, 0.725]) box(parent, [0.035, 0.035, 0.56], [x, 1.49, 0], C.darkWood, 0.008);
+  box(parent, [1.54, 0.07, 0.62], [0, 1.545, 0], '#73533d', 0.02);
+  box(parent, [1.3, 0.02, 0.06], [0, 1.502, 0.18], '#fff1c9', 0.006).material = material(scene, '#fff1c9', { emissive: '#ffe7ad', emissiveIntensity: 0.8 });
+}
+
+// A turned floor globe. The stand and meridian are still; the globe is its
+// own mesh, painted with low continents, and spins on a tap.
+function globeStand(parent) {
+  cylinder(parent, 0.26, 0.3, 0.06, [0, 0.03, 0], C.darkWood);
+  cylinder(parent, 0.05, 0.08, 0.1, [0, 0.11, 0], C.darkWood);
+  rod(parent, [0, 0.16, 0], [0, 0.66, 0], 0.035, C.wood);
+  sphere(parent, [0.06, 0.05, 0.06], [0, 0.7, 0], C.darkWood);
+  const axis = group(parent, [0, 1.07, 0]); axis.rotation.z = GLOBE_TILT;
+  torus(axis, 0.335, 0.014, [0, 0, 0], C.brass);
+  for (const y of [-0.345, 0.345]) sphere(axis, [0.02, 0.02, 0.02], [0, y, 0], C.brass);
+}
+const GLOBE_TILT = 0.41;
+
+// A painter's easel: an A-frame of oak legs, a ledge and a canvas that shows
+// the chosen picture (see createFurniture), a jar of brushes on the ledge. The
+// canvas stands well in front of the legs, clear of their outlines.
+function easel(parent) {
+  for (const side of [-1, 1]) rod(parent, [side * 0.34, 0.012, 0.22], [side * 0.09, 2.08, -0.02], 0.026, C.wood);
+  rod(parent, [0, 0.012, -0.44], [0, 1.98, -0.06], 0.024, C.wood);
+  rod(parent, [-0.27, 0.8, 0.16], [0.27, 0.8, 0.16], 0.018, C.darkWood);
+  const canvas = group(parent, EASEL_CANVAS.position); canvas.rotation.x = EASEL_CANVAS.tilt;
+  const scene = parent.getScene(), paint = (part, color) => { part.material = material(scene, color, { part: 'canvas' }); return part; };
+  paint(box(canvas, [0.9, 1.14, 0.04], [0, 0, 0], '#f1e6cf', 0.01), '#f1e6cf');
+  paint(box(canvas, [0.96, 0.05, 0.14], [0, -0.6, 0.05], C.darkWood, 0.01), C.darkWood);
+  paint(box(canvas, [0.14, 0.07, 0.07], [0, 0.6, 0.01], C.darkWood, 0.01), C.darkWood);
+  paint(cylinder(canvas, 0.045, 0.04, 0.1, [0.32, -0.525, 0.07], '#b6c0b0'), '#b6c0b0');
+  for (const [dx, dz, color] of [[-0.012, 0, '#c77868'], [0.014, 0.01, '#d7b572'], [0, -0.012, '#6f8aa6']]) { paint(rod(canvas, [0.32 + dx, -0.5, 0.07 + dz], [0.32 + dx * 3, -0.33, 0.07 + dz * 3], 0.006, C.darkWood), C.darkWood); paint(sphere(canvas, [0.011, 0.02, 0.011], [0.32 + dx * 3, -0.32, 0.07 + dz * 3], color), color); }
+}
+const EASEL_CANVAS = { position: [0, 1.46, 0.14], tilt: -0.17 };
+
+// A deep bean bag with a soft seat and a raised back.
+function beanBag(parent) {
+  sphere(parent, [0.62, 0.34, 0.58], [0, 0.34, 0], '#c9a27e');
+  sphere(parent, [0.44, 0.13, 0.4], [0.02, 0.6, 0.06], '#b58f6c');
+  sphere(parent, [0.5, 0.3, 0.24], [0, 0.62, -0.3], '#d3ae8a');
+  torus(parent, 0.585, 0.012, [0, 0.36, 0], '#b58f6c').rotation.x = Math.PI / 2;
+}
+
+// A Swiss cheese plant in a cream pot: stems stay planted, the split leaves
+// sway like the other plants' canopies.
+function monstera(parent, canopyOnly = false) {
+  const leaves = [[0.1, 1.72, 0.05, 0.2, '#5f7d4f'], [2.2, 1.48, 0.1, -0.35, '#6f8d58'], [4.1, 1.62, 0.06, 0.3, '#5f7d4f'], [1.2, 1.2, 0.08, -0.2, '#6f8d58'], [3.2, 1.3, 0.1, 0.25, '#809a62'], [5.2, 1.05, 0.05, -0.3, '#6f8d58']];
+  if (!canopyOnly) {
+    cylinder(parent, 0.3, 0.23, 0.5, [0, 0.25, 0], '#ded4c1');
+    cylinder(parent, 0.315, 0.315, 0.05, [0, 0.5, 0], '#ded4c1');
+    cylinder(parent, 0.28, 0.28, 0.012, [0, 0.528, 0], C.darkWood);
+    for (const [angle, h] of leaves) rod(parent, [0, 0.53, 0], [Math.cos(angle) * 0.28, h - 0.1, Math.sin(angle) * 0.28], 0.014, C.darkLeaf);
+    return;
+  }
+  for (const [angle, h, tilt, turn, color] of leaves) {
+    const x = Math.cos(angle) * 0.4, z = Math.sin(angle) * 0.4, sway = { anchorY: h - 0.1, height: 0.42, phase: angle };
+    // A split leaf: a broad blade and two side lobes with a gap between them.
+    for (const [dx, dy, sx, sy] of [[0, 0.06, 0.2, 0.22], [-0.2, -0.02, 0.1, 0.16], [0.2, -0.02, 0.1, 0.16]]) {
+      const lobe = sphere(parent, [sx, sy, 0.02], [x + dx * Math.cos(-angle), h + dy, z + dx * Math.sin(-angle)], color);
+      lobe.rotation.set(0.9 + tilt, -angle + Math.PI / 2, turn); lobe.metadata = { sway };
+    }
+  }
+}
+
+// A brass tea cart: two oak trays on wheels, a teapot and cups on top, books
+// and a basket below. A tap puffs steam from the teapot.
+function teaCart(parent) {
+  for (const x of [-0.5, 0.5]) for (const z of [-0.26, 0.26]) {
+    rod(parent, [x, 0.1, z], [x, 0.92, z], 0.018, C.brass, { metalness: 0.4 });
+    cylinder(parent, 0.065, 0.065, 0.03, [x, 0.07, z], C.dark, { segments: 16 }).rotation.z = Math.PI / 2;
+  }
+  for (const y of [0.3, 0.78]) {
+    box(parent, [1.08, 0.03, 0.6], [0, y, 0], C.wood, 0.01);
+    for (const z of [-0.29, 0.29]) box(parent, [1.08, 0.05, 0.02], [0, y + 0.035, z], C.edge, 0.008);
+  }
+  rod(parent, [0.5, 0.98, -0.26], [0.5, 0.98, 0.26], 0.02, C.brass, { metalness: 0.4 });
+  // The teapot, cups and a plate of biscuits.
+  sphere(parent, [0.13, 0.11, 0.13], [-0.22, 0.91, 0], C.cream);
+  rod(parent, [-0.13, 0.9, 0], [-0.05, 0.98, 0], 0.018, C.cream);
+  sphere(parent, [0.05, 0.025, 0.05], [-0.22, 1.02, 0], C.cream);
+  const handle = torus(parent, 0.05, 0.012, [-0.35, 0.92, 0], C.cream); handle.rotation.y = Math.PI / 2;
+  mug(parent, 0.12, 0.8, 0.12, 0.6); mug(parent, 0.26, 0.8, -0.1, 0.6);
+  cylinder(parent, 0.11, 0.11, 0.012, [0.3, 0.8, 0.14], C.paper);
+  for (let i = 0; i < 3; i++) cylinder(parent, 0.028, 0.028, 0.014, [0.27 + i * 0.03, 0.815, 0.12 + (i % 2) * 0.04], '#d7b572');
+  book(parent, 0.3, 0.05, 0.22, -0.2, 0.34, 0, bookColors[1], 0.1); book(parent, 0.28, 0.045, 0.2, -0.2, 0.39, 0, bookColors[3], -0.05);
+  box(parent, [0.34, 0.16, 0.3], [0.24, 0.395, 0], '#b8a17d', 0.03);
+}
+// Where the tea cart's steam starts: the teapot spout.
+const TEA_CART_SPOUT = [-0.05, 1.0, 0];
+
 // Wall pieces. Each is modeled around the center of its rectangle on the wall,
 // with its back on the wall face (z = 0) and z pointing into the room. The
 // retreat's frames, clock and potion shelf and the themed rooms' scroll, cloud
@@ -537,7 +656,7 @@ function moonRug(parent) {
 function tube(parent, points, radius, color, extra) {
   return mesh(parent, CreateTube('soft-curve', { path: points.map(point => new Vector3(...point)), radius, tessellation: 6, cap: Mesh.CAP_ALL }, parent.getScene()), color, [0, 0, 0], extra);
 }
-const pictureSizes = { 'tall-frame': [0.88, 1.23], 'small-frame': [0.60, 0.86], 'wide-frame': [1.32, 0.86] };
+const pictureSizes = { 'tall-frame': [0.88, 1.23], 'small-frame': [0.60, 0.86], 'wide-frame': [1.32, 0.86], easel: [0.87, 1.11] };
 // Each view covers its opening (the frame less OPENING_INSET) with a margin.
 const viewSizes = { 'cottage-window': [1.42, 1.62], 'arched-window': [1.02, 2.22], 'round-window': [1.12, 1.12] };
 // Behind the thickest wall and its brick facing.
@@ -655,7 +774,7 @@ function createSwayingCanopy(parent, type) {
   const scene = parent.getScene(), templates = cacheFor(scene).templates, key = `${type}-canopy`;
   if (!templates.has(key)) {
     const source = new TransformNode('leaf-source', scene);
-    if (type === 'plant') plant(source, true); else moonTree(source, true);
+    if (type === 'plant') plant(source, true); else if (type === 'monstera') monstera(source, true); else moonTree(source, true);
     const ranges = []; let vertexOffset = 0;
     for (const leaf of source.getChildMeshes()) {
       ranges.push({ start: vertexOffset, end: vertexOffset + leaf.getTotalVertices(), ...leaf.metadata.sway });
@@ -672,7 +791,7 @@ function createSwayingCanopy(parent, type) {
   const limitX = width / 2 - 0.002, limitZ = depth / 2 - 0.002;
   const originalBounds = canopy.getBoundingInfo().boundingBox;
   canopy.setBoundingInfo(new BoundingInfo(new Vector3(-width / 2, originalBounds.minimum.y - 0.02, -depth / 2), new Vector3(width / 2, originalBounds.maximum.y + 0.02, depth / 2)));
-  const amplitude = type === 'plant' ? 0.075 : 0.11, phaseOffset = parent.uniqueId * 0.37;
+  const amplitude = type === 'plant' ? 0.075 : type === 'monstera' ? 0.06 : 0.11, phaseOffset = parent.uniqueId * 0.37;
   let resting = true;
   return (seconds, focused, reducedMotion) => {
     if (reducedMotion) {
@@ -703,6 +822,70 @@ function createSwayingCanopy(parent, type) {
   };
 }
 
+// The globe's painted sphere, once per scene: seas, low continents and white
+// poles in its vertex colors, on the shared white paint.
+function globeTemplate(scene) {
+  const templates = cacheFor(scene).templates;
+  if (!templates.has('globe-sphere')) {
+    const globe = CreateSphere('globe-sphere', { diameter: 0.6, segments: 18 }, scene), positions = globe.getVerticesData('position'), colors = [];
+    const lands = [[0.3, 0.5, 0.8, 0.55], [-0.6, 0.2, 0.7, 0.62], [0.7, -0.35, -0.2, 0.5], [-0.25, -0.6, -0.7, 0.58], [0.1, 0.85, -0.45, 0.6], [-0.8, -0.3, -0.3, 0.7]].map(([x, y, z, t]) => [new Vector3(x, y, z).normalize(), t]);
+    const sea = Color3.FromHexString('#6f96ae'), land = Color3.FromHexString('#a9b887'), ice = Color3.FromHexString('#eef0ea'), direction = new Vector3();
+    for (let i = 0; i < positions.length; i += 3) {
+      direction.set(positions[i], positions[i + 1], positions[i + 2]).normalize();
+      const paint = Math.abs(direction.y) > 0.9 ? ice : lands.some(([center, t]) => Vector3.Dot(direction, center) > t) ? land : sea;
+      colors.push(paint.r, paint.g, paint.b, 1);
+    }
+    globe.setVerticesData('color', colors); globe.material = material(scene, '#ffffff'); globe.receiveShadows = true; globe.isPickable = true;
+    globe.setEnabled(false); templates.set('globe-sphere', globe);
+  }
+  return templates.get('globe-sphere');
+}
+// Three fish and a string of bubbles, as instances of one small mesh each:
+// the fish swim to and fro and turn around, the bubbles rise and start again.
+// Both keep still with reduced motion, and the bubbles hide.
+function createAquariumLife(parent) {
+  const scene = parent.getScene(), templates = cacheFor(scene).templates;
+  if (!templates.has('aquarium-fish')) {
+    const body = CreateSphere('fish-body', { diameter: 2, segments: 6 }, scene); body.scaling.set(0.07, 0.04, 0.019);
+    const tail = CreateSphere('fish-tail', { diameter: 2, segments: 4 }, scene); tail.scaling.set(0.03, 0.036, 0.007); tail.position.x = -0.082;
+    const fish = Mesh.MergeMeshes([body, tail], true, true); fish.name = 'aquarium-fish';
+    const bubble = CreateSphere('aquarium-bubble', { diameter: 2, segments: 4 }, scene);
+    for (const mesh of [fish, bubble]) { mesh.material = material(scene, '#ffffff'); mesh.setEnabled(false); }
+    templates.set('aquarium-fish', fish); templates.set('aquarium-bubble', bubble);
+  }
+  const water = new BoundingInfo(new Vector3(-0.7, 0.88, -0.24), new Vector3(0.7, 1.48, 0.24));
+  const school = [{ y: 1.12, z: 0.08, speed: 0.55, phase: 0, reach: 0.48, size: 1, color: '#ec8a4e' }, { y: 1.3, z: -0.07, speed: 0.42, phase: 2.1, reach: 0.4, size: 0.8, color: '#e9bd57' }, { y: 0.99, z: 0.01, speed: 0.68, phase: 4.2, reach: 0.36, size: 0.9, color: '#6c9bd4' }];
+  const bubbles = Array.from({ length: 6 }, (_, i) => ({ phase: i / 6, x: 0.5 + (i % 2) * 0.02, z: -0.08, size: 0.012 + (i % 3) * 0.004 }));
+  const parts = [['aquarium-fish', school], ['aquarium-bubble', bubbles]].map(([name, seeds]) => {
+    const mesh = templates.get(name).clone(name, parent); mesh.setEnabled(true); mesh.isPickable = false; mesh.receiveShadows = false;
+    mesh.metadata = { dynamic: true, effect: 'aquarium-life', castShadow: false }; mesh.setBoundingInfo(water);
+    const matrices = new Float32Array(seeds.length * 16), colors = new Float32Array(seeds.length * 4);
+    seeds.forEach((seed, i) => { const color = Color3.FromHexString(seed.color || '#eaf7f5'); colors.set([color.r, color.g, color.b, 1], i * 4); });
+    mesh.thinInstanceSetBuffer('matrix', matrices, 16, false); mesh.thinInstanceSetBuffer('color', colors, 4, true);
+    return { mesh, matrices };
+  });
+  const [fish, bubble] = parts, scratch = new Matrix(), turn = new Quaternion(), scale = new Vector3(), at = new Vector3(), still = Quaternion.Identity();
+  function pose(seconds, moving) {
+    school.forEach((seed, i) => {
+      const s = seconds * seed.speed + seed.phase, heading = Math.max(-1, Math.min(1, Math.cos(s) * 3));
+      at.set(Math.sin(s) * seed.reach, seed.y + Math.sin(s * 1.7) * 0.03, seed.z + Math.sin(s * 0.8) * 0.04);
+      Quaternion.RotationYawPitchRollToRef((1 - heading) / 2 * Math.PI + (moving ? Math.sin(seconds * 9 + i) * 0.1 : 0), 0, 0, turn);
+      Matrix.ComposeToRef(scale.setAll(seed.size), turn, at, scratch); scratch.copyToArray(fish.matrices, i * 16);
+    });
+    bubbles.forEach((seed, i) => {
+      const t = (seconds * 0.35 + seed.phase) % 1;
+      Matrix.ComposeToRef(scale.setAll(seed.size), still, at.set(seed.x + Math.sin(t * 12 + i) * 0.012, 0.92 + t * 0.52, seed.z), scratch); scratch.copyToArray(bubble.matrices, i * 16);
+    });
+    fish.mesh.thinInstanceBufferUpdated('matrix'); bubble.mesh.thinInstanceBufferUpdated('matrix');
+  }
+  pose(0, false); bubble.mesh.setEnabled(false);
+  let resting = true;
+  return (seconds, focused, reducedMotion) => {
+    if (reducedMotion) { if (!resting) { pose(0, false); bubble.mesh.setEnabled(false); } resting = true; return; }
+    if (resting) bubble.mesh.setEnabled(true);
+    resting = false; pose(seconds, true);
+  };
+}
 function createSpinningRecord(parent) {
   const scene = parent.getScene(), templates = cacheFor(scene).templates;
   if (!templates.has('spinning-record')) {
@@ -1203,6 +1386,7 @@ export function createFurniture(type, scene) {
       'cloud-shelf': parent => cloudShelf(parent, 2.5), 'small-cloud-shelf': parent => cloudShelf(parent, 2.1),
       'wall-scroll': wallScroll, 'neon-orbit': neonOrbit, 'record-sleeve': recordSleeve, 'felt-rainbow': feltRainbow,
       'cottage-window': cottageWindow, 'arched-window': archedWindow, 'round-window': roundWindow,
+      'fish-tank': fishTank, globe: globeStand, easel, 'bean-bag': beanBag, monstera: parent => monstera(parent), 'tea-cart': teaCart,
     };
     builders[type](source);
     const template = batch(source); template.setEnabled(false); templates.set(type, template);
@@ -1279,10 +1463,15 @@ export function createFurniture(type, scene) {
   // room can give each one its chosen art.
   if (pictureSizes[type] || type === 'record-sleeve') {
     const [width, height] = pictureSizes[type] || [1.06, 1.06];
-    const picture = type === 'record-sleeve' ? CreateBox('record-sleeve-art', { width, height, depth: 0.03 }, scene) : CreatePlane('framed-picture', { width, height }, scene);
+    // A sleeve and the easel's canvas are thin boxes, so their outline has a rim.
+    // The canvas face shows the picture the right way up; its thin sides and back take its edge.
+    const canvasFaces = [new Vector4(0, 1, 1, 0), ...Array(5).fill(new Vector4(0, 0, 0.02, 1))];
+    const picture = type === 'record-sleeve' ? CreateBox('record-sleeve-art', { width, height, depth: 0.03 }, scene) : type === 'easel' ? CreateBox('easel-picture', { width, height, depth: 0.012, faceUV: canvasFaces }, scene) : CreatePlane('framed-picture', { width, height }, scene);
     picture.parent = result; picture.position.z = type === 'record-sleeve' ? 0.1375 : 0.14;
     picture.material = material(scene, type === 'record-sleeve' ? '#b4aecb' : C.paper); picture.receiveShadows = type === 'record-sleeve';
     picture.metadata = { picture: true, castShadow: type === 'record-sleeve' };
+    // The easel's picture lies on its tilted canvas.
+    if (type === 'easel') { const holder = group(result, EASEL_CANVAS.position); holder.rotation.x = EASEL_CANVAS.tilt; picture.parent = holder; picture.position.set(0, 0, 0.027); }
     result.metadata.picture = picture;
   }
   // A window's view sits behind its wall, inside the opening; the room gives
@@ -1323,7 +1512,15 @@ export function createFurniture(type, scene) {
     result.metadata.book = hinge;
   }
   if (type === 'fireplace') { animations.push(createDancingFire(result)); animations.push(createHearthEmbers(result)); }
-  if (type === 'plant' || type === 'moon-tree') animations.push(createSwayingCanopy(result, type));
+  if (type === 'plant' || type === 'moon-tree' || type === 'monstera') animations.push(createSwayingCanopy(result, type));
+  if (type === 'fish-tank') animations.push(createAquariumLife(result));
+  if (type === 'tea-cart') animations.push(createTeaSteam(result, TEA_CART_SPOUT, 0.8));
+  if (type === 'globe') {
+    // The globe turns about its tilted axis; a tap spins it once.
+    const axis = group(result, [0, 1.07, 0]); axis.rotation.z = GLOBE_TILT; axis.name = 'globe-axis';
+    const globe = globeTemplate(scene).clone('painted-globe', axis); globe.setEnabled(true); globe.metadata = { dynamic: true };
+    result.metadata.globe = globe;
+  }
   if (type === 'low-cabinet') animations.push(createSpinningRecord(result));
   if (animations.length) result.metadata.animate = (seconds, focused, reducedMotion) => {
     for (const animate of animations) animate(seconds, focused, reducedMotion);
