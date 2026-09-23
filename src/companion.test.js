@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
-import { PRESETS, createLayout } from './layout.js';
+import { PRESETS, createLayout, validatePlacement } from './layout.js';
 import { createMobileCompanion, disposeFurnitureAssets } from './furniture.js';
 import { petSpots } from './pet.js';
 import { companionIntent, localPoint, planCompanionTrip, planActivityTrip, activitySpots, navigationObstacles, walkable, clearSegment, createCompanionRoutine, DOZE_AFTER, ACTIVITIES } from './companion.js';
@@ -74,6 +74,15 @@ test('every design offers break activities the companion can reach, each facing 
     assert.ok(!activitySpots(cold).some(spot => spot.kind === 'warm'));
     assert.ok(!activitySpots(layout, { pet: { ...pet, moving: true } }).some(spot => spot.kind === 'pet'));
   }
+});
+test('the companion waters the Swiss cheese plant too, facing it', () => {
+  const layout = createLayout('writers-loft'), monstera = { id: 'test-monstera', type: 'monstera', x: -1, z: 1, rotation: 0 };
+  assert.ok(validatePlacement(layout.items, monstera).valid, 'the plant stands on free floor');
+  layout.items.push(monstera);
+  const spot = activitySpots(layout).find(entry => entry.kind === 'water' && entry.itemId === monstera.id);
+  assert.ok(spot && planActivityTrip(layout, null, spot), 'the companion can walk to it with the watering can');
+  const toward = Math.atan2(-(monstera.x - spot.x), -(monstera.z - spot.z));
+  assert.ok(Math.abs(Math.atan2(Math.sin(toward - spot.yaw), Math.cos(toward - spot.yaw))) < 1e-6);
 });
 test('at night an unlit lamp comes first: the companion switches it on once, then sits', () => {
   // The library's lamp stands in a corner that furniture closes off; the
