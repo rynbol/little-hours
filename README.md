@@ -42,6 +42,7 @@ The development server binds to `127.0.0.1`. Open the local URL Vite prints. Run
 - Pet interaction and user-activated synthesized rain audio.
 - Mini view demonstrates a smaller room **inside this page**.
 - An optional Performance panel shows measured frame cadence, CPU submission, drawing cost and quality controls.
+- Buttons press in softly and spring back, the room's own buttons lift a little under a mouse, a choice that turns on settles into place, the Night and Daylight icon turns, and panels ease in. Reduced motion keeps them still.
 
 Everything is available in the prototype collection; there are no purchases. This is an early playable prototype with no accounts, cross-device sync, multiplayer, native always-on-top window, notch integration or coding-agent integration. No competitor code, models or music are included. The furniture, room geometry and decorative details are authored in JavaScript; no generated raster furniture assets or Blender files are required. Google Fonts is the only external presentation request; fallback fonts work without it.
 

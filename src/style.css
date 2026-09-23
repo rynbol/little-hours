@@ -452,3 +452,31 @@ body[data-design='metro'] .stage { background: radial-gradient(ellipse at 50% 45
 /* With nothing selected, the room designs need the space: the wall and floor pickers wait on the furniture tab. */
 .is-decorating .builder-panel[data-collection='presets'] .selection-inspector:not(:has(.selection-actions:not(.room-surfaces))) { display: none; }
 .is-decorating .builder-panel[data-collection='presets'] .preset-grid { max-height: calc(100% - 8px); overflow-y: auto; }
+
+/* Motion. A button presses in softly and springs back, the room's own
+   buttons lift a little under a mouse, and a button that turns on settles
+   into place. Panels ease in. Only transforms, opacity and colors change, so
+   no layout runs for them, and reduced motion turns all of it off (above). */
+:root { --press-spring: cubic-bezier(.34, 1.56, .64, 1); --soft-ease: cubic-bezier(.25, .8, .35, 1); }
+/* The furniture cards set a transition of their own above, so they are named here too. */
+button, .furniture-card { transition: background-color .22s var(--soft-ease), border-color .22s var(--soft-ease), color .22s var(--soft-ease), box-shadow .22s var(--soft-ease), opacity .22s var(--soft-ease), transform .34s var(--press-spring); }
+button:not(:disabled):active { transform: scale(.95); transition-duration: .22s, .22s, .22s, .22s, .22s, .07s; transition-timing-function: var(--soft-ease), var(--soft-ease), var(--soft-ease), var(--soft-ease), var(--soft-ease), ease-out; }
+/* Wide buttons and cards press in less. */
+:is(.furniture-card, .preset-card button, .theme-option, .pet-option, .quality-options button, .start-button, .sound-button):not(:disabled):active { transform: scale(.98); }
+@media (hover: hover) {
+  :is(.mode-button, .time-toggle, .focus-toggle, .tool, .icon-button, .start-button):not(:disabled):not(:active):hover { transform: translateY(-1px); box-shadow: 0 5px 14px #0b061026; }
+}
+@keyframes settle-in { from { transform: scale(.93); } }
+:is(.mode-button, .tool, .durations button, .collection-tabs button, .category-list button, .art-picker button, .theme-option, .pet-option, .quality-options button, .furniture-card)[aria-pressed='true'],
+:is(.tool, .focus-toggle)[aria-expanded='true'] { animation: settle-in .4s var(--press-spring); }
+/* A card in the scrolling furniture strip settles and springs back without
+   overshoot, so it never reaches past the strip's edge to bring a scroll bar in. */
+button.furniture-card { transition-timing-function: var(--soft-ease); }
+button.furniture-card[aria-pressed='true'] { animation-timing-function: var(--soft-ease); }
+/* Night and Daylight: the new icon turns in and its label fades in. */
+@keyframes icon-turn { from { transform: rotate(-70deg) scale(.55); opacity: 0; } }
+@keyframes label-in { from { opacity: 0; transform: translateX(-3px); } }
+.time-toggle svg { animation: icon-turn .55s var(--press-spring); }
+.time-toggle span { animation: label-in .35s var(--soft-ease); }
+@keyframes panel-in { from { opacity: 0; transform: translateY(8px); } }
+.room-panel:not([hidden]), .builder-panel:not([hidden]) { animation: panel-in .3s var(--soft-ease); }
