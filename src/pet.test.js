@@ -71,9 +71,12 @@ test('picked up and put down, the pet sits a moment, then walks home', () => {
   boxed.pickUp(); boxed.moveHeld(-2.48, 3.26); boxed.drop();
   assert.ok(findWalkingPath(ember, boxed.pose, petHome(ember), petObstacles(ember)), 'the landing spot has a way home');
   assert.ok(distance(boxed.pose, { x: -2.48, z: 3.26 }) < 1.6, 'and it is close to where it was set down');
-  // Dropped onto its own bed, it settles straight in.
+  // Dropped onto its own bed, it steps to the middle and settles, with no jump.
   routine.pickUp(); const bed = petBed(layout); routine.moveHeld(bed.x + 0.2, bed.z); routine.drop();
-  assert.equal(routine.pose.state, 'settling');
+  assert.equal(routine.pose.state, 'returning'); assert.ok(Math.abs(routine.pose.x - bed.x - 0.2) < 1e-6);
+  advance(routine, 1.5); assert.equal(routine.pose.state, 'settling');
+  routine.pickUp(); routine.moveHeld(bed.x, bed.z); routine.drop();
+  assert.equal(routine.pose.state, 'settling', 'dropped in the middle, it settles straight in');
 });
 
 test('petting pauses a nap and a walk; editing and reduced motion keep the pet home', () => {

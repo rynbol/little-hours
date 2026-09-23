@@ -11,6 +11,8 @@ export const PETS = Object.freeze({
   dog: Object.freeze({ id: 'dog', name: 'Mochi', speed: 0.62 }),
 });
 export const PET_REACTION = 2.6;
+// Half the room the companion takes up where it stands, for walks around it.
+const COMPANION_CLEARANCE = 0.2;
 const STRETCH = 2.2, SETTLE = 1.6, AFTER_DROP = [3.5, 5];
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const turnToward = (from, to, amount) => from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * Math.min(1, amount);
@@ -51,7 +53,8 @@ export function petSpots(layout, { windowX = -2.7, companion = null } = {}) {
   const exits = [...desks.flatMap(item => seatsFor(item)).flatMap(seat => [seat.portal, seat.side]), ...(companion?.portal ? [companion.portal] : [])];
   // A spot also lies clear of the pet's own bed, so every stroll ends with a
   // walk home. A rug under the bed is no place to stroll to.
-  const clear = point => walkable(point, obstacles) && exits.every(exit => distance(exit, point) > 0.65) && (!companion || distance(companion, point) > 0.7) && (!home || distance(home, point) > 0.85);
+  // Nor does it sit where the companion stands or is going.
+  const clear = point => walkable(point, obstacles) && exits.every(exit => distance(exit, point) > 0.65) && (!companion || (distance(companion, point) > 0.7 && (!companion.to || distance(companion.to, point) > 0.7))) && (!home || distance(home, point) > 0.85);
   const add = (point, yaw, kind) => { if (clear(point)) spots.push({ x: point.x, z: point.z, yaw, kind }); };
   for (const fire of layout.items.filter(item => item.type === 'fireplace' && !item.off)) {
     for (const x of [0, -0.6, 0.6]) add(localPoint(fire, x, getFurniture('fireplace').footprint[1] / 2 + 0.5), fire.rotation * Math.PI / 2, 'fire');
@@ -75,9 +78,12 @@ export function petSpots(layout, { windowX = -2.7, companion = null } = {}) {
 }
 
 export function createPetRoutine({ random = Math.random, onChange = () => {} } = {}) {
-  const pose = { state: 'sleeping', action: 'sleep', x: 0, z: 0, yaw: 0, onBed: true, moving: false, walked: 0, petAge: Infinity, held: false, species: 'cat' };
+  // `to` is where a walk ends, so the companion keeps out of the way.
+  const pose = { state: 'sleeping', action: 'sleep', x: 0, z: 0, yaw: 0, onBed: true, moving: false, walked: 0, petAge: Infinity, held: false, species: 'cat', to: null };
   let layout = null, editing = false, windowX = -2.7, companion = null, speed = PETS.cat.speed;
-  let timer = 0, trip = null, legIndex = 0, visits = 0, target = null, waited = 0, goHome = false, stall = 0, settleFrom = 0;
+  // The floor that leads home, found once per layout.
+  let homeFloor = null;
+  let timer = 0, trip = null, legIndex = 0, visits = 0, target = null, waited = 0, goHome = false, stall = 0, settleFrom = 0, passed = null;
   const wait = ([low, high]) => low + random() * (high - low);
   function status(next, action = next) {
     pose.action = action;
@@ -85,43 +91,49 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
   }
   function sleepAtHome(first = false) {
     const home = petHome(layout); if (!home) return;
-    Object.assign(pose, { x: home.x, z: home.z, yaw: home.yaw, onBed: true, moving: false, held: false });
+    Object.assign(pose, { x: home.x, z: home.z, yaw: home.yaw, onBed: true, moving: false, held: false, to: null });
     trip = null; target = null; visits = 0; goHome = false; stall = 0;
     timer = wait(first ? [14, 26] : [32, 62]); status('sleeping', 'sleep');
   }
+  // The walk goes around the companion where it stands or is going, unless
+  // that closes the only way.
   function walkTo(point, kind) {
-    const obstacles = petObstacles(layout), start = walkable(pose, obstacles) ? { x: pose.x, z: pose.z } : null;
-    const path = start && findWalkingPath(layout, start, { x: point.x, z: point.z }, obstacles);
+    const obstacles = petObstacles(layout), start = walkable(pose, obstacles) ? { x: pose.x, z: pose.z } : null, end = { x: point.x, z: point.z }, boxes = [];
+    const box = spot => ({ minX: spot.x - COMPANION_CLEARANCE, maxX: spot.x + COMPANION_CLEARANCE, minZ: spot.z - COMPANION_CLEARANCE, maxZ: spot.z + COMPANION_CLEARANCE });
+    if (companion && !companion.atDesk) { if (!companion.moving && !companion.seated) boxes.push(box(companion)); if (companion.to) boxes.push(box(companion.to)); }
+    const path = start && ((boxes.length && findWalkingPath(layout, start, end, petObstacles(layout, boxes))) || findWalkingPath(layout, start, end, obstacles));
     if (!path) return false;
-    trip = { path, kind, end: point }; legIndex = 1; waited = 0; target = point;
+    trip = { path, kind, end: point }; legIndex = 1; waited = 0; target = point; pose.to = end;
     pose.moving = true; pose.onBed = false; status(kind === 'home' ? 'returning' : 'walking', 'walk');
     return true;
   }
   function goHomeNow() {
     const home = petHome(layout);
     if (!home) return;
-    if (insideBed(layout, pose)) { settle(); return; }
-    if (!walkTo(home, 'home')) sleepAtHome();
+    // At the edge of its bed, the pet steps to the middle before it lies down.
+    if (distance(pose, home) < 0.05) { settle(); return; }
+    if (!walkTo(home, 'home')) { if (insideBed(layout, pose)) settle(); else sleepAtHome(); }
   }
   // Before it lies down, the pet turns once around in its bed.
   function settle() {
     const home = petHome(layout);
-    Object.assign(pose, { x: home.x, z: home.z, onBed: true, moving: false });
+    Object.assign(pose, { x: home.x, z: home.z, onBed: true, moving: false, to: null });
     trip = null; target = null; timer = SETTLE; settleFrom = pose.yaw; status('settling', 'settle');
   }
   function wander() {
-    // One flood fill finds which spots the pet can reach, so the path search
-    // runs once, for a spot that it can reach, and never fails.
-    const obstacles = petObstacles(layout), reached = walkable(pose, obstacles) ? reachableFloor(layout, pose, obstacles) : null;
-    const reachable = spot => reached && reaches(reached, spot, obstacles);
-    const spots = petSpots(layout, { windowX, companion }).filter(spot => (!target || distance(spot, target) > 0.8) && reachable(spot));
+    // One flood fill from home finds the spots that the pet can reach and walk
+    // home from, so the path search runs for a spot that it can reach.
+    if (!homeFloor) { const obstacles = petObstacles(layout); homeFloor = { obstacles, reached: reachableFloor(layout, petHome(layout), obstacles) }; }
+    const { obstacles, reached } = homeFloor;
+    const spots = petSpots(layout, { windowX, companion }).filter(spot => (!target || distance(spot, target) > 0.8) && reaches(reached, spot, obstacles));
     // Loved spots first, with a little chance so a visit is never the same.
     const ordered = spots.map((spot, index) => ({ spot, score: index + random() * 3 })).sort((a, b) => a.score - b.score).map(entry => entry.spot);
     for (const spot of ordered) if (walkTo(spot, spot.kind)) { visits++; return; }
-    sleepAtHome();
+    // Nowhere else to go: away from home, the pet walks back.
+    if (pose.onBed) sleepAtHome(); else goHomeNow();
   }
   function arrive() {
-    const end = trip.end, kind = trip.kind; trip = null; pose.moving = false;
+    const end = trip.end, kind = trip.kind; trip = null; pose.moving = false; pose.to = null;
     if (kind === 'home') { settle(); return; }
     pose.x = end.x; pose.z = end.z;
     timer = wait([10, 18]); status('sitting', kind === 'fire' || kind === 'rug' ? 'loaf' : 'sit');
@@ -130,7 +142,7 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
     pose,
     setSpecies(id) { pose.species = PETS[id] ? id : 'cat'; speed = PETS[pose.species].speed; },
     setLayout(next, { windowX: nextWindow } = {}) {
-      const first = !layout; layout = next; if (Number.isFinite(nextWindow)) windowX = nextWindow;
+      const first = !layout; layout = next; homeFloor = null; if (Number.isFinite(nextWindow)) windowX = nextWindow;
       const home = petHome(layout); if (!home) return;
       if (first) { sleepAtHome(true); return; }
       if (pose.held) return;
@@ -154,7 +166,7 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
     },
     pickUp() {
       if (!layout || editing) return false;
-      trip = null; target = null; stall = 0; pose.held = true; pose.moving = false; pose.onBed = false; status('held', 'held'); return true;
+      trip = null; target = null; stall = 0; pose.held = true; pose.moving = false; pose.onBed = false; pose.to = null; status('held', 'held'); return true;
     },
     moveHeld(x, z) {
       if (!pose.held) return;
@@ -166,7 +178,7 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
     drop(x = pose.x, z = pose.z) {
       if (!pose.held) return;
       this.moveHeld(x, z); pose.held = false;
-      if (insideBed(layout, pose)) { settle(); return; }
+      if (insideBed(layout, pose)) { goHomeNow(); return; }
       const spot = landingSpot(layout, pose, petHome(layout));
       if (!spot) { sleepAtHome(); return; }
       pose.x = spot.x; pose.z = spot.z; goHome = true; timer = wait(AFTER_DROP); status('sitting', 'sit');
@@ -202,7 +214,12 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
         if (stall > 0) { stall -= dt; pose.moving = false; return pose; }
         const a = trip.path[legIndex - 1], b = trip.path[legIndex];
         const ahead = companion && distance(companion, pose) < 0.75 && ((companion.x - pose.x) * (b.x - pose.x) + (companion.z - pose.z) * (b.z - pose.z)) > 0;
-        // The pet waits for the companion to pass, but never forever.
+        // The pet walks around a companion that stands in its way, once for
+        // each place it stands, and waits for one that walks past, but never forever.
+        if (ahead && !companion.moving && !companion.atDesk && !companion.seated && !(passed && distance(passed, companion) < 0.05)) {
+          passed = { x: companion.x, z: companion.z };
+          if (walkTo(trip.end, trip.kind)) return pose;
+        }
         if (ahead && waited < 3) { waited += dt; pose.moving = false; pose.action = 'stand'; return pose; }
         pose.action = 'walk'; pose.moving = true;
         const step = speed * dt, left = distance(pose, b);

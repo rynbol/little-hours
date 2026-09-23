@@ -3,6 +3,8 @@ import { ROOM_BOUNDS } from './layout.js';
 import { sessionPhase } from './session.js';
 
 export const COMPANION_RADIUS = 0.24;
+// Half the room a sitting pet takes up, for walks around it.
+const PET_CLEARANCE = 0.2;
 export const DOZE_AFTER = 30;
 const STEP = 0.2;
 const SEATS = ['daybed', 'lounge-chair', 'ottoman'];
@@ -35,30 +37,34 @@ export function navigationObstacles(layout, ignoredId, radius = COMPANION_RADIUS
     boxes.push({ minX: item.x - w / 2, maxX: item.x + w / 2, minZ: item.z - d / 2, maxZ: item.z + d / 2 });
   }
   const grown = boxes.map(box => ({ minX: box.minX - radius, maxX: box.maxX + radius, minZ: box.minZ - radius, maxZ: box.maxZ + radius }));
-  grown.radius = radius;
+  grown.radius = radius; grown.extra = extra.length;
   return grown;
 }
 export function walkable(point, obstacles) {
   const radius = obstacles.radius ?? COMPANION_RADIUS;
-  return point.x >= ROOM_BOUNDS.minX + radius && point.x <= ROOM_BOUNDS.maxX - radius
-    && point.z >= ROOM_BOUNDS.minZ + radius && point.z <= ROOM_BOUNDS.maxZ - radius
-    && !obstacles.some(box => point.x > box.minX && point.x < box.maxX && point.z > box.minZ && point.z < box.maxZ);
-}
-export function clearSegment(a, b, obstacles) {
-  if (!walkable(a, obstacles) || !walkable(b, obstacles)) return false;
-  for (const box of obstacles) {
-    let first = 0, last = 1;
-    for (const [axis, low, high] of [['x', 'minX', 'maxX'], ['z', 'minZ', 'maxZ']]) {
-      const delta = b[axis] - a[axis];
-      if (Math.abs(delta) < 1e-9) { if (a[axis] <= box[low] || a[axis] >= box[high]) { first = 2; break; } }
-      else {
-        const t1 = (box[low] + 1e-7 - a[axis]) / delta, t2 = (box[high] - 1e-7 - a[axis]) / delta;
-        first = Math.max(first, Math.min(t1, t2)); last = Math.min(last, Math.max(t1, t2));
-      }
-    }
-    if (first <= last) return false;
+  if (point.x < ROOM_BOUNDS.minX + radius || point.x > ROOM_BOUNDS.maxX - radius || point.z < ROOM_BOUNDS.minZ + radius || point.z > ROOM_BOUNDS.maxZ - radius) return false;
+  for (let i = 0; i < obstacles.length; i++) {
+    const box = obstacles[i];
+    if (point.x > box.minX && point.x < box.maxX && point.z > box.minZ && point.z < box.maxZ) return false;
   }
   return true;
+}
+// Whether the line from `a` to `b` passes through a box (slab test).
+function crosses(a, b, obstacles) {
+  const dx = b.x - a.x, dz = b.z - a.z;
+  for (let i = 0; i < obstacles.length; i++) {
+    const box = obstacles[i];
+    let first = 0, last = 1;
+    if (Math.abs(dx) < 1e-9) { if (a.x <= box.minX || a.x >= box.maxX) continue; }
+    else { const t1 = (box.minX + 1e-7 - a.x) / dx, t2 = (box.maxX - 1e-7 - a.x) / dx; first = Math.max(first, Math.min(t1, t2)); last = Math.min(last, Math.max(t1, t2)); }
+    if (Math.abs(dz) < 1e-9) { if (a.z <= box.minZ || a.z >= box.maxZ) continue; }
+    else { const t1 = (box.minZ + 1e-7 - a.z) / dz, t2 = (box.maxZ - 1e-7 - a.z) / dz; first = Math.max(first, Math.min(t1, t2)); last = Math.min(last, Math.max(t1, t2)); }
+    if (first <= last) return true;
+  }
+  return false;
+}
+export function clearSegment(a, b, obstacles) {
+  return walkable(a, obstacles) && walkable(b, obstacles) && !crosses(a, b, obstacles);
 }
 // Small floor grid, searched only when a trip begins or its destination changes.
 // Every diagonal and shortcut is checked with the companion's clearance radius.
@@ -67,18 +73,48 @@ export function clearSegment(a, b, obstacles) {
 // finds that once, so no path search runs to failure.
 const GRID = { width: 56, height: 43, step: STEP, x: -5.5, z: -4.2 };
 export const cellPoint = index => ({ x: GRID.x + index % GRID.width * GRID.step, z: GRID.z + Math.floor(index / GRID.width) * GRID.step });
+// Which of the eight moves from each cell are clear, found once for a set of
+// furniture and walker size and shared by every search on it. Boxes that
+// come and go with the pet or companion (`extra`) are checked on each move.
+const MOVES = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]];
+const moveSets = new Map(), grids = new WeakMap();
+function floorGrid(obstacles) {
+  let grid = grids.get(obstacles);
+  if (grid) return grid;
+  const count = obstacles.extra || 0, fixed = Object.assign(obstacles.slice(count), { radius: obstacles.radius });
+  const key = `${obstacles.radius}|${fixed.map(box => `${box.minX},${box.maxX},${box.minZ},${box.maxZ}`).join(';')}`;
+  let moves = moveSets.get(key);
+  if (!moves) {
+    const total = GRID.width * GRID.height, open = new Uint8Array(total);
+    moves = new Uint8Array(total);
+    for (let i = 0; i < total; i++) open[i] = walkable(cellPoint(i), fixed) ? 1 : 0;
+    for (let i = 0; i < total; i++) {
+      if (!open[i]) continue;
+      const x = i % GRID.width, z = Math.floor(i / GRID.width), here = cellPoint(i);
+      for (let k = 0; k < 8; k++) {
+        const nx = x + MOVES[k][0], nz = z + MOVES[k][1], next = nz * GRID.width + nx;
+        if (nx >= 0 && nx < GRID.width && nz >= 0 && nz < GRID.height && open[next] && !crosses(here, cellPoint(next), fixed)) moves[i] |= 1 << k;
+      }
+    }
+    moveSets.set(key, moves);
+    if (moveSets.size > 6) moveSets.delete(moveSets.keys().next().value);
+  }
+  grid = { moves, extra: count ? Object.assign(obstacles.slice(0, count), { radius: obstacles.radius }) : null };
+  grids.set(obstacles, grid);
+  return grid;
+}
 export function reachableFloor(layout, from, obstacles = navigationObstacles(layout)) {
-  const total = GRID.width * GRID.height, reached = new Uint8Array(total), queue = [], sources = Array.isArray(from) ? from : [from];
+  const { moves, extra } = floorGrid(obstacles), total = GRID.width * GRID.height, reached = new Uint8Array(total), queue = [], sources = Array.isArray(from) ? from : [from];
   for (let i = 0; i < total; i++) {
     const point = cellPoint(i);
-    if (!reached[i] && walkable(point, obstacles) && sources.some(source => Math.hypot(point.x - source.x, point.z - source.z) < 0.43 && clearSegment(source, point, obstacles))) { reached[i] = 1; queue.push(i); }
+    if (sources.some(source => Math.hypot(point.x - source.x, point.z - source.z) < 0.43 && clearSegment(source, point, obstacles))) { reached[i] = 1; queue.push(i); }
   }
   while (queue.length) {
-    const current = queue.pop(), x = current % GRID.width, z = Math.floor(current / GRID.width), here = cellPoint(current);
-    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
-      if (x + dx < 0 || x + dx >= GRID.width || z + dz < 0 || z + dz >= GRID.height) continue;
-      const next = current + dx + dz * GRID.width;
-      if (!reached[next] && walkable(cellPoint(next), obstacles) && clearSegment(here, cellPoint(next), obstacles)) { reached[next] = 1; queue.push(next); }
+    const current = queue.pop();
+    for (let k = 0; k < 8; k++) {
+      if (!(moves[current] & 1 << k)) continue;
+      const next = current + MOVES[k][0] + MOVES[k][1] * GRID.width;
+      if (!reached[next] && (!extra || clearSegment(cellPoint(current), cellPoint(next), extra))) { reached[next] = 1; queue.push(next); }
     }
   }
   return reached;
@@ -98,7 +134,7 @@ export function findWalkingPath(layout, start, end, obstacles = navigationObstac
   if (clearSegment(start, end, obstacles)) return [start, end];
   const width = 56, height = 43, total = width * height;
   const point = index => ({ x: -5.5 + index % width * STEP, z: -4.2 + Math.floor(index / width) * STEP });
-  const costs = new Float32Array(total).fill(Infinity), parent = new Int32Array(total).fill(-1), closed = new Uint8Array(total), allowed = new Uint8Array(total);
+  const costs = new Float32Array(total).fill(Infinity), parent = new Int32Array(total).fill(-1), closed = new Uint8Array(total), { moves, extra } = floorGrid(obstacles);
   // The open set is a binary heap on cost plus distance to go, so each step
   // is logarithmic instead of a scan of every open cell.
   const heap = [], rank = [];
@@ -120,8 +156,7 @@ export function findWalkingPath(layout, start, end, obstacles = navigationObstac
     }
     return top;
   };
-  for (let i = 0; i < total; i++) allowed[i] = walkable(point(i), obstacles) ? 1 : 0;
-  for (let i = 0; i < total; i++) if (allowed[i] && distance(start, point(i)) < .43 && clearSegment(start, point(i), obstacles)) { costs[i] = distance(start, point(i)); push(i); }
+  for (let i = 0; i < total; i++) if (distance(start, point(i)) < .43 && clearSegment(start, point(i), obstacles)) { costs[i] = distance(start, point(i)); push(i); }
   let found = -1;
   while (heap.length) {
     const current = pop();
@@ -129,12 +164,11 @@ export function findWalkingPath(layout, start, end, obstacles = navigationObstac
     closed[current] = 1;
     const here = point(current);
     if (distance(here, end) < .43 && clearSegment(here, end, obstacles)) { found = current; break; }
-    const x = current % width, z = Math.floor(current / width);
-    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
-      if (x + dx < 0 || x + dx >= width || z + dz < 0 || z + dz >= height) continue;
-      const next = current + dx + dz * width;
-      if (!allowed[next] || closed[next] || !clearSegment(here, point(next), obstacles)) continue;
-      const cost = costs[current] + Math.hypot(dx, dz) * STEP;
+    for (let k = 0; k < 8; k++) {
+      if (!(moves[current] & 1 << k)) continue;
+      const next = current + MOVES[k][0] + MOVES[k][1] * width;
+      if (closed[next] || (extra && !clearSegment(here, point(next), extra))) continue;
+      const cost = costs[current] + Math.hypot(MOVES[k][0], MOVES[k][1]) * STEP;
       if (cost < costs[next]) { costs[next] = cost; parent[next] = current; push(next); }
     }
   }
@@ -164,11 +198,11 @@ function usableSeat(layout, seat) {
   return clearSegment(seat.seat, seat.side || seat.portal, obstacles) && (!seat.side || clearSegment(seat.side, seat.portal, obstacles));
 }
 // The shortest walk from any of `starts` to any of `ends`.
-function bestRoute(layout, starts, ends) {
+function bestRoute(layout, starts, ends, obstacles = navigationObstacles(layout)) {
   let best = null;
   for (const start of starts) for (const end of ends) {
     if ((start.seat && !usableSeat(layout, start)) || !usableSeat(layout, end)) continue;
-    const path = findWalkingPath(layout, start.portal, end.portal);
+    const path = findWalkingPath(layout, start.portal, end.portal, obstacles);
     if (!path) continue;
     const length = path.reduce((sum, point, i) => sum + (i ? distance(path[i - 1], point) : 0), 0);
     if (!best || length < best.length) best = { start, end, path, length };
@@ -176,19 +210,21 @@ function bestRoute(layout, starts, ends) {
   return best;
 }
 const routeStarts = (layout, source) => source?.seat ? [source] : source?.x != null ? [{ portal: source }] : seatsFor(layout.items.find(item => item.id === layout.activeDeskId));
-export function planCompanionTrip(layout, source, toDesk, seatTypes = SEATS) {
+// `canReach` keeps to seats whose way in joins the floor that leads back to
+// the desk; `obstacles` can add where the pet is.
+export function planCompanionTrip(layout, source, toDesk, seatTypes = SEATS, { canReach = null, obstacles = navigationObstacles(layout) } = {}) {
   const desk = layout.items.find(item => item.id === layout.activeDeskId);
   const targets = toDesk ? [desk] : layout.items.filter(item => seatTypes.includes(item.type)).sort((a, b) => SEATS.indexOf(a.type) - SEATS.indexOf(b.type));
   const starts = routeStarts(layout, source);
   for (const target of targets) {
-    const best = target && bestRoute(layout, starts, seatsFor(target));
+    const best = target && bestRoute(layout, starts, seatsFor(target).filter(seat => toDesk || !canReach || canReach(seat.portal)), obstacles);
     if (best) return best;
   }
   return null;
 }
 // A walk to stand at an activity spot, facing its piece.
-export function planActivityTrip(layout, source, spot) {
-  return bestRoute(layout, routeStarts(layout, source), [{ itemId: spot.itemId, desk: false, activity: spot.kind, seat: spot, portal: spot, yaw: spot.yaw, reach: spot.reach }]);
+export function planActivityTrip(layout, source, spot, obstacles = navigationObstacles(layout)) {
+  return bestRoute(layout, routeStarts(layout, source), [{ itemId: spot.itemId, desk: false, activity: spot.kind, seat: spot, portal: spot, yaw: spot.yaw, reach: spot.reach }], obstacles);
 }
 // Where the companion can stand for each activity: before a lit fire, beside
 // a plant, at the record player, at the window, beside a still pet, and at
@@ -196,8 +232,8 @@ export function planActivityTrip(layout, source, spot) {
 // the floor), for the pieces it touches.
 export function activitySpots(layout, { night = false, windowX = -2.7, pet = null, canReach = null } = {}) {
   const obstacles = navigationObstacles(layout), spots = [];
-  // The pet is no obstacle for walking, but nothing is done standing on it.
-  const clearOfPet = point => !pet || pet.held || distance(point, pet) > 0.6;
+  // Nothing is done standing on the pet, or where it is going.
+  const clearOfPet = point => !pet || pet.held || (distance(point, pet) > 0.6 && (!pet.to || distance(point, pet.to) > 0.6));
   const add = (kind, point, look, itemId = null, reach = null) => {
     if (!walkable(point, obstacles) || (kind !== 'pet' && !clearOfPet(point)) || (canReach && !canReach(point))) return false;
     spots.push({ kind, itemId, x: point.x, z: point.z, yaw: facing(point, look), reach: typeof reach === 'function' ? reach(point) : reach }); return true;
@@ -227,7 +263,7 @@ export function activitySpots(layout, { night = false, windowX = -2.7, pet = nul
 }
 
 export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, random = Math.random } = {}) {
-  const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null, goal: null, seated: false, portal: null };
+  const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null, goal: null, seated: false, portal: null, to: null };
   let layout, intent = 'idle', editing = false, anchor = null, trip = null, legs = [], legIndex = 0, elapsed = 0, restTime = 0;
   // One activity per break; `reduced` is the last reduced-motion setting,
   // which skips standing activities. A lamp or record player is switched on
@@ -236,17 +272,49 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   // How often each activity was done this visit: the least done comes first.
   const done = new Map();
   const switched = new Set();
+  // The floor that the desk's chair exits reach, found once per layout. Every
+  // seat and spot the companion goes to joins it, so it can always walk back.
+  let deskFloor = null;
+  function canReach(point) {
+    if (!deskFloor) {
+      const obstacles = navigationObstacles(layout), exits = seatsFor(layout.items.find(item => item.id === layout.activeDeskId)).filter(seat => usableSeat(layout, seat)).map(seat => seat.portal);
+      deskFloor = { obstacles, reached: exits.length ? reachableFloor(layout, exits, obstacles) : null };
+    }
+    return Boolean(deskFloor.reached) && reaches(deskFloor.reached, point, deskFloor.obstacles);
+  }
+  // Walks go around the pet where it sits or is going, unless that closes
+  // the only way.
+  const petBox = point => ({ minX: point.x - PET_CLEARANCE, maxX: point.x + PET_CLEARANCE, minZ: point.z - PET_CLEARANCE, maxZ: point.z + PET_CLEARANCE });
+  function aroundPet(plan) {
+    const pet = context.pet, boxes = [];
+    if (pet && !pet.held) { if (!pet.moving) boxes.push(petBox(pet)); if (pet.to) boxes.push(petBox(pet.to)); }
+    return (boxes.length && plan(navigationObstacles(layout, undefined, COMPANION_RADIUS, boxes))) || plan(navigationObstacles(layout));
+  }
+  // A pet that stops close ahead sends the walk around it, to the same place,
+  // once for each spot where it stops. A chair's side step keeps its line.
+  let dodged = null;
+  function walkAroundPet(leg) {
+    const pet = context.pet;
+    if (!pet || pet.held || pet.moving || leg.a === trip.start.side || leg.b === trip.end.side || (dodged && distance(dodged, pet) < 0.05)) return;
+    const dx = leg.b.x - pose.x, dz = leg.b.z - pose.z, length = Math.hypot(dx, dz);
+    if (length < 1e-6) return;
+    const along = ((pet.x - pose.x) * dx + (pet.z - pose.z) * dz) / length, across = Math.abs((pet.x - pose.x) * dz - (pet.z - pose.z) * dx) / length;
+    if (along < 0 || along > Math.min(length + 0.3, 1.5) || across > PET_CLEARANCE + COMPANION_RADIUS) return;
+    dodged = { x: pet.x, z: pet.z };
+    const here = { x: pose.x, z: pose.z }, path = findWalkingPath(layout, here, trip.end.portal, navigationObstacles(layout, undefined, COMPANION_RADIUS, [petBox(pet)]));
+    if (path) startTrip(null, trip.end.desk, { start: { portal: here }, end: trip.end, path });
+  }
   function status(state) { if (pose.state !== state) { pose.state = state; onChange({ state, atDesk: pose.atDesk, activity: pose.activity }); } }
   const seatType = end => layout.items.find(item => item.id === end.itemId)?.type;
   function deskPose() {
     const desk = layout?.items.find(item => item.id === layout.activeDeskId);
     if (!desk) return;
     const seat = seatsFor(desk)[0];
-    Object.assign(pose, { x: seat.seat.x, z: seat.seat.z, yaw: seat.yaw, atDesk: true, sit: 1, seatHeight: .80, doze: 0, moving: false, activity: null, goal: null, seated: false, portal: null });
+    Object.assign(pose, { x: seat.seat.x, z: seat.seat.z, yaw: seat.yaw, atDesk: true, sit: 1, seatHeight: .80, doze: 0, moving: false, activity: null, goal: null, seated: false, portal: null, to: null });
     anchor = null; trip = null; legs = []; restTime = 0;
     status(intent === 'working' ? 'working' : intent === 'break' ? 'resting-at-desk' : 'idle');
   }
-  function startTrip(from, toDesk, planned = planCompanionTrip(layout, from, toDesk)) {
+  function startTrip(from, toDesk, planned = aroundPet(obstacles => planCompanionTrip(layout, from, toDesk, SEATS, { canReach, obstacles }))) {
     if (!planned) return false;
     trip = planned; legs = []; legIndex = 0; elapsed = 0; restTime = 0;
     const add = (a, b, kind, sitFrom = 0, sitTo = 0, yaw = null) => legs.push({ a, b, kind, sitFrom, sitTo, yaw, duration: kind === 'walk' ? distance(a, b) / 1.15 : .85 });
@@ -261,8 +329,10 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       if (planned.end.side) add(planned.end.portal, planned.end.side, 'walk');
       add(planned.end.side || planned.end.portal, planned.end.seat, 'sit', 0, 1, planned.end.yaw);
     }
-    // `goal` tells the pet that the companion is on its way to pet it.
+    // `goal` tells the pet that the companion is on its way to pet it, and
+    // `to` where it will stand, so the pet keeps out of its way.
     pose.atDesk = false; pose.doze = 0; pose.moving = true; pose.activity = null; pose.goal = planned.end.activity || null; pose.seated = false; pose.portal = null;
+    pose.to = planned.end.desk ? null : { x: planned.end.portal.x, z: planned.end.portal.z };
     status(toDesk ? 'returning' : 'walking');
     return true;
   }
@@ -272,15 +342,12 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   function startBreak() {
     if (!breakUsed) {
       breakUsed = true;
-      // One flood fill from the desk's chair exits: every spot offered can be
-      // reached, and a piece's first reachable side wins.
-      const obstacles = navigationObstacles(layout), exits = seatsFor(layout.items.find(item => item.id === layout.activeDeskId)).filter(seat => usableSeat(layout, seat)).map(seat => seat.portal);
-      const reached = !reduced && exits.length ? reachableFloor(layout, exits, obstacles) : null;
-      const spots = reached ? activitySpots(layout, { ...context, canReach: point => reaches(reached, point, obstacles) }) : [], lamp = spots.find(spot => spot.kind === 'lamp' && !switched.has(spot.itemId));
+      // Every spot offered can be reached, and a piece's first reachable side wins.
+      const spots = reduced ? [] : activitySpots(layout, { ...context, canReach }), lamp = spots.find(spot => spot.kind === 'lamp' && !switched.has(spot.itemId));
       const choices = [...spots.filter(spot => spot.kind !== 'lamp'), ...(layout.items.some(item => item.type === 'lounge-chair') ? [{ kind: 'read' }] : [])]
         .map(choice => ({ choice, score: random() + (done.get(choice.kind) || 0) * 2 })).sort((a, b) => a.score - b.score).map(entry => entry.choice);
       for (const choice of lamp ? [lamp, ...choices] : choices) {
-        const planned = choice.kind === 'read' ? planCompanionTrip(layout, null, false, ['lounge-chair']) : planActivityTrip(layout, null, choice);
+        const planned = aroundPet(obstacles => choice.kind === 'read' ? planCompanionTrip(layout, null, false, ['lounge-chair'], { canReach, obstacles }) : planActivityTrip(layout, null, choice, obstacles));
         if (planned && startTrip(null, false, planned)) { done.set(choice.kind, (done.get(choice.kind) || 0) + 1); return true; }
       }
     }
@@ -293,7 +360,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     if (!startTrip(here, false) && !startTrip(here, true)) deskPose();
   }
   function arrive(end) {
-    anchor = end; trip = null; legs = []; pose.atDesk = end.desk; pose.moving = false; pose.yaw = end.yaw; pose.goal = null;
+    anchor = end; trip = null; legs = []; pose.atDesk = end.desk; pose.moving = false; pose.yaw = end.yaw; pose.goal = null; pose.to = null;
     // Seated away from the desk, the pet may curl up at its feet, clear of its way out.
     pose.seated = !end.desk && !end.activity; pose.portal = pose.seated ? end.portal : null;
     pose.activity = end.activity || (!end.desk && seatType(end) === 'lounge-chair' ? 'read' : null); pose.activityTime = 0; pose.reach = end.reach || null; pose.useAt = ACTIVITIES[end.activity]?.useAt ?? null; used = false;
@@ -317,7 +384,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   return {
     pose,
     setLayout(next) {
-      layout = next;
+      layout = next; deskFloor = null;
       // A resting or busy companion stays put when its seat or spot is
       // unchanged and still clear, e.g. when another tab moves an unrelated
       // plant. A busy companion whose piece moved walks on from where it is.
@@ -351,6 +418,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
         Object.assign(pose, { x: end.seat.x, z: end.seat.z, yaw: end.yaw, sit: end.activity ? 0 : 1, seatHeight: end.seatHeight || .80, atDesk: end.desk, moving: false });
         arrive(end);
       } else if (trip) {
+        if (legs[legIndex].kind === 'walk') walkAroundPet(legs[legIndex]);
         const leg = legs[legIndex]; elapsed += Math.min(dt, .1);
         const t = Math.min(1, elapsed / Math.max(.001, leg.duration)), amount = leg.kind === 'walk' ? t : ease(t);
         const x = leg.a.x + (leg.b.x - leg.a.x) * amount, z = leg.a.z + (leg.b.z - leg.a.z) * amount;
