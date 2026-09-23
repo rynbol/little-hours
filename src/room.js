@@ -784,7 +784,7 @@ export function createRoom(container, options = {}) {
     if (drag) {
       drag.object.position.copyFrom(drag.originalPosition); drag.object.rotation.y = drag.original.rotation * Math.PI / 2;
       for (const [mesh, visibility] of drag.visibility) if (!mesh.isDisposed()) mesh.visibility = visibility;
-      liftShade(drag.object, drag.original);
+      liftShade(drag.object, drag.original); drag.object.metadata.shade?.setEnabled(true);
     }
     drag = null; downPosition = null; hasPendingPointer = false; releasePointer(pointerId);
     if (wasDragging) {
@@ -796,7 +796,9 @@ export function createRoom(container, options = {}) {
   function startDrag() {
     const item = layout.items.find(item => item.id === downPosition?.itemId), object = placedObjects.get(item?.id);
     if (!item || !object || !downPosition.floor) return;
-    settlingPieces.delete(item.id); object.scaling.setAll(1);
+    // A held piece shows no shadow: the sun map drops it below, and its floor
+    // shade waits too. Both return where the piece is placed.
+    settlingPieces.delete(item.id); object.scaling.setAll(1); object.metadata.shade?.setEnabled(false);
     drag = { active: true, id: item.id, original: { ...item }, candidate: { ...item }, object,
       originalPosition: object.position.clone(), rotation: item.rotation,
       offsetX: downPosition.floor.x - item.x, offsetZ: downPosition.floor.z - item.z,

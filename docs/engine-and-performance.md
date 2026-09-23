@@ -194,6 +194,8 @@ Verification: 47 unit tests, all runtime groups (plus a separate 30 Hz room) and
 
 Decorate mode keeps Babylon's camera input detached, so a drag that starts on a piece only ever moves that piece. A drag that starts on empty space turns the room instead: the room adds the same offsets as the camera input (`angularSensibility` 700, with the camera's inertia and angle limits), and it saves nothing. A drag while placing a new piece also turns the room and never places the preview. Empty space shows the grab cursor, as it does outside Decorate; the plus cursor is kept for placement.
 
+A held piece shows no shadow. The cached sun map already dropped it for the drag; now its floor shade is hidden too, so the piece reads as lifted. Both return at the spot where it is placed, or where it started if the drop is cancelled. The lighting is unchanged: at rest and after a drop, frames match the previous build pixel for pixel (largest difference 1 of 255, by day and night); only frames during a drag differ.
+
 The room owns the canvas cursor (`scene.doNotHandleCursors`). Babylon reset it to the arrow on every pointer move, and the room set its own cursor one frame later, so the cursor flickered while moving over or dragging furniture. In a 41-step hover sweep, that reset showed the arrow 24 times in Firefox and 29 times in Chrome; with the fix, the cursor did not change. The cursor also leaves "grabbing" on release, before the next pointer move.
 
 The canvas no longer draws a focus ring. Babylon focuses the canvas on every press, and browsers can match `:focus-visible` for focus that a script moves, so a gold frame appeared after ordinary clicks (in Zen, and in headless Chrome captures). Keyboard shortcuts listen on the document and do not need canvas focus.

@@ -314,6 +314,8 @@ try {
   assert.equal(JSON.stringify(diagnostics().layout), originalDragLayout, 'preview never edits the saved layout');
   assert.equal(changes.length, writesBeforeDrag, 'no persistence while dragging');
   assert.ok(plantMeshes.every(mesh => !scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList.includes(mesh)), 'moving furniture leaves the cached shadow map');
+  const plantShade = dragNode.metadata.shade;
+  assert.equal(plantShade.isEnabled(false), false, 'a held piece shows no floor shade either');
   const meshCountDuringDrag = scene.meshes.length, materialCountDuringDrag = scene.materials.length;
   hoverPicks = 0; scene.pickWithRay = function (...args) { hoverPicks++; return nativePick.apply(this, args); };
   for (let i = 0; i < 30; i++) { canvas.emit('pointermove', movedPointer); advance(); }
@@ -323,6 +325,7 @@ try {
   assert.deepEqual(plantMeshes.map(mesh => mesh.material), originalMaterials, 'outline and preview leave shared materials untouched');
   canvas.emit('pointerup', movedPointer);
   assert.equal(diagnostics().layout.items.find(item => item.id === dragPlant.id).x, 3);
+  assert.ok(plantShade.isEnabled(false) && scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList.some(mesh => plantMeshes.includes(mesh)), 'both shadows return once the piece is placed');
   assert.equal(changes.length, writesBeforeDrag + 1, 'a complete drag is exactly one undoable edit');
   assert.equal(canvas.capturedPointer, null); assert.equal(diagnostics().dragging, null);
   room.setLayout(dragLayout);
@@ -337,6 +340,7 @@ try {
   assert.ok(plantMeshes.every(mesh => mesh.visibility === .13 && !mesh.renderOutline), 'return preview fades without transparent GPU outlines');
   room.cancelDrag(); assert.equal(dragStates.at(-1), null);
   assert.ok(plantMeshes.every(mesh => mesh.visibility === 1)); assert.equal(dragNode.position.x, 2);
+  assert.equal(plantShade.isEnabled(false), true, 'a cancelled drag brings the shade back');
   assert.ok(plantMeshes.filter(mesh => !mesh.metadata?.effect).every(mesh => scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList.includes(mesh)), 'cancel restores cached shadow casters');
   for (const cancelEvent of ['pointercancel', 'lostpointercapture', 'blur']) {
     beginPlantDrag(); (cancelEvent === 'blur' ? win : canvas).emit(cancelEvent, { pointerId: 7 });
