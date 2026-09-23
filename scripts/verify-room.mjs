@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
+import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { createLayout, footprintBounds } from '../src/layout.js';
 
 class Surface {
@@ -788,6 +789,55 @@ try {
     assert.equal(saved('metro-neon').off, true); assert.ok(neon.every(mesh => mesh.material.emissiveColor.r + mesh.material.emissiveColor.g + mesh.material.emissiveColor.b === 0), 'a tap switches the neon off');
     room.setLayout(beforeDesignLayout); advance(3);
     console.log('PASS wall layer: back and side walls, drags along and across the corner, refused fixtures, arrows, pictures, floor clearance, old saves, neon glow and switch, a band instead of outlines.');
+  }
+  {
+    // A window cuts a real opening: a ray passes through it, its view hangs
+    // behind it, a dragged window closes it, and it opens again where it lands.
+    const deskOnly = { presetId: 'ember-library', items: [desk], activeDeskId: desk.id, v: 2 };
+    room.setEditMode(true); room.setLayout(deskOnly); advance(3);
+    const node = id => scene.transformNodes.find(item => item.metadata?.itemId === id);
+    const saved = id => diagnostics().layout.items.find(item => item.id === id);
+    const on = spot => spot.wall === 'back' ? pointerAt(spot.u, spot.v, -4.49) : pointerAt(-5.83, spot.v, spot.u);
+    // Is a shell's wall solid at a wall spot? A ray from the room meets it or passes.
+    const wallMesh = (style, wall) => scene.getMeshByName(style === 'retreat' ? `retreat-${wall}-wall` : `${style}-walls`);
+    const solid = (style, spot) => {
+      const origin = spot.wall === 'back' ? new Vector3(spot.u, spot.v, -3) : new Vector3(-4.5, spot.v, spot.u), direction = spot.wall === 'back' ? new Vector3(0, 0, -1) : new Vector3(-1, 0, 0);
+      return Boolean(wallMesh(style, spot.wall).intersects(new Ray(origin, direction, 3), false).hit);
+    };
+    assert.ok(solid('retreat', { wall: 'side', u: 2, v: 3 }), 'the side wall starts solid');
+    room.beginPlacement('cottage-window'); const spot = on({ wall: 'side', u: 2, v: 3 });
+    canvas.emit('pointermove', spot); advance(2); canvas.emit('pointerdown', spot); canvas.emit('pointerup', spot); advance(2);
+    const win = diagnostics().layout.items.find(item => item.type === 'cottage-window');
+    assert.deepEqual([win.wall, win.u, win.v], ['side', 2, 3], 'a click on the wall hangs the window');
+    assert.ok(!solid('retreat', win) && solid('retreat', { wall: 'side', u: 3.5, v: 3 }), 'the window cuts its opening, and only there');
+    const view = node(win.id).metadata.view, sun = scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList;
+    assert.equal(view.position.z, -0.27); assert.match(view.material.emissiveTexture.name, /enchanted-forest/, 'the view is the room view');
+    assert.ok(sun.includes(wallMesh('retreat', 'side')) && !sun.includes(view) && !sun.some(mesh => mesh.isDisposed()), 'the walls cast shadows; the view never does');
+    // A dragged window closes its opening; the drop opens it where it lands.
+    canvas.emit('pointerdown', on(win)); canvas.emit('pointermove', on({ ...win, u: 3 })); advance(2);
+    assert.ok(solid('retreat', win) && view.position.z === 0.012, 'while held, the opening closes and the view comes forward');
+    canvas.emit('pointerup', on({ ...win, u: 3 })); advance(2);
+    assert.equal(saved(win.id).u, 3);
+    assert.ok(!solid('retreat', { wall: 'side', u: 3, v: 3 }) && solid('retreat', win) && view.position.z === -0.27, 'the opening moves with the window');
+    canvas.emit('pointerdown', on(saved(win.id))); canvas.emit('pointermove', on({ ...win, u: 1.8 })); advance(2); room.cancelDrag(); advance(2);
+    assert.ok(!solid('retreat', { wall: 'side', u: 3, v: 3 }), 'a cancelled drag opens it again');
+    // A refused drop reopens the window where it was, and the new walls cast shadows.
+    const refusedAt = on({ wall: 'back', u: -2.7, v: 3.3 });
+    canvas.emit('pointerdown', on(saved(win.id))); canvas.emit('pointermove', refusedAt); advance(2); canvas.emit('pointerup', refusedAt); advance(2);
+    const casters = () => scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList;
+    assert.equal(saved(win.id).u, 3); assert.ok(!solid('retreat', { wall: 'side', u: 3, v: 3 }), 'a refused drop reopens the window where it was');
+    assert.ok(casters().includes(wallMesh('retreat', 'side')) && casters().includes(wallMesh('retreat', 'back')) && !casters().some(mesh => mesh.isDisposed()), 'the rebuilt walls are in the shadow map');
+    room.selectItem(win.id); room.removeSelection(); advance(2);
+    assert.ok(solid('retreat', { wall: 'side', u: 3, v: 3 }), 'a removed window leaves solid wall');
+    // The other shells cut their facings too: Sakura's shoji and the metro bricks.
+    for (const [presetId, style, wall] of [['sakura-studio', 'sakura', 'side'], ['midnight-metro', 'metro', 'side'], ['cloud-loft', 'cloud', 'back']]) {
+      const round = { id: `round-${presetId}`, type: 'round-window', wall, u: wall === 'side' ? 2 : 1.4, v: 3 };
+      room.setLayout({ presetId, items: [desk, round], activeDeskId: desk.id, v: 2 }); advance(3);
+      assert.equal(diagnostics().layout.items.length, 2, `${presetId} takes the window`);
+      assert.ok(!solid(style, round) && solid(style, { ...round, u: round.u + 1.2 }), `${presetId} cuts its wall and facing for a window`);
+    }
+    room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
+    console.log('PASS windows: real openings in walls and facings, the room view behind, closed while dragged, moved on drop, reopened on cancel, closed on removal, walls cast shadows and views never.');
   }
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);

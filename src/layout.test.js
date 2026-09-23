@@ -6,6 +6,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, createLayout, validatePlacement, normalizeLayout, findFreePosition, nearestValidPlacement, rugsOverlap } from './layout.js';
 import { createFurniture, disposeFurnitureAssets } from './furniture.js';
+import { cutRect, subtractRect, openings, OPENING_INSET } from './walls.js';
 
 const placement = (type, x, z, rotation = 0, id = 'test-item') => ({ id, type, x, z, rotation });
 
@@ -110,9 +111,13 @@ test('native Babylon furniture meshes fit declared footprints and the room heigh
       const furniture = createFurniture(definition.id, scene);
       assert.ok(furniture.getChildMeshes().length <= 9, `${definition.id} stays within its draw budget`);
       if (definition.mount === 'wall') {
-        // A wall piece fills its rectangle on the wall and stands out no further than its depth.
+        // A wall piece fills its rectangle on the wall and stands out no further
+        // than its depth; a window's view hangs behind the wall, in its opening.
         furniture.position.y = 0; furniture.getChildMeshes().forEach(part => part.computeWorldMatrix(true));
-        const { min, max } = furniture.getHierarchyBoundingVectors(true), [width, height] = definition.size, epsilon = 0.003;
+        const view = furniture.metadata.view;
+        assert.equal(Boolean(view), Boolean(definition.opening), `${definition.id} has a view only if it is a window`);
+        if (view) assert.ok(view.position.z < -0.25 && view.metadata.castShadow === false, `${definition.id} shows its view behind the wall and casts no shadow`);
+        const { min, max } = furniture.getHierarchyBoundingVectors(true, mesh => mesh !== view), [width, height] = definition.size, epsilon = 0.003;
         assert.ok(min.x >= -width / 2 - epsilon && max.x <= width / 2 + epsilon && min.y >= -height / 2 - epsilon && max.y <= height / 2 + epsilon, `${definition.id} fits its wall rectangle`);
         assert.ok(min.z >= -epsilon && max.z <= definition.depth + epsilon, `${definition.id} stands out ${definition.depth} or less`);
         furniture.dispose(); continue;
@@ -574,4 +579,29 @@ test('saved rooms keep their furniture and gain their wall pieces once', () => {
   assert.equal(odd.items.some(item => ['x', 'z'].includes(item.id)), false);
   assert.equal(odd.items.find(item => item.id === 'y').art, 'herbarium', 'an unknown picture falls back to the first one');
   assert.equal(normalizeLayout({ ...ember, items: ember.items.map(item => item.type === 'record-sleeve' ? { ...item, art: 'lilac' } : item) }).v, ember.v);
+});
+
+test('windows cut exact openings in their wall and follow the wall-piece rules', () => {
+  const area = parts => parts.reduce((sum, part) => sum + (part.maxU - part.minU) * (part.maxV - part.minV), 0);
+  const meet = (a, b) => a.minU < b.maxU - 1e-9 && a.maxU > b.minU + 1e-9 && a.minV < b.maxV - 1e-9 && a.maxV > b.minV + 1e-9;
+  const wall = { minU: -6, maxU: 6, minV: 0.2, maxV: 5.8 }, holes = [{ minU: 1, maxU: 2.4, minV: 2, maxV: 3.6 }, { minU: 3, maxU: 4, minV: 1, maxV: 6 }];
+  const parts = cutRect(wall, holes);
+  assert.ok(Math.abs(area(parts) - (area([wall]) - 1.4 * 1.6 - 1 * 4.8)) < 1e-9, 'the wall keeps exactly its area less the openings');
+  assert.ok(!parts.some(part => holes.some(hole => meet(part, hole))) && !parts.some((part, i) => parts.some((other, j) => i !== j && meet(part, other))), 'no part covers an opening or another part');
+  assert.deepEqual(cutRect({ minU: 0, maxU: 1, minV: 0, maxV: 1 }, [{ minU: -1, maxU: 2, minV: -1, maxV: 2 }]), [], 'a fully open part disappears');
+  assert.deepEqual(subtractRect({ minU: 0, maxU: 1, minV: 0, maxV: 1 }, { minU: 2, maxU: 3, minV: 0, maxV: 1 }), [{ minU: 0, maxU: 1, minV: 0, maxV: 1 }]);
+  // Only windows cut openings: inset inside the frame, and skipped while dragged.
+  const window = { id: 'win', type: 'cottage-window', wall: 'side', u: 2, v: 3 }, frame = { id: 'frame', type: 'small-frame', wall: 'back', u: 2, v: 3, art: 'hills' };
+  assert.deepEqual(openings([window, frame]), [{ wall: 'side', minU: 2 - 0.75 + OPENING_INSET, maxU: 2 + 0.75 - OPENING_INSET, minV: 3 - 0.85 + OPENING_INSET, maxV: 3 + 0.85 - OPENING_INSET }]);
+  assert.deepEqual(openings([window, frame], 'win'), []);
+  // Windows hang like any wall piece: clear of fixtures, behind fairy lights.
+  for (const type of ['cottage-window', 'arched-window', 'round-window']) {
+    assert.equal(getFurniture(type).opening, true);
+    assert.match(validatePlacement([], { id: type, type, wall: 'back', u: -2.7, v: 3.3 }).reason, /window/, `${type} keeps clear of the main window`);
+    assert.match(validatePlacement([], { id: type, type, wall: 'back', u: -0.18, v: 3.3 }).reason, /post|curtain|vine/, `${type} keeps clear of the post`);
+  }
+  assert.equal(validatePlacement([], { id: 'win', type: 'cottage-window', wall: 'back', u: 2.8, v: 4.1 }).valid, true, 'a window may reach up behind the fairy lights');
+  assert.match(validatePlacement([], { id: 'win', type: 'cottage-window', wall: 'back', u: 2.8, v: 4.15 }).reason, /vine/, 'but not into the vine');
+  assert.match(validatePlacement([{ id: 'books', type: 'bookcase', x: 2.75, z: -3.75, rotation: 0 }], { id: 'win', type: 'cottage-window', wall: 'back', u: 2.8, v: 3.2 }).reason, /in front/, 'a bookcase keeps a window clear');
+  assert.equal(validatePlacement([], { id: 'win', type: 'round-window', wall: 'side', u: 2, v: 3 }, 'sakura').valid, true, 'the sakura shoji can take a window');
 });
