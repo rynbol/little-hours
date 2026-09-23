@@ -26,6 +26,8 @@ import { createCompanionRoutine } from './companion.js';
 import { createArchitecture, styleFurniture } from './architecture.js';
 import { getFurniture } from './catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, rugsOverlap, footprintBounds, MAX_ITEMS, roomDesign, CAT_BOUNDS } from './layout.js';
+import { SHELLS, isWallPiece, snapWall } from './walls.js';
+import { ARTWORKS, SLEEVES } from './art.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -266,37 +268,6 @@ export function createRoom(container, options = {}) {
   vine([[-0.14, 5.62, -4.18], [0.28, 5.31, -4.08], [0.49, 4.70, -4.03], [0.20, 4.13, -4.0]], 17);
   vine([[-5.64, 5.48, -2.1], [-5.53, 4.86, -2.0], [-5.53, 4.48, -1.8], [-5.52, 4.13, -1.95]], 15);
   vine([[0.3, 5.54, -4.27], [1.4, 5.18, -4.20], [2.4, 5.45, -4.21], [3.6, 5.21, -4.20], [5.4, 5.51, -4.20]], 28);
-  box([0.60, 0.11, 2.18], [-5.52, 3.42, -0.52], palette.wood, 0.025);
-  const bottleColors = ['#768d77', '#b09572', '#95839d', '#b9795e'];
-  for (let i = 0; i < 6; i++) {
-    const z = -1.30 + i * 0.31, h = 0.24 + (i % 3) * 0.09, mat = material(bottleColors[i % 4]);
-    cylinder(0.075, 0.11, h, [-5.42, 3.53 + h / 2, z], mat); cylinder(0.04, 0.06, 0.10, [-5.42, 3.55 + h, z], mat); cylinder(0.045, 0.045, 0.06, [-5.42, 3.62 + h, z], palette.edge);
-  }
-  const artTexture = drawing(256, 320, (ctx, width, height) => {
-    ctx.fillStyle = '#e9d9b7'; ctx.fillRect(0, 0, width, height); ctx.strokeStyle = '#766d56'; ctx.lineWidth = 3; ctx.strokeRect(14, 14, width - 28, height - 28);
-    ctx.fillStyle = '#9b784d'; ctx.beginPath(); ctx.arc(128, 112, 58, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#e9d9b7'; ctx.beginPath(); ctx.arc(148, 99, 49, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#6e815b'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(110, 274); ctx.quadraticCurveTo(151, 216, 105, 175); ctx.stroke();
-    for (let i = 0; i < 5; i++) { ctx.save(); ctx.translate(118, 252 - i * 15); ctx.rotate(i % 2 ? 0.7 : -0.7); ctx.fillStyle = '#899872'; ctx.beginPath(); ctx.ellipse(i % 2 ? 18 : -18, -8, 23, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
-  }, 'moon-herbarium');
-  box([1.04, 1.40, 0.08], [0.72, 3.45, -4.40], palette.darkWood, 0.025); picture(0.88, 1.23, artTexture, [0.72, 3.45, -4.35]);
-  box([0.74, 1.02, 0.08], [5.04, 3.63, -4.40], palette.edge, 0.025); picture(0.60, 0.86, artTexture, [5.04, 3.63, -4.35]);
-  const wallClock = new TransformNode('moon-clock', scene); wallClock.parent = classicArchitecture; wallClock.position.set(-5.79, 4.56, 1.76); wallClock.rotation.y = Math.PI / 2;
-  const rim = cylinder(0.43, 0.43, 0.08, [0, 0, 0], palette.brass, wallClock, 32); rim.rotation.x = Math.PI / 2;
-  const face = cylinder(0.37, 0.37, 0.015, [0, 0, 0.05], material('#e5d4ac'), wallClock, 32); face.rotation.x = Math.PI / 2;
-  const clockMotion = new TransformNode('clock-movement', scene); clockMotion.parent = wallClock;
-  const hourHand = new TransformNode('clock-hour-hand', scene); hourHand.parent = clockMotion;
-  const minuteHand = new TransformNode('clock-minute-hand', scene); minuteHand.parent = clockMotion;
-  const secondHand = new TransformNode('clock-second-hand', scene); secondHand.parent = clockMotion;
-  rod([0, 0, 0.065], [0.13, 0.18, 0.065], 0.014, palette.darkWood, hourHand);
-  rod([0, 0, 0.075], [-0.25, 0.045, 0.075], 0.012, palette.darkWood, minuteHand);
-  rod([0, -0.055, 0.085], [0, 0.30, 0.085], 0.008, palette.ginger, secondHand);
-  const pendulum = new TransformNode('clock-pendulum', scene); pendulum.parent = clockMotion; pendulum.position.set(0, -0.25, 0.07);
-  box([0.31, 0.87, 0.065], [0, -0.77, 0], palette.darkWood, 0.035, wallClock);
-  rod([0, 0, 0], [0, -0.67, 0], 0.017, palette.brass, pendulum);
-  const bob = cylinder(0.13, 0.13, 0.052, [0, -0.69, 0], palette.brass, pendulum, 20); bob.rotation.x = Math.PI / 2;
-  batchMoving(pendulum);
-  for (let i = 0; i < 12; i++) { const angle = i / 12 * Math.PI * 2; sphere([0.018, 0.018, 0.008], [Math.cos(angle) * 0.31, Math.sin(angle) * 0.31, 0.067], palette.darkWood, wallClock); }
-
   const cat = new TransformNode('sleeping-cat', scene); cat.parent = world; cat.position.set(0.84, 0.29, 1.59); cat.rotation.y = -0.3;
   const catTorso = new TransformNode('miso-breathing', scene); catTorso.parent = cat;
   const catBody = sphere([0.56, 0.26, 0.36], [-0.08, 0.23, 0], palette.ginger, catTorso); catBody.name = 'miso-body';
@@ -364,7 +335,7 @@ export function createRoom(container, options = {}) {
       merged.freezeWorldMatrix();
     }
   }
-  batchStatic(classicArchitecture, new Set([clockMotion])); Object.values(decor).forEach(group => batchStatic(group, new Set(swayingLanterns)));
+  batchStatic(classicArchitecture); Object.values(decor).forEach(group => batchStatic(group, new Set(swayingLanterns)));
   // A tap on the fairy lights, the lanterns or the sill candles switches them.
   for (const mesh of decor.lights.getChildMeshes()) { mesh.isPickable = true; mesh.metadata = { ...mesh.metadata, lightSwitch: true }; }
   const sillFlames = decor.lights.getChildMeshes().filter(mesh => mesh.material === candleFlame);
@@ -560,9 +531,25 @@ export function createRoom(container, options = {}) {
   function refreshShadows() {
     shadow.getShadowMap().renderList = scene.meshes.filter(mesh => mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && (!drag?.active || itemAncestor(mesh)?.metadata.itemId !== drag.id) && mesh !== rain && mesh !== marker && !mesh.isDescendantOf(heart) && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
     for (const mesh of glowingMeshes) bloom.removeIncludedOnlyMesh(mesh); glowingMeshes.clear();
-    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && !mesh.metadata?.companion && mesh.metadata?.effect !== 'tea-steam' && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
+    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && !mesh.metadata?.companion && !['tea-steam', 'wall-highlight'].includes(mesh.metadata?.effect) && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
     bloom.mainTexture.renderList = [...glowingMeshes];
     requestRender(true);
+  }
+  // A wall piece is flat, and its picture, sleeve or clock hands sit just in
+  // front of it, where an outline would paint over them. It shows a band in
+  // the outline color around it instead: on its front for flat pieces, and on
+  // the wall behind deep shelves.
+  const bandMaterial = new StandardMaterial('wall-highlight', scene); bandMaterial.disableLighting = true; bandMaterial.backFaceCulling = false; bandMaterial.diffuseColor = Color3.Black(); bandMaterial.specularColor = Color3.Black();
+  let band = null;
+  function showBand(object, item, tint, width) {
+    const key = `${item.id}:${width}`;
+    if (!band || band.isDisposed() || band.metadata.key !== key) {
+      if (band && !band.isDisposed()) band.dispose();
+      const { size, depth } = getFurniture(item.type), [w, h] = size.map(extent => extent / 2 + 0.03), z = depth <= 0.25 ? depth + 0.005 : 0.012;
+      const parts = [[w * 2 + width * 2, width, 0, h + width / 2], [w * 2 + width * 2, width, 0, -h - width / 2], [width, h * 2, -w - width / 2, 0], [width, h * 2, w + width / 2, 0]].map(([across, tall, x, y]) => { const part = MeshBuilder.CreatePlane('wall-highlight', { width: across, height: tall }, scene); part.position.set(x, y, z); return part; });
+      band = Mesh.MergeMeshes(parts, true); band.name = 'wall-highlight'; band.material = bandMaterial; band.isPickable = false; band.receiveShadows = false; band.metadata = { effect: 'wall-highlight', castShadow: false, key };
+    }
+    band.parent = object; bandMaterial.emissiveColor = tint; band.setEnabled(true);
   }
   function updateOutline() {
     const id = editing ? (!placement ? drag?.id || hoveredId || selectedId : null) : playHover;
@@ -570,15 +557,17 @@ export function createRoom(container, options = {}) {
     if (key === outlineKey) return;
     for (const mesh of outlinedMeshes) if (!mesh.isDisposed()) mesh.renderOutline = false;
     outlinedMeshes.length = 0; outlineKey = key; outlineFrames = 120;
-    const object = placedObjects.get(id);
+    if (band && !band.isDisposed()) band.setEnabled(false);
+    const object = placedObjects.get(id), item = layout.items.find(entry => entry.id === id);
     // The disappearing preview uses a dashed drawing in the collection instead
     // of outlining transparent meshes (which would require another stencil pass).
     if (object && !(drag?.overCollection && drag.removable)) {
-      for (const mesh of object.getChildMeshes()) {
+      // Outside Decorate a thinner, softer line only hints that a tap does something.
+      const tint = !editing ? playOutline : drag && !drag.valid ? invalidOutline : hoveredId === id ? hoverOutline : selectedOutline, width = editing ? 0.04 : 0.022;
+      if (isWallPiece(item)) showBand(object, item, tint, width);
+      else for (const mesh of object.getChildMeshes()) {
         if (!mesh.isEnabled() || !isFurnitureSurface(mesh) || (object.metadata.avatar && mesh.isDescendantOf(object.metadata.avatar))) continue;
-        // Outside Decorate a thinner, softer line only hints that a tap does something.
-        mesh.outlineColor = !editing ? playOutline : drag && !drag.valid ? invalidOutline : hoveredId === id ? hoverOutline : selectedOutline;
-        mesh.outlineWidth = editing ? 0.04 : 0.022; mesh.renderOutline = true; outlinedMeshes.push(mesh);
+        mesh.outlineColor = tint; mesh.outlineWidth = width; mesh.renderOutline = true; outlinedMeshes.push(mesh);
       }
     } else if (id === 'room-lights') for (const mesh of scene.meshes) if (mesh.metadata?.lightSwitch && mesh.isEnabled()) { mesh.outlineColor = playOutline; mesh.outlineWidth = 0.014; mesh.renderOutline = true; outlinedMeshes.push(mesh); }
     requestRender();
@@ -588,7 +577,9 @@ export function createRoom(container, options = {}) {
   // for at most two seconds after each outline change.
   let outlineFrames = 0;
   function outlinesPending() {
-    if (!outlinedMeshes.length || outlineFrames <= 0) return false;
+    if (outlineFrames <= 0) return false;
+    if (band?.isEnabled() && !band.isDisposed() && !band.isReady(true)) return true;
+    if (!outlinedMeshes.length) return false;
     const outline = scene.getOutlineRenderer();
     return outlinedMeshes.some(mesh => !mesh.isDisposed() && mesh.renderOutline && mesh.subMeshes?.some(subMesh => !outline.isReady(subMesh, false)));
   }
@@ -602,10 +593,39 @@ export function createRoom(container, options = {}) {
     for (const [id, object] of placedObjects) object.metadata.avatar?.setEnabled(atDesk && id === layout.activeDeskId);
     mobileCompanion?.root.setEnabled(!atDesk); mobileCompanion?.contact.setEnabled(!atDesk);
   }
+  // A wall piece's back sits on its wall face; the side wall turns it to face the room.
+  function placeOnWall(node, piece) {
+    const face = (SHELLS[architectureStyle] || SHELLS.retreat)[piece.wall].face;
+    if (piece.wall === 'back') { node.position.set(piece.u, piece.v, face); node.rotation.y = 0; }
+    else { node.position.set(face, piece.v, piece.u); node.rotation.y = Math.PI / 2; }
+  }
+  // Pictures are painted once per artwork and frame shape; records take a
+  // sleeve color. Both are shared by every piece that shows them.
+  const artMaterials = new Map();
+  function artMaterial(type, art) {
+    const key = `${type === 'wide-frame' ? 'wide' : type}:${art}`;
+    if (!artMaterials.has(key)) {
+      let mat;
+      if (SLEEVES[art]) { mat = new StandardMaterial(`sleeve-${art}`, scene); mat.diffuseColor = color(SLEEVES[art].color); mat.specularColor.set(0.035, 0.035, 0.035); }
+      else {
+        const [width, height] = type === 'wide-frame' ? [320, 224] : [256, 320], artwork = ARTWORKS[art] || ARTWORKS.herbarium;
+        mat = new StandardMaterial(`picture-${key}`, scene); mat.disableLighting = true; mat.diffuseColor = Color3.Black(); mat.backFaceCulling = false;
+        mat.emissiveTexture = drawing(width, height, (context, w, h) => artwork.draw(context, w, h), `art-${key}`);
+      }
+      artMaterials.set(key, mat);
+    }
+    return artMaterials.get(key);
+  }
+  // Neon glows like the rooms' accent lights: brightest at night, soft by day.
+  function applyAccents() {
+    const strength = theme === 'day' ? 0.355 : theme === 'rain' ? 0.667 : 1;
+    for (const object of placedObjects.values()) for (const mesh of object.getChildMeshes()) { const accent = mesh.material?.metadata?.accent; if (accent) mesh.material.emissiveColor = accent.scale(strength); }
+  }
   function updateMarker() {
     marker?.dispose(); marker = null;
     const item = layout.items.find(candidate => candidate.id === selectedId);
-    if (!editing || !item || placement) return;
+    // A selected wall piece shows its band instead (see showBand).
+    if (!editing || !item || placement || isWallPiece(item)) return;
     const [width, depth] = getFurniture(item.type).footprint, w = width / 2 + 0.035, d = depth / 2 + 0.035;
     marker = MeshBuilder.CreateLines('selected-footprint', { points: [new Vector3(-w, 0, -d), new Vector3(w, 0, -d), new Vector3(w, 0, d), new Vector3(-w, 0, d), new Vector3(-w, 0, -d)] }, scene);
     marker.color = color('#b77d38'); marker.position.set(item.x, 0.30, item.z); marker.rotation.y = item.rotation * Math.PI / 2; marker.isPickable = false; marker.metadata = { castShadow: false };
@@ -646,18 +666,21 @@ export function createRoom(container, options = {}) {
       if (object && object.metadata.furnitureType !== item.type) { settlingPieces.delete(item.id); object.dispose(false, false); placedObjects.delete(item.id); object = null; }
       if (!object) {
         object = createFurniture(item.type, scene); styleFurniture(object, architectureStyle); object.parent = furnitureRoot;
-        if (getFurniture(item.type).category !== 'Rugs') groundPiece(object, item.type);
+        if (getFurniture(item.type).category !== 'Rugs' && !isWallPiece(item)) groundPiece(object, item.type);
         object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type;
         object.getChildMeshes().forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = !mesh.metadata?.effect; });
         placedObjects.set(item.id, object);
         if (settleNew && !reducedMotion) { object.scaling.setAll(0.92); settlingPieces.set(item.id, { object, start: performance.now() }); }
       }
-      object.position.y = getFurniture(item.type).category === 'Rugs' ? 0.22 + rugLayer++ * 0.006 : 0.22;
-      object.position.x = item.x; object.position.z = item.z; object.rotation.y = item.rotation * Math.PI / 2;
+      if (isWallPiece(item)) { placeOnWall(object, item); if (object.metadata.picture) object.metadata.picture.material = artMaterial(item.type, item.art); }
+      else {
+        object.position.y = getFurniture(item.type).category === 'Rugs' ? 0.22 + rugLayer++ * 0.006 : 0.22;
+        object.position.x = item.x; object.position.z = item.z; object.rotation.y = item.rotation * Math.PI / 2;
+      }
       object.setEnabled(item.type === 'plant' ? decorVisible.plants : getFurniture(item.type).category === 'Rugs' ? decorVisible.rug : true);
     }
     // A rug lies fully on every rug put down before it. Rugs are several
-    // centimetres thick, so a covered rug flattens to a few millimetres instead
+    // centimeters thick, so a covered rug flattens to a few millimeters instead
     // of pushing its raised weave up through the rug on top.
     rugSurfaces.length = 0;
     const rugs = layout.items.filter(item => getFurniture(item.type).category === 'Rugs' && placedObjects.get(item.id).isEnabled());
@@ -677,7 +700,7 @@ export function createRoom(container, options = {}) {
     animatedObjects.length = 0;
     for (const object of placedObjects.values()) if (object.metadata.animate) animatedObjects.push(object);
     for (const item of layout.items) applyUse(placedObjects.get(item.id), item);
-    placeRoomLights();
+    placeRoomLights(); applyAccents();
     if (hoveredId && !ids.has(hoveredId)) hoveredId = null;
     const layoutKey = JSON.stringify([layout.activeDeskId, layout.items.map(item => [item.id, item.type, item.x, item.z, item.rotation])]);
     if (companionLayoutKey !== layoutKey) { companionLayoutKey = layoutKey; companionRoutine?.setLayout(layout); }
@@ -696,7 +719,7 @@ export function createRoom(container, options = {}) {
   // paint. Candles and fires lose their flames.
   const unlitMaterials = new Map();
   function unlit(mat) {
-    if (!unlitMaterials.has(mat)) { const twin = mat.clone(`${mat.name}-unlit`); twin.emissiveColor = Color3.Black(); unlitMaterials.set(mat, twin); }
+    if (!unlitMaterials.has(mat)) { const twin = mat.clone(`${mat.name}-unlit`); twin.emissiveColor = Color3.Black(); twin.metadata = { unlit: true }; unlitMaterials.set(mat, twin); }
     return unlitMaterials.get(mat);
   }
   function applyUse(object, item) {
@@ -731,7 +754,7 @@ export function createRoom(container, options = {}) {
   function setLayout(next) {
     cancelDrag(); layout = normalizeLayout(next); syncFurniture();
     if (selectedId) options.onSelectionChange?.({ ...layout.items.find(item => item.id === selectedId) });
-    if (placement) updatePlacement(placement.x, placement.z);
+    if (placement) updatePlacement(placement);
   }
   function commitLayout() { syncFurniture(true); options.onLayoutChange?.(copyLayout()); }
   function selectItem(id) {
@@ -742,13 +765,28 @@ export function createRoom(container, options = {}) {
   // away. The spot shown last wins near-ties, so a piece dragged across an
   // obstacle does not flicker between its two sides.
   function resolveSpot(candidate, previous) {
-    const verdict = validatePlacement(layout.items, candidate);
-    if (verdict.valid) return { spot: { x: candidate.x, z: candidate.z }, verdict };
-    const spot = nearestValidPlacement(layout.items, candidate);
+    const wall = isWallPiece(candidate), [a, b] = wall ? ['u', 'v'] : ['x', 'z'], at = point => ({ [a]: point[a], [b]: point[b] });
+    const verdict = validatePlacement(layout.items, candidate, architectureStyle);
+    if (verdict.valid) return { spot: at(candidate), verdict };
+    const spot = nearestValidPlacement(layout.items, candidate, 1, architectureStyle);
     if (!spot) return { spot: null, verdict };
-    const reach = point => Math.hypot(point.x - candidate.x, point.z - candidate.z);
-    const keep = previous && reach(previous) <= reach(spot) + 0.3 && validatePlacement(layout.items, { ...candidate, x: previous.x, z: previous.z }).valid;
-    return { spot: keep ? { x: previous.x, z: previous.z } : spot, verdict: { valid: true, reason: '' } };
+    const reach = point => Math.hypot(point[a] - candidate[a], point[b] - candidate[b]);
+    const keep = previous && (!wall || previous.wall === candidate.wall) && reach(previous) <= reach(spot) + 0.3 && validatePlacement(layout.items, { ...candidate, ...at(previous) }, architectureStyle).valid;
+    return { spot: keep ? at(previous) : spot, verdict: { valid: true, reason: '' } };
+  }
+  // Where a pointer ray meets a wall, in wall coordinates. Both walls are
+  // tried, and the nearer hit along the ray is the wall in view.
+  function wallPosition(ray, margin = 0.6) {
+    let best = null;
+    for (const wall of ['back', 'side']) {
+      const shell = (SHELLS[architectureStyle] || SHELLS.retreat)[wall], across = wall === 'back' ? 'z' : 'x', along = wall === 'back' ? 'x' : 'z';
+      const step = ray.direction[across]; if (Math.abs(step) < 1e-6) continue;
+      const t = (shell.face - ray.origin[across]) / step; if (t <= 0) continue;
+      const u = ray.origin[along] + ray.direction[along] * t, v = ray.origin.y + ray.direction.y * t;
+      if (u < shell.min - margin || u > shell.max + margin || v < shell.bottom - margin || v > shell.top + margin) continue;
+      if (!best || t < best.t) best = { wall, u, v, t };
+    }
+    return best;
   }
   // The rug put down last lies on top of the others.
   function raiseRug(item) { if (getFurniture(item.type).category === 'Rugs') layout.items = [...layout.items.filter(other => other !== item), item]; }
@@ -756,11 +794,14 @@ export function createRoom(container, options = {}) {
     placement = null; if (ghost) { ghost.dispose(false, false); ghost = null; }
     if (lastPlacementState) options.onPlacementState?.(null); lastPlacementState = ''; updateMarker(); updateOutline(); requestRender();
   }
-  function updatePlacement(x, z) {
-    if (!placement) return;
-    const candidate = { ...placement, x: snap(x), z: snap(z) }, { spot, verdict } = resolveSpot(candidate, placement.valid ? placement : null);
-    Object.assign(placement, spot || { x: candidate.x, z: candidate.z }); placement.valid = Boolean(spot); placement.reason = spot ? '' : verdict.reason || '';
-    ghost.position.x = placement.x; ghost.position.z = placement.z; ghost.rotation.y = placement.rotation * Math.PI / 2;
+  // `point` is a floor spot { x, z } or, for a wall piece, { wall, u, v }.
+  function updatePlacement(point) {
+    if (!placement || !point) return;
+    const wall = isWallPiece(placement);
+    const candidate = wall ? { ...placement, wall: point.wall, u: snapWall(point.u), v: snapWall(point.v) } : { ...placement, x: snap(point.x), z: snap(point.z) };
+    const { spot, verdict } = resolveSpot(candidate, placement.valid ? placement : null);
+    Object.assign(placement, candidate, spot || {}); placement.valid = Boolean(spot); placement.reason = spot ? '' : verdict.reason || '';
+    if (wall) placeOnWall(ghost, placement); else { ghost.position.x = placement.x; ghost.position.z = placement.z; ghost.rotation.y = placement.rotation * Math.PI / 2; }
     ghostMaterial.diffuseColor = color(placement.valid ? '#85ac80' : '#cf7868'); ghostMaterial.emissiveColor = color(placement.valid ? '#42653f' : '#8a4238');
     const key = `${placement.type}:${placement.valid}:${placement.reason}`;
     if (key !== lastPlacementState) { lastPlacementState = key; options.onPlacementState?.({ type: placement.type, valid: placement.valid, reason: placement.reason }); }
@@ -772,30 +813,35 @@ export function createRoom(container, options = {}) {
     cancelDrag(); hoverItem(null); cancelPlacement(); selectItem(null); setEditMode(true);
     ghost = createFurniture(type, scene); ghost.getChildMeshes().forEach(mesh => { mesh.material = ghostMaterial; mesh.isPickable = false; mesh.receiveShadows = false; });
     ghost.metadata.avatar?.setEnabled(false);
-    placement = { id: `piece-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, type, x: 0, z: 0, rotation: 0 };
+    const wall = getFurniture(type).mount === 'wall', id = `piece-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    placement = wall ? { id, type, wall: 'back', u: 0, v: 3 } : { id, type, x: 0, z: 0, rotation: 0 };
     updateOutline();
-    const free = findFreePosition(layout.items, type); updatePlacement(free?.x ?? 0, free?.z ?? 0); return true;
+    const free = findFreePosition(layout.items, type, 0, architectureStyle); updatePlacement(free || (wall ? { wall: 'back', u: 0, v: 3 } : { x: 0, z: 0 })); return true;
   }
   // Adds the previewed piece where it stands. Pointer clicks and the Enter key
   // share this path, so keyboard users can add furniture too.
   function confirmPlacement() {
     if (!placement) return false;
     if (!placement.valid) { options.onNotice?.(placement.reason || 'Choose a clear spot inside the room.'); return false; }
-    const { id, type, x, z, rotation } = placement; layout.items.push({ id, type, x, z, rotation }); cancelPlacement(); commitLayout(); selectItem(id); return true;
+    const { id, type } = placement, arts = getFurniture(type).arts;
+    layout.items.push(isWallPiece(placement) ? { id, type, wall: placement.wall, u: placement.u, v: placement.v, ...(arts ? { art: arts[0] } : {}) } : { id, type, x: placement.x, z: placement.z, rotation: placement.rotation });
+    cancelPlacement(); commitLayout(); selectItem(id); return true;
   }
+  const wallStep = (piece, dx, dz) => ({ u: Math.round((piece.u + Math.sign(dx) * 0.1 * (piece.wall === 'side' ? -1 : 1)) * 1000) / 1000, v: Math.round((piece.v - Math.sign(dz) * 0.1) * 1000) / 1000 });
   function moveSelection(dx, dz) {
     if (drag) return;
-    if (placement) { updatePlacement(placement.x + dx, placement.z + dz); return; }
+    if (placement) { updatePlacement(isWallPiece(placement) ? { wall: placement.wall, ...wallStep(placement, dx, dz) } : { x: placement.x + dx, z: placement.z + dz }); return; }
     const item = layout.items.find(candidate => candidate.id === selectedId); if (!item) return;
-    const candidate = { ...item, x: snap(item.x + dx), z: snap(item.z + dz) }, verdict = validatePlacement(layout.items, candidate);
+    const candidate = isWallPiece(item) ? { ...item, ...wallStep(item, dx, dz) } : { ...item, x: snap(item.x + dx), z: snap(item.z + dz) }, verdict = validatePlacement(layout.items, candidate, architectureStyle);
     if (!verdict.valid) { options.onNotice?.(verdict.reason); return; }
     Object.assign(item, candidate); raiseRug(item); commitLayout(); selectItem(item.id);
   }
   function rotateSelection() {
-    if (drag) { drag.rotation = (drag.rotation + 1) % 4; updateDrag(pendingPointer); return; }
-    if (placement) { placement.rotation = (placement.rotation + 1) % 4; updatePlacement(placement.x, placement.z); return; }
-    const item = layout.items.find(candidate => candidate.id === selectedId); if (!item) return;
-    // A turn that would touch a wall or a neighbour slides the piece clear.
+    // Wall pieces always face the room, so they have nothing to turn.
+    if (drag) { if (!drag.wallPiece) { drag.rotation = (drag.rotation + 1) % 4; updateDrag(pendingPointer); } return; }
+    if (placement) { if (!isWallPiece(placement)) { placement.rotation = (placement.rotation + 1) % 4; updatePlacement(placement); } return; }
+    const item = layout.items.find(candidate => candidate.id === selectedId); if (!item || isWallPiece(item)) return;
+    // A turn that would touch a wall or a neighbor slides the piece clear.
     const candidate = { ...item, rotation: (item.rotation + 1) % 4 }, { spot, verdict } = resolveSpot(candidate);
     if (!spot) { options.onNotice?.(verdict.reason); return; }
     Object.assign(item, candidate, spot); raiseRug(item); commitLayout(); selectItem(item.id);
@@ -809,6 +855,12 @@ export function createRoom(container, options = {}) {
     selectItem(null); commitLayout();
   }
   function setActiveDesk(id) { if (!isDesk(layout.items.find(item => item.id === id))) return; cancelDrag(); layout.activeDeskId = id; commitLayout(); }
+  // A frame shows the picture chosen for it, and a framed record its sleeve.
+  function setArt(art) {
+    const item = layout.items.find(candidate => candidate.id === selectedId);
+    if (!item || item.art === art || !getFurniture(item.type).arts?.includes(art)) return;
+    cancelDrag(); item.art = art; commitLayout(); selectItem(item.id);
+  }
   function setEditMode(value) {
     cancelDrag(); hoverItem(null); playHover = null;
     const wasEditing = editing; editing = Boolean(value);
@@ -837,7 +889,7 @@ export function createRoom(container, options = {}) {
     hemisphere.groundColor = color(daylight ? '#a48b6b' : '#645441');
     hemisphere.intensity = daylight ? 0.90 : night ? 0.44 : 0.70;
     windowGlow.intensity = daylight ? 0.22 : night ? 1.25 : 0.65;
-    applyBulbs();
+    applyBulbs(); applyAccents();
     bloom.intensity = daylight ? 0.18 : night ? 0.40 : 0.26;
     shadow.darkness = daylight ? 0.34 : 0.24;
     // Light direction changes only here, so the shadow map remains cached.
@@ -879,7 +931,7 @@ export function createRoom(container, options = {}) {
   function cancelDrag() {
     const wasDragging = Boolean(drag), pointerId = downPosition?.pointerId;
     if (drag) {
-      drag.object.position.copyFrom(drag.originalPosition); drag.object.rotation.y = drag.original.rotation * Math.PI / 2;
+      drag.object.position.copyFrom(drag.originalPosition); drag.object.rotation.y = drag.wallPiece ? drag.originalRotation : drag.original.rotation * Math.PI / 2;
       for (const [mesh, visibility] of drag.visibility) if (!mesh.isDisposed()) mesh.visibility = visibility;
       liftShade(drag.object, drag.original); drag.object.metadata.shade?.setEnabled(true);
     }
@@ -892,15 +944,17 @@ export function createRoom(container, options = {}) {
   }
   function startDrag() {
     const item = layout.items.find(item => item.id === downPosition?.itemId), object = placedObjects.get(item?.id);
-    if (!item || !object || !downPosition.floor) return;
+    const wallPiece = isWallPiece(item);
+    if (!item || !object || !(wallPiece ? downPosition.wall : downPosition.floor)) return;
     // A held piece shows no shadow: the sun map drops it below, and its floor
     // shade waits too. Both return where the piece is placed.
     settlingPieces.delete(item.id); object.scaling.setAll(1); object.metadata.shade?.setEnabled(false);
     drag = { active: true, id: item.id, original: { ...item }, candidate: { ...item }, object,
-      originalPosition: object.position.clone(), rotation: item.rotation,
-      offsetX: downPosition.floor.x - item.x, offsetZ: downPosition.floor.z - item.z,
+      originalPosition: object.position.clone(), originalRotation: object.rotation.y, rotation: item.rotation,
+      offsetX: wallPiece ? 0 : downPosition.floor.x - item.x, offsetZ: wallPiece ? 0 : downPosition.floor.z - item.z,
+      wallPiece, grabWall: wallPiece ? downPosition.wall.wall : null, offsetU: wallPiece && downPosition.wall.wall === item.wall ? downPosition.wall.u - item.u : 0, offsetV: wallPiece && downPosition.wall.wall === item.wall ? downPosition.wall.v - item.v : 0,
       visibility: object.getChildMeshes().map(mesh => [mesh, mesh.visibility]),
-      removable: canRemove(item), overCollection: false, valid: true, reason: '', shown: { x: item.x, z: item.z } };
+      removable: canRemove(item), overCollection: false, valid: true, reason: '', shown: wallPiece ? { wall: item.wall, u: item.u, v: item.v } : { x: item.x, z: item.z } };
     hoveredId = null; selectItem(item.id); refreshShadows();
   }
   function updateDrag(event) {
@@ -913,8 +967,15 @@ export function createRoom(container, options = {}) {
     } else {
       const rect = canvas.getBoundingClientRect();
       const inside = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
-      const floor = inside ? floorPosition(castPointer(event)) : null;
-      if (floor) {
+      const ray = inside ? castPointer(event) : null, floor = ray && !drag.wallPiece ? floorPosition(ray) : null, wallHit = ray && drag.wallPiece ? wallPosition(ray, 1.5) : null;
+      if (wallHit) {
+        // A wall piece slides along the wall under the pointer and crosses the corner to the other wall.
+        const same = wallHit.wall === drag.grabWall;
+        const candidate = { ...drag.original, wall: wallHit.wall, u: snapWall(wallHit.u - (same ? drag.offsetU : 0)), v: snapWall(wallHit.v - (same ? drag.offsetV : 0)) };
+        const { spot, verdict } = resolveSpot(candidate, drag.shown);
+        drag.candidate = spot ? { ...candidate, ...spot } : candidate; drag.shown = spot ? { ...spot, wall: candidate.wall } : null; drag.valid = Boolean(spot); drag.reason = spot ? '' : verdict.reason || '';
+        placeOnWall(drag.object, drag.candidate);
+      } else if (floor) {
         const candidate = { ...drag.original, x: snap(floor.x - drag.offsetX), z: snap(floor.z - drag.offsetZ), rotation: drag.rotation };
         const { spot, verdict } = resolveSpot(candidate, drag.shown);
         drag.candidate = spot ? { ...candidate, ...spot } : candidate; drag.shown = spot; drag.valid = Boolean(spot); drag.reason = spot ? '' : verdict.reason || '';
@@ -924,8 +985,8 @@ export function createRoom(container, options = {}) {
     }
     for (const [mesh, visibility] of drag.visibility) mesh.visibility = overCollection && drag.removable ? visibility * 0.13 : visibility;
     if (marker) {
-      marker.setEnabled(!overCollection); marker.position.set(drag.candidate.x, 0.30, drag.candidate.z);
-      marker.rotation.y = drag.rotation * Math.PI / 2; marker.color = drag.valid ? selectedOutline : invalidOutline;
+      marker.setEnabled(!overCollection); marker.color = drag.valid ? selectedOutline : invalidOutline;
+      marker.position.set(drag.candidate.x, 0.30, drag.candidate.z); marker.rotation.y = drag.rotation * Math.PI / 2;
     }
     canvas.style.cursor = overCollection ? drag.removable ? 'alias' : 'not-allowed' : drag.valid ? 'grabbing' : 'not-allowed';
     updateOutline();
@@ -939,16 +1000,16 @@ export function createRoom(container, options = {}) {
     if (completed.overCollection && completed.removable) { removeSelection(); options.onNotice?.(`${getFurniture(completed.original.type).name} returned to the collection. Undo brings it back.`); }
     else if (completed.valid && !completed.overCollection) {
       const item = layout.items.find(item => item.id === completed.id);
-      if (item && (item.x !== completed.candidate.x || item.z !== completed.candidate.z || item.rotation !== completed.candidate.rotation)) {
+      if (item && ['x', 'z', 'rotation', 'wall', 'u', 'v'].some(key => item[key] !== completed.candidate[key])) {
         Object.assign(item, completed.candidate); raiseRug(item); commitLayout(); selectItem(item.id);
       }
     } else options.onNotice?.(completed.reason || 'That spot is occupied. Your piece is back where it started.');
   }
   const onPointerDown = event => {
     if (event.isPrimary === false || (event.button != null && event.button !== 0) || downPosition) return;
-    const ray = editing && !placement ? castPointer(event) : null, floor = ray && floorPosition(ray);
+    const ray = editing && !placement ? castPointer(event) : null, floor = ray && floorPosition(ray), wall = ray && wallPosition(ray, 1.5);
     downPosition = { x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, pointerId: event.pointerId,
-      itemId: ray ? hitItem(ray) : null, floor: floor ? { x: floor.x, z: floor.z } : null };
+      itemId: ray ? hitItem(ray) : null, floor: floor ? { x: floor.x, z: floor.z } : null, wall };
     if (editing && event.pointerId != null) canvas.setPointerCapture(event.pointerId);
     requestRender();
   };
@@ -964,10 +1025,10 @@ export function createRoom(container, options = {}) {
     requestRender(); if (!clicked) return;
     const ray = castPointer(event);
     if (!editing) { const target = playTarget(ray); if (target?.cat) pet(); else if (target?.id) useItem(target.id); else if (target?.lights) options.onToggleLights?.(); return; }
-    const floor = floorPosition(ray);
     if (placement) {
-      if (!floor) { options.onNotice?.(placement.reason || 'Choose a clear spot inside the room.'); return; }
-      updatePlacement(floor.x, floor.z); confirmPlacement(); return;
+      const point = isWallPiece(placement) ? wallPosition(ray) : floorPosition(ray);
+      if (!point) { options.onNotice?.(placement.reason || (isWallPiece(placement) ? 'Choose a clear spot on a wall.' : 'Choose a clear spot inside the room.')); return; }
+      updatePlacement(point); confirmPlacement(); return;
     }
     // A click selects the piece under the pointer. Empty floor only deselects,
     // so a stray click never moves the selected piece.
@@ -1002,7 +1063,7 @@ export function createRoom(container, options = {}) {
     if (drag) { updateDrag(pendingPointer); return; }
     const ray = castPointer(pendingPointer);
     if (editing && placement) {
-      const floor = floorPosition(ray); if (floor) updatePlacement(floor.x, floor.z);
+      updatePlacement(isWallPiece(placement) ? wallPosition(ray) : floorPosition(ray));
       canvas.style.cursor = 'crosshair'; return;
     }
     if (pendingPointer.pointerType === 'mouse' || pendingPointer.pointerType === 'pen') {
@@ -1057,10 +1118,6 @@ export function createRoom(container, options = {}) {
     }
     const ambientTime = reducedMotion ? 0 : seconds;
     for (let i = 0; i < swayingLanterns.length; i++) { const lantern = swayingLanterns[i]; lantern.rotation.z = reducedMotion ? 0 : Math.sin(seconds * 0.85 + i * 1.7) * 0.085; lantern.rotation.x = reducedMotion ? 0 : Math.sin(seconds * 0.63 + i * 1.3) * 0.025; }
-    hourHand.rotation.z = reducedMotion ? 0 : -(seconds % 43200) * Math.PI / 21600;
-    minuteHand.rotation.z = reducedMotion ? 0 : -(seconds % 3600) * Math.PI / 1800;
-    secondHand.rotation.z = reducedMotion ? 0 : -(Math.floor(seconds) % 60) * Math.PI / 30;
-    pendulum.rotation.z = reducedMotion ? 0 : Math.sin(seconds * 2.8) * 0.17;
     for (let i = 0; i < fireflySeeds.length; i++) {
       const seed = fireflySeeds[i], offset = i * 16;
       const scale = seed.scale * (reducedMotion ? 1 : 1 + Math.sin(seconds * 1.15 + i * 2.7) * 0.16);
@@ -1176,7 +1233,7 @@ export function createRoom(container, options = {}) {
   requestRender();
 
   return {
-    setTheme, setLayout, setEditMode, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setQuality,
+    setTheme, setLayout, setEditMode, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setQuality,
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },

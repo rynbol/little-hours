@@ -5,6 +5,7 @@ import { createStateStore, localDate, storageKey } from './state.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { PRESETS, normalizeLayout, MAX_ITEMS, roomDesign } from './layout.js';
 import { companionIntent } from './companion.js';
+import { ARTWORKS, SLEEVES, artName } from './art.js';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -356,7 +357,7 @@ function rememberControlFocus(container) {
   const active = document.activeElement;
   if (!container.contains(active)) return null;
   if (active.id) return { id: active.id };
-  for (const key of ['category', 'furniture', 'preset', 'resetDesign', 'nudge']) {
+  for (const key of ['category', 'furniture', 'preset', 'resetDesign', 'nudge', 'art']) {
     if (active.dataset?.[key] !== undefined) return { key, value: active.dataset[key] };
   }
   return null;
@@ -417,8 +418,35 @@ function furnitureArt(type) {
     'moon-tree': '<path fill="#b18a62" d="m32 62 6 22q12 9 24 0l6-22z"/><ellipse cx="50" cy="62" rx="18" ry="7" fill="#d0b17e"/><path stroke="#8c6b50" stroke-width="4" d="M50 63V21m0 27L27 31m23 8 20-20"/><path fill="#8d9e75" d="M48 35Q22 35 24 14q26-2 24 21m5 9q28-1 28-25-27 1-28 25M48 53Q19 50 20 31q24-2 28 22m3-29Q35 7 50 4q17 5 1 20"/><circle cx="27" cy="26" r="3" fill="#f0c27b"/><circle cx="69" cy="31" r="3" fill="#f0c27b"/><circle cx="33" cy="44" r="3" fill="#f0c27b"/><path fill="#efcf98" d="M55 10a9 9 0 1 0 9 13A9 9 0 0 1 55 10"/>',
     'lantern-cluster': '<path fill="#72543a" d="m19 47 14-7 15 8v31l-15 8-14-8zm35-18 14-7 15 8v43l-15 8-14-8z"/><path fill="#e8b96c" d="m23 49 9 5v26l-9-5zm13 5 8-4v25l-8 5zm22-22 9 5v36l-9-5zm13 5 8-4v35l-8 5z"/><path fill="#bd9157" d="m16 46 17-10 18 11-18 9zm35-18 17-11 18 12-18 10z"/><path fill="none" stroke="#a67a4a" stroke-width="3" d="M27 39v-6q6-9 12 0v6M62 22v-7q6-9 12 0v7"/><path stroke="#fff0ba" stroke-width="3" d="M28 72V60m35 3V45"/>',
     'moon-rug': '<path fill="#685971" d="m9 58 46-30 38 24-46 31z"/><path fill="none" stroke="#c6a66f" stroke-width="2" d="m16 57 39-24 31 19-39 26z"/><path fill="#ddc18a" d="M54 42q-15 1-18 13 9 12 26 3-16 3-16-6 0-6 8-10z"/><path fill="#e4cda0" d="m69 43 1 3 4 1-4 2-1 3-2-3-4-1 4-2zm-43 9 1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/><path stroke="#b99971" stroke-width="2" d="m12 62-4 3m11 1-4 3m11 1-4 3m11 1-4 3m11 1-4 3m11 1-4 3"/>',
+    // Wall pieces are drawn face on, with a soft shadow on the wall behind them.
+    'tall-frame': '<rect class="art-shadow" x="34" y="17" width="36" height="52" rx="2" fill="#8c765722"/><rect x="31" y="14" width="36" height="52" rx="2" fill="#6b4b3b"/><rect x="35.5" y="18.5" width="27" height="43" fill="#e9d9b7"/><circle cx="49" cy="31" r="7" fill="#9b784d"/><circle cx="51.5" cy="29.5" r="6" fill="#e9d9b7"/><path fill="none" stroke="#6e815b" stroke-width="1.6" d="M47 57q5-7-1-13"/><path fill="#899872" d="M46 54q-6-1-6 3 5 1 6-3m1-4q6-2 7 2-5 2-7-2m-2-4q-6-1-6 3 5 1 6-3"/>',
+    'small-frame': '<rect class="art-shadow" x="39" y="25" width="26" height="36" rx="2" fill="#8c765722"/><rect x="36" y="22" width="26" height="36" rx="2" fill="#ac8357"/><rect x="39.5" y="25.5" width="19" height="29" fill="#e9d9b7"/><circle cx="48" cy="33" r="4.5" fill="#9b784d"/><circle cx="49.8" cy="32" r="3.8" fill="#e9d9b7"/><path fill="none" stroke="#6e815b" stroke-width="1.3" d="M47.5 52q3-4-1-9"/><path fill="#899872" d="M47 50q-4 0-4 2 3 1 4-2m.5-3q4-1 4.5 1.5-3.5 1-4.5-1.5"/>',
+    'wide-frame': '<rect class="art-shadow" x="23" y="27" width="58" height="38" rx="2" fill="#8c765722"/><rect x="20" y="24" width="58" height="38" rx="2" fill="#6b4b3b"/><rect x="24.5" y="28.5" width="49" height="29" fill="#efcfb2"/><circle cx="61" cy="36" r="3.5" fill="#fbeed2"/><path fill="#b79bc6" d="M24.5 50q10-9 20-3t29-2v12.5h-49z"/><path fill="#879771" d="M24.5 54q14-7 26-2t23 1v4.5h-49z"/>',
+    'moon-clock': '<path class="art-shadow" fill="#8c765722" d="M44 45h18v36q-9 6-18 0zm25-12a16 16 0 1 1-32 0 16 16 0 0 1 32 0"/><path fill="#7a5a3e" d="M41 42h18v36q-9 6-18 0z"/><circle cx="50" cy="30" r="16" fill="#bf9762"/><circle cx="50" cy="30" r="12.5" fill="#f4e9cc"/><path fill="#d9b978" d="M45 25a6.5 6.5 0 1 0 9 8 5.5 5.5 0 0 1-9-8"/><path stroke="#5a4636" stroke-width="1.6" stroke-linecap="round" d="M50 30v-8m0 8 5 3"/><path stroke="#c49a5c" stroke-width="1.4" d="M50 46v21"/><circle cx="50" cy="70" r="4" fill="#d9b370"/>',
+    'apothecary-shelf': '<rect class="art-shadow" x="20" y="62" width="64" height="7" rx="1.5" fill="#8c765722"/><rect x="17" y="59" width="64" height="7" rx="1.5" fill="#926747"/><path fill="#7a5539" d="M23 66h7l-7 9zm45 0h7v9z"/><path fill="#879771" d="M27 40h5v5a7 7 0 1 1-5 0z"/><path fill="#e0b56e" d="M41 38h7v4q3 1 3 4v13H38V46q0-3 3-4z"/><path fill="#8a5a7a" d="M58 44h4v2.5a6.5 6.5 0 1 1-4 0z"/><path fill="#6d8f8a" d="M69 42h6v17h-6z"/><path fill="#c8a27a" d="M26.5 37h6v3h-6zm14-2.5h7v3.5h-7zm17 7h5v3h-5zm11-2.5h7v3h-7z"/>',
+    'wall-shelf': '<rect class="art-shadow" x="18" y="61" width="68" height="6" rx="1.5" fill="#8c765722"/><rect x="15" y="58" width="68" height="6" rx="1.5" fill="#aa7954"/><path fill="#788864" d="M22 36h6v22h-6z"/><path fill="#b87b65" d="M28.5 39h6v19h-6z"/><path fill="#e6cb89" d="m35 41 5.5-1.5 5 17.5-5.5 1.5z"/><path fill="#f4e9cc" d="M52 47h6v11h-6z"/><path fill="#f9cc76" d="M55 45q-2-3 0-6 2 3 0 6"/><path fill="#b58164" d="M64 50h14l-2 8H66z"/><path fill="#829669" d="M66 50q-4-8 4-9-1 6-4 9m6 0q3-9 9-6-5 3-9 6m-4 12q-5 7-2 13 4-6 2-13m8 1q2 8-3 12 0-7 3-12"/>',
+    'hanging-plant': '<path fill="none" stroke="#b08a52" stroke-width="2.5" stroke-linecap="round" d="M30 16v8h24m-2 0v6"/><path class="art-shadow" fill="#8c765722" d="M43 33h24l-3 16H47z"/><path fill="#b58164" d="M40 30h24l-3 16H44z"/><path fill="#9a6a50" d="M40 30h24v3H40z"/><path fill="#829669" d="M42 31q-6-7 1-11 2 6-1 11m8-2q-1-9 6-10-1 7-6 10m8 2q4-8 10-5-4 4-10 5M45 45q-7 8-4 18 5-8 4-18m7 1q-1 12 3 19 3-10-3-19m8-1q6 8 4 16-5-7-4-16"/>',
+    'cloud-shelf': `<path class="art-shadow" fill="#8c765722" d="M17 58h72v5${'q-4.5 6-9 0'.repeat(8)}z"/><path fill="#f5e6d9" d="M14 55h72v5${'q-4.5 6-9 0'.repeat(8)}z"/><path fill="#b79bc6" d="M21 35h6v20h-6z"/><path fill="#8fa7a6" d="M27.5 38h6v17h-6z"/><path fill="#e6cb89" d="M34 37h5v18h-5z"/><path fill="#f6d5c9" d="M46 55q-3-8 4-9 2-5 7-3 6-1 6 5 4 2 2 7z"/><path fill="#d68f88" d="M74 55q-7 0-7-7 0-5 5-7v-4h4v4q5 2 5 7 0 7-7 7z"/>`,
+    'small-cloud-shelf': `<path class="art-shadow" fill="#8c765722" d="M26 58h54v5${'q-4.5 6-9 0'.repeat(6)}z"/><path fill="#f5e6d9" d="M23 55h54v5${'q-4.5 6-9 0'.repeat(6)}z"/><path fill="#8fa7a6" d="M30 37h6v18h-6z"/><path fill="#e6cb89" d="M36.5 40h5v15h-5z"/><path fill="#e8a7ae" d="M60 55q-6 0-6-6 0-4 4-6v-5h4v5q4 2 4 6 0 6-6 6z"/>`,
+    'wall-scroll': '<path fill="none" stroke="#6b4b3b" stroke-width="1.2" d="M34 15 49 6l15 9"/><rect class="art-shadow" x="36" y="18" width="30" height="58" fill="#8c765722"/><rect x="34" y="16" width="30" height="58" fill="#faf0da"/><rect x="31" y="13" width="36" height="4" rx="2" fill="#503d30"/><rect x="31" y="72" width="36" height="4" rx="2" fill="#503d30"/><path fill="none" stroke="#3f3634" stroke-width="1.6" stroke-linecap="round" d="M40 64q8-9 10-20t9-15m-12 20q-5-3-6-8"/><path fill="#f0b9c5" d="M60 30a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0m-5 6a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0m-5 10a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0m-7-5a2 2 0 1 1-4 0 2 2 0 0 1 4 0m15.8 0a1.8 1.8 0 1 1-3.6 0 1.8 1.8 0 0 1 3.6 0"/>',
+    'neon-orbit': '<rect class="art-shadow" x="33" y="13" width="38" height="58" rx="2" fill="#8c765722"/><rect x="30" y="10" width="38" height="58" rx="2" fill="#282d43"/><circle cx="49" cy="36" r="13" fill="none" stroke="#a997ff" stroke-width="5" stroke-opacity=".3"/><circle cx="49" cy="36" r="13" fill="none" stroke="#cbc1ff" stroke-width="2"/><path stroke="#ef8bab" stroke-width="5" stroke-opacity=".3" stroke-linecap="round" d="m34.5 44.5 29.5-17.5"/><path stroke="#ffc3d4" stroke-width="2.2" stroke-linecap="round" d="m34.5 44.5 29.5-17.5"/><path stroke="#c6b5d8" stroke-width="1.6" d="M37 59h6m3 0h6m3 0h6"/>',
+    'record-sleeve': '<rect class="art-shadow" x="30" y="20" width="44" height="44" rx="1.5" fill="#8c765722"/><rect x="27" y="17" width="44" height="44" rx="1.5" fill="#303447"/><rect x="30" y="20" width="38" height="38" fill="#b4aecb"/><circle cx="49" cy="39" r="12.5" fill="none" stroke="#343c52" stroke-width="4.5"/>',
+    'felt-rainbow': '<path class="art-shadow" fill="none" stroke="#8c765722" stroke-width="7" stroke-linecap="round" d="M23 67a30 30 0 0 1 60 0m-52 0a22 22 0 0 1 44 0m-36 0a14 14 0 0 1 28 0"/><path fill="none" stroke="#eabfa1" stroke-width="7" stroke-linecap="round" d="M20 64a30 30 0 0 1 60 0"/><path fill="none" stroke="#f5d6bf" stroke-width="7" stroke-linecap="round" d="M28 64a22 22 0 0 1 44 0"/><path fill="none" stroke="#b79bc6" stroke-width="7" stroke-linecap="round" d="M36 64a14 14 0 0 1 28 0"/>',
   };
-  return `<svg class="furniture-art" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="87" rx="35" ry="6" fill="#8c765714"/>${pieces[type] || pieces.plant}</svg>`;
+  const floorShadow = getFurniture(type)?.mount === 'wall' ? '' : '<ellipse cx="50" cy="87" rx="35" ry="6" fill="#8c765714"/>';
+  return `<svg class="furniture-art" viewBox="0 0 100 100" aria-hidden="true">${floorShadow}${pieces[type] || pieces.plant}</svg>`;
+}
+
+// Picture choices are painted by the same code as the pictures in the room.
+const artThumbs = new Map();
+function artThumb(art, wide) {
+  const key = `${art}:${wide}`;
+  if (!artThumbs.has(key)) {
+    const canvas = document.createElement('canvas'); [canvas.width, canvas.height] = wide ? [120, 84] : [96, 120];
+    ARTWORKS[art].draw(canvas.getContext('2d'), canvas.width, canvas.height);
+    artThumbs.set(key, canvas.toDataURL());
+  }
+  return artThumbs.get(key);
 }
 
 function roomDesignArt(preset) {
@@ -497,7 +525,7 @@ function renderDragState(drag) {
   }
   if (drag.overCollection) preview.style.transform = `translate3d(${drag.clientX - 44}px, ${drag.clientY - 76}px, 0)`;
   const hint = drag.overCollection ? (drag.removable ? 'Release to put it away · Undo brings it back' : drag.reason)
-    : drag.valid ? 'Release to place · R to rotate · Esc to cancel' : `${drag.reason} · Esc to cancel`;
+    : drag.valid ? (getFurniture(drag.type)?.mount === 'wall' ? 'Release to place · Esc to cancel' : 'Release to place · R to rotate · Esc to cancel') : `${drag.reason} · Esc to cancel`;
   if (hint !== dragHint) { dragHint = hint; $('#room-hint').textContent = hint; }
 }
 
@@ -511,17 +539,22 @@ function renderInspector() {
     return;
   }
   const rememberedFocus = rememberControlFocus(inspector);
-  $('#room-hint').textContent = pending ? `Click the floor to place ${pending.name.toLowerCase()}` : selected ? 'Drag to move · Drop over the collection to put away' : 'Drag a piece to move it · Drag empty space to look around';
+  $('#room-hint').textContent = pending ? `Click ${pending.mount === 'wall' ? 'a wall' : 'the floor'} to place ${pending.name.toLowerCase()}` : selected ? 'Drag to move · Drop over the collection to put away' : 'Drag a piece to move it · Drag empty space to look around';
   if (!pending && !selected) {
     inspector.innerHTML = `<div class="selection-copy">${icon('build')}<span><strong>A room that feels like you</strong><small>Drag furniture around your room, or back here to put it away. Pick a piece below to add something new.</small></span></div>`;
     restoreControlFocus(inspector, rememberedFocus);
     return;
   }
-  const item = pending || selected;
+  const item = pending || selected, wall = item.mount === 'wall';
   const currentDesk = selectedItem?.id === state.layout.activeDeskId;
-  const hint = pending ? (placement.valid === false && placement.reason ? placement.reason : 'Move over the floor to find a spot. Click to place.') : 'Drag to move or put away. Arrow buttons work too.';
-  inspector.innerHTML = `<div class="selection-copy">${icon(pending ? 'plus' : 'build')}<span><strong>${pending ? 'Placing ' : ''}${item.name}${!pending && currentDesk ? '<span class="active-desk-tag">Study spot</span>' : ''}</strong><small>${hint}</small></span></div><div class="selection-actions"><button class="small-button" id="rotate-item" aria-label="Rotate ${item.name}">${icon('rotate')}<span>Rotate</span></button>${!pending ? `<div class="nudge-buttons" aria-label="Move selected furniture"><button data-nudge="0,-0.25" aria-label="Move toward back wall">↑</button><button data-nudge="-0.25,0" aria-label="Move left">←</button><button data-nudge="0.25,0" aria-label="Move right">→</button><button data-nudge="0,0.25" aria-label="Move toward front">↓</button></div>${item.category === 'Study' ? `<button class="small-button study-here" id="study-here" aria-label="${currentDesk ? 'Studying here' : 'Study here'}" ${currentDesk ? 'disabled' : ''}>${icon('check')}<span>${currentDesk ? 'Studying here' : 'Study here'}</span></button>` : ''}<button class="small-button remove-item" id="remove-item" aria-label="Remove ${item.name}">${icon('trash')}</button>` : ''}<button class="small-button" id="cancel-item" aria-label="${pending ? 'Cancel placement' : 'Deselect furniture'}">${icon('close')}</button></div>`;
-  $('#rotate-item').addEventListener('click', () => room?.rotateSelection?.());
+  const hint = pending ? (placement.valid === false && placement.reason ? placement.reason : `Move over ${wall ? 'a wall' : 'the floor'} to find a spot. Click to place.`) : 'Drag to move or put away. Arrow buttons work too.';
+  // Wall pieces always face the room: they move up, down and along the wall
+  // instead of turning. Frames and records offer their pictures.
+  const nudges = [['0,-0.25', wall ? 'Move up' : 'Move toward back wall', '↑'], ['-0.25,0', 'Move left', '←'], ['0.25,0', 'Move right', '→'], ['0,0.25', wall ? 'Move down' : 'Move toward front', '↓']];
+  const arts = !pending && item.arts ? `<div class="art-picker" role="group" aria-label="${item.id === 'record-sleeve' ? 'Choose the sleeve' : 'Choose the picture'}">${item.arts.map(art => `<button data-art="${art}" aria-pressed="${selectedItem.art === art}" aria-label="${artName(art)}" title="${artName(art)}">${SLEEVES[art] ? `<span class="sleeve-swatch" style="--sleeve: ${SLEEVES[art].color}"></span>` : `<img src="${artThumb(art, item.id === 'wide-frame')}" alt="">`}</button>`).join('')}</div>` : '';
+  inspector.innerHTML = `<div class="selection-copy">${icon(pending ? 'plus' : 'build')}<span><strong>${pending ? 'Placing ' : ''}${item.name}${!pending && currentDesk ? '<span class="active-desk-tag">Study spot</span>' : ''}</strong><small>${hint}</small></span></div><div class="selection-actions">${arts}${wall ? '' : `<button class="small-button" id="rotate-item" aria-label="Rotate ${item.name}">${icon('rotate')}<span>Rotate</span></button>`}${!pending ? `<div class="nudge-buttons" aria-label="Move selected ${wall ? 'wall piece' : 'furniture'}">${nudges.map(([step, label, arrow]) => `<button data-nudge="${step}" aria-label="${label}">${arrow}</button>`).join('')}</div>${item.category === 'Study' ? `<button class="small-button study-here" id="study-here" aria-label="${currentDesk ? 'Studying here' : 'Study here'}" ${currentDesk ? 'disabled' : ''}>${icon('check')}<span>${currentDesk ? 'Studying here' : 'Study here'}</span></button>` : ''}<button class="small-button remove-item" id="remove-item" aria-label="Remove ${item.name}">${icon('trash')}</button>` : ''}<button class="small-button" id="cancel-item" aria-label="${pending ? 'Cancel placement' : 'Deselect furniture'}">${icon('close')}</button></div>`;
+  $('#rotate-item')?.addEventListener('click', () => room?.rotateSelection?.());
+  inspector.querySelectorAll('[data-art]').forEach(button => button.addEventListener('click', () => room?.setArt?.(button.dataset.art)));
   $('#remove-item')?.addEventListener('click', () => room?.removeSelection?.());
   $('#study-here')?.addEventListener('click', () => room?.setActiveDesk?.(selectedItem.id));
   $('#cancel-item').addEventListener('click', () => { room?.cancelPlacement?.(); room?.selectItem?.(null); });

@@ -72,11 +72,6 @@ export function createArchitecture(style, scene) {
     for (const x of [-4.8, -2.7, -.6]) box([.075, 3.9, .22], [x, 3.35, -4.44], wood);
     for (const y of [1.43, 2.3, 3.35, 4.4, 5.27]) box([4.35, .075, .24], [-2.7, y, -4.43], wood);
     box([4.55, .13, .57], [-2.7, 1.41, -4.25], '#b98c5f', .025);
-    // Linen wall scroll, an ink branch and small sculpted blossom petals.
-    box([1.28, 2.25, .045], [2.52, 3.47, -4.44], '#faf0da');
-    for (const y of [2.31, 4.64]) rod([1.77, y, -4.36], [3.27, y, -4.36], .038, '#795e46');
-    curve([[2.2, 2.5, -4.37], [2.64, 3.25, -4.37], [2.47, 3.7, -4.37], [2.91, 4.33, -4.37]], .023, '#64594e');
-    for (let i = 0; i < 9; i++) { const x = 2.2 + (i % 3) * .25, y = 3.25 + Math.floor(i / 3) * .29; for (let p = 0; p < 5; p++) ball([.05, .06, .012], [x + Math.cos(p * 1.257) * .065, y + Math.sin(p * 1.257) * .065, -4.32], i % 2 ? '#d3979c' : '#e8b3b0'); }
     pendant(.6, -3.7, 4.9, .36, '#ffe5b7', true); pendant(4.75, -3.75, 4.5, .49, '#fff0d0', true);
   } else if (style === 'cloud') {
     for (let x = 0; x < 16; x++) for (let z = 0; z < 12; z++) box([.746, .05, .765], [-5.625 + x * .75, .194, -4.2075 + z * .765], (x + z) % 2 ? '#dfc6c0' : '#f3e7db');
@@ -93,15 +88,6 @@ export function createArchitecture(style, scene) {
     box([.12, 1.02, 9.1], [-5.78, .76, 0], '#eee1d4');
     for (let i = 0; i < 47; i++) box([.035, .93, .028], [-5.7, .78, -4.4 + i * .19], '#c8b3bd');
     for (const y of [.32, 1.3, 5.76]) { box([.22, .10, 9.25], [-5.75, y, 0], '#f2e2d4'); box([12, .10, .22], [0, y, -4.4], '#f2e2d4'); }
-    // Cloud shelves are small wall features, leaving the floor fully editable.
-    for (const [x, y, width] of [[1.75, 3.15, 2.5], [4.2, 4.45, 2.1]]) {
-      box([width, .10, .48], [x, y, -4.17], '#f5e6d9', .04);
-      for (let i = 0; i < 5; i++) ball([width / 6, .20 + (i % 2) * .11, .09], [x - width * .37 + i * width * .185, y + .05, -4.35], '#f5e6d9');
-      for (let i = 0; i < 4; i++) box([.12, .34 + (i % 2) * .08, .25], [x - .55 + i * .14, y + .24, -4.05], ['#c8a8bd', '#abc8ba', '#e5bb87', '#a4b3ce'][i]);
-      ball([.13, .23, .13], [x + .48, y + .26, -4.08], '#ce9cba');
-    }
-    // Rounded three-color rainbow on the side wall.
-    for (let band = 0; band < 3; band++) curve(Array.from({ length: 25 }, (_, i) => { const a = i / 24 * Math.PI; return [-5.76, 3.2 + Math.sin(a) * (1.1 - band * .20), 1.9 + Math.cos(a) * (1.1 - band * .20)]; }), .07, ['#eabfa1', '#f5d6bf', '#b79bc6'][band]);
     pendant(.3, -3.5, 4.9, .27, '#ffe5ca'); pendant(3.35, -3.6, 4.2, .32, '#ffc6da'); pendant(5.1, -3.55, 5.05, .24, '#d7d3ff');
   } else {
     for (let x = 0; x < 6; x++) for (let z = 0; z < 5; z++) box([1.99, .05, 1.826], [-5 + x * 2, .194, -3.66 + z * 1.83], (x + z) % 2 ? '#677080' : '#747b89');
@@ -116,15 +102,7 @@ export function createArchitecture(style, scene) {
     box([8.23, .09, .23], [-1, 3.25, -4.40], '#293345');
     for (const z of [-4.4, .2, 4.38]) box([.22, 5.5, .19], [-5.70, 3.03, z], '#343546');
     box([8.6, .13, .53], [-1, 1.48, -4.21], '#333b51', .025);
-    // Neon orbit sign, geometric record sleeves, and an exposed copper pipe.
-    box([1.66, 2.4, .065], [4.42, 3.64, -4.44], '#282d43', .04);
-    curve(Array.from({ length: 49 }, (_, i) => [4.42 + Math.cos(i / 48 * Math.PI * 2) * .57, 3.78 + Math.sin(i / 48 * Math.PI * 2) * .57, -4.32]), .023, '#a997ff', true);
-    rod([3.79, 3.40, -4.29], [5.07, 4.16, -4.29], .027, '#ef8bab', true);
-    for (let i = 0; i < 3; i++) box([.30, .042, .025], [3.98 + i * .44, 2.79, -4.33], '#c6b5d8');
-    for (const [z, hex] of [[1.5, '#b4aecb'], [3.1, '#d68f88']]) {
-      box([.075, 1.22, 1.22], [-5.71, 3.63, z], '#303447'); box([.03, 1.06, 1.06], [-5.66, 3.63, z], hex);
-      curve(Array.from({ length: 33 }, (_, i) => [-5.62, 3.63 + Math.cos(i / 32 * Math.PI * 2) * .34, z + Math.sin(i / 32 * Math.PI * 2) * .34]), .06, '#343c52');
-    }
+    // An exposed copper pipe; the neon sign and records are movable wall pieces.
     curve([[-5.57, .5, -.8], [-5.57, 5.3, -.8], [-5.57, 5.3, 4.3]], .032, '#b49380');
     rod([-4.85, 5.17, -4.26], [2.89, 5.17, -4.26], .018, '#77c8e6', true);
     pendant(-4.8, -3.6, 4.57, .19, '#ffc89f'); pendant(.8, -3.6, 4.85, .19, '#ffc89f');

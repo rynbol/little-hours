@@ -454,7 +454,8 @@ try {
   assert.equal(frames.size, 0, 'a ready reduced-motion scene stops requesting frames');
   room.setFocused(false); advance(3); assert.equal(frames.size, 0, 'one reduced-motion state change renders and returns to idle');
   for (const lantern of lanterns) assert.deepEqual(lantern.rotation.asArray(), [0, 0, 0], 'reduced motion restores lanterns to neutral');
-  assert.equal(secondHand.rotation.z, 0); assert.equal(pendulum.rotation.z, 0);
+  // The clock is a wall piece now: check the one in this layout, if it has one.
+  for (const name of ['clock-second-hand', 'clock-pendulum']) { const node = scene.getTransformNodeByName(name); if (node) assert.equal(node.rotation.z, 0, `${name} rests with reduced motion`); }
   camera.inertialAlphaOffset = 0.025; room.setFocused(false); advance(80);
   assert.equal(camera.inertialAlphaOffset, 0, 'reduced motion lets camera inertia finish instead of deferring a later drift');
   assert.equal(frames.size, 0, 'camera inertia returns the reduced-motion scheduler to idle');
@@ -628,7 +629,7 @@ try {
     assert.ok(Math.abs(miso.position.y - (0.29 - (0.056 - 0.0055))) < 1e-9, 'the cat lies on its flattened rug');
     room.setLayout(createLayout('ember-library')); advance(3);
     assert.equal(miso.position.y, 0.29, 'on the top rug, the cat keeps its height');
-    // A drop that overlaps a neighbour lands on the closest free spot.
+    // A drop that overlaps a neighbor lands on the closest free spot.
     room.setLayout(dragLayout); advance(3);
     const slide = beginPlantDrag(-0.25, -2.5);
     assert.equal(diagnostics().dragging.valid, true, 'a free spot beside the desk replaces the refusal');
@@ -735,6 +736,58 @@ try {
     assert.equal(diagnostics().selectedId, 'ember-lamp'); assert.equal(saved('ember-lamp').off, undefined, 'Decorate taps never switch');
     room.setEditMode(false); room.setLayout(beforeDesignLayout); motion.matches = motionBefore; motion.emit('change', { matches: motionBefore }); advance(3);
     console.log('PASS tap to use: hover outlines, saved switches for lamps, desk lamp, fire, records and candles, room lights, four reactions that end at rest, reduced motion and Decorate taps.');
+  }
+  {
+    // Wall pieces hang on the back and side walls. They slide along a wall and
+    // across the corner, refuse fixtures, keep floor furniture clear, show the
+    // chosen picture and a band instead of an outline.
+    room.setEditMode(true); room.setLayout(createLayout('ember-library')); advance(3);
+    const node = id => scene.transformNodes.find(item => item.metadata?.itemId === id);
+    const saved = id => diagnostics().layout.items.find(item => item.id === id);
+    // A pointer on the wall face itself, so its wall coordinates are exact.
+    const on = spot => spot.wall === 'back' ? pointerAt(spot.u, spot.v, -4.49) : pointerAt(-5.83, spot.v, spot.u);
+    const move = (from, to) => { canvas.emit('pointerdown', on(from)); canvas.emit('pointermove', on(to)); advance(2); canvas.emit('pointerup', on(to)); advance(2); };
+    const frame = saved('ember-frame-mantel');
+    assert.deepEqual(node('ember-frame-mantel').position.asArray(), [frame.u, frame.v, -4.49], 'a picture hangs on the back wall face');
+    assert.equal(node('ember-clock').rotation.y, Math.PI / 2, 'side wall pieces face the room');
+    canvas.emit('pointermove', on(frame)); advance(2);
+    const band = scene.getMeshByName('wall-highlight');
+    assert.ok(band?.isEnabled() && band.parent === node('ember-frame-mantel'), 'a hovered wall piece shows its band');
+    assert.ok(node('ember-frame-mantel').getChildMeshes().every(mesh => !mesh.renderOutline), 'no outline paints over the picture');
+    const writes = changes.length;
+    move(frame, { ...frame, u: frame.u - 0.6 });
+    assert.equal(changes.length, writes + 1, 'one save per drop');
+    assert.deepEqual(['wall', 'u', 'v'].map(key => saved('ember-frame-mantel')[key]), ['back', 2.65, frame.v], 'a drag slides the picture along the wall');
+    move(saved('ember-frame-mantel'), { wall: 'side', u: -2.9, v: 4.15 });
+    assert.deepEqual(['wall', 'u', 'v'].map(key => saved('ember-frame-mantel')[key]), ['side', -2.9, 4.15], 'a drag across the corner hangs it on the side wall');
+    assert.deepEqual([node('ember-frame-mantel').position.asArray(), node('ember-frame-mantel').rotation.y], [[-5.83, 4.15, -2.9], Math.PI / 2]);
+    const beforeWindow = JSON.stringify(diagnostics().layout);
+    move(saved('ember-frame-mantel'), { wall: 'back', u: -2.7, v: 3.4 });
+    assert.equal(JSON.stringify(diagnostics().layout), beforeWindow); assert.match(notices.at(-1), /window/, 'the window refuses the picture');
+    assert.deepEqual(node('ember-frame-mantel').position.asArray(), [-5.83, 4.15, -2.9], 'and it returns to its spot');
+    // Arrows move a wall piece along its wall; R leaves it as it is.
+    room.selectItem('ember-frame-mantel'); room.moveSelection(0, -0.25); room.rotateSelection();
+    assert.deepEqual(['wall', 'u', 'v'].map(key => saved('ember-frame-mantel')[key]), ['side', -2.9, 4.25]);
+    room.setArt('hills'); room.setArt('not-a-picture');
+    assert.equal(saved('ember-frame-mantel').art, 'hills'); assert.match(node('ember-frame-mantel').metadata.picture.material.name, /hills/, 'the frame shows the chosen picture');
+    // A bookcase stops short of standing in front of the Sakura scroll.
+    room.setLayout(createLayout('sakura-studio')); advance(3); room.selectItem('sakura-books');
+    for (let i = 0; i < 4; i++) room.moveSelection(-0.25, 0);
+    assert.equal(saved('sakura-books').x, 4.25); assert.match(notices.at(-1), /in front of the blossom scroll/);
+    // A room saved before wall pieces gains its design's pieces.
+    const legacy = createLayout('ember-library'); legacy.items = legacy.items.filter(item => !item.wall); delete legacy.v;
+    room.setLayout(legacy); advance(3);
+    assert.deepEqual(diagnostics().layout.items.filter(item => item.wall).map(item => item.id).sort(), ['ember-clock', 'ember-frame-mantel', 'ember-frame-small', 'ember-potions']);
+    // The neon sign follows the time of day and switches with a tap.
+    room.setEditMode(false); room.setLayout(createLayout('midnight-metro')); advance(3);
+    const neon = node('metro-neon').getChildMeshes().filter(mesh => mesh.material?.metadata?.accent), base = neon.map(mesh => mesh.material.metadata.accent);
+    room.setTheme('day'); assert.ok(neon.every((mesh, i) => mesh.material.emissiveColor.equalsWithEpsilon(base[i].scale(0.355), 1e-6)), 'the neon is soft by day');
+    room.setTheme('dusk'); assert.ok(neon.every((mesh, i) => mesh.material.emissiveColor.equalsWithEpsilon(base[i], 1e-6)), 'and bright at night');
+    const sign = on({ wall: 'back', u: 4.4, v: 3.79 }); canvas.emit('pointermove', sign); advance(2);
+    assert.equal(diagnostics().playHover, 'metro-neon'); canvas.emit('pointerdown', sign); canvas.emit('pointerup', sign); advance(2);
+    assert.equal(saved('metro-neon').off, true); assert.ok(neon.every(mesh => mesh.material.emissiveColor.r + mesh.material.emissiveColor.g + mesh.material.emissiveColor.b === 0), 'a tap switches the neon off');
+    room.setLayout(beforeDesignLayout); advance(3);
+    console.log('PASS wall layer: back and side walls, drags along and across the corner, refused fixtures, arrows, pictures, floor clearance, old saves, neon glow and switch, a band instead of outlines.');
   }
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);

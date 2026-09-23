@@ -14,7 +14,8 @@ test('catalog contains coherent unique furniture definitions and two usable stud
   assert.equal(FURNITURE.filter(item => item.category === 'Study').length, 2);
   assert.equal(getFurniture('unknown'), undefined);
   for (const item of FURNITURE) {
-    assert.ok(item.footprint.every(value => Number.isFinite(value) && value > 0));
+    if (item.mount === 'wall') assert.ok(item.size.every(value => value > 0) && item.depth > 0 && !item.blocking && !item.footprint, `${item.id} is a wall piece`);
+    else assert.ok(item.footprint.every(value => Number.isFinite(value) && value > 0));
     assert.equal(getFurniture(item.id), item);
     assert.match(item.color, /^#[\da-f]{6}$/i);
   }
@@ -25,7 +26,7 @@ test('every preset fits the room, clears the cat and other furniture, and has a 
     const layout = createLayout(preset.id);
     assert.ok(layout.items.length <= MAX_ITEMS);
     assert.equal(getFurniture(layout.items.find(item => item.id === layout.activeDeskId)?.type)?.category, 'Study');
-    for (const item of layout.items) assert.deepEqual(validatePlacement(layout.items, item), { valid: true, reason: '' }, `${preset.id}: ${item.id}`);
+    for (const item of layout.items) assert.deepEqual(validatePlacement(layout.items, item, preset.style || 'retreat'), { valid: true, reason: '' }, `${preset.id}: ${item.id}`);
     assert.deepEqual(normalizeLayout(layout), layout);
     layout.items[0].x = 999;
     assert.notEqual(createLayout(preset.id).items[0].x, 999, 'templates are not mutated through a layout');
@@ -91,7 +92,7 @@ test('empty, malformed, or deskless restored rooms recover a usable preset', () 
 });
 
 test('free placement search returns valid snapped spots for every catalog item and rotation', () => {
-  for (const definition of FURNITURE) for (let rotation = 0; rotation < 4; rotation++) {
+  for (const definition of FURNITURE.filter(entry => entry.mount !== 'wall')) for (let rotation = 0; rotation < 4; rotation++) {
     const point = findFreePosition([], definition.id, rotation);
     assert.ok(point, `${definition.id} rotation ${rotation}`);
     assert.equal(validatePlacement([], { ...point, type: definition.id, rotation }).valid, true);
@@ -108,6 +109,14 @@ test('native Babylon furniture meshes fit declared footprints and the room heigh
     for (const definition of FURNITURE) {
       const furniture = createFurniture(definition.id, scene);
       assert.ok(furniture.getChildMeshes().length <= 9, `${definition.id} stays within its draw budget`);
+      if (definition.mount === 'wall') {
+        // A wall piece fills its rectangle on the wall and stands out no further than its depth.
+        furniture.position.y = 0; furniture.getChildMeshes().forEach(part => part.computeWorldMatrix(true));
+        const { min, max } = furniture.getHierarchyBoundingVectors(true), [width, height] = definition.size, epsilon = 0.003;
+        assert.ok(min.x >= -width / 2 - epsilon && max.x <= width / 2 + epsilon && min.y >= -height / 2 - epsilon && max.y <= height / 2 + epsilon, `${definition.id} fits its wall rectangle`);
+        assert.ok(min.z >= -epsilon && max.z <= definition.depth + epsilon, `${definition.id} stands out ${definition.depth} or less`);
+        furniture.dispose(); continue;
+      }
       for (let rotation = 0; rotation < 4; rotation++) {
         furniture.rotation.y = rotation * Math.PI / 2;
         furniture.getChildMeshes().forEach(part => part.computeWorldMatrix(true));
@@ -515,4 +524,54 @@ test('switched-off lamps, fires and record players stay off after a reload; othe
   assert.equal('off' in restored.items.find(item => item.id === 'ember-plant'), false);
   assert.equal('off' in restored.items.find(item => item.id === 'ember-hearth'), false);
   for (const definition of FURNITURE) if (definition.use) assert.ok(['lamp', 'candles', 'fire', 'record'].includes(definition.use.toggle) || ['rustle', 'book', 'squish', 'steam'].includes(definition.use.react), definition.id);
+});
+
+test('wall pieces hang inside their wall, clear of fixtures, each other and tall furniture', () => {
+  const frame = (u, v, wall = 'back', id = 'frame') => ({ id, type: 'small-frame', wall, u, v, art: 'hills' });
+  assert.deepEqual(validatePlacement([], frame(2.5, 3)), { valid: true, reason: '' });
+  assert.match(validatePlacement([], frame(-2.7, 3)).reason, /window/, 'windows stay clear');
+  assert.match(validatePlacement([], frame(-0.18, 3)).reason, /post/);
+  assert.match(validatePlacement([], frame(1.64, 4.3)).reason, /lantern/);
+  assert.match(validatePlacement([], frame(2.5, 5.4)).reason, /wall/, 'the whole piece stays on the wall');
+  assert.equal(validatePlacement([], frame(2.8, 4.4)).valid, true, 'a flat picture may hang behind the fairy lights');
+  assert.match(validatePlacement([], { id: 'shelf', type: 'wall-shelf', wall: 'back', u: 2.8, v: 4.5 }).reason, /fairy lights/, 'a deep shelf may not');
+  assert.match(validatePlacement([frame(2.5, 3, 'back', 'other')], frame(2.8, 3.2)).reason, /overlaps/);
+  // The corner: a deep shelf on each wall meets in 3D.
+  const shelf = (wall, u, id) => ({ id, type: 'apothecary-shelf', wall, u, v: 3, });
+  assert.match(validatePlacement([shelf('side', -3.55, 'side-shelf')], { id: 'plant', type: 'hanging-plant', wall: 'back', u: -5.25, v: 3 }, 'cloud').reason, /overlaps the potion shelf/);
+  // A tall bookcase against the wall keeps a picture off its patch of wall, both ways round.
+  const books = { id: 'books', type: 'bookcase', x: 2.5, z: -3.75, rotation: 0 };
+  assert.match(validatePlacement([books], frame(2.5, 3)).reason, /in front/);
+  assert.match(validatePlacement([frame(2.5, 3)], books).reason, /in front of the honey picture frame/);
+  assert.equal(validatePlacement([frame(2.5, 4.2)], books).valid, true, 'a picture above the bookcase is fine');
+  assert.equal(validatePlacement([frame(2.5, 3)], { ...books, z: -3 }).valid, true, 'away from the wall is fine');
+  assert.equal(validatePlacement([frame(2.5, 3)], { id: 'rug', type: 'rug', x: 2.5, z: -3, rotation: 0 }).valid, true, 'rugs never block');
+  // Each shell has its own fixtures: the cloud loft's pink lamp hangs clear of a shallow shelf.
+  assert.equal(validatePlacement([], { id: 'cloud', type: 'small-cloud-shelf', wall: 'back', u: 4.2, v: 4.55 }, 'cloud').valid, true);
+  assert.match(validatePlacement([], { id: 'deep', type: 'apothecary-shelf', wall: 'back', u: 3.35, v: 4.3 }, 'cloud').reason, /lamp/, 'a deeper shelf would reach the lamp');
+  // A blocked wall spot resolves to the closest free one on the same wall.
+  const spot = nearestValidPlacement([frame(2.5, 3, 'back', 'other')], frame(2.8, 3.2));
+  assert.ok(spot && validatePlacement([frame(2.5, 3, 'back', 'other')], frame(spot.u, spot.v)).valid);
+  assert.ok(Math.hypot(spot.u - 2.8, spot.v - 3.2) <= 0.75 + 1e-9);
+  const free = findFreePosition([], 'tall-frame');
+  assert.equal(free.wall, 'back'); assert.equal(validatePlacement([], { id: 'new', type: 'tall-frame', ...free }).valid, true);
+});
+
+test('saved rooms keep their furniture and gain their wall pieces once', () => {
+  const ember = createLayout('ember-library'), furniture = ember.items.filter(item => !item.wall);
+  // A room saved before wall pieces existed gains the design's pieces.
+  const legacy = normalizeLayout({ presetId: 'ember-library', items: furniture, activeDeskId: 'ember-desk' });
+  assert.deepEqual(legacy, ember);
+  // After that, a piece that was put away stays away.
+  const tidied = { ...ember, items: ember.items.filter(item => item.id !== 'ember-clock') };
+  assert.deepEqual(normalizeLayout(tidied), tidied);
+  // Furniture never gives way to a picture: the picture moves or stays out.
+  const crowded = normalizeLayout({ presetId: 'ember-library', items: [...furniture, { id: 'books-under-frame', type: 'bookcase', x: 4.5, z: -3.75, rotation: 0 }].filter(item => !['ember-lanterns', 'ember-hearth'].includes(item.id)), activeDeskId: 'ember-desk' });
+  assert.ok(crowded.items.some(item => item.id === 'books-under-frame'), 'the saved bookcase stays');
+  for (const piece of crowded.items.filter(item => item.wall)) assert.equal(validatePlacement(crowded.items, piece).valid, true, `${piece.id} hangs somewhere valid`);
+  // Wall pieces are sanitized like furniture.
+  const odd = normalizeLayout({ ...ember, items: [...ember.items, { id: 'x', type: 'tall-frame', wall: 'ceiling', u: 0, v: 3 }, { id: 'y', type: 'small-frame', wall: 'side', u: 3.5, v: 3.2, art: 'made-up' }, { id: 'z', type: 'wide-frame', wall: 'back', u: Infinity, v: 3 }] });
+  assert.equal(odd.items.some(item => ['x', 'z'].includes(item.id)), false);
+  assert.equal(odd.items.find(item => item.id === 'y').art, 'herbarium', 'an unknown picture falls back to the first one');
+  assert.equal(normalizeLayout({ ...ember, items: ember.items.map(item => item.type === 'record-sleeve' ? { ...item, art: 'lilac' } : item) }).v, ember.v);
 });
