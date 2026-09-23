@@ -10,7 +10,7 @@ const EPSILON = 1e-7;
 // The pet sleeps in its own movable bed. Rooms saved before the bed existed
 // kept this spot clear for the cat, so the bed moves in there.
 export const PET_HOME = Object.freeze({ x: 0.75, z: 1.5 });
-const item = (id, type, x, z, rotation = 0) => ({ id, type, x, z, rotation });
+const item = (id, type, x, z, rotation = 0, extra = {}) => ({ id, type, x, z, rotation, ...extra });
 const wallItem = (id, type, wall, u, v, art) => ({ id, type, wall, u, v, ...(art ? { art } : {}) });
 // Layouts saved before wall pieces existed gain their design's wall pieces once.
 export const LAYOUT_VERSION = 2;
@@ -46,7 +46,10 @@ export const PRESETS = [
       item('ember-desk-rug', 'rug', -2.5, -2.75),
       item('ember-reading-rug', 'rug', -3, 2.25, 1),
       item('ember-cat-rug', 'rug', 0, 1.5),
-      ...retreatWalls('ember'),
+      item('ember-globe', 'globe', -3.5, 0),
+      item('ember-tea-cart', 'tea-cart', 4.75, 0.75, 1),
+      // One moon picture, over the hearth, is enough for the library.
+      ...retreatWalls('ember').filter(entry => entry.id !== 'ember-frame-small'),
     ],
   },
   {
@@ -73,6 +76,7 @@ export const PRESETS = [
       item('green-window-rug', 'rug', -2.5, -2.75),
       item('green-cat-rug', 'rug', 0.25, 1.5),
       item('green-reading-rug', 'rug', 3.25, 1.5, 1),
+      item('green-globe', 'globe', 5, -3.5),
       ...retreatWalls('green'),
     ],
   },
@@ -99,6 +103,8 @@ export const PRESETS = [
       item('loft-study-rug', 'rug', -2.5, -2.75),
       item('loft-writing-rug', 'rug', -3.25, 0.5, 1),
       item('loft-cat-rug', 'rug', 0.25, 1.5),
+      item('loft-easel', 'easel', -2.75, 2.5, 0, { art: 'hills' }),
+      item('loft-bean-bag', 'bean-bag', -1, 1),
       ...retreatWalls('loft'),
     ],
   },
@@ -112,16 +118,20 @@ const themedPreset = (id, name, style, description, sourceId, omit, additions = 
   return { id, name, style, description, items: [...source.items.filter(entry => !omit.includes(entry.id) && !entry.wall).map(entry => ({ ...entry, id: `${id}-${entry.id}` })), ...additions] };
 };
 PRESETS.push(
-  themedPreset('sakura-studio', 'Sakura studio', 'sakura', 'Shoji screens, woven tatami, paper lanterns and cherry blossoms beyond the window.', 'moonlit-greenhouse', ['green-tree-back', 'green-tree-window', 'green-tree-front', 'green-tree-right', 'green-hearth', 'green-records-side', 'green-lamp', 'green-moon-rug', 'green-window-rug', 'green-reading-rug', 'green-candles'], [
+  themedPreset('sakura-studio', 'Sakura studio', 'sakura', 'Shoji screens, woven tatami, paper lanterns and cherry blossoms beyond the window.', 'moonlit-greenhouse', ['green-tree-back', 'green-tree-window', 'green-tree-front', 'green-tree-right', 'green-hearth', 'green-records-side', 'green-lamp', 'green-moon-rug', 'green-window-rug', 'green-reading-rug', 'green-candles', 'green-globe'], [
     item('sakura-books', 'bookcase', 4.5, -3.75), item('sakura-plant', 'plant', -4.75, -3.5), item('sakura-lamp', 'floor-lamp', -5, 3.5),
+    item('sakura-tea-cart', 'tea-cart', 1.75, -2.25), item('sakura-easel', 'easel', -4.5, -2.25, 0, { art: 'blossom' }),
     wallItem('sakura-scroll', 'wall-scroll', 'back', 2.5, 3.45),
   ]),
-  themedPreset('cloud-loft', 'Cloud loft', 'cloud', 'A round sky window, blush checkerboard, lilac upholstery and shelves shaped like clouds.', 'ember-library', ['ember-hearth', 'ember-books-front', 'ember-books-right', 'ember-tree', 'ember-tree-right', 'ember-lanterns', 'ember-moon-rug'], [
+  themedPreset('cloud-loft', 'Cloud loft', 'cloud', 'A round sky window, blush checkerboard, lilac upholstery and shelves shaped like clouds.', 'ember-library', ['ember-hearth', 'ember-books-front', 'ember-books-right', 'ember-tree', 'ember-tree-right', 'ember-lanterns', 'ember-moon-rug', 'ember-tea-cart'], [
     item('cloud-books', 'bookcase', 4.5, -3.75), item('cloud-fern', 'plant', -4.75, -3.5), item('cloud-linen-rug', 'rug', 3, .5, 1),
+    item('cloud-aquarium', 'fish-tank', 1.75, -3.75), item('cloud-bean-bag', 'bean-bag', 4, 2.5, 0, { tint: 'rose' }),
     wallItem('cloud-shelf-low', 'cloud-shelf', 'back', 1.75, 3.25), wallItem('cloud-shelf-high', 'small-cloud-shelf', 'back', 4.2, 4.55), wallItem('cloud-rainbow', 'felt-rainbow', 'side', 1.9, 3.75),
   ]),
-  themedPreset('midnight-metro', 'Midnight metro', 'metro', 'An exposed-brick listening loft, steel windows, soft neon and a city that stays up with you.', 'writers-loft', ['loft-hearth', 'loft-tree', 'loft-lanterns', 'loft-plant-front', 'loft-bookcase-right', 'loft-moon-rug'], [
+  themedPreset('midnight-metro', 'Midnight metro', 'metro', 'An exposed-brick listening loft, steel windows, soft neon and a city that stays up with you.', 'writers-loft', ['loft-hearth', 'loft-tree', 'loft-lanterns', 'loft-plant-front', 'loft-bookcase-right', 'loft-moon-rug', 'loft-easel', 'loft-bean-bag'], [
     item('metro-record-wall', 'low-cabinet', 4.75, -2.75, 3), item('metro-studio-rug', 'rug', 3.25, 2),
+    item('metro-monstera', 'monstera', 2.75, -2.75, 0, { tint: 'indigo' }), item('metro-easel', 'easel', -1.75, 2.5, 0, { art: 'stars' }),
+    item('metro-aquarium', 'fish-tank', -5, -2.5, 1),
     wallItem('metro-neon', 'neon-orbit', 'back', 4.4, 3.65), wallItem('metro-record-lilac', 'record-sleeve', 'side', 1.5, 4.3, 'lilac'), wallItem('metro-record-coral', 'record-sleeve', 'side', 3.1, 4.3, 'coral'),
   ]),
 );
