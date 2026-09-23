@@ -5,6 +5,7 @@ import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { createLayout, footprintBounds, pieceCount } from '../src/layout.js';
+import { SURFACES } from '../src/surfaces.js';
 
 class Surface {
   listeners = new Map();
@@ -968,6 +969,61 @@ try {
     room.setTint(null); advance(2); assert.ok(paint('sakura-studio-green-sofa').has('ba9595'), 'Sakura velvet again');
     room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
     console.log('PASS colors: a chosen color rebuilds only its piece, keeps selection, shadows and asset counts, ignores repeats and unknown colors, and follows loaded layouts and room designs.');
+  }
+  {
+    // A room's walls and floor wear its choices. The retreat repaints its paint
+    // materials; a shell builds its walls again in the new paint and repaints
+    // only the floor's part of its baked paint. Every choice names paint that
+    // its design uses, windows still cut painted walls, and each room keeps its own.
+    const counts = mesh => { const colors = mesh.getVerticesData('color') || [], found = new Map(); for (let i = 0; i < colors.length; i += 4) { const hex = '#' + [0, 1, 2].map(c => Math.round(colors[i + c] * 255).toString(16).padStart(2, '0')).join(''); found.set(hex, (found.get(hex) || 0) + 1); } return found; };
+    const hexOf = mat => mat.diffuseColor.toHexString().toLowerCase(), paintOf = hex => scene.getMaterialByName(`paint-${hex}:{}`);
+    const casters = () => scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList;
+    const through = (mesh, spot) => { const origin = spot.wall === 'back' ? new Vector3(spot.u, spot.v, -3) : new Vector3(-4.5, spot.v, spot.u), direction = spot.wall === 'back' ? new Vector3(0, 0, -1) : new Vector3(-1, 0, 0); return !mesh.intersects(new Ray(origin, direction, 3), false).hit; };
+    const choice = (style, kind, id) => SURFACES[style][kind].find(entry => entry.id === id).paint;
+    room.setEditMode(true); room.setLayout(createLayout('ember-library')); advance(3);
+    const back = () => scene.getMeshByName('retreat-back-wall'), side = () => scene.getMeshByName('retreat-side-wall');
+    for (const kind of ['walls', 'floor']) for (const entry of SURFACES.retreat[kind].slice(1)) for (const hex of Object.keys(entry.paint)) assert.ok(paintOf(hex), `the retreat paints with ${hex}`);
+    const assets = [scene.meshes.length, scene.materials.length], saves = changes.length;
+    room.setSurface('walls', 'rose'); room.setSurface('floor', 'walnut'); advance(2);
+    assert.equal(changes.length, saves + 2, 'each choice is one save'); assert.equal(diagnostics().layout.walls, 'rose'); assert.equal(diagnostics().layout.floor, 'walnut');
+    assert.ok(hexOf(back().material) === '#b28e88' && hexOf(side().material) === '#ddcdb9', 'rose and linen walls');
+    for (const kind of ['walls', 'floor']) for (const [from, to] of Object.entries(choice('retreat', kind, kind === 'walls' ? 'rose' : 'walnut'))) assert.equal(hexOf(paintOf(from)), to, `${from} is ${to}`);
+    assert.deepEqual([scene.meshes.length, scene.materials.length], assets, 'no new meshes or materials');
+    room.setSurface('walls', 'teal'); room.setSurface('floor', 'walnut'); room.setSurface('carpet', 'walnut'); advance(2);
+    assert.equal(changes.length, saves + 2, 'repeats and unknown choices change nothing');
+    // A window cuts the painted wall, and the rebuilt wall keeps its paint.
+    const win = { id: 'paint-window', type: 'cottage-window', wall: 'side', u: 2, v: 3 };
+    room.setLayout({ presetId: 'ember-library', items: [desk, win], activeDeskId: desk.id, v: 2, walls: 'rose', floor: 'walnut' }); advance(3);
+    assert.ok(through(side(), win) && hexOf(side().material) === '#ddcdb9' && casters().includes(side()), 'the window cuts the linen wall');
+    room.setSurface('walls', null); room.setSurface('floor', null); advance(2);
+    assert.ok(hexOf(back().material) === '#80917d' && hexOf(paintOf('#855b43')) === '#855b43' && !('walls' in diagnostics().layout), 'back to sage and honey oak');
+    for (const [presetId, style, walls, floor] of [['sakura-studio', 'sakura', 'matcha', 'fresh'], ['cloud-loft', 'cloud', 'mint', 'butter'], ['midnight-metro', 'metro', 'painted', 'clay']]) {
+      room.setLayout(createLayout(presetId)); advance(3);
+      const wallsMesh = () => scene.getMeshByName(`${style}-walls`), body = () => scene.getMeshByName(`${style}-architecture`);
+      const designWalls = counts(wallsMesh()), designBody = counts(body()), shellAssets = [scene.meshes.length, scene.materials.length];
+      for (const entry of SURFACES[style].walls.slice(1)) for (const hex of Object.keys(entry.paint)) assert.ok(designWalls.has(hex), `${style} walls use ${hex}`);
+      for (const entry of SURFACES[style].floor.slice(1)) for (const hex of Object.keys(entry.paint)) assert.ok(designBody.has(hex), `${style} floor uses ${hex}`);
+      room.setSurface('walls', walls); room.setSurface('floor', floor); advance(2);
+      const paintedWalls = counts(wallsMesh()), paintedBody = counts(body());
+      for (const [from, to] of Object.entries(choice(style, 'walls', walls))) assert.ok(paintedWalls.get(to) === designWalls.get(from) && !paintedWalls.has(from), `${style} walls: ${from} → ${to}`);
+      // A floor color moves to its new paint; any other part in that color keeps it.
+      for (const [from, to] of Object.entries(choice(style, 'floor', floor))) assert.ok(paintedBody.get(to) > 0 && (paintedBody.get(from) || 0) + paintedBody.get(to) === designBody.get(from) + (designBody.get(to) || 0), `${style} floor: ${from} → ${to}`);
+      for (const [hex, count] of designBody) if (!(hex in choice(style, 'floor', floor)) && !Object.values(choice(style, 'floor', floor)).includes(hex)) assert.equal(paintedBody.get(hex), count, `${style} keeps ${hex}`);
+      assert.ok(casters().includes(wallsMesh()) && !casters().some(mesh => mesh.isDisposed()), `${style} walls cast shadows`);
+      assert.deepEqual([scene.meshes.length, scene.materials.length], shellAssets, `${style} adds no meshes or materials`);
+      // A window cuts the painted walls, which keep their paint.
+      const round = { id: `paint-${style}`, type: 'round-window', wall: style === 'cloud' ? 'back' : 'side', u: style === 'cloud' ? 1.4 : 2, v: 3 };
+      room.setLayout({ presetId, items: [desk, round], activeDeskId: desk.id, v: 2, walls, floor }); advance(3);
+      assert.ok(through(wallsMesh(), round) && [...Object.values(choice(style, 'walls', walls))].some(hex => counts(wallsMesh()).has(hex)), `${style} cuts its painted walls`);
+      room.setSurface('walls', null); room.setSurface('floor', null); advance(2);
+      assert.ok(counts(wallsMesh()).has(Object.keys(choice(style, 'walls', walls))[0]) && counts(body()).get(Object.keys(choice(style, 'floor', floor))[0]) === designBody.get(Object.keys(choice(style, 'floor', floor))[0]), `${style} as designed again`);
+    }
+    // Another room keeps its own: the retreat after a painted Sakura is as designed.
+    room.setLayout({ ...createLayout('sakura-studio'), walls: 'matcha', floor: 'fresh' }); advance(3);
+    room.setLayout(createLayout('ember-library')); advance(3);
+    assert.ok(hexOf(back().material) === '#80917d' && hexOf(paintOf('#92654a')) === '#92654a', 'the retreat keeps its design');
+    room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
+    console.log('PASS walls and floors: retreat paint materials, shell walls built again and floor paint in place, real design colors, windows through painted walls, shadows, asset counts and rooms that keep their own.');
   }
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);

@@ -12,12 +12,13 @@ import { cutRect } from './walls.js';
 // The walls of a room, as one mesh, less the openings of its windows. Each
 // spec is a box on the back or side wall; its extent along the wall and its
 // height are cut around every opening on that wall. Walls are rebuilt only
-// when a window is added, moved or removed. `painted` walls take the spec
-// colors as vertex colors; otherwise the material alone gives the color.
+// when a window is added, moved or removed, or repainted. `painted` walls
+// take the spec colors, through `paint` (design color → chosen color), as
+// vertex colors; otherwise the material alone gives the color.
 // Box shapes are cached per spec list and size: a rebuild mostly copies
 // vertices instead of building meshes, so a window drop never stalls a frame.
 const wallShapes = new WeakMap();
-export function buildWallMesh(specs, holes, material, scene, name, parent, painted = true) {
+export function buildWallMesh(specs, holes, material, scene, name, parent, painted = true, paint = null) {
   const pieces = [];
   if (!wallShapes.has(specs)) wallShapes.set(specs, new Map());
   const shapes = wallShapes.get(specs);
@@ -30,7 +31,7 @@ export function buildWallMesh(specs, holes, material, scene, name, parent, paint
     return shapes.get(key);
   };
   for (const { size, xyz, hex, radius, wall } of specs) {
-    const along = wall === 'back' ? 0 : 2, color = Color3.FromHexString(hex);
+    const along = wall === 'back' ? 0 : 2, color = Color3.FromHexString(paint?.[hex] || hex);
     const rect = { minU: xyz[along] - size[along] / 2, maxU: xyz[along] + size[along] / 2, minV: xyz[1] - size[1] / 2, maxV: xyz[1] + size[1] / 2 };
     for (const part of cutRect(rect, holes.filter(hole => hole.wall === wall))) {
       const partSize = [...size], center = [...xyz];
@@ -70,6 +71,8 @@ export function createArchitecture(style, scene) {
   function box(size, xyz, hex, radius = 0) { return finish(radius ? createRoundedBox('architectural-joinery', size, radius, scene) : MeshBuilder.CreateBox('architectural-joinery', { width: size[0], height: size[1], depth: size[2] }, scene), xyz, hex); }
   // Parts of the back or side wall: built with the walls, cut by windows.
   function wallBox(wall, size, xyz, hex, radius = 0) { wallSpecs.push({ wall, size, xyz, hex, radius }); }
+  // Floor parts keep their design color, so a floor choice repaints them alone.
+  function floorBox(size, xyz, hex) { const mesh = box(size, xyz, hex); mesh.metadata.floor = hex; return mesh; }
   function ball(size, xyz, hex, glow = false) { const mesh = finish(MeshBuilder.CreateSphere('architectural-orb', { diameter: 2, segments: 8 }, scene), xyz, hex, glow); mesh.scaling.set(...size); return mesh; }
   function rod(a, b, radius, hex, glow = false) {
     const start = Vector3.FromArray(a), end = Vector3.FromArray(b), delta = end.subtract(start);
@@ -97,11 +100,11 @@ export function createArchitecture(style, scene) {
   box([12.05, .14, 9.3], [0, .10, 0], style === 'metro' ? '#596173' : '#e2cdb1', .04);
 
   if (style === 'sakura') {
-    box([12, .04, 9.2], [0, .19, 0], '#7c7655');
+    floorBox([12, .04, 9.2], [0, .19, 0], '#7c7655');
     for (let col = 0; col < 3; col++) for (let row = 0; row < 2; row++) {
       const x = -4 + col * 4, z = -2.28 + row * 4.56;
-      box([3.88, .035, 4.43], [x, .207, z], (col + row) % 2 ? '#c8bd87' : '#d7ca97');
-      for (let stripe = 0; stripe < 44; stripe++) box([3.85, .003, .014], [x, .226, z - 2.14 + stripe * .099], '#bdb27f');
+      floorBox([3.88, .035, 4.43], [x, .207, z], (col + row) % 2 ? '#c8bd87' : '#d7ca97');
+      for (let stripe = 0; stripe < 44; stripe++) floorBox([3.85, .003, .014], [x, .226, z - 2.14 + stripe * .099], '#bdb27f');
     }
     rectangularWall('#eee2c6'); wallBox('side', [.22, 5.6, 9.2], [-5.94, 3.01, 0], '#e8ddc4');
     for (let panel = 0; panel < 4; panel++) {
@@ -117,7 +120,7 @@ export function createArchitecture(style, scene) {
     box([4.55, .13, .57], [-2.7, 1.41, -4.25], '#b98c5f', .025);
     pendant(.6, -3.7, 4.9, .36, '#ffe5b7', true); pendant(4.75, -3.75, 4.5, .49, '#fff0d0', true);
   } else if (style === 'cloud') {
-    for (let x = 0; x < 16; x++) for (let z = 0; z < 12; z++) box([.746, .05, .765], [-5.625 + x * .75, .194, -4.2075 + z * .765], (x + z) % 2 ? '#dfc6c0' : '#f3e7db');
+    for (let x = 0; x < 16; x++) for (let z = 0; z < 12; z++) floorBox([.746, .05, .765], [-5.625 + x * .75, .194, -4.2075 + z * .765], (x + z) % 2 ? '#dfc6c0' : '#f3e7db');
     wallBox('side', [.22, 5.6, 9.2], [-5.94, 3.01, 0], '#dcbfcf');
     // A genuine circular opening, filled around with narrow plaster strips.
     const radius = window.radius;
@@ -133,7 +136,7 @@ export function createArchitecture(style, scene) {
     for (const y of [.32, 1.3, 5.76]) { box([.22, .10, 9.25], [-5.75, y, 0], '#f2e2d4'); box([12, .10, .22], [0, y, -4.4], '#f2e2d4'); }
     pendant(.3, -3.5, 4.9, .27, '#ffe5ca'); pendant(3.35, -3.6, 4.2, .32, '#ffc6da'); pendant(5.1, -3.55, 5.05, .24, '#d7d3ff');
   } else {
-    for (let x = 0; x < 6; x++) for (let z = 0; z < 5; z++) box([1.99, .05, 1.826], [-5 + x * 2, .194, -3.66 + z * 1.83], (x + z) % 2 ? '#677080' : '#747b89');
+    for (let x = 0; x < 6; x++) for (let z = 0; z < 5; z++) floorBox([1.99, .05, 1.826], [-5 + x * 2, .194, -3.66 + z * 1.83], (x + z) % 2 ? '#677080' : '#747b89');
     rectangularWall('#434b61'); wallBox('side', [.22, 5.6, 9.2], [-5.94, 3.01, 0], '#5b4f5b');
     for (let row = 0; row < 17; row++) for (let col = 0; col < 10; col++) {
       const z = -4.35 + col * .89 + (row % 2) * .44;
@@ -153,29 +156,45 @@ export function createArchitecture(style, scene) {
 
   // Bake all the architectural paint into one colored mesh; luminous accents
   // remain a tiny number of batches. Temporary source materials are released.
-  const buckets = new Map();
+  // The floor parts' vertex ranges in the baked paint are kept for repainting.
+  const buckets = new Map(), floorRanges = []; let paintVertices = 0;
   for (const part of parts) {
     part.computeWorldMatrix(true);
     const glow = glows.includes(part.material), key = glow ? part.material.uniqueId : 'paint';
     if (!buckets.has(key)) buckets.set(key, { mat: glow ? part.material : null, data: [] });
     const data = VertexData.ExtractFromMesh(part, true, true); data.transform(part.getWorldMatrix()); data.uvs = undefined; data.colors = [];
-    const color = part.material.diffuseColor;
-    for (let i = 0; i < data.positions.length / 3; i++) data.colors.push(color.r, color.g, color.b, 1);
+    const color = part.material.diffuseColor, count = data.positions.length / 3;
+    for (let i = 0; i < count; i++) data.colors.push(color.r, color.g, color.b, 1);
+    if (!glow) { if (part.metadata.floor) floorRanges.push({ start: paintVertices, count, hex: part.metadata.floor }); paintVertices += count; }
     buckets.get(key).data.push(data);
   }
   const bodyMaterial = new StandardMaterial(`${style}-batched-paint`, scene); bodyMaterial.diffuseColor = Color3.White(); bodyMaterial.specularColor.set(.035, .035, .035); materials.push(bodyMaterial);
+  let body = null;
   for (const [key, bucket] of buckets) {
     const data = bucket.data[0]; if (bucket.data.length > 1) data.merge(bucket.data.slice(1), true);
     // Accent lights take a tap outside Decorate, which switches them.
-    const mesh = new Mesh(`${style}-${key === 'paint' ? 'architecture' : 'accent'}`, scene); data.applyToMesh(mesh); mesh.parent = root; mesh.material = bucket.mat || bodyMaterial; mesh.useVertexColors = true; mesh.receiveShadows = !bucket.mat; mesh.isPickable = Boolean(bucket.mat); mesh.metadata = { architecture: style, castShadow: !bucket.mat, lightSwitch: Boolean(bucket.mat) }; mesh.freezeWorldMatrix();
+    const mesh = new Mesh(`${style}-${key === 'paint' ? 'architecture' : 'accent'}`, scene); data.applyToMesh(mesh); if (key === 'paint') body = mesh; mesh.parent = root; mesh.material = bucket.mat || bodyMaterial; mesh.useVertexColors = true; mesh.receiveShadows = !bucket.mat; mesh.isPickable = Boolean(bucket.mat); mesh.metadata = { architecture: style, castShadow: !bucket.mat, lightSwitch: Boolean(bucket.mat) }; mesh.freezeWorldMatrix();
   }
   parts.forEach(part => part.dispose(false, false));
   for (const mat of paint.values()) if (!glows.includes(mat)) { mat.dispose(); materials.splice(materials.indexOf(mat), 1); }
   // The walls are their own mesh, so a window can cut them without the rest.
-  let walls = null, wallKey = '';
-  function setOpenings(holes) {
-    const key = JSON.stringify(holes); if (walls && key === wallKey) return; wallKey = key;
-    walls?.dispose(); walls = buildWallMesh(wallSpecs, holes, bodyMaterial, scene, `${style}-walls`, root);
+  // A wall choice builds them again in its paint; a floor choice repaints the
+  // floor's range of the baked paint in place.
+  let walls = null, wallKey = '', holes = [], wallPaint = {}, floorKey = '{}';
+  function buildWalls() {
+    const key = JSON.stringify([holes, wallPaint]); if (walls && key === wallKey) return; wallKey = key;
+    walls?.dispose(); walls = buildWallMesh(wallSpecs, holes, bodyMaterial, scene, `${style}-walls`, root, true, wallPaint);
+  }
+  function setOpenings(next) { holes = next; buildWalls(); }
+  function setSurfaces({ walls: nextWalls = {}, floor = {} }) {
+    wallPaint = nextWalls; buildWalls();
+    const key = JSON.stringify(floor); if (key === floorKey) return; floorKey = key;
+    const colors = body.getVerticesData('color');
+    for (const { start, count, hex } of floorRanges) {
+      const color = Color3.FromHexString(floor[hex] || hex);
+      for (let i = start * 4; i < (start + count) * 4; i += 4) { colors[i] = color.r; colors[i + 1] = color.g; colors[i + 2] = color.b; }
+    }
+    body.setVerticesData('color', colors);
   }
   setOpenings([]);
 
@@ -194,7 +213,7 @@ export function createArchitecture(style, scene) {
   }
   // Top of the walkable floor surface (tatami stripes stand slightly proud).
   const floorTop = style === 'sakura' ? .2275 : .219;
-  return { root, window, floorTop, viewMaterial, setTheme, setOpenings, setLights(enabled) { lit = enabled; applyGlow(); }, dispose() { root.dispose(false, false); materials.forEach(mat => mat.dispose()); textures.forEach(texture => texture.dispose()); } };
+  return { root, window, floorTop, viewMaterial, setTheme, setOpenings, setSurfaces, setLights(enabled) { lit = enabled; applyGlow(); }, dispose() { root.dispose(false, false); materials.forEach(mat => mat.dispose()); textures.forEach(texture => texture.dispose()); } };
 }
 
 // Procedural views are painted once per atmosphere change, never per frame.

@@ -31,6 +31,7 @@ import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nea
 import { SHELLS, isWallPiece, snapWall, openings } from './walls.js';
 import { ARTWORKS, SLEEVES } from './art.js';
 import { tintPaint } from './tints.js';
+import { surfacePaint } from './surfaces.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -179,6 +180,8 @@ export function createRoom(container, options = {}) {
     retreatWalls.push({ wall: 'back', size: [archRadius * 2 / 44 + 0.012, 5.42 - curveTop, 0.22], xyz: [x, (5.42 + curveTop) / 2, -4.6], hex: '#80917d' });
   }
   const panel = material('#52695c'), inset = material('#647869'), carved = material('#a78053');
+  // The retreat's wall and floor paint, by design color, for a room's choices.
+  const retreatSurfaces = { walls: [['#80917d', palette.sage], ['#c9bba2', palette.cream], ['#52695c', panel], ['#647869', inset]], floor: boardColors.map(hex => [hex, material(hex)]) };
   box([0.14, 1.1, 9.02], [-5.76, 0.80, 0], panel);
   box([11.72, 1.1, 0.14], [0.04, 0.80, -4.42], panel);
   for (let i = 0; i < 14; i++) {
@@ -585,6 +588,16 @@ export function createRoom(container, options = {}) {
   // Windows cut their openings where they hang, so daylight falls through them.
   // A window being dragged closes its opening until it is dropped. The walls
   // are rebuilt only on such a change, never per frame.
+  // A room's wall and floor choices repaint the retreat's paint materials, or
+  // a shell's walls and floor. The walls mesh a shell builds again joins the
+  // shadow map at the end of the sync.
+  let surfacesKey = '';
+  function applySurfaces() {
+    const walls = surfacePaint(architectureStyle, 'walls', layout.walls) || {}, floor = surfacePaint(architectureStyle, 'floor', layout.floor) || {};
+    const key = JSON.stringify([architectureStyle, walls, floor]); if (key === surfacesKey) return; surfacesKey = key;
+    if (architecture) { architecture.setSurfaces({ walls, floor }); return; }
+    for (const [kind, paint] of [['walls', walls], ['floor', floor]]) for (const [hex, mat] of retreatSurfaces[kind]) mat.diffuseColor = color(paint[hex] || hex);
+  }
   let retreatWallMeshes = [], openingsKey = '';
   function syncOpenings() {
     const holes = openings(layout.items, drag?.id), key = `${architectureStyle}:${JSON.stringify(holes)}`;
@@ -703,7 +716,7 @@ export function createRoom(container, options = {}) {
       rugSurfaces.push({ ...footprintBounds(item), top: object.position.y + (flat ? FLAT_RUG : height), lost: flat ? height - FLAT_RUG : 0 });
     });
     for (const item of layout.items) liftShade(placedObjects.get(item.id), item);
-    syncOpenings();
+    applySurfaces(); syncOpenings();
     if (selectedId && !ids.has(selectedId)) { selectedId = null; options.onSelectionChange?.(null); }
     animatedObjects.length = 0;
     for (const object of placedObjects.values()) if (object.metadata.animate) animatedObjects.push(object);
@@ -874,6 +887,14 @@ export function createRoom(container, options = {}) {
     const item = layout.items.find(candidate => candidate.id === selectedId);
     if (!item || item.art === art || !getFurniture(item.type).arts?.includes(art)) return;
     cancelDrag(); item.art = art; commitLayout(); selectItem(item.id);
+  }
+  // A room's walls and floor wear the chosen paint; null gives back the
+  // design's own. No furniture changes, so only the surfaces and the shadow
+  // list (for a shell's new walls mesh) are brought up to date.
+  function setSurface(kind, id) {
+    if (!['walls', 'floor'].includes(kind) || (layout[kind] ?? null) === id || (id !== null && !surfacePaint(architectureStyle, kind, id))) return;
+    cancelDrag(); if (id === null) delete layout[kind]; else layout[kind] = id;
+    applySurfaces(); refreshShadows(); options.onLayoutChange?.(copyLayout());
   }
   // A piece with color choices wears the chosen one; null gives it back the
   // room's colors.
@@ -1371,7 +1392,7 @@ export function createRoom(container, options = {}) {
   requestRender();
 
   return {
-    setTheme, setLayout, setEditMode, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setQuality,
+    setTheme, setLayout, setEditMode, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setSurface, setQuality,
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet,
     setPet(species) { const next = species === 'dog' ? 'dog' : 'cat'; if (next === petSpecies) return; if (petRoutine.pose.held) releasePet(); petSpecies = next; buildPet(); requestRender(); },

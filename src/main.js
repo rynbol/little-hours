@@ -9,6 +9,7 @@ import { PETS } from './pet.js';
 import { createSpeech, PET_LINES, AVATAR_LINES } from './speech.js';
 import { ARTWORKS, SLEEVES, artName } from './art.js';
 import { tintsFor } from './tints.js';
+import { surfaceChoices } from './surfaces.js';
 import { designPaint } from './architecture.js';
 
 const icons = {
@@ -402,7 +403,7 @@ function rememberControlFocus(container) {
   const active = document.activeElement;
   if (!container.contains(active)) return null;
   if (active.id) return { id: active.id };
-  for (const key of ['category', 'furniture', 'preset', 'resetDesign', 'nudge', 'art', 'tint']) {
+  for (const key of ['category', 'furniture', 'preset', 'resetDesign', 'nudge', 'art', 'tint', 'walls', 'floor']) {
     if (active.dataset?.[key] !== undefined) return { key, value: active.dataset[key] };
   }
   return null;
@@ -600,7 +601,11 @@ function renderInspector() {
   const rememberedFocus = rememberControlFocus(inspector);
   $('#room-hint').textContent = pending ? `Click ${pending.mount === 'wall' ? 'a wall' : 'the floor'} to place ${pending.name.toLowerCase()}` : selected ? 'Drag to move · Drop over the collection to put away' : 'Drag a piece to move it · Drag empty space to look around';
   if (!pending && !selected) {
-    inspector.innerHTML = `<div class="selection-copy">${icon('build')}<span><strong>A room that feels like you</strong><small>Drag furniture around your room, or back here to put it away. Pick a piece below to add something new.</small></span></div>`;
+    // With nothing selected, the room itself offers its walls and floors.
+    const style = roomDesign(state.layout).style || 'retreat';
+    const surfaces = ['walls', 'floor'].map(kind => `<div class="art-picker" role="group" aria-label="Choose the ${kind}"><span class="picker-label">${kind === 'walls' ? 'Walls' : 'Floor'}</span>${surfaceChoices(style, kind).map(entry => `<button data-${kind}="${entry.id}" aria-pressed="${(state.layout[kind] || '') === entry.id}" aria-label="${entry.name}" title="${entry.name}"><span class="tint-swatch" style="--tint: ${entry.swatch[0]}; --tint-2: ${entry.swatch[1]}"></span></button>`).join('')}</div>`).join('');
+    inspector.innerHTML = `<div class="selection-copy">${icon('build')}<span><strong>A room that feels like you</strong><small>Drag furniture around your room, or back here to put it away. Pick a piece below to add something new.</small></span></div><div class="selection-actions room-surfaces">${surfaces}</div>`;
+    for (const kind of ['walls', 'floor']) inspector.querySelectorAll(`[data-${kind}]`).forEach(button => button.addEventListener('click', () => { room?.setSurface?.(kind, button.dataset[kind] || null); renderInspector(); }));
     restoreControlFocus(inspector, rememberedFocus);
     return;
   }
