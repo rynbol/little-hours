@@ -212,7 +212,8 @@ export function activitySpots(layout, { night = false, windowX = -2.7, pet = nul
   for (const item of layout.items) {
     // Wall pieces have no floor footprint.
     const depth = getFurniture(item.type)?.footprint?.[1] ?? 0;
-    if (item.type === 'fireplace' && !item.off) add('warm', localPoint(item, 0, depth / 2 + 0.75), item, item.id);
+    // Before the hearth, or beside the middle when the pet has the warm spot.
+    if (item.type === 'fireplace' && !item.off) [0, -0.7, 0.7].some(x => add('warm', localPoint(item, x, depth / 2 + 0.75), localPoint(item, x, 0), item.id));
     else if (item.type === 'plant' || item.type === 'moon-tree') around(item, 'water', 0.45);
     else if (item.type === 'low-cabinet') add('record', localPoint(item, -0.25, depth / 2 + 0.26), localPoint(item, -0.25, 0), item.id, { ...localPoint(item, -0.25, 0.14), y: 1.05 });
     else if (item.type === 'floor-lamp' && item.off && night) around(item, 'lamp', 0.27, spot => toward(item, spot, 0.07, 1.5));

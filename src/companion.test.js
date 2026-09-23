@@ -61,9 +61,10 @@ test('every design offers break activities the companion can reach, each facing 
     assert.ok(planCompanionTrip(layout, null, false, ['lounge-chair']), `${preset.id}: the reading chair can be reached, past its tea table`);
     for (const spot of spots) {
       assert.ok(walkable(spot, obstacles), `${preset.id} ${spot.kind} stands on clear floor`);
-      // The record player sits toward one end of its cabinet.
+      // The record player sits toward one end of its cabinet; at the hearth
+      // the companion faces the fire straight on.
       const item = layout.items.find(entry => entry.id === spot.itemId), target = spot.kind === 'record' ? localPoint(item, -0.25, 0) : item || (spot.kind === 'pet' ? pet : { x: spot.x, z: -10 });
-      const toward = Math.atan2(-(target.x - spot.x), -(target.z - spot.z));
+      const toward = spot.kind === 'warm' ? item.rotation * Math.PI / 2 : Math.atan2(-(target.x - spot.x), -(target.z - spot.z));
       assert.ok(Math.abs(Math.atan2(Math.sin(toward - spot.yaw), Math.cos(toward - spot.yaw))) < 1e-6, `${preset.id} ${spot.kind} faces its piece`);
     }
     // A switched-off fire is no place to warm up; a walking pet is not petted.
@@ -103,7 +104,8 @@ test('activity spots keep clear of a still pet', () => {
   const warm = activitySpots(layout).find(spot => spot.kind === 'warm');
   assert.ok(warm, 'the loft hearth has a warm spot');
   const pet = { x: warm.x + 0.2, z: warm.z, yaw: 0, state: 'sitting', moving: false, held: false };
-  assert.ok(!activitySpots(layout, { pet }).some(spot => spot.kind === 'warm' && spot.itemId === fire.id), 'no warming up on top of the pet');
+  const beside = activitySpots(layout, { pet }).find(spot => spot.kind === 'warm' && spot.itemId === fire.id);
+  assert.ok(beside && Math.hypot(beside.x - pet.x, beside.z - pet.z) > 0.6, 'no warming up on top of the pet: the companion stands beside it at the hearth');
   assert.ok(activitySpots(layout, { pet: { ...pet, held: true } }).some(spot => spot.kind === 'warm'), 'a carried pet is no bother');
 });
 test('resuming focus during an activity walks straight back to the desk, without a rise', () => {
