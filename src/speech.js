@@ -66,14 +66,17 @@ export function createSpeech(layer, { anchor, reducedMotion = () => false }) {
       element.className = 'speech-bubble'; element.dataset.speaker = who; element.hidden = true;
       element.setAttribute('role', 'status'); element.setAttribute('aria-live', 'polite');
       const text = document.createElement('span'); text.className = 'speech-text'; element.appendChild(text);
-      layer.appendChild(element); bubbles.set(who, { element, text, timer: 0, shown: false });
+      layer.appendChild(element); bubbles.set(who, { element, text, timer: 0, shown: false, x: null, y: null, offstage: null });
     }
     return bubbles.get(who);
   }
+  // The DOM is written only when the rounded spot or the visibility changes.
   function place(who, entry) {
-    const point = anchor(who);
-    entry.element.classList.toggle('is-offstage', !point?.visible);
-    if (point?.visible) entry.element.style.transform = `translate3d(${Math.round(point.x)}px, ${Math.round(point.y)}px, 0)`;
+    const point = anchor(who), offstage = !point?.visible;
+    if (offstage !== entry.offstage) { entry.offstage = offstage; entry.element.classList.toggle('is-offstage', offstage); }
+    if (offstage) return;
+    const x = Math.round(point.x), y = Math.round(point.y);
+    if (x !== entry.x || y !== entry.y) { entry.x = x; entry.y = y; entry.element.style.transform = `translate3d(${x}px, ${y}px, 0)`; }
   }
   function hide(who) {
     const entry = bubbles.get(who); if (!entry?.shown) return;

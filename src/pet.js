@@ -1,6 +1,6 @@
 import { getFurniture } from './catalog.js';
 import { petBed, ROOM_BOUNDS } from './layout.js';
-import { navigationObstacles, walkable, clearSegment, findWalkingPath, localPoint, seatsFor } from './companion.js';
+import { navigationObstacles, walkable, clearSegment, findWalkingPath, localPoint, seatsFor, reachableFloor, reaches, cellPoint } from './companion.js';
 
 // The pet's own day: it naps in its bed, wakes with a stretch, strolls to a
 // favorite spot (the fire, the window, a rug, beside you), sits a while and
@@ -25,32 +25,10 @@ export function petHome(layout) {
 }
 export function insideBed(layout, point) {
   const bed = petBed(layout); if (!bed) return false;
-  const [w, d] = bed.rotation % 2 ? [...getFurniture('pet-bed').footprint].reverse() : getFurniture('pet-bed').footprint;
+  const [width, depth] = getFurniture('pet-bed').footprint, w = bed.rotation % 2 ? depth : width, d = bed.rotation % 2 ? width : depth;
   return Math.abs(point.x - bed.x) < w / 2 && Math.abs(point.z - bed.z) < d / 2;
 }
 
-// The floor a pet can reach from its bed, on the same 0.2 grid as walking.
-// Furniture can close off a corner; a pet set down there must not be stuck.
-const GRID = { width: 56, height: 43, step: 0.2, x: -5.5, z: -4.2 };
-const cellPoint = index => ({ x: GRID.x + index % GRID.width * GRID.step, z: GRID.z + Math.floor(index / GRID.width) * GRID.step });
-export function reachableFloor(layout, from, obstacles = petObstacles(layout)) {
-  const total = GRID.width * GRID.height, reached = new Uint8Array(total), queue = [];
-  for (let i = 0; i < total; i++) { const point = cellPoint(i); if (Math.hypot(point.x - from.x, point.z - from.z) < 0.43 && walkable(point, obstacles) && clearSegment(from, point, obstacles)) { reached[i] = 1; queue.push(i); } }
-  while (queue.length) {
-    const current = queue.pop(), x = current % GRID.width, z = Math.floor(current / GRID.width), here = cellPoint(current);
-    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
-      if (x + dx < 0 || x + dx >= GRID.width || z + dz < 0 || z + dz >= GRID.height) continue;
-      const next = current + dx + dz * GRID.width;
-      if (!reached[next] && walkable(cellPoint(next), obstacles) && clearSegment(here, cellPoint(next), obstacles)) { reached[next] = 1; queue.push(next); }
-    }
-  }
-  return reached;
-}
-// One of the four grid cells around a point (k = 0..3), or -1 off the grid.
-function cellNear(point, k) {
-  const gx = Math.floor((point.x - GRID.x) / GRID.step) + (k & 1), gz = Math.floor((point.z - GRID.z) / GRID.step) + (k >> 1);
-  return gx < 0 || gz < 0 || gx >= GRID.width || gz >= GRID.height ? -1 : gz * GRID.width + gx;
-}
 // The closest spot to `point` that can still walk home: the point itself
 // when it can, or the nearest reachable grid spot.
 export function landingSpot(layout, point, home) {
@@ -133,7 +111,7 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
     // One flood fill finds which spots the pet can reach, so the path search
     // runs once, for a spot that it can reach, and never fails.
     const obstacles = petObstacles(layout), reached = walkable(pose, obstacles) ? reachableFloor(layout, pose, obstacles) : null;
-    const reachable = spot => reached && [0, 1, 2, 3].some(k => { const i = cellNear(spot, k); return i >= 0 && reached[i] && clearSegment(spot, cellPoint(i), obstacles); });
+    const reachable = spot => reached && reaches(reached, spot, obstacles);
     const spots = petSpots(layout, { windowX, companion }).filter(spot => (!target || distance(spot, target) > 0.8) && reachable(spot));
     // Loved spots first, with a little chance so a visit is never the same.
     const ordered = spots.map((spot, index) => ({ spot, score: index + random() * 3 })).sort((a, b) => a.score - b.score).map(entry => entry.spot);
@@ -154,10 +132,11 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
       const home = petHome(layout); if (!home) return;
       if (first) { sleepAtHome(true); return; }
       if (pose.held) return;
-      // At home, the pet follows its bed and keeps its nap: a lamp switched
-      // elsewhere in the room does not restart the timer.
+      // At home, the pet follows its bed, turned or moved, and keeps its nap:
+      // a lamp switched elsewhere in the room does not restart the timer.
       if (editing || pose.onBed || ['sleeping', 'settling', 'waking'].includes(pose.state)) {
-        if (distance(pose, home) > 1e-6) Object.assign(pose, { x: home.x, z: home.z, yaw: home.yaw, onBed: true });
+        const turned = pose.state !== 'settling' && Math.abs(Math.atan2(Math.sin(pose.yaw - home.yaw), Math.cos(pose.yaw - home.yaw))) > 1e-6;
+        if (distance(pose, home) > 1e-6 || turned) Object.assign(pose, { x: home.x, z: home.z, yaw: home.yaw, onBed: true });
         return;
       }
       // A piece moved under a sitting or walking pet: it heads home.
@@ -191,18 +170,22 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
       pose.x = spot.x; pose.z = spot.z; goHome = true; timer = wait(AFTER_DROP); status('sitting', 'sit');
     },
     update(dt, reducedMotion) {
-      if (!layout || editing) return pose;
+      if (!layout) return pose;
       // Frames are steady in full motion; reduced motion may pass a long gap.
       if (!reducedMotion) dt = Math.min(dt, 0.1);
+      // A pet given in Decorate still ends its heart.
       if (pose.petAge < PET_REACTION) pose.petAge += dt; else pose.petAge = Infinity;
-      if (pose.held) return pose;
+      if (editing || pose.held) return pose;
       if (reducedMotion) {
         // No strolls: the pet stays asleep at home, or snaps home after a drop.
         if (pose.state === 'sitting' && (timer -= dt) <= 0) sleepAtHome();
         else if (!['sitting', 'sleeping'].includes(pose.state)) sleepAtHome();
         return pose;
       }
-      if (pose.state === 'sleeping') { if ((timer -= dt) <= 0 && pose.petAge === Infinity) { timer = STRETCH; status('waking', 'stretch'); } }
+      // A pet that the companion comes to pet, or is petting, stays put
+      // until the fuss ends.
+      const fussed = companion?.goal === 'pet' || (companion?.state === 'busy' && companion.activity === 'pet');
+      if (pose.state === 'sleeping') { if ((timer -= dt) <= 0 && pose.petAge === Infinity && !fussed) { timer = STRETCH; status('waking', 'stretch'); } }
       else if (pose.state === 'waking') { if ((timer -= dt) <= 0) wander(); }
       else if (pose.state === 'settling') {
         const home = petHome(layout), progress = 1 - Math.max(0, timer -= dt) / SETTLE, turn = Math.atan2(Math.sin(home.yaw - settleFrom), Math.cos(home.yaw - settleFrom)) + Math.PI * 2;
@@ -210,7 +193,7 @@ export function createPetRoutine({ random = Math.random, onChange = () => {} } =
         if (timer <= 0) { timer = wait([32, 62]); pose.yaw = home.yaw; status('sleeping', 'sleep'); }
       }
       else if (pose.state === 'sitting') {
-        if ((timer -= dt) <= 0 && pose.petAge === Infinity) {
+        if ((timer -= dt) <= 0 && pose.petAge === Infinity && !fussed) {
           if (!goHome && visits < 2 && random() < 0.45) wander(); else { goHome = false; goHomeNow(); }
         }
       } else if (trip) {

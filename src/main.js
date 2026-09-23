@@ -211,7 +211,7 @@ try {
       $('#loading-note').hidden = true;
       setDecorEntry(true);
       // Back after half an hour or more: a small hello.
-      if (state.seenAt && Date.now() - state.seenAt > 30 * 60_000) setTimeout(() => avatarSay('welcome', { force: true }), 1200);
+      if (state.seenAt && Date.now() - state.seenAt > 30 * 60_000) setTimeout(welcome, 1200);
     },
     onCompanionTap({ state: activity, activity: doing }) {
       const lines = (activity === 'busy' || (activity === 'resting' && doing === 'read')) ? AVATAR_LINES.activity[doing] : AVATAR_LINES.tap[activity];
@@ -726,9 +726,11 @@ window.addEventListener('storage', event => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshState(); }, { signal: listeners.signal });
 // Remember the last visit, for a hello after a long time away.
 function markSeen() { store.update(draft => { draft.seenAt = Date.now(); }); }
+// A hello after a long time away, but never in the middle of focus.
+function welcome() { if (!state.session.running) avatarSay('welcome', { force: true }); }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenSince = Date.now(); markSeen(); }
-  else if (hiddenSince && Date.now() - hiddenSince > 10 * 60_000) { hiddenSince = 0; setTimeout(() => avatarSay('welcome', { force: true }), 600); }
+  else if (hiddenSince && Date.now() - hiddenSince > 10 * 60_000) { hiddenSince = 0; setTimeout(welcome, 600); }
 }, { signal: listeners.signal });
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 

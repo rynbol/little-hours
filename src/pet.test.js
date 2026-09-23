@@ -86,23 +86,39 @@ test('petting pauses a nap and a walk; editing and reduced motion keep the pet h
   advance(routine, 3); assert.notDeepEqual({ x: routine.pose.x, z: routine.pose.z }, before, 'then carries on');
   routine.setEditing(true); assert.equal(routine.pose.state, 'sleeping'); assert.ok(distance(routine.pose, petHome(layout)) < 1e-6);
   advance(routine, 60); assert.equal(routine.pose.state, 'sleeping', 'no strolls while decorating');
+  routine.pet(); advance(routine, PET_REACTION + 0.5); assert.equal(routine.pose.petAge, Infinity, 'a pet given in Decorate still ends its heart');
   routine.setEditing(false); advance(routine, 120, true); assert.equal(routine.pose.state, 'sleeping', 'reduced motion: no strolls');
   // A moved bed takes the sleeping pet with it, without restarting its nap.
   const moved = structuredClone(layout); Object.assign(petBed(moved), { x: -3.5, z: 2, rotation: 1 });
   routine.setLayout(moved); assert.deepEqual([routine.pose.x, routine.pose.z], [-3.5, 2]);
+  // A bed turned in place turns the pet with it.
+  const turned = structuredClone(moved); petBed(turned).rotation = 2;
+  routine.setLayout(turned); assert.equal(routine.pose.yaw, petHome(turned).yaw); assert.notEqual(petHome(turned).yaw, petHome(moved).yaw);
 });
 
+test('a pet that the companion is petting stays put until the fuss ends', () => {
+  const layout = createLayout('ember-library'), routine = createPetRoutine({ random: seeded(5) }), companion = { state: 'walking', activity: null, goal: 'pet', x: 0, z: 0 };
+  routine.setLayout(layout); routine.setCompanion(companion);
+  advance(routine, 45); assert.equal(routine.pose.state, 'sleeping', 'it waits while the companion comes over');
+  Object.assign(companion, { state: 'busy', activity: 'pet', goal: null });
+  advance(routine, 45); assert.equal(routine.pose.state, 'sleeping', 'no waking up mid-fuss, however long the nap timer');
+  companion.state = 'walking'; companion.activity = null;
+  advance(routine, 4); assert.notEqual(routine.pose.state, 'sleeping', 'the fuss over, the overdue nap ends');
+});
 test('cat and dog models: one mesh, finite poses, paws on the floor, eyes that close for a nap', () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   try {
     for (const species of Object.keys(PETS)) {
       const model = createPetModel(scene, species), meshes = scene.meshes.length, geometry = model.body.geometry;
       const pose = { action: 'sleep', moving: false, walked: 0, petAge: Infinity };
-      const positions = () => model.body.getPositionData(true);
+      // The skeleton recomputes its matrices once per render; without a
+      // render, force it, or every read sees the first pose.
+      const positions = () => { model.body.skeleton.prepare(true); return model.body.getPositionData(true); };
+      const poses = new Set();
       for (const action of ['sleep', 'stretch', 'walk', 'stand', 'sit', 'loaf', 'held', 'settle']) {
         pose.action = action; pose.moving = action === 'walk';
         for (let i = 0; i < 90; i++) { pose.walked += pose.moving ? 0.01 : 0; model.animate(pose, 1 / 30, i / 30, false); }
-        const data = positions(), normals = model.body.getNormalsData(true);
+        const data = positions(), normals = model.body.getNormalsData(true); poses.add(Array.from(data.slice(0, 300)).join());
         assert.ok(data.every(Number.isFinite) && normals.every(Number.isFinite), `${species} ${action} is finite`);
         let lowest = Infinity; for (let j = 1; j < data.length; j += 3) lowest = Math.min(lowest, data[j]);
         if (action !== 'held') assert.ok(lowest > -0.02, `${species} ${action} stays on the floor (${lowest.toFixed(3)})`);
@@ -110,6 +126,7 @@ test('cat and dog models: one mesh, finite poses, paws on the floor, eyes that c
         let inside = true; for (let j = 0; j < data.length; j += 3) inside &&= data[j] >= box.minimum.x && data[j] <= box.maximum.x && data[j + 1] <= box.maximum.y && data[j + 2] >= box.minimum.z && data[j + 2] <= box.maximum.z;
         assert.ok(inside, `${species} ${action} fits its picking box`);
       }
+      assert.equal(poses.size, 8, `${species}: eight distinct poses`);
       // Asleep, the pet shows closed eyes and floating letters; petting brings a heart.
       pose.action = 'sleep'; pose.moving = false; for (let i = 0; i < 60; i++) model.animate(pose, 1 / 30, 3 + i / 30, false);
       assert.equal(model.sleepLetters.isEnabled(), true); assert.equal(model.heart.isEnabled(), false);

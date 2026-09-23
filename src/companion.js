@@ -62,6 +62,37 @@ export function clearSegment(a, b, obstacles) {
 }
 // Small floor grid, searched only when a trip begins or its destination changes.
 // Every diagonal and shortcut is checked with the companion's clearance radius.
+// The floor that can be reached from `from` (a point or several), on the
+// same 0.2 grid as walking. Furniture can close off a corner: a flood fill
+// finds that once, so no path search runs to failure.
+const GRID = { width: 56, height: 43, step: STEP, x: -5.5, z: -4.2 };
+export const cellPoint = index => ({ x: GRID.x + index % GRID.width * GRID.step, z: GRID.z + Math.floor(index / GRID.width) * GRID.step });
+export function reachableFloor(layout, from, obstacles = navigationObstacles(layout)) {
+  const total = GRID.width * GRID.height, reached = new Uint8Array(total), queue = [], sources = Array.isArray(from) ? from : [from];
+  for (let i = 0; i < total; i++) {
+    const point = cellPoint(i);
+    if (!reached[i] && walkable(point, obstacles) && sources.some(source => Math.hypot(point.x - source.x, point.z - source.z) < 0.43 && clearSegment(source, point, obstacles))) { reached[i] = 1; queue.push(i); }
+  }
+  while (queue.length) {
+    const current = queue.pop(), x = current % GRID.width, z = Math.floor(current / GRID.width), here = cellPoint(current);
+    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+      if (x + dx < 0 || x + dx >= GRID.width || z + dz < 0 || z + dz >= GRID.height) continue;
+      const next = current + dx + dz * GRID.width;
+      if (!reached[next] && walkable(cellPoint(next), obstacles) && clearSegment(here, cellPoint(next), obstacles)) { reached[next] = 1; queue.push(next); }
+    }
+  }
+  return reached;
+}
+// Whether `point` joins the reached floor: one of the four grid cells
+// around it is reached and in a clear line.
+export function reaches(reached, point, obstacles) {
+  const gx = Math.floor((point.x - GRID.x) / GRID.step), gz = Math.floor((point.z - GRID.z) / GRID.step);
+  for (let k = 0; k < 4; k++) {
+    const x = gx + (k & 1), z = gz + (k >> 1), i = z * GRID.width + x;
+    if (x >= 0 && z >= 0 && x < GRID.width && z < GRID.height && reached[i] && clearSegment(point, cellPoint(i), obstacles)) return true;
+  }
+  return false;
+}
 export function findWalkingPath(layout, start, end, obstacles = navigationObstacles(layout)) {
   if (!walkable(start, obstacles) || !walkable(end, obstacles)) return null;
   if (clearSegment(start, end, obstacles)) return [start, end];
@@ -163,10 +194,12 @@ export function planActivityTrip(layout, source, spot) {
 // a plant, at the record player, at the window, beside a still pet, and at
 // night beside an unlit floor lamp. `reach` is where its hand goes (y above
 // the floor), for the pieces it touches.
-export function activitySpots(layout, { night = false, windowX = -2.7, pet = null } = {}) {
+export function activitySpots(layout, { night = false, windowX = -2.7, pet = null, canReach = null } = {}) {
   const obstacles = navigationObstacles(layout), spots = [];
+  // The pet is no obstacle for walking, but nothing is done standing on it.
+  const clearOfPet = point => !pet || pet.held || distance(point, pet) > 0.6;
   const add = (kind, point, look, itemId = null, reach = null) => {
-    if (!walkable(point, obstacles)) return false;
+    if (!walkable(point, obstacles) || (kind !== 'pet' && !clearOfPet(point)) || (canReach && !canReach(point))) return false;
     spots.push({ kind, itemId, x: point.x, z: point.z, yaw: facing(point, look), reach: typeof reach === 'function' ? reach(point) : reach }); return true;
   };
   // In front of a piece first, then beside it, then behind it.
@@ -193,18 +226,20 @@ export function activitySpots(layout, { night = false, windowX = -2.7, pet = nul
 }
 
 export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, random = Math.random } = {}) {
-  const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null };
+  const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null, goal: null, seated: false, portal: null };
   let layout, intent = 'idle', editing = false, anchor = null, trip = null, legs = [], legIndex = 0, elapsed = 0, restTime = 0;
   // One activity per break; `reduced` is the last reduced-motion setting,
-  // which skips standing activities.
+  // which skips standing activities. A lamp or record player is switched on
+  // at most once per visit (`switched`), so one switched off on purpose stays off.
   let context = { night: false, windowX: -2.7, pet: null }, breakUsed = false, lastKind = null, used = false, reduced = false;
+  const switched = new Set();
   function status(state) { if (pose.state !== state) { pose.state = state; onChange({ state, atDesk: pose.atDesk, activity: pose.activity }); } }
   const seatType = end => layout.items.find(item => item.id === end.itemId)?.type;
   function deskPose() {
     const desk = layout?.items.find(item => item.id === layout.activeDeskId);
     if (!desk) return;
     const seat = seatsFor(desk)[0];
-    Object.assign(pose, { x: seat.seat.x, z: seat.seat.z, yaw: seat.yaw, atDesk: true, sit: 1, seatHeight: .80, doze: 0, moving: false, activity: null });
+    Object.assign(pose, { x: seat.seat.x, z: seat.seat.z, yaw: seat.yaw, atDesk: true, sit: 1, seatHeight: .80, doze: 0, moving: false, activity: null, goal: null, seated: false, portal: null });
     anchor = null; trip = null; legs = []; restTime = 0;
     status(intent === 'working' ? 'working' : intent === 'break' ? 'resting-at-desk' : 'idle');
   }
@@ -223,7 +258,8 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       if (planned.end.side) add(planned.end.portal, planned.end.side, 'walk');
       add(planned.end.side || planned.end.portal, planned.end.seat, 'sit', 0, 1, planned.end.yaw);
     }
-    pose.atDesk = false; pose.doze = 0; pose.moving = true; pose.activity = null;
+    // `goal` tells the pet that the companion is on its way to pet it.
+    pose.atDesk = false; pose.doze = 0; pose.moving = true; pose.activity = null; pose.goal = planned.end.activity || null; pose.seated = false; pose.portal = null;
     status(toDesk ? 'returning' : 'walking');
     return true;
   }
@@ -233,7 +269,11 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   function startBreak() {
     if (!breakUsed) {
       breakUsed = true;
-      const spots = reduced ? [] : activitySpots(layout, context), lamp = spots.find(spot => spot.kind === 'lamp');
+      // One flood fill from the desk's chair exits: every spot offered can be
+      // reached, and a piece's first reachable side wins.
+      const obstacles = navigationObstacles(layout), exits = seatsFor(layout.items.find(item => item.id === layout.activeDeskId)).filter(seat => usableSeat(layout, seat)).map(seat => seat.portal);
+      const reached = !reduced && exits.length ? reachableFloor(layout, exits, obstacles) : null;
+      const spots = reached ? activitySpots(layout, { ...context, canReach: point => reaches(reached, point, obstacles) }) : [], lamp = spots.find(spot => spot.kind === 'lamp' && !switched.has(spot.itemId));
       const choices = [...spots.filter(spot => spot.kind !== 'lamp'), ...(layout.items.some(item => item.type === 'lounge-chair') ? [{ kind: 'read' }] : [])]
         .map(choice => ({ choice, score: random() + (choice.kind === lastKind ? 2 : 0) })).sort((a, b) => a.score - b.score).map(entry => entry.choice);
       for (const choice of lamp ? [lamp, ...choices] : choices) {
@@ -250,7 +290,9 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     if (!startTrip(here, false) && !startTrip(here, true)) deskPose();
   }
   function arrive(end) {
-    anchor = end; trip = null; legs = []; pose.atDesk = end.desk; pose.moving = false; pose.yaw = end.yaw;
+    anchor = end; trip = null; legs = []; pose.atDesk = end.desk; pose.moving = false; pose.yaw = end.yaw; pose.goal = null;
+    // Seated away from the desk, the pet may curl up at its feet, clear of its way out.
+    pose.seated = !end.desk && !end.activity; pose.portal = pose.seated ? end.portal : null;
     pose.activity = end.activity || (!end.desk && seatType(end) === 'lounge-chair' ? 'read' : null); pose.activityTime = 0; pose.reach = end.reach || null; pose.useAt = ACTIVITIES[end.activity]?.useAt ?? null; used = false;
     status(end.desk ? intent === 'working' ? 'working' : 'idle' : end.activity ? 'busy' : 'resting'); reconcile();
   }
@@ -288,6 +330,9 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       }
       deskPose(); reconcile();
     },
+    // The same furniture in the same places, with only switches changed:
+    // the companion keeps its plan and reads the new object.
+    useLayout(next) { layout = next; },
     setIntent(next) {
       if (!['idle', 'working', 'break'].includes(next) || next === intent) return;
       intent = next; if (next !== 'break') breakUsed = false; reconcile();
@@ -322,7 +367,11 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
         // fire switched off, ends it early.
         const plan = ACTIVITIES[pose.activity], pet = context.pet;
         pose.activityTime += Math.min(dt, .1);
-        if (!used && plan.useAt != null && pose.activityTime >= plan.useAt && !reducedMotion) { used = true; onUse({ kind: pose.activity, itemId: anchor.itemId }); }
+        if (!used && plan.useAt != null && pose.activityTime >= plan.useAt && !reducedMotion) {
+          used = true;
+          const toggles = pose.activity === 'lamp' || pose.activity === 'record';
+          if (!toggles || !switched.has(anchor.itemId)) { if (toggles) switched.add(anchor.itemId); onUse({ kind: pose.activity, itemId: anchor.itemId }); }
+        }
         const petGone = pose.activity === 'pet' && (!pet || pet.moving || pet.held || distance(pet, anchor.seat) > 1.3);
         const cold = pose.activity === 'warm' && layout.items.find(item => item.id === anchor.itemId)?.off;
         if (reducedMotion || pose.activityTime >= plan.seconds || petGone || cold) leaveActivity();

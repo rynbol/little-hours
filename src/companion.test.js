@@ -4,6 +4,7 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { PRESETS, createLayout } from './layout.js';
 import { createMobileCompanion, disposeFurnitureAssets } from './furniture.js';
+import { petSpots } from './pet.js';
 import { companionIntent, localPoint, planCompanionTrip, planActivityTrip, activitySpots, navigationObstacles, walkable, clearSegment, createCompanionRoutine, DOZE_AFTER, ACTIVITIES } from './companion.js';
 
 const advance = (routine, seconds, reduced = false) => { for (let i = 0; i < Math.ceil(seconds * 60); i++) routine.update(1 / 60, reduced); };
@@ -42,6 +43,10 @@ test('breaks do one thing in the room, settle on a seat, doze, and resume workin
   assert.notDeepEqual({ x: routine.pose.x, z: routine.pose.z }, first);
   assert.equal(until(routine, 'busy', 30), 'busy'); assert.ok(ACTIVITIES[routine.pose.activity]); assert.equal(routine.pose.sit, 0, 'an activity is done standing');
   assert.equal(until(routine, 'resting', 60), 'resting'); assert.equal(routine.pose.atDesk, false); assert.equal(routine.pose.sit, 1);
+  // Seated, it tells the pet where its feet and its way out are.
+  assert.ok(routine.pose.seated && routine.pose.portal, 'seated, with a way out');
+  const friends = petSpots(createLayout('writers-loft'), { companion: routine.pose }).filter(spot => spot.kind === 'friend');
+  assert.ok(friends.length >= 1 && friends.every(spot => Math.hypot(spot.x - routine.pose.portal.x, spot.z - routine.pose.portal.z) > 0.65), 'the pet can curl up at its feet, clear of its way out');
   advance(routine, DOZE_AFTER + 2.5); assert.equal(routine.pose.state, 'sleeping'); assert.equal(routine.pose.doze, 1);
   routine.setIntent('working'); assert.equal(routine.pose.state, 'returning');
   advance(routine, 20); assert.equal(routine.pose.state, 'working'); assert.equal(routine.pose.atDesk, true);
@@ -82,6 +87,24 @@ test('at night an unlit lamp comes first: the companion switches it on once, the
   assert.ok(Math.abs(uses[0].at - ACTIVITIES.lamp.useAt) < 0.05, 'the switch clicks at its moment');
   assert.equal(until(routine, 'resting', 40), 'resting');
   assert.equal(uses.length, 1, 'nothing else is used');
+  // Switched off again on purpose, the lamp stays off for the rest of the visit.
+  lamp.off = true; routine.setIntent('working'); assert.equal(until(routine, 'working', 40), 'working');
+  routine.setIntent('break'); for (let i = 0; i < 60 * 60 && routine.pose.state !== 'resting'; i++) { routine.update(1 / 60, false); assert.notEqual(routine.pose.activity, 'lamp'); }
+  assert.equal(uses.filter(use => use.kind === 'lamp').length, 1, 'no second switch-on');
+});
+test('a night break reaches an unlit lamp from whichever side is open', () => {
+  // The Cloud loft lamp stands in a corner: only its back side can be reached.
+  const layout = createLayout('cloud-loft'), lamp = layout.items.find(item => item.type === 'floor-lamp'); lamp.off = true;
+  const routine = createCompanionRoutine(() => {}, { random: () => 0.5 }); routine.setLayout(layout); routine.setContext({ night: true }); routine.setIntent('break');
+  assert.equal(routine.pose.goal, 'lamp'); assert.equal(until(routine, 'busy', 40), 'busy'); assert.equal(routine.pose.activity, 'lamp');
+});
+test('activity spots keep clear of a still pet', () => {
+  const layout = createLayout('writers-loft'), fire = layout.items.find(item => item.type === 'fireplace');
+  const warm = activitySpots(layout).find(spot => spot.kind === 'warm');
+  assert.ok(warm, 'the loft hearth has a warm spot');
+  const pet = { x: warm.x + 0.2, z: warm.z, yaw: 0, state: 'sitting', moving: false, held: false };
+  assert.ok(!activitySpots(layout, { pet }).some(spot => spot.kind === 'warm' && spot.itemId === fire.id), 'no warming up on top of the pet');
+  assert.ok(activitySpots(layout, { pet: { ...pet, held: true } }).some(spot => spot.kind === 'warm'), 'a carried pet is no bother');
 });
 test('resuming focus during an activity walks straight back to the desk, without a rise', () => {
   const routine = createCompanionRoutine(() => {}, { random: () => 0.5 }); routine.setLayout(createLayout('ember-library')); routine.setIntent('break');
@@ -126,6 +149,14 @@ test('a pet that gets up ends the fuss early; a moved piece sends a busy compani
   warm.setLayout(moved); assert.equal(warm.pose.state, 'busy'); assert.deepEqual({ x: warm.pose.x, z: warm.pose.z }, spot);
   const shifted = structuredClone(moved); shifted.items.find(item => item.type === 'fireplace').x += 0.4;
   warm.setLayout(shifted); assert.equal(warm.pose.state, 'walking'); assert.equal(warm.pose.activity, null);
+  // A layout with only a switch changed (a reset, or another tab) is read
+  // without a new plan: the companion sees that a lamp is now lit.
+  const lit = createCompanionRoutine(() => {}, { random: () => 0.5 }), dark = createLayout('moonlit-greenhouse');
+  dark.items.find(item => item.type === 'floor-lamp').off = true;
+  lit.setLayout(dark); lit.setContext({ night: true }); lit.setIntent('working');
+  const relit = structuredClone(dark); delete relit.items.find(item => item.type === 'floor-lamp').off;
+  lit.useLayout(relit); lit.setIntent('break');
+  assert.equal(until(lit, 'busy', 40), 'busy'); assert.notEqual(lit.pose.activity, 'lamp', 'no walk to a lamp that is already lit');
   // A fire switched off (a tap changes the live layout in place) ends the warming.
   const cold = createCompanionRoutine(() => {}, { random: () => 0.5 }), hearth = structuredClone(onlyFire);
   cold.setLayout(hearth); cold.setContext({ windowX: 40 }); cold.setIntent('break');

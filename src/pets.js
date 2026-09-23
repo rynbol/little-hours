@@ -278,6 +278,11 @@ export function createPetModel(scene, species = 'cat') {
   const breathChest = new Vector3(1, 1, 1), breathHips = new Vector3(1, 1, 1);
   let gait = 0, lastWalked = 0, eyesShown = 'open', mouthShown = false, blinkAt = 3, skipped = false;
   const place = (name, rotation, at, scaling = one) => Matrix.ComposeToRef(scaling, rotation, at, bones.get(name));
+  // Stride offsets for one paw (diagonal pairs move together), from the
+  // frame's walk weight and gait phase.
+  let stepWalking = 0, stepGait = 0;
+  const stepZ = key => stepWalking * Math.sin(stepGait + (key === 'fl' || key === 'br' ? 0 : Math.PI)) * spec.stride * 0.45;
+  const stepY = key => stepWalking * Math.max(0, Math.cos(stepGait + (key === 'fl' || key === 'br' ? 0 : Math.PI))) * 0.045;
   function segment(name, a, b) {
     b.subtractToRef(a, dir); const length = dir.length(); dir.scaleInPlace(1 / Math.max(length, 1e-6));
     Quaternion.FromUnitVectorsToRef(UP, dir, qTemp); stretch.set(1, length, 1); place(name, qTemp, a, stretch);
@@ -368,8 +373,7 @@ export function createPetModel(scene, species = 'cat') {
         v.rotateByQuaternionToRef(qHead, w); w.addInPlace(head); qHead.multiplyToRef(qLocal, qTemp); place(name, qTemp, w);
       }
       // Paws: stride offsets on top of the pose's paw targets.
-      const stepZ = key => walking * Math.sin(gait + (key === 'fl' || key === 'br' ? 0 : Math.PI)) * spec.stride * 0.45;
-      const stepY = key => walking * Math.max(0, Math.cos(gait + (key === 'fl' || key === 'br' ? 0 : Math.PI))) * 0.045;
+      stepWalking = walking; stepGait = gait;
       for (const key of PAWS) { paws[key].z += stepZ(key); paws[key].y += stepY(key); }
       leg('fl', spec.front, qChest, chest); leg('fr', spec.front, qChest, chest); leg('bl', spec.hind, qHips, hips); leg('br', spec.hind, qHips, hips);
       for (const key of PAWS) { paws[key].z -= stepZ(key); paws[key].y -= stepY(key); }
