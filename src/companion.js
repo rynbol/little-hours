@@ -177,7 +177,8 @@ export function activitySpots(layout, { night = false, windowX = -2.7, pet = nul
   // A point `by` from `from` toward `to`, at height `y`.
   const toward = (from, to, by, y) => { const d = Math.max(distance(from, to), 1e-6); return { x: from.x + (to.x - from.x) / d * by, z: from.z + (to.z - from.z) / d * by, y }; };
   for (const item of layout.items) {
-    const depth = getFurniture(item.type)?.footprint[1] ?? 0;
+    // Wall pieces have no floor footprint.
+    const depth = getFurniture(item.type)?.footprint?.[1] ?? 0;
     if (item.type === 'fireplace' && !item.off) add('warm', localPoint(item, 0, depth / 2 + 0.75), item, item.id);
     else if (item.type === 'plant' || item.type === 'moon-tree') around(item, 'water', 0.45);
     else if (item.type === 'low-cabinet') add('record', localPoint(item, -0.25, depth / 2 + 0.26), localPoint(item, -0.25, 0), item.id, { ...localPoint(item, -0.25, 0.14), y: 1.05 });

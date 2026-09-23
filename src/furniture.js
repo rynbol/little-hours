@@ -5,6 +5,8 @@ import { CreateBox, CreateSegmentedBoxVertexData } from '@babylonjs/core/Meshes/
 import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder.js';
 import { CreateCylinder } from '@babylonjs/core/Meshes/Builders/cylinderBuilder.js';
 import { CreateLineSystem } from '@babylonjs/core/Meshes/Builders/linesBuilder.js';
+import { CreateTube } from '@babylonjs/core/Meshes/Builders/tubeBuilder.js';
+import { CreatePlane } from '@babylonjs/core/Meshes/Builders/planeBuilder.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { Vector3, Quaternion } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
@@ -90,7 +92,7 @@ function material(scene, color, extra = {}) {
     result.specularColor = new Color3(extra.metalness ? 0.32 : 0.045, extra.metalness ? 0.27 : 0.045, extra.metalness ? 0.18 : 0.045);
     result.specularPower = extra.metalness ? 48 : 20;
     result.emissiveColor = extra.emissive ? Color3.FromHexString(extra.emissive).scale(extra.emissiveIntensity ?? 1) : Color3.Black();
-    result.metadata = { batchKey: JSON.stringify({ metal: Boolean(extra.metalness), emissive: extra.emissive || null, intensity: extra.emissiveIntensity || 0 }) };
+    result.metadata = { batchKey: JSON.stringify({ metal: Boolean(extra.metalness), emissive: extra.emissive || null, intensity: extra.emissiveIntensity || 0, ...(extra.accent ? { accent: true } : {}) }) };
     cache.materials.set(key, result);
   }
   return cache.materials.get(key);
@@ -107,8 +109,8 @@ function sphere(parent, size, position, color) {
   const result = mesh(parent, CreateSphere('soft-form', { diameter: 2, segments: 6 }, parent.getScene()), color, position);
   result.scaling.set(...size); return result;
 }
-function cylinder(parent, top, bottom, height, position, color, extra = {}) {
-  return mesh(parent, CreateCylinder('turned-form', { diameterTop: top * 2, diameterBottom: bottom * 2, height, tessellation: 12 }, parent.getScene()), color, position, extra);
+function cylinder(parent, top, bottom, height, position, color, { segments = 12, ...extra } = {}) {
+  return mesh(parent, CreateCylinder('turned-form', { diameterTop: top * 2, diameterBottom: bottom * 2, height, tessellation: segments }, parent.getScene()), color, position, extra);
 }
 function rod(parent, a, b, radius, color, extra = {}) {
   const start = new Vector3(...a), end = new Vector3(...b), delta = end.subtract(start);
@@ -144,8 +146,11 @@ function batch(source) {
     const mat = part.material, key = mat.metadata.batchKey;
     if (!cache.batches.has(key)) {
       const result = new StandardMaterial(`furniture-batch-${key}`, scene);
-      result.diffuseColor = Color3.White(); result.specularColor = mat.specularColor.clone();
+      // An accent keeps its color on the material too, so its whole light is
+      // tinted like the rooms' own glowing parts.
+      result.diffuseColor = JSON.parse(key).accent ? mat.diffuseColor.clone() : Color3.White(); result.specularColor = mat.specularColor.clone();
       result.specularPower = mat.specularPower; result.emissiveColor = mat.emissiveColor.clone();
+      if (JSON.parse(key).accent) result.metadata = { accent: mat.emissiveColor.clone() };
       cache.batches.set(key, result);
     }
     part.computeWorldMatrix(true);
@@ -165,6 +170,8 @@ function batch(source) {
     object.material = cache.batches.get(key); object.parent = result;
     object.useVertexColors = true; object.hasVertexAlpha = false;
     object.receiveShadows = true; object.isPickable = true;
+    // Glowing accents cast no shadows, like the rooms' own.
+    if (JSON.parse(key).accent) object.metadata = { castShadow: false };
   }
   source.dispose(false, false); return result;
 }
@@ -534,6 +541,87 @@ function moonRug(parent) {
     box(parent, [size * 0.2, 0.005, size * 1.9], [x, 0.077, z], '#d9c495', 0.001);
     box(parent, [size * 1.9, 0.005, size * 0.2], [x, 0.077, z], '#d9c495', 0.001);
   }
+}
+
+// Wall pieces. Each is modeled around the center of its rectangle on the wall,
+// with its back on the wall face (z = 0) and z pointing into the room. The
+// retreat's frames, clock and potion shelf and the themed rooms' scroll, cloud
+// shelves, rainbow, neon sign and records keep their original shapes.
+function tube(parent, points, radius, color, extra) {
+  return mesh(parent, CreateTube('soft-curve', { path: points.map(point => new Vector3(...point)), radius, tessellation: 6, cap: Mesh.CAP_ALL }, parent.getScene()), color, [0, 0, 0], extra);
+}
+const pictureSizes = { 'tall-frame': [0.88, 1.23], 'small-frame': [0.60, 0.86], 'wide-frame': [1.32, 0.86] };
+function frame(parent, size, color) { box(parent, [...size, 0.08], [0, 0, 0.09], color, 0.025); }
+function moonClockCase(parent) {
+  const brass = { metalness: 0.45 };
+  const rim = cylinder(parent, 0.43, 0.43, 0.08, [0, 0.39, 0.04], C.brass, { ...brass, segments: 32 }); rim.rotation.x = Math.PI / 2;
+  const face = cylinder(parent, 0.37, 0.37, 0.015, [0, 0.39, 0.09], '#e5d4ac', { segments: 32 }); face.rotation.x = Math.PI / 2;
+  box(parent, [0.31, 0.87, 0.065], [0, -0.38, 0.04], '#503d30', 0.035);
+  for (let i = 0; i < 12; i++) { const angle = i / 12 * Math.PI * 2; sphere(parent, [0.018, 0.018, 0.008], [Math.cos(angle) * 0.31, 0.39 + Math.sin(angle) * 0.31, 0.107], '#503d30'); }
+}
+function apothecaryShelf(parent) {
+  box(parent, [1.4, 0.11, 0.60], [0, -0.2975, 0.31], '#926747', 0.025);
+  const colors = ['#768d77', '#b09572', '#95839d', '#b9795e'];
+  for (let i = 0; i < 4; i++) {
+    const x = 0.465 - i * 0.31, h = 0.24 + (i % 3) * 0.09, base = -0.1875;
+    cylinder(parent, 0.075, 0.11, h, [x, base + h / 2, 0.41], colors[i]); cylinder(parent, 0.04, 0.06, 0.10, [x, base + 0.02 + h, 0.41], colors[i]);
+    cylinder(parent, 0.045, 0.045, 0.06, [x, base + 0.09 + h, 0.41], '#ac8357');
+  }
+}
+function wallShelf(parent) {
+  const y = 0.18; // Centers the shelf, books and trailing leaves on the wall rectangle.
+  box(parent, [1.6, 0.08, 0.40], [0, y - 0.32, 0.21], C.wood, 0.02);
+  for (const x of [-0.62, 0.62]) box(parent, [0.05, 0.16, 0.30], [x, y - 0.40, 0.16], C.darkWood, 0.012);
+  for (let i = 0; i < 5; i++) { const h = 0.30 + (i * 7 % 5) * 0.025; box(parent, [0.085, h, 0.26], [-0.66 + i * 0.095, y - 0.28 + h / 2, 0.19], bookColors[i], 0.006); }
+  const leaning = box(parent, [0.085, 0.34, 0.26], [-0.13, y - 0.12, 0.19], bookColors[5], 0.006); leaning.rotation.z = -0.32;
+  cylinder(parent, 0.06, 0.065, 0.18, [0.12, y - 0.19, 0.2], '#ead6aa'); cylinder(parent, 0.008, 0.035, 0.07, [0.12, y - 0.055, 0.2], '#ffd186', candleGlow);
+  cylinder(parent, 0.13, 0.10, 0.17, [0.52, y - 0.195, 0.2], C.terracotta);
+  for (let i = 0; i < 9; i++) { const t = i / 8; sphere(parent, [0.07, 0.035, 0.05], [0.5 + Math.sin(i * 1.9) * 0.14, y - 0.13 - t * 0.2 + (i % 2) * 0.05, 0.25 + Math.cos(i * 1.3) * 0.08], i % 2 ? C.leaf : '#95a576').rotation.set(0.4, i, i % 2 ? 0.5 : -0.5); }
+  for (let i = 0; i < 6; i++) sphere(parent, [0.055, 0.03, 0.045], [0.64 - i * 0.012, y - 0.34 - i * 0.012, 0.36 - i * 0.004], i % 2 ? C.leaf : C.darkLeaf).rotation.set(0.9, i * 0.7, 0.3);
+}
+function hangingPlant(parent) {
+  const brass = { metalness: 0.4 };
+  box(parent, [0.16, 0.22, 0.04], [0, 0.52, 0.02], C.brass, 0.012);
+  rod(parent, [0, 0.55, 0.03], [0, 0.55, 0.25], 0.014, C.brass, brass);
+  for (const angle of [0, 2.1, 4.2]) rod(parent, [0, 0.55, 0.25], [Math.cos(angle) * 0.16, 0.26, 0.25 + Math.sin(angle) * 0.16], 0.006, '#c9b78f');
+  cylinder(parent, 0.18, 0.13, 0.22, [0, 0.16, 0.25], C.terracotta); cylinder(parent, 0.19, 0.19, 0.035, [0, 0.27, 0.25], C.terracotta);
+  for (let strand = 0; strand < 5; strand++) {
+    const angle = strand * 1.26, x0 = Math.cos(angle) * 0.14, z0 = 0.25 + Math.sin(angle) * 0.12;
+    for (let i = 0; i < 7; i++) { const t = i / 6; sphere(parent, [0.075, 0.04, 0.055], [x0 + Math.sin(t * 3 + strand) * 0.05, 0.26 - t * (0.62 + strand % 2 * 0.2), z0], (strand + i) % 2 ? C.leaf : '#95a576').rotation.set(0.5, angle + i, (i % 2 ? 0.6 : -0.6)); }
+  }
+}
+function wallScroll(parent) {
+  box(parent, [1.28, 2.25, 0.045], [0, -0.005, 0.05], '#faf0da', 0);
+  for (const y of [-1.165, 1.165]) rod(parent, [-0.75, y, 0.13], [0.75, y, 0.13], 0.038, '#795e46');
+  tube(parent, [[-0.32, -0.975, 0.12], [0.12, -0.225, 0.12], [-0.05, 0.225, 0.12], [0.39, 0.855, 0.12]], 0.023, '#64594e');
+  for (let i = 0; i < 9; i++) {
+    const x = -0.32 + (i % 3) * 0.25, y = -0.225 + Math.floor(i / 3) * 0.29;
+    for (let p = 0; p < 5; p++) sphere(parent, [0.05, 0.06, 0.012], [x + Math.cos(p * 1.257) * 0.065, y + Math.sin(p * 1.257) * 0.065, 0.17], i % 2 ? '#d3979c' : '#e8b3b0');
+  }
+}
+function cloudShelf(parent, width) {
+  box(parent, [width, 0.10, 0.48], [0, -0.115, 0.32], '#f5e6d9', 0.04);
+  for (let i = 0; i < 5; i++) sphere(parent, [width / 6, 0.20 + (i % 2) * 0.11, 0.09], [-width * 0.37 + i * width * 0.185, -0.065, 0.14], '#f5e6d9');
+  for (let i = 0; i < 4; i++) box(parent, [0.12, 0.34 + (i % 2) * 0.08, 0.25], [-0.55 + i * 0.14, 0.125, 0.44], ['#c8a8bd', '#abc8ba', '#e5bb87', '#a4b3ce'][i], 0);
+  sphere(parent, [0.13, 0.23, 0.13], [0.48, 0.145, 0.41], '#ce9cba');
+}
+function feltRainbow(parent) {
+  for (let band = 0; band < 3; band++) {
+    const radius = 1.1 - band * 0.2;
+    tube(parent, Array.from({ length: 25 }, (_, i) => { const a = i / 24 * Math.PI; return [-Math.cos(a) * radius, -0.55 + Math.sin(a) * radius, 0.07]; }), 0.07, ['#eabfa1', '#f5d6bf', '#b79bc6'][band]);
+  }
+}
+// The sign's glow follows the time of day like the rooms' accent lights.
+const neonGlow = hex => ({ emissive: hex, emissiveIntensity: 0.9, accent: true });
+function neonOrbit(parent) {
+  box(parent, [1.66, 2.4, 0.065], [0, 0, 0.05], '#282d43', 0.04);
+  tube(parent, Array.from({ length: 49 }, (_, i) => [Math.cos(i / 48 * Math.PI * 2) * 0.57, 0.14 + Math.sin(i / 48 * Math.PI * 2) * 0.57, 0.17]), 0.023, '#a997ff', neonGlow('#a997ff'));
+  rod(parent, [-0.63, -0.24, 0.2], [0.65, 0.52, 0.2], 0.027, '#ef8bab', neonGlow('#ef8bab'));
+  for (let i = 0; i < 3; i++) box(parent, [0.30, 0.042, 0.025], [-0.44 + i * 0.44, -0.85, 0.16], '#c6b5d8', 0);
+}
+function recordSleeve(parent) {
+  box(parent, [1.22, 1.22, 0.075], [0, 0, 0.0875], '#303447', 0);
+  tube(parent, Array.from({ length: 33 }, (_, i) => [Math.cos(i / 32 * Math.PI * 2) * 0.34, Math.sin(i / 32 * Math.PI * 2) * 0.34, 0.1775]), 0.06, '#343c52');
 }
 
 function createSwayingCanopy(parent, type) {
@@ -1154,6 +1242,10 @@ export function createFurniture(type, scene) {
       bookcase, 'lounge-chair': loungeChair, 'side-table': sideTable, 'floor-lamp': floorLamp,
       plant, rug, ottoman, 'low-cabinet': cabinet,
       fireplace, daybed, 'moon-tree': moonTree, 'lantern-cluster': lanternCluster, 'moon-rug': moonRug, 'pet-bed': petBed,
+      'tall-frame': parent => frame(parent, [1.04, 1.4], '#503d30'), 'small-frame': parent => frame(parent, [0.74, 1.02], '#ac8357'), 'wide-frame': parent => frame(parent, [1.5, 1.04], '#6b4b3b'),
+      'moon-clock': moonClockCase, 'apothecary-shelf': apothecaryShelf, 'wall-shelf': wallShelf, 'hanging-plant': hangingPlant,
+      'cloud-shelf': parent => cloudShelf(parent, 2.5), 'small-cloud-shelf': parent => cloudShelf(parent, 2.1),
+      'wall-scroll': wallScroll, 'neon-orbit': neonOrbit, 'record-sleeve': recordSleeve, 'felt-rainbow': feltRainbow,
     };
     builders[type](source);
     const template = batch(source); template.setEnabled(false); templates.set(type, template);
@@ -1227,6 +1319,36 @@ export function createFurniture(type, scene) {
     animations.push(createTeaSteam(result, writing ? [0.72, 1.445, -0.06] : [0.83, 1.465, -0.13], writing ? 0.9 : 1));
   }
   if (type === 'side-table') animations.push(createTeaSteam(result, [0.18, 0.846, 0.07], 0.72));
+  // A frame's picture and a record's sleeve are separate small meshes, so the
+  // room can give each one its chosen art.
+  if (pictureSizes[type] || type === 'record-sleeve') {
+    const [width, height] = pictureSizes[type] || [1.06, 1.06];
+    const picture = type === 'record-sleeve' ? CreateBox('record-sleeve-art', { width, height, depth: 0.03 }, scene) : CreatePlane('framed-picture', { width, height }, scene);
+    picture.parent = result; picture.position.z = type === 'record-sleeve' ? 0.1375 : 0.14;
+    picture.material = material(scene, type === 'record-sleeve' ? '#b4aecb' : C.paper); picture.receiveShadows = type === 'record-sleeve';
+    picture.metadata = { picture: true, castShadow: type === 'record-sleeve' };
+    result.metadata.picture = picture;
+  }
+  if (type === 'moon-clock') {
+    // The hands keep the real local time; the room clock supplies seconds.
+    const hands = group(result, [0, 0.39, 0.04]); hands.name = 'clock-movement';
+    const hand = (name, points, radius, color) => { const node = group(hands); node.name = name; const part = rod(node, ...points, radius, color); part.metadata = { dynamic: true }; return node; };
+    const hour = hand('clock-hour-hand', [[0, 0, 0.065], [0.13, 0.18, 0.065]], 0.014, '#503d30');
+    const minute = hand('clock-minute-hand', [[0, 0, 0.075], [-0.25, 0.045, 0.075]], 0.012, '#503d30');
+    const second = hand('clock-second-hand', [[0, -0.055, 0.085], [0, 0.30, 0.085]], 0.008, '#c8884d');
+    const pendulum = group(hands, [0, -0.25, 0.07]); pendulum.name = 'clock-pendulum';
+    rod(pendulum, [0, 0, 0], [0, -0.67, 0], 0.017, C.brass, { metalness: 0.45 }).metadata = { dynamic: true };
+    const bob = cylinder(pendulum, 0.13, 0.13, 0.052, [0, -0.69, 0], C.brass, { metalness: 0.45, segments: 20 }); bob.rotation.x = Math.PI / 2; bob.metadata = { dynamic: true };
+    // Rest angles, clockwise from twelve, of the hands as they are modeled.
+    const rest = { hour: Math.atan2(0.13, 0.18), minute: Math.atan2(-0.25, 0.045), second: 0 };
+    const localOffset = -new Date().getTimezoneOffset() * 60 + Date.now() / 1000 - performance.now() / 1000;
+    animations.push((seconds, focused, reducedMotion) => {
+      if (reducedMotion) { for (const node of [hour, minute, second, pendulum]) node.rotation.z = 0; return; }
+      const time = (seconds + localOffset) % 43200, turn = Math.PI * 2;
+      hour.rotation.z = -(time / 43200 * turn - rest.hour); minute.rotation.z = -(time % 3600 / 3600 * turn - rest.minute);
+      second.rotation.z = -(Math.floor(time % 60) / 60 * turn - rest.second); pendulum.rotation.z = Math.sin(seconds * 2.8) * 0.17;
+    });
+  }
   if (type === 'bookcase') {
     if (!templates.has('tipping-book')) {
       const source = new TransformNode('book-source', scene); tippingBook(source);

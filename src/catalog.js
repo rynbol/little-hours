@@ -1,4 +1,5 @@
 // Every catalog object is modeled by hand in furniture.js, using real geometry.
+const FRAME_ARTS = ['herbarium', 'hills', 'sea', 'kitten', 'blossom', 'stars', 'fern'];
 // `height` is the top of the model above the floor, kept in step with the
 // geometry by a test; wall pieces and fixtures use it to avoid tall furniture.
 // `use` is what a tap does outside Decorate: `toggle` switches a light, the
@@ -21,6 +22,21 @@ export const FURNITURE = [
   // The pet's own bed: one per room, always kept, never counted as a piece.
   { id: 'pet-bed', name: 'Cozy pet bed', category: 'Pets', description: 'A soft, low cushion bed where your pet naps and comes home to.', footprint: [1.2, 0.8], height: 0.18, color: '#dfd1b2', blocking: true, unique: true },
   { id: 'moon-rug', name: 'Midnight constellation rug', category: 'Rugs', description: 'A round indigo rug with a woven moon, tiny stars and a warm tasseled border.', footprint: [3.6, 3.6], height: 0.08, color: '#676779', blocking: false },
+  // Wall pieces hang on the back or side wall: `size` is their width and height
+  // on the wall, `depth` how far they stand out, `arts` the pictures to choose.
+  { id: 'tall-frame', name: 'Walnut picture frame', category: 'Wall decor', description: 'A deep walnut frame for a favorite little picture. Pick the picture.', mount: 'wall', size: [1.04, 1.4], depth: 0.14, arts: FRAME_ARTS, color: '#503d30', blocking: false },
+  { id: 'small-frame', name: 'Honey picture frame', category: 'Wall decor', description: 'A small honey-wood frame. Pick the picture.', mount: 'wall', size: [0.74, 1.02], depth: 0.14, arts: FRAME_ARTS, color: '#ac8357', blocking: false },
+  { id: 'wide-frame', name: 'Landscape frame', category: 'Wall decor', description: 'A wide walnut frame for a landscape. Pick the picture.', mount: 'wall', size: [1.5, 1.04], depth: 0.14, arts: FRAME_ARTS, color: '#6b4b3b', blocking: false },
+  { id: 'moon-clock', name: 'Moon clock', category: 'Wall decor', description: 'A brass pendulum clock that keeps the real time.', mount: 'wall', size: [0.86, 1.64], depth: 0.14, color: '#bf9762', blocking: false },
+  { id: 'apothecary-shelf', name: 'Potion shelf', category: 'Wall decor', description: 'A little wooden shelf of glass bottles in sage, honey and plum.', mount: 'wall', size: [1.4, 0.705], depth: 0.61, color: '#926747', blocking: false },
+  { id: 'wall-shelf', name: 'Floating book shelf', category: 'Wall decor', description: 'A floating oak shelf with a few books, a candle and a trailing plant.', mount: 'wall', size: [1.6, 0.62], depth: 0.42, color: '#aa7954', blocking: false },
+  { id: 'hanging-plant', name: 'Trailing wall planter', category: 'Wall decor', description: 'A terracotta planter on a brass bracket, with leaves that trail down.', mount: 'wall', size: [0.8, 1.3], depth: 0.45, color: '#819566', blocking: false },
+  { id: 'cloud-shelf', name: 'Cloud shelf', category: 'Wall decor', description: 'A soft cream shelf edged with little clouds, books and a vase.', mount: 'wall', size: [2.69, 0.75], depth: 0.565, color: '#f5e6d9', blocking: false },
+  { id: 'small-cloud-shelf', name: 'Little cloud shelf', category: 'Wall decor', description: 'A shorter cloud shelf with books and a rose-colored vase.', mount: 'wall', size: [2.26, 0.75], depth: 0.565, color: '#f5e6d9', blocking: false },
+  { id: 'wall-scroll', name: 'Blossom scroll', category: 'Wall decor', description: 'A linen hanging scroll with an ink branch and cherry blossoms.', mount: 'wall', size: [1.5, 2.41], depth: 0.19, color: '#faf0da', blocking: false },
+  { id: 'neon-orbit', name: 'Neon orbit sign', category: 'Wall decor', description: 'A lilac ring and a pink streak on a navy panel. Tap it to switch it.', mount: 'wall', size: [1.66, 2.4], depth: 0.23, use: { toggle: 'lamp' }, color: '#a997ff', blocking: false },
+  { id: 'record-sleeve', name: 'Framed record', category: 'Wall decor', description: 'A favorite record in a dark frame. Pick the sleeve color.', mount: 'wall', size: [1.22, 1.22], depth: 0.24, arts: ['lilac', 'coral', 'sage', 'honey'], color: '#b4aecb', blocking: false },
+  { id: 'felt-rainbow', name: 'Felt rainbow', category: 'Wall decor', description: 'Three soft felt arches in peach, cream and lilac.', mount: 'wall', size: [2.34, 1.24], depth: 0.14, color: '#eabfa1', blocking: false },
 ];
 
 const furnitureById = new Map(FURNITURE.map(item => [item.id, item]));
