@@ -132,3 +132,32 @@ export function findFreeWallSpot(items, type, style = 'retreat') {
   }
   return null;
 }
+
+// Windows cut a real opening through their wall, so daylight falls through
+// them. The opening sits just inside the frame, which covers its cut edges.
+export const OPENING_INSET = 0.06;
+export const isOpening = item => Boolean(getFurniture(item?.type)?.opening);
+export function openings(items, skipId = null) {
+  return items.filter(item => isOpening(item) && item.id !== skipId).map(item => {
+    const rect = wallRect(item);
+    return { wall: item.wall, minU: rect.minU + OPENING_INSET, maxU: rect.maxU - OPENING_INSET, minV: rect.minV + OPENING_INSET, maxV: rect.maxV - OPENING_INSET };
+  });
+}
+// The parts of `rect` outside `hole`: whole-height strips left and right of
+// it, then the pieces below and above it.
+export function subtractRect(rect, hole) {
+  if (hole.minU >= rect.maxU || hole.maxU <= rect.minU || hole.minV >= rect.maxV || hole.maxV <= rect.minV) return [rect];
+  const parts = [];
+  if (hole.minU > rect.minU) parts.push({ ...rect, maxU: hole.minU });
+  if (hole.maxU < rect.maxU) parts.push({ ...rect, minU: hole.maxU });
+  const minU = Math.max(rect.minU, hole.minU), maxU = Math.min(rect.maxU, hole.maxU);
+  if (hole.minV > rect.minV) parts.push({ minU, maxU, minV: rect.minV, maxV: hole.minV });
+  if (hole.maxV < rect.maxV) parts.push({ minU, maxU, minV: hole.maxV, maxV: rect.maxV });
+  return parts;
+}
+// A rectangle minus every hole; slivers under 1 mm are dropped.
+export function cutRect(rect, holes) {
+  let parts = [rect];
+  for (const hole of holes) parts = parts.flatMap(part => subtractRect(part, hole));
+  return parts.filter(part => part.maxU - part.minU > 0.001 && part.maxV - part.minV > 0.001);
+}

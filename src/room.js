@@ -21,15 +21,16 @@ import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstr
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 import '@babylonjs/core/Culling/ray.js';
 import '@babylonjs/core/Rendering/outlineRenderer.js';
-import { createFurniture, createRoundedBox, createMobileCompanion, disposeFurnitureAssets, PET_BED_SURFACE } from './furniture.js';
+import { createFurniture, createRoundedBox, createContactShadow, createMobileCompanion, disposeFurnitureAssets, WINDOW_VIEW_DEPTH, PET_BED_SURFACE } from './furniture.js';
 import { createPetModel } from './pets.js';
 import { createPetRoutine, insideBed, PETS, PET_REACTION } from './pet.js';
 import { createCompanionRoutine } from './companion.js';
-import { createArchitecture, styleFurniture } from './architecture.js';
+import { createArchitecture, styleFurniture, buildWallMesh } from './architecture.js';
 import { getFurniture } from './catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, rugsOverlap, footprintBounds, MAX_ITEMS, pieceCount, petBed, roomDesign } from './layout.js';
-import { SHELLS, isWallPiece, snapWall } from './walls.js';
+import { SHELLS, isWallPiece, snapWall, openings } from './walls.js';
 import { ARTWORKS, SLEEVES } from './art.js';
+import { tintPaint } from './tints.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -164,18 +165,18 @@ export function createRoom(container, options = {}) {
   box([12.08, 0.16, 9.33], [0, 0.10, 0], palette.edge, 0.06);
   const boardColors = ['#855b43', '#92654a', '#9c6e50', '#805640', '#8c6249', '#a27352'];
   for (let row = 0; row < 24; row++) for (let section = 0; section < 3; section++) box([0.487, 0.052, 3.025], [row * 0.498 - 5.727, 0.193, (section - 1) * 3.045], material(boardColors[(row + section * 3) % 6]));
-  box([0.22, 5.6, 9.2], [-5.94, 3.01, 0], palette.cream);
+  // The cream side wall and the sage back wall are meshes of their own (see
+  // syncOpenings), so that windows can cut them. They keep their own paint
+  // materials: lit paint differs from vertex colors where bright light clamps.
   const archCenter = -2.7, archRadius = 2.1, archSpring = 3.15, windowBottom = 1.45;
-  box([12.02, 1.25, 0.22], [0, 0.835, -4.6], palette.sage);
-  box([12.02, 0.39, 0.22], [0, 5.595, -4.6], palette.sage);
-  box([1.11, 4.12, 0.22], [-5.455, 3.41, -4.6], palette.sage);
-  box([6.6, 4.12, 0.22], [2.7, 3.41, -4.6], palette.sage);
+  const retreatWalls = [{ wall: 'side', size: [0.22, 5.6, 9.2], xyz: [-5.94, 3.01, 0], hex: '#c9bba2' },
+    ...[[12.02, 1.25, 0, 0.835], [12.02, 0.39, 0, 5.595], [1.11, 4.12, -5.455, 3.41], [6.6, 4.12, 2.7, 3.41]].map(([width, height, x, y]) => ({ wall: 'back', size: [width, height, 0.22], xyz: [x, y, -4.6], hex: '#80917d' }))];
   // Small strips fill the spandrels above the arch; the broad timber arch covers
   // their edges. This leaves a genuine opening instead of a decal on a wall.
   for (let i = 0; i < 44; i++) {
     const x = archCenter - archRadius + (i + 0.5) * archRadius * 2 / 44;
     const curveTop = archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2));
-    box([archRadius * 2 / 44 + 0.012, 5.42 - curveTop, 0.22], [x, (5.42 + curveTop) / 2, -4.6], palette.sage);
+    retreatWalls.push({ wall: 'back', size: [archRadius * 2 / 44 + 0.012, 5.42 - curveTop, 0.22], xyz: [x, (5.42 + curveTop) / 2, -4.6], hex: '#80917d' });
   }
   const panel = material('#52695c'), inset = material('#647869'), carved = material('#a78053');
   box([0.14, 1.1, 9.02], [-5.76, 0.80, 0], panel);
@@ -199,7 +200,9 @@ export function createRoom(container, options = {}) {
   box([12.0, 0.027, 0.035], [0, 0.15, 4.65], carved); box([0.035, 0.027, 9.2], [6.03, 0.15, 0], carved);
 
   const skyTexture = drawing(768, 768, () => {}, 'painted-enchanted-forest');
-  picture(4.2, 3.82, skyTexture, [archCenter, 3.34, -4.64]);
+  // Added windows show other parts of the view; mirroring never shows a seam.
+  skyTexture.wrapU = skyTexture.wrapV = DynamicTexture.MIRROR_ADDRESSMODE;
+  const retreatView = picture(4.2, 3.82, skyTexture, [archCenter, 3.34, -4.64]).material;
   function paintSky(theme) {
     const ctx = skyTexture.getContext(), size = 768, daylight = theme === 'day', night = theme === 'dusk';
     const stops = daylight ? ['#8bc5dc', '#bededc', '#f7e6b4'] : night ? ['#182643', '#384667', '#8b7e9c'] : ['#5a7288', '#a1b2b8', '#d1cebb'];
@@ -579,6 +582,30 @@ export function createRoom(container, options = {}) {
     if (piece.wall === 'back') { node.position.set(piece.u, piece.v, face); node.rotation.y = 0; }
     else { node.position.set(face, piece.v, piece.u); node.rotation.y = Math.PI / 2; }
   }
+  // Windows cut their openings where they hang, so daylight falls through them.
+  // A window being dragged closes its opening until it is dropped. The walls
+  // are rebuilt only on such a change, never per frame.
+  let retreatWallMeshes = [], openingsKey = '';
+  function syncOpenings() {
+    const holes = openings(layout.items, drag?.id), key = `${architectureStyle}:${JSON.stringify(holes)}`;
+    if (key === openingsKey) return; openingsKey = key;
+    if (architecture) architecture.setOpenings(holes);
+    else {
+      for (const mesh of retreatWallMeshes) mesh.dispose();
+      retreatWallMeshes = [['back', palette.sage], ['side', palette.cream]].map(([wall, paint]) => buildWallMesh(retreatWalls.filter(spec => spec.wall === wall), holes, paint, scene, `retreat-${wall}-wall`, classicArchitecture, false));
+    }
+    // The new walls replace the old ones in the sun's shadow map at once.
+    refreshShadows();
+  }
+  // A window shows the part of the room's view behind it, at the scale of the
+  // main window and offset by where it hangs.
+  function showView(view, item) {
+    const main = architecture?.window || { x: archCenter, y: 3.34, width: 4.2, height: 3.82 }, [width, height] = view.metadata.size;
+    const left = 0.5 + ((item.wall === 'back' ? item.u - main.x : item.u) - width / 2) / main.width, bottom = 0.5 + (item.v - main.y - height / 2) / main.height;
+    const key = `${architectureStyle}:${left}:${bottom}`;
+    if (view.metadata.key !== key) { view.metadata.key = key; view.setVerticesData('uv', view.metadata.uvs.map((value, i) => i % 2 ? bottom + value * height / main.height : left + value * width / main.width)); }
+    view.material = architecture?.viewMaterial || retreatView;
+  }
   // Pictures are painted once per artwork and frame shape; records take a
   // sleeve color. Both are shared by every piece that shows them.
   const artMaterials = new Map();
@@ -643,16 +670,21 @@ export function createRoom(container, options = {}) {
     let rugLayer = 0;
     for (const item of layout.items) {
       let object = placedObjects.get(item.id);
-      if (object && object.metadata.furnitureType !== item.type) { settlingPieces.delete(item.id); object.dispose(false, false); placedObjects.delete(item.id); object = null; }
+      // A new color builds the piece again from its model.
+      if (object && (object.metadata.furnitureType !== item.type || object.metadata.tint !== item.tint)) { settlingPieces.delete(item.id); object.dispose(false, false); placedObjects.delete(item.id); object = null; }
       if (!object) {
-        object = createFurniture(item.type, scene); styleFurniture(object, architectureStyle); object.parent = furnitureRoot;
+        object = createFurniture(item.type, scene); styleFurniture(object, architectureStyle, tintPaint(item.type, item.tint)); object.parent = furnitureRoot;
         if (getFurniture(item.type).category !== 'Rugs' && !isWallPiece(item)) groundPiece(object, item.type);
-        object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type;
+        object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type; object.metadata.tint = item.tint;
         object.getChildMeshes().forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = !mesh.metadata?.effect; });
         placedObjects.set(item.id, object);
         if (settleNew && !reducedMotion) { object.scaling.setAll(0.92); settlingPieces.set(item.id, { object, start: performance.now() }); }
       }
-      if (isWallPiece(item)) { placeOnWall(object, item); if (object.metadata.picture) object.metadata.picture.material = artMaterial(item.type, item.art); }
+      if (isWallPiece(item)) {
+        placeOnWall(object, item);
+        if (object.metadata.picture) object.metadata.picture.material = artMaterial(item.type, item.art);
+        if (object.metadata.view) showView(object.metadata.view, item);
+      }
       else {
         object.position.y = getFurniture(item.type).category === 'Rugs' ? 0.22 + rugLayer++ * 0.006 : 0.22;
         object.position.x = item.x; object.position.z = item.z; object.rotation.y = item.rotation * Math.PI / 2;
@@ -671,6 +703,7 @@ export function createRoom(container, options = {}) {
       rugSurfaces.push({ ...footprintBounds(item), top: object.position.y + (flat ? FLAT_RUG : height), lost: flat ? height - FLAT_RUG : 0 });
     });
     for (const item of layout.items) liftShade(placedObjects.get(item.id), item);
+    syncOpenings();
     if (selectedId && !ids.has(selectedId)) { selectedId = null; options.onSelectionChange?.(null); }
     animatedObjects.length = 0;
     for (const object of placedObjects.values()) if (object.metadata.animate) animatedObjects.push(object);
@@ -842,6 +875,13 @@ export function createRoom(container, options = {}) {
     if (!item || item.art === art || !getFurniture(item.type).arts?.includes(art)) return;
     cancelDrag(); item.art = art; commitLayout(); selectItem(item.id);
   }
+  // A piece with color choices wears the chosen one; null gives it back the
+  // room's colors.
+  function setTint(tint) {
+    const item = layout.items.find(candidate => candidate.id === selectedId);
+    if (!item || (item.tint ?? null) === tint || (tint !== null && !tintPaint(item.type, tint))) return;
+    cancelDrag(); if (tint === null) delete item.tint; else item.tint = tint; commitLayout(); selectItem(item.id);
+  }
   function setEditMode(value) {
     cancelDrag(); hoverItem(null); playHover = null;
     const wasEditing = editing; editing = Boolean(value);
@@ -946,16 +986,19 @@ export function createRoom(container, options = {}) {
     if (id == null) return;
     try { canvas.releasePointerCapture(id); } catch { /* A cancelled pointer may already be released. */ }
   }
-  function cancelDrag() {
-    // Escape, a hidden tab or a layout from another tab sets a carried pet down.
+  // `reopen` puts a window's opening back at once; a drop reopens it where it lands.
+  // Escape, a hidden tab or a layout from another tab sets a carried pet down.
+  function cancelDrag(reopen = true) {
     const carried = downPosition?.pet ? releasePet() : false;
     const wasDragging = Boolean(drag), pointerId = downPosition?.pointerId;
     if (drag) {
       drag.object.position.copyFrom(drag.originalPosition); drag.object.rotation.y = drag.wallPiece ? drag.originalRotation : drag.original.rotation * Math.PI / 2;
       for (const [mesh, visibility] of drag.visibility) if (!mesh.isDisposed()) mesh.visibility = visibility;
       liftShade(drag.object, drag.original); drag.object.metadata.shade?.setEnabled(true);
+      if (drag.object.metadata.view) drag.object.metadata.view.position.z = WINDOW_VIEW_DEPTH;
     }
     drag = null; downPosition = null; hasPendingPointer = false; releasePointer(pointerId);
+    if (reopen) syncOpenings();
     if (wasDragging) {
       options.onDragState?.(null); updateMarker(); outlineKey = ''; updateOutline(); refreshShadows();
     }
@@ -975,7 +1018,9 @@ export function createRoom(container, options = {}) {
       wallPiece, grabWall: wallPiece ? downPosition.wall.wall : null, offsetU: wallPiece && downPosition.wall.wall === item.wall ? downPosition.wall.u - item.u : 0, offsetV: wallPiece && downPosition.wall.wall === item.wall ? downPosition.wall.v - item.v : 0,
       visibility: object.getChildMeshes().map(mesh => [mesh, mesh.visibility]),
       removable: canRemove(item), overCollection: false, valid: true, reason: '', shown: wallPiece ? { wall: item.wall, u: item.u, v: item.v } : { x: item.x, z: item.z } };
-    hoveredId = null; selectItem(item.id); refreshShadows();
+    // A dragged window closes its opening and shows its view in front of the wall.
+    if (object.metadata.view) object.metadata.view.position.z = 0.012;
+    syncOpenings(); hoveredId = null; selectItem(item.id); refreshShadows();
   }
   function updateDrag(event) {
     if (!drag) return;
@@ -1016,7 +1061,7 @@ export function createRoom(container, options = {}) {
   function finishDrag(event) {
     updateDrag(event);
     const completed = drag;
-    cancelDrag();
+    cancelDrag(false);
     if (completed.overCollection && completed.removable) { removeSelection(); options.onNotice?.(`${getFurniture(completed.original.type).name} returned to the collection. Undo brings it back.`); }
     else if (completed.valid && !completed.overCollection) {
       const item = layout.items.find(item => item.id === completed.id);
@@ -1024,6 +1069,7 @@ export function createRoom(container, options = {}) {
         Object.assign(item, completed.candidate); raiseRug(item); commitLayout(); selectItem(item.id);
       }
     } else options.onNotice?.(completed.reason || 'That spot is occupied. Your piece is back where it started.');
+    syncOpenings();
   }
   const onPointerDown = event => {
     if (event.isPrimary === false || (event.button != null && event.button !== 0) || downPosition) return;
@@ -1325,7 +1371,7 @@ export function createRoom(container, options = {}) {
   requestRender();
 
   return {
-    setTheme, setLayout, setEditMode, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setQuality,
+    setTheme, setLayout, setEditMode, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setQuality,
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet,
     setPet(species) { const next = species === 'dog' ? 'dog' : 'cat'; if (next === petSpecies) return; if (petRoutine.pose.held) releasePet(); petSpecies = next; buildPet(); requestRender(); },

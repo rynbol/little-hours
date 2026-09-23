@@ -37,6 +37,11 @@ export const FURNITURE = [
   { id: 'neon-orbit', name: 'Neon orbit sign', category: 'Wall decor', description: 'A lilac ring and a pink streak on a navy panel. Tap it to switch it.', mount: 'wall', size: [1.66, 2.4], depth: 0.23, use: { toggle: 'lamp' }, color: '#a997ff', blocking: false },
   { id: 'record-sleeve', name: 'Framed record', category: 'Wall decor', description: 'A favorite record in a dark frame. Pick the sleeve color.', mount: 'wall', size: [1.22, 1.22], depth: 0.24, arts: ['lilac', 'coral', 'sage', 'honey'], color: '#b4aecb', blocking: false },
   { id: 'felt-rainbow', name: 'Felt rainbow', category: 'Wall decor', description: 'Three soft felt arches in peach, cream and lilac.', mount: 'wall', size: [2.34, 1.24], depth: 0.14, color: '#eabfa1', blocking: false },
+  // A window (`opening`) cuts a real opening in its wall: daylight falls
+  // through it onto the floor, and the room's own view shows behind it.
+  { id: 'cottage-window', name: 'Cottage window', category: 'Windows', description: 'A four-pane timber window with a deep sill. Daylight falls through it.', mount: 'wall', opening: true, size: [1.5, 1.7], depth: 0.2, color: '#aa7954', blocking: false },
+  { id: 'arched-window', name: 'Arched window', category: 'Windows', description: 'A tall window with a round top and six small panes.', mount: 'wall', opening: true, size: [1.1, 2.3], depth: 0.2, color: '#aa7954', blocking: false },
+  { id: 'round-window', name: 'Round window', category: 'Windows', description: 'A little round window with a cross of glazing bars.', mount: 'wall', opening: true, size: [1.2, 1.2], depth: 0.14, color: '#bc9169', blocking: false },
 ];
 
 const furnitureById = new Map(FURNITURE.map(item => [item.id, item]));

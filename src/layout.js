@@ -1,5 +1,6 @@
 import { getFurniture } from './catalog.js';
 import { isWallPiece, wallPlacementReason, wallClearanceReason, nearestWallSpot, findFreeWallSpot } from './walls.js';
+import { tintPaint } from './tints.js';
 
 export const ROOM_BOUNDS = Object.freeze({ minX: -5.5, maxX: 5.5, minZ: -4.2, maxZ: 4.2 });
 export const MAX_ITEMS = 32;
@@ -247,9 +248,11 @@ export function normalizeLayout(raw) {
       id, type: saved.type, x: snap(saved.x), z: snap(saved.z),
       rotation: Number.isInteger(saved.rotation) && saved.rotation >= 0 && saved.rotation <= 3 ? saved.rotation : 0,
     };
-    // A lamp, fire or record player that was switched off stays off.
+    // A lamp, fire or record player that was switched off stays off, and a
+    // piece keeps the color chosen for it.
     if (saved.off === true && getFurniture(saved.type).use?.toggle) candidate.off = true;
     if (isPetBed(candidate) && items.some(isPetBed)) continue;
+    if (tintPaint(saved.type, saved.tint)) candidate.tint = saved.tint;
     if (validatePlacement(items, candidate, style).valid) { items.push(candidate); ids.add(id); }
   }
   // Wall pieces come after the floor, so a saved piece of furniture is never

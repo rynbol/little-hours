@@ -4,15 +4,56 @@ import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture.js';
-import { Vector3, Quaternion } from '@babylonjs/core/Maths/math.vector.js';
+import { Vector3, Quaternion, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { createRoundedBox } from './furniture.js';
+import { cutRect } from './walls.js';
+
+// The walls of a room, as one mesh, less the openings of its windows. Each
+// spec is a box on the back or side wall; its extent along the wall and its
+// height are cut around every opening on that wall. Walls are rebuilt only
+// when a window is added, moved or removed. `painted` walls take the spec
+// colors as vertex colors; otherwise the material alone gives the color.
+// Box shapes are cached per spec list and size: a rebuild mostly copies
+// vertices instead of building meshes, so a window drop never stalls a frame.
+const wallShapes = new WeakMap();
+export function buildWallMesh(specs, holes, material, scene, name, parent, painted = true) {
+  const pieces = [];
+  if (!wallShapes.has(specs)) wallShapes.set(specs, new Map());
+  const shapes = wallShapes.get(specs);
+  const shape = (size, radius) => {
+    const key = `${size.map(value => value.toFixed(4))}:${radius}`;
+    if (!shapes.has(key)) {
+      const mesh = radius ? createRoundedBox('wall-part', size, radius, scene) : MeshBuilder.CreateBox('wall-part', { width: size[0], height: size[1], depth: size[2] }, scene);
+      shapes.set(key, VertexData.ExtractFromMesh(mesh, true, true)); mesh.dispose();
+    }
+    return shapes.get(key);
+  };
+  for (const { size, xyz, hex, radius, wall } of specs) {
+    const along = wall === 'back' ? 0 : 2, color = Color3.FromHexString(hex);
+    const rect = { minU: xyz[along] - size[along] / 2, maxU: xyz[along] + size[along] / 2, minV: xyz[1] - size[1] / 2, maxV: xyz[1] + size[1] / 2 };
+    for (const part of cutRect(rect, holes.filter(hole => hole.wall === wall))) {
+      const partSize = [...size], center = [...xyz];
+      partSize[along] = part.maxU - part.minU; center[along] = (part.minU + part.maxU) / 2;
+      partSize[1] = part.maxV - part.minV; center[1] = (part.minV + part.maxV) / 2;
+      const base = shape(partSize, radius), data = new VertexData();
+      data.positions = Array.from(base.positions); data.normals = Array.from(base.normals); data.indices = Array.from(base.indices);
+      data.transform(Matrix.Translation(...center));
+      if (painted) { data.colors = []; for (let i = 0; i < data.positions.length / 3; i++) data.colors.push(color.r, color.g, color.b, 1); }
+      pieces.push(data);
+    }
+  }
+  const result = new Mesh(name, scene);
+  if (pieces.length) { const merged = pieces[0]; if (pieces.length > 1) merged.merge(pieces.slice(1), true); merged.applyToMesh(result); }
+  result.material = material; result.useVertexColors = painted; result.receiveShadows = true; result.isPickable = false; result.metadata = { castShadow: true, walls: true };
+  result.parent = parent; result.freezeWorldMatrix(); return result;
+}
 
 // Each shell is authored in JavaScript, in the same editable floor footprint.
 // Only the current alternative shell exists; its static paint shares one draw.
 export function createArchitecture(style, scene) {
   const root = new TransformNode(`architecture-${style}`, scene);
-  const parts = [], materials = [], textures = [], glows = [], paint = new Map();
+  const parts = [], materials = [], textures = [], glows = [], paint = new Map(), wallSpecs = [];
   // `radius` marks Cloud loft's round opening; the other shells are rectangles.
   const window = style === 'metro' ? { x: -1, y: 3.35, width: 8.1, height: 3.65, radius: 0 } : { x: -2.7, y: 3.35, width: 4.2, height: 3.82, radius: style === 'cloud' ? 1.95 : 0 };
   const tint = hex => Color3.FromHexString(hex);
@@ -27,6 +68,8 @@ export function createArchitecture(style, scene) {
   }
   function finish(mesh, xyz, hex, glow = false) { mesh.position.set(...xyz); mesh.parent = root; mesh.material = material(hex, glow); mesh.receiveShadows = !glow; mesh.isPickable = false; mesh.metadata = { castShadow: !glow, architecture: style }; parts.push(mesh); return mesh; }
   function box(size, xyz, hex, radius = 0) { return finish(radius ? createRoundedBox('architectural-joinery', size, radius, scene) : MeshBuilder.CreateBox('architectural-joinery', { width: size[0], height: size[1], depth: size[2] }, scene), xyz, hex); }
+  // Parts of the back or side wall: built with the walls, cut by windows.
+  function wallBox(wall, size, xyz, hex, radius = 0) { wallSpecs.push({ wall, size, xyz, hex, radius }); }
   function ball(size, xyz, hex, glow = false) { const mesh = finish(MeshBuilder.CreateSphere('architectural-orb', { diameter: 2, segments: 8 }, scene), xyz, hex, glow); mesh.scaling.set(...size); return mesh; }
   function rod(a, b, radius, hex, glow = false) {
     const start = Vector3.FromArray(a), end = Vector3.FromArray(b), delta = end.subtract(start);
@@ -44,10 +87,10 @@ export function createArchitecture(style, scene) {
   }
   function rectangularWall(hex) {
     const left = window.x - window.width / 2, right = window.x + window.width / 2, bottom = window.y - window.height / 2, top = window.y + window.height / 2;
-    box([12, bottom - .22, .22], [0, (bottom + .22) / 2, -4.6], hex);
-    box([12, 5.8 - top, .22], [0, (5.8 + top) / 2, -4.6], hex);
-    box([left + 6, window.height, .22], [(left - 6) / 2, window.y, -4.6], hex);
-    box([6 - right, window.height, .22], [(right + 6) / 2, window.y, -4.6], hex);
+    wallBox('back', [12, bottom - .22, .22], [0, (bottom + .22) / 2, -4.6], hex);
+    wallBox('back', [12, 5.8 - top, .22], [0, (5.8 + top) / 2, -4.6], hex);
+    wallBox('back', [left + 6, window.height, .22], [(left - 6) / 2, window.y, -4.6], hex);
+    wallBox('back', [6 - right, window.height, .22], [(right + 6) / 2, window.y, -4.6], hex);
   }
   const wood = style === 'sakura' ? '#a77b53' : style === 'cloud' ? '#d5b9bb' : '#343b50';
   box([12.15, .40, 9.4], [0, -.09, 0], wood, .14);
@@ -60,12 +103,12 @@ export function createArchitecture(style, scene) {
       box([3.88, .035, 4.43], [x, .207, z], (col + row) % 2 ? '#c8bd87' : '#d7ca97');
       for (let stripe = 0; stripe < 44; stripe++) box([3.85, .003, .014], [x, .226, z - 2.14 + stripe * .099], '#bdb27f');
     }
-    rectangularWall('#eee2c6'); box([.22, 5.6, 9.2], [-5.94, 3.01, 0], '#e8ddc4');
+    rectangularWall('#eee2c6'); wallBox('side', [.22, 5.6, 9.2], [-5.94, 3.01, 0], '#e8ddc4');
     for (let panel = 0; panel < 4; panel++) {
       const z = -3.42 + panel * 2.27;
-      box([.06, 3.95, 2.12], [-5.79, 3.12, z], '#f8efd4');
-      for (let i = 0; i < 5; i++) box([.10, 4.1, .038], [-5.71, 3.12, z - 1.04 + i * .52], wood);
-      for (let i = 0; i < 9; i++) box([.10, .035, 2.12], [-5.70, 1.16 + i * .49, z], wood);
+      wallBox('side', [.06, 3.95, 2.12], [-5.79, 3.12, z], '#f8efd4');
+      for (let i = 0; i < 5; i++) wallBox('side', [.10, 4.1, .038], [-5.71, 3.12, z - 1.04 + i * .52], wood);
+      for (let i = 0; i < 9; i++) wallBox('side', [.10, .035, 2.12], [-5.70, 1.16 + i * .49, z], wood);
     }
     for (const y of [.43, 1.03, 5.38, 5.78]) { box([.27, .13, 9.25], [-5.78, y, 0], wood); box([12.05, .13, .27], [0, y, -4.43], wood); }
     for (const x of [-5.76, -.35, 5.8]) box([.16, 5.5, .22], [x, 3.02, -4.4], wood);
@@ -75,13 +118,13 @@ export function createArchitecture(style, scene) {
     pendant(.6, -3.7, 4.9, .36, '#ffe5b7', true); pendant(4.75, -3.75, 4.5, .49, '#fff0d0', true);
   } else if (style === 'cloud') {
     for (let x = 0; x < 16; x++) for (let z = 0; z < 12; z++) box([.746, .05, .765], [-5.625 + x * .75, .194, -4.2075 + z * .765], (x + z) % 2 ? '#dfc6c0' : '#f3e7db');
-    box([.22, 5.6, 9.2], [-5.94, 3.01, 0], '#dcbfcf');
+    wallBox('side', [.22, 5.6, 9.2], [-5.94, 3.01, 0], '#dcbfcf');
     // A genuine circular opening, filled around with narrow plaster strips.
     const radius = window.radius;
     for (let i = 0; i < 96; i++) {
       const x = -6 + (i + .5) * .125, dx = x - window.x;
-      if (Math.abs(dx) >= radius) box([.13, 5.58, .22], [x, 3.01, -4.6], '#b5afcf');
-      else { const dy = Math.sqrt(radius ** 2 - dx ** 2), bottom = window.y - dy, top = window.y + dy; box([.13, bottom - .22, .22], [x, (.22 + bottom) / 2, -4.6], '#b5afcf'); box([.13, 5.8 - top, .22], [x, (5.8 + top) / 2, -4.6], '#b5afcf'); }
+      if (Math.abs(dx) >= radius) wallBox('back', [.13, 5.58, .22], [x, 3.01, -4.6], '#b5afcf');
+      else { const dy = Math.sqrt(radius ** 2 - dx ** 2), bottom = window.y - dy, top = window.y + dy; wallBox('back', [.13, bottom - .22, .22], [x, (.22 + bottom) / 2, -4.6], '#b5afcf'); wallBox('back', [.13, 5.8 - top, .22], [x, (5.8 + top) / 2, -4.6], '#b5afcf'); }
     }
     curve(Array.from({ length: 65 }, (_, i) => [window.x + Math.cos(i / 64 * Math.PI * 2) * radius, window.y + Math.sin(i / 64 * Math.PI * 2) * radius, -4.4]), .11, '#f4dfd2');
     box([.055, 3.8, .14], [-2.7, 3.35, -4.36], '#f2dfd4'); box([3.8, .055, .14], [-2.7, 3.35, -4.36], '#f2dfd4');
@@ -91,11 +134,11 @@ export function createArchitecture(style, scene) {
     pendant(.3, -3.5, 4.9, .27, '#ffe5ca'); pendant(3.35, -3.6, 4.2, .32, '#ffc6da'); pendant(5.1, -3.55, 5.05, .24, '#d7d3ff');
   } else {
     for (let x = 0; x < 6; x++) for (let z = 0; z < 5; z++) box([1.99, .05, 1.826], [-5 + x * 2, .194, -3.66 + z * 1.83], (x + z) % 2 ? '#677080' : '#747b89');
-    rectangularWall('#434b61'); box([.22, 5.6, 9.2], [-5.94, 3.01, 0], '#5b4f5b');
+    rectangularWall('#434b61'); wallBox('side', [.22, 5.6, 9.2], [-5.94, 3.01, 0], '#5b4f5b');
     for (let row = 0; row < 17; row++) for (let col = 0; col < 10; col++) {
       const z = -4.35 + col * .89 + (row % 2) * .44;
       if (z > 4.45) continue;
-      box([.025, .27, .83], [-5.81, .51 + row * .305, z], ['#826365', '#976e69', '#765b61', '#aa7d70'][(row * 3 + col) % 4], .008);
+      wallBox('side', [.025, .27, .83], [-5.81, .51 + row * .305, z], ['#826365', '#976e69', '#765b61', '#aa7d70'][(row * 3 + col) % 4], .008);
     }
     for (const y of [.36, 1.47, 5.24, 5.77]) { box([12.02, .13, .27], [0, y, -4.42], '#262d3f'); box([.20, .13, 9.2], [-5.76, y, 0], '#343546'); }
     for (let i = 0; i < 6; i++) box([.09, 3.82, .23], [-5.05 + i * 1.62, 3.35, -4.40], '#293345');
@@ -128,9 +171,18 @@ export function createArchitecture(style, scene) {
   }
   parts.forEach(part => part.dispose(false, false));
   for (const mat of paint.values()) if (!glows.includes(mat)) { mat.dispose(); materials.splice(materials.indexOf(mat), 1); }
+  // The walls are their own mesh, so a window can cut them without the rest.
+  let walls = null, wallKey = '';
+  function setOpenings(holes) {
+    const key = JSON.stringify(holes); if (walls && key === wallKey) return; wallKey = key;
+    walls?.dispose(); walls = buildWallMesh(wallSpecs, holes, bodyMaterial, scene, `${style}-walls`, root);
+  }
+  setOpenings([]);
 
   const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 512;
   const texture = new DynamicTexture(`${style}-view`, canvas, scene, false); textures.push(texture);
+  // Added windows show other parts of the view; mirroring never shows a seam.
+  texture.wrapU = texture.wrapV = DynamicTexture.MIRROR_ADDRESSMODE;
   const viewMaterial = new StandardMaterial(`${style}-view`, scene); viewMaterial.disableLighting = true; viewMaterial.emissiveTexture = texture; viewMaterial.diffuseColor = Color3.Black(); viewMaterial.backFaceCulling = false; materials.push(viewMaterial);
   const view = MeshBuilder.CreatePlane(`${style}-window-view`, { width: window.width, height: window.height }, scene); view.position.set(window.x, window.y, -4.64); view.material = viewMaterial; view.parent = root; view.isPickable = false; view.metadata = { castShadow: false, architecture: style };
   // Accent lights switch off rather than vanish: the globes and neon keep their
@@ -142,7 +194,7 @@ export function createArchitecture(style, scene) {
   }
   // Top of the walkable floor surface (tatami stripes stand slightly proud).
   const floorTop = style === 'sakura' ? .2275 : .219;
-  return { root, window, floorTop, setTheme, setLights(enabled) { lit = enabled; applyGlow(); }, dispose() { root.dispose(false, false); materials.forEach(mat => mat.dispose()); textures.forEach(texture => texture.dispose()); } };
+  return { root, window, floorTop, viewMaterial, setTheme, setOpenings, setLights(enabled) { lit = enabled; applyGlow(); }, dispose() { root.dispose(false, false); materials.forEach(mat => mat.dispose()); textures.forEach(texture => texture.dispose()); } };
 }
 
 // Procedural views are painted once per atmosphere change, never per frame.
@@ -187,11 +239,16 @@ const recolors = {
   metro: ['#8e766e', '#b29988', '#424557', '#8196a7', '#a7b3c4', '#cbbdb7', '#757899', '#a7a2be', '#464b69', '#9b8e9e'],
 };
 const originalPaint = ['#aa7954', '#bc9169', '#73533d', '#83968a', '#a0afa0', '#dfd1b2', '#785965', '#91707c', '#654939', '#baa07a'];
+// The model colors a room design repaints, as [model color, design color].
+export const designPaint = style => !recolors[style] ? []
+  : [...originalPaint.map((hex, i) => [hex, i]), ['#64483b', 2], ['#936c4e', 0], ['#c29c68', 1], ['#73533f', 2], ['#c6a16b', 1]].map(([hex, i]) => [hex, recolors[style][i]]);
 // Recolor only static furniture geometry, leaving the companion and animated
 // leaves/fire untouched. Source templates and other instances stay shared/safe.
-export function styleFurniture(root, style) {
-  if (!recolors[style]) return;
-  const replacements = [...originalPaint.map((hex, i) => [hex, i]), ['#64483b', 2], ['#936c4e', 0], ['#c29c68', 1], ['#73533f', 2], ['#c6a16b', 1]].map(([hex, i]) => ({ from: Color3.FromHexString(hex), to: Color3.FromHexString(recolors[style][i]) }));
+// A color chosen for the piece (`paint`, model color → new color) comes before
+// the design palette, so it looks the same in every room.
+export function styleFurniture(root, style, paint = null) {
+  const replacements = [...Object.entries(paint || {}), ...designPaint(style)].map(([from, to]) => ({ from: Color3.FromHexString(from), to: Color3.FromHexString(to) }));
+  if (!replacements.length) return;
   for (const mesh of root.getChildMeshes()) {
     if (mesh.metadata?.effect || (root.metadata.avatar && mesh.isDescendantOf(root.metadata.avatar)) || mesh.metadata?.dynamic) continue;
     const source = mesh.getVerticesData('color'); if (!source) continue;

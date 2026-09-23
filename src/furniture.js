@@ -551,6 +551,10 @@ function tube(parent, points, radius, color, extra) {
   return mesh(parent, CreateTube('soft-curve', { path: points.map(point => new Vector3(...point)), radius, tessellation: 6, cap: Mesh.CAP_ALL }, parent.getScene()), color, [0, 0, 0], extra);
 }
 const pictureSizes = { 'tall-frame': [0.88, 1.23], 'small-frame': [0.60, 0.86], 'wide-frame': [1.32, 0.86] };
+// Each view covers its opening (the frame less OPENING_INSET) with a margin.
+const viewSizes = { 'cottage-window': [1.42, 1.62], 'arched-window': [1.02, 2.22], 'round-window': [1.12, 1.12] };
+// Behind the thickest wall and its brick facing.
+export const WINDOW_VIEW_DEPTH = -0.27;
 function frame(parent, size, color) { box(parent, [...size, 0.08], [0, 0, 0.09], color, 0.025); }
 function moonClockCase(parent) {
   const brass = { metalness: 0.45 };
@@ -618,6 +622,42 @@ function neonOrbit(parent) {
   tube(parent, Array.from({ length: 49 }, (_, i) => [Math.cos(i / 48 * Math.PI * 2) * 0.57, 0.14 + Math.sin(i / 48 * Math.PI * 2) * 0.57, 0.17]), 0.023, '#a997ff', neonGlow('#a997ff'));
   rod(parent, [-0.63, -0.24, 0.2], [0.65, 0.52, 0.2], 0.027, '#ef8bab', neonGlow('#ef8bab'));
   for (let i = 0; i < 3; i++) box(parent, [0.30, 0.042, 0.025], [-0.44 + i * 0.44, -0.85, 0.16], '#c6b5d8', 0);
+}
+// Windows: a timber frame around a real opening in the wall. The frame, bars
+// and corner fillets cast shadows, so the daylight they let in has their shape.
+function cottageWindow(parent) {
+  for (const y of [0.8, -0.8]) box(parent, [1.5, 0.1, 0.1], [0, y, 0.05], C.wood, 0.012);
+  for (const x of [0.7, -0.7]) box(parent, [0.1, 1.5, 0.1], [x, 0, 0.05], C.wood, 0.012);
+  box(parent, [0.05, 1.5, 0.06], [0, 0, 0.03], C.edge, 0.006); box(parent, [1.3, 0.05, 0.06], [0, 0.06, 0.03], C.edge, 0.006);
+  box(parent, [1.5, 0.07, 0.2], [0, -0.815, 0.1], C.darkWood, 0.012);
+  cylinder(parent, 0.07, 0.055, 0.1, [0.44, -0.73, 0.1], C.terracotta);
+  for (let i = 0; i < 5; i++) sphere(parent, [0.055, 0.03, 0.04], [0.44 + Math.cos(i * 1.26) * 0.05, -0.64 + (i % 2) * 0.03, 0.1 + Math.sin(i * 1.26) * 0.04], i % 2 ? C.leaf : C.darkLeaf).rotation.set(0.4, i * 1.3, i % 2 ? 0.5 : -0.5);
+}
+function archedWindow(parent) {
+  const spring = 0.6, radius = 0.5;
+  for (const x of [0.5, -0.5]) box(parent, [0.1, 1.75 + spring - 0.6, 0.1], [x, (spring - 1.15) / 2, 0.05], C.wood, 0.012);
+  box(parent, [1.1, 0.1, 0.1], [0, -1.1, 0.05], C.wood, 0.012);
+  tube(parent, Array.from({ length: 25 }, (_, i) => { const a = i / 24 * Math.PI; return [Math.cos(a) * radius, spring + Math.sin(a) * radius, 0.05]; }), 0.05, C.wood);
+  // Corner fillets fill the frame above the arch, so the opening reads round.
+  for (let i = 0; i < 12; i++) {
+    const x = -0.55 + (i + 0.5) * 1.1 / 12, bottom = Math.abs(x) >= radius ? spring : spring + Math.sqrt(radius ** 2 - x ** 2);
+    box(parent, [1.1 / 12 + 0.004, 1.15 - bottom, 0.04], [x, (1.15 + bottom) / 2, 0.02], C.wood, 0);
+  }
+  box(parent, [0.04, 1.7 + radius, 0.05], [0, (spring + radius - 1.1) / 2 - 0.05, 0.025], C.edge, 0.005);
+  for (const y of [-0.45, 0.15]) box(parent, [0.92, 0.04, 0.05], [0, y, 0.025], C.edge, 0.005);
+  box(parent, [1.1, 0.07, 0.2], [0, -1.115, 0.1], C.darkWood, 0.012);
+}
+function roundWindow(parent) {
+  const radius = 0.46;
+  // A square timber panel with a round opening, built from narrow strips.
+  for (let i = 0; i < 16; i++) {
+    const x = -0.6 + (i + 0.5) * 1.2 / 16, dx = Math.abs(x) + 1.2 / 32;
+    if (dx >= radius) { box(parent, [1.2 / 16 + 0.004, 1.2, 0.05], [x, 0, 0.025], C.edge, 0); continue; }
+    const dy = Math.sqrt(radius ** 2 - dx ** 2);
+    for (const side of [1, -1]) box(parent, [1.2 / 16 + 0.004, 0.6 - dy, 0.05], [x, side * (0.6 + dy) / 2, 0.025], C.edge, 0);
+  }
+  tube(parent, Array.from({ length: 33 }, (_, i) => { const a = i / 32 * Math.PI * 2; return [Math.cos(a) * radius, Math.sin(a) * radius, 0.07]; }), 0.05, C.wood);
+  box(parent, [0.9, 0.035, 0.04], [0, 0, 0.04], C.wood, 0.004); box(parent, [0.035, 0.9, 0.04], [0, 0, 0.04], C.wood, 0.004);
 }
 function recordSleeve(parent) {
   box(parent, [1.22, 1.22, 0.075], [0, 0, 0.0875], '#303447', 0);
@@ -1246,6 +1286,7 @@ export function createFurniture(type, scene) {
       'moon-clock': moonClockCase, 'apothecary-shelf': apothecaryShelf, 'wall-shelf': wallShelf, 'hanging-plant': hangingPlant,
       'cloud-shelf': parent => cloudShelf(parent, 2.5), 'small-cloud-shelf': parent => cloudShelf(parent, 2.1),
       'wall-scroll': wallScroll, 'neon-orbit': neonOrbit, 'record-sleeve': recordSleeve, 'felt-rainbow': feltRainbow,
+      'cottage-window': cottageWindow, 'arched-window': archedWindow, 'round-window': roundWindow,
     };
     builders[type](source);
     const template = batch(source); template.setEnabled(false); templates.set(type, template);
@@ -1328,6 +1369,14 @@ export function createFurniture(type, scene) {
     picture.material = material(scene, type === 'record-sleeve' ? '#b4aecb' : C.paper); picture.receiveShadows = type === 'record-sleeve';
     picture.metadata = { picture: true, castShadow: type === 'record-sleeve' };
     result.metadata.picture = picture;
+  }
+  // A window's view sits behind its wall, inside the opening; the room gives
+  // it the room's own view. It never casts a shadow into its own daylight.
+  if (viewSizes[type]) {
+    const [width, height] = viewSizes[type], view = CreatePlane('window-view', { width, height }, scene);
+    view.parent = result; view.position.z = WINDOW_VIEW_DEPTH; view.material = material(scene, C.paper);
+    view.metadata = { castShadow: false, size: [width, height], uvs: Array.from(view.getVerticesData('uv')) };
+    result.metadata.view = view;
   }
   if (type === 'moon-clock') {
     // The hands keep the real local time; the room clock supplies seconds.
