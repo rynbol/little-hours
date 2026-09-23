@@ -1,6 +1,6 @@
 import './style.css';
 import { createRoom } from './room.js';
-import { createSession, remainingAt, formatTime } from './session.js';
+import { createSession, remainingAt, formatTime, sessionPhase, displayedRemaining } from './session.js';
 import { createStateStore, localDate, storageKey } from './state.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { PRESETS, normalizeLayout, MAX_ITEMS, roomDesign } from './layout.js';
@@ -51,6 +51,7 @@ let quality = 'auto';
 let performanceStats = null;
 let focusCollapsed = false;
 let lastSessionRender = '';
+let lastCompanionIntent = null;
 let draggedItemId = null;
 let dragHint = '';
 let companionActivity = 'idle';
@@ -128,6 +129,9 @@ function applyState(next, force = false) {
   const design = roomDesign(state.layout);
   document.body.dataset.design = design.style || 'retreat';
   $('#room-title').textContent = design.name;
+  // An open Atmosphere panel keeps its lights label in step with the room.
+  const lightsLabel = $('#room-panel .fairy-lights span');
+  if (lightsLabel) lightsLabel.textContent = design.style ? 'Accent lights' : 'Fairy lights';
   $('#room-subtitle').textContent = design.style ? ({ sakura: 'Soft light. Cherry blossoms. Room to breathe.', cloud: 'Head in the clouds. Feet on a soft little rug.', metro: 'The city hums. Your little corner is quiet.' })[design.style] : themeCopy[state.theme];
   if (force || previous.theme !== state.theme) {
     document.body.dataset.theme = state.theme;
@@ -151,7 +155,7 @@ function applyState(next, force = false) {
     if (editMode && collectionTab === 'presets') renderCollection();
   }
   $('#item-count').textContent = `${state.layout.items.length} / ${MAX_ITEMS} pieces`;
-  room?.setActivity(companionIntent(state.session));
+  syncCompanionIntent();
   document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', button.dataset.themeChoice === state.theme));
   document.querySelectorAll('[data-decor]').forEach(input => { input.checked = state.decor[input.dataset.decor]; });
 }
@@ -172,12 +176,14 @@ function petFeedback() {
   clearTimeout(petTimeout);
   petTimeout = setTimeout(() => { $('#pet-bubble').hidden = true; }, 2600);
 }
+// The decorator needs a ready room: both entry buttons wait for it.
+const setDecorEntry = enabled => { $('#decorate-button').disabled = !enabled; $('#rooms-button').disabled = !enabled; };
 try {
-  $('#decorate-button').disabled = true;
+  setDecorEntry(false);
   room = createRoom($('#room-canvas'), {
     onReady() {
       $('#loading-note').hidden = true;
-      $('#decorate-button').disabled = false;
+      setDecorEntry(true);
     },
     onPet: petFeedback,
     onCompanionState({ state: activity }) {
@@ -205,19 +211,27 @@ try {
 } catch (error) {
   $('#loading-note').textContent = 'The room couldn’t load. Try reloading; your focus timer is still ready.';
   console.error('Could not create the room:', error);
-  $('#decorate-button').disabled = true;
+  setDecorEntry(false);
 }
 applyState(state, true);
 
+// Tell the room only when the companion's intent changes, not on every key
+// press, storage refresh or timer tick; each call also requests a frame.
+function syncCompanionIntent() {
+  const intent = companionIntent(state.session);
+  if (!room || intent === lastCompanionIntent) return;
+  lastCompanionIntent = intent; room?.setActivity(intent);
+}
 function renderCompanionNote() {
   const minutes = state.history.filter(h => h.date === localDate()).reduce((sum, h) => sum + h.minutes, 0);
   const notes = { idle: 'Start focusing to work alongside your companion.', working: 'Your companion is working alongside you.', walking: 'A little stretch. Your companion is finding a cozy spot.', returning: 'Your companion is on the way back to the desk.', resting: 'A soft seat and a little breather. Take your time.', sleeping: 'Your companion has drifted off. Resume whenever you’re ready.', 'resting-at-desk': 'Your companion is taking a quiet break at the desk.' };
   $('#daily-note').textContent = minutes ? `${minutes} quiet minutes made today. Look at you go.` : notes[companionActivity];
 }
 function renderSession() {
-  const ms = remainingAt(state.session);
+  const ms = displayedRemaining(state.session);
   const formatted = formatTime(ms);
-  const presence = state.session.running ? 'focusing' : ms < state.session.duration ? 'break' : 'idle';
+  const presence = sessionPhase(state.session);
+  syncCompanionIntent();
   const today = localDate();
   const minutes = state.history.filter(h => h.date === today).reduce((sum, h) => sum + h.minutes, 0);
   const renderKey = `${formatted}:${presence}:${state.session.duration}:${today}:${minutes}`;
@@ -258,10 +272,14 @@ $('#start-button').addEventListener('click', () => {
 });
 $('#reset-session').addEventListener('click', () => {
   acceptUpdate(store.update(draft => { draft.session = createSession(draft.session.duration / 60000); }));
+  // Reset hides itself; keep keyboard and screen-reader focus on the timer.
+  if ($('#reset-session').hidden) $('#start-button').focus();
 });
 document.querySelectorAll('[data-minutes]').forEach(button => button.addEventListener('click', () => {
+  // Choosing the duration that is already selected must not erase a paused session.
   acceptUpdate(store.update(draft => {
-    if (!draft.session.running) draft.session = createSession(Number(button.dataset.minutes));
+    const minutes = Number(button.dataset.minutes);
+    if (!draft.session.running && (minutes * 60_000 !== draft.session.duration || draft.session.remaining === 0)) draft.session = createSession(minutes);
   }));
 }));
 $('#task').addEventListener('input', event => {
@@ -290,6 +308,7 @@ $('#mini-button').addEventListener('click', () => {
 });
 
 function setEditMode(enabled) {
+  if (enabled && !room) return;
   editMode = enabled;
   if (enabled && compact) {
     compact = false;
@@ -312,7 +331,7 @@ function setEditMode(enabled) {
   room?.setEditMode?.(enabled);
   if (!enabled) { placement = null; selectedItem = null; }
   renderInspector();
-  if (enabled) renderCollection();
+  if (enabled) { renderCollection(); revealRoomForPlacement(); }
 }
 
 function syncFocusDock() {
@@ -365,8 +384,11 @@ $('#undo-layout').addEventListener('click', () => {
   undoLayout = null;
   room?.cancelPlacement?.();
   room?.selectItem?.(null);
+  const hadFocus = document.activeElement === $('#undo-layout');
   commitLayout(previous, false);
   $('#undo-layout').disabled = true;
+  // A disabled button drops focus to the page; keep it in the collection tabs.
+  if (hadFocus) document.querySelector('[data-collection-tab][aria-pressed="true"]')?.focus();
   toast('Your previous arrangement is back.');
 });
 
@@ -447,7 +469,7 @@ function renderCollection() {
 function revealRoomForPlacement() {
   const stage = $('#stage');
   const rect = stage.getBoundingClientRect();
-  if (rect.top >= 12 && rect.bottom <= $('#builder-panel').getBoundingClientRect().top) return;
+  if (rect.top >= 12 && rect.bottom <= Math.min(window.innerHeight, $('#builder-panel').getBoundingClientRect().top)) return;
   stage.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
 }
 
@@ -548,13 +570,18 @@ document.querySelectorAll('[data-panel]').forEach(button => button.addEventListe
 }));
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && room?.cancelDrag?.()) { event.preventDefault(); return; }
-  if (event.key === 'Escape' && currentPanel) { closePanel(); return; }
+  // Escape while typing (or composing) belongs to the text field, not the panel.
+  const typing = event.isComposing || event.target.closest('textarea, [contenteditable="true"], input:not([type="range"], [type="checkbox"], [type="radio"], [type="button"])');
+  if (event.key === 'Escape' && currentPanel && !typing) { closePanel(); return; }
   if (!editMode || event.target.closest('input, textarea, select, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey) return;
   const steps = { ArrowLeft: [-.25, 0], ArrowRight: [.25, 0], ArrowUp: [0, -.25], ArrowDown: [0, .25] };
   if (event.key === 'Escape') { room?.cancelPlacement?.(); room?.selectItem?.(null); }
+  // Enter drops a new piece at its preview spot; preventDefault stops the
+  // focused collection card from starting another placement.
+  else if (event.key === 'Enter' && placement) { event.preventDefault(); room?.confirmPlacement?.(); }
   else if (event.key.toLowerCase() === 'r' && (placement || selectedItem)) { event.preventDefault(); room?.rotateSelection?.(); }
   else if ((event.key === 'Delete' || event.key === 'Backspace') && selectedItem) { event.preventDefault(); room?.removeSelection?.(); }
-  else if (steps[event.key] && selectedItem) { event.preventDefault(); room?.moveSelection?.(...steps[event.key]); }
+  else if (steps[event.key] && (placement || selectedItem)) { event.preventDefault(); room?.moveSelection?.(...steps[event.key]); }
 }, { signal: listeners.signal });
 
 async function toggleSound() {
@@ -573,6 +600,8 @@ async function toggleSound() {
     await audioContext.resume();
     soundEnabled = !soundEnabled;
     gainNode.gain.setTargetAtTime(soundEnabled ? Number($('#volume').value) / 130 : 0, audioContext.currentTime, 0.15);
+    // After the fade-out, suspend the context so the audio device can sleep.
+    if (!soundEnabled) setTimeout(() => { if (!soundEnabled) audioContext.suspend().catch(() => {}); }, 800);
     $('#sound-button').setAttribute('aria-pressed', soundEnabled);
     $('#sound-state').textContent = soundEnabled ? 'Rain is falling' : 'Sound off';
   } catch { toast('Audio isn’t available in this browser. Your quiet room is still here.'); }
@@ -581,11 +610,15 @@ $('#sound-button').addEventListener('click', toggleSound);
 $('#volume').addEventListener('input', event => {
   if (soundEnabled && gainNode) gainNode.gain.setTargetAtTime(Number(event.target.value) / 130, audioContext.currentTime, 0.1);
 });
-room?.setActivity(companionIntent(state.session));
+syncCompanionIntent();
 tick();
 const tickInterval = setInterval(tick, 500);
 function refreshState() {
+  const before = JSON.stringify(state.layout);
   applyState(store.refresh());
+  // Another tab changed the room: this tab's Undo snapshot is now stale and
+  // would overwrite that work, so drop it.
+  if (JSON.stringify(state.layout) !== before && undoLayout) { undoLayout = null; $('#undo-layout').disabled = true; }
   tick();
 }
 window.addEventListener('storage', event => {
