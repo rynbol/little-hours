@@ -4,8 +4,9 @@ export const ROOM_BOUNDS = Object.freeze({ minX: -5.5, maxX: 5.5, minZ: -4.2, ma
 export const MAX_ITEMS = 32;
 const GRID = 0.25;
 const EPSILON = 1e-7;
-// The resident cat has a little permanent spot. A rug can sit underneath it.
-export const CAT_BOUNDS = Object.freeze({ minX: 0.15, maxX: 1.5, minZ: 1.1, maxZ: 2.15 });
+// The pet sleeps in its own movable bed. Rooms saved before the bed existed
+// kept this spot clear for the cat, so the bed moves in there.
+export const PET_HOME = Object.freeze({ x: 0.75, z: 1.5 });
 const item = (id, type, x, z, rotation = 0) => ({ id, type, x, z, rotation });
 
 export const PRESETS = [
@@ -108,6 +109,10 @@ PRESETS.push(
 export function roomDesign(layout) { return PRESETS.find(preset => preset.id === layout?.presetId) || PRESETS[0]; }
 
 const isDesk = candidate => getFurniture(candidate?.type)?.category === 'Study';
+const isPetBed = candidate => candidate?.type === 'pet-bed';
+// The pet bed does not use up the room's piece budget.
+export function pieceCount(items) { return items.filter(entry => !getFurniture(entry?.type)?.unique).length; }
+export function petBed(layout) { return layout?.items?.find(isPetBed) || null; }
 const snap = value => Math.round(value / GRID) * GRID;
 export function footprintBounds(candidate) { return bounds(candidate); }
 function bounds(candidate) {
@@ -139,12 +144,11 @@ export function validatePlacement(items, candidate) {
   if (!Number.isInteger(candidate.rotation) || candidate.rotation < 0 || candidate.rotation > 3) return { valid: false, reason: 'Turn furniture in quarter turns.' };
   if (Math.abs(snap(candidate.x) - candidate.x) > EPSILON || Math.abs(snap(candidate.z) - candidate.z) > EPSILON) return { valid: false, reason: 'Place furniture on the room grid.' };
   const otherItems = (Array.isArray(items) ? items : []).filter(existing => !candidate.id || existing.id !== candidate.id);
-  if (otherItems.length >= MAX_ITEMS) return { valid: false, reason: `This room has space for ${MAX_ITEMS} items. Remove one to make room.` };
+  if (!definition.unique && pieceCount(otherItems) >= MAX_ITEMS) return { valid: false, reason: `This room has space for ${MAX_ITEMS} items. Remove one to make room.` };
   const area = bounds(candidate);
   if (area.minX < ROOM_BOUNDS.minX - EPSILON || area.maxX > ROOM_BOUNDS.maxX + EPSILON || area.minZ < ROOM_BOUNDS.minZ - EPSILON || area.maxZ > ROOM_BOUNDS.maxZ + EPSILON) {
     return { valid: false, reason: 'Keep the whole piece inside the room.' };
   }
-  if (definition.blocking && overlaps(area, CAT_BOUNDS)) return { valid: false, reason: 'Leave a little room for the sleeping cat.' };
   if (definition.blocking) {
     const collision = otherItems.find(existing => getFurniture(existing.type)?.blocking && overlaps(area, bounds(existing)));
     if (collision) return { valid: false, reason: `That spot overlaps the ${getFurniture(collision.type).name.toLowerCase()}.` };
@@ -169,7 +173,17 @@ export function nearestValidPlacement(items, candidate, reach = 1) {
 export function createLayout(presetId = PRESETS[0].id) {
   const preset = PRESETS.find(entry => entry.id === presetId) || PRESETS[0];
   const items = preset.items.map(entry => ({ ...entry }));
+  addPetBed(items);
   return { presetId: preset.id, items, activeDeskId: items.find(isDesk)?.id ?? null };
+}
+
+// Every room has exactly one pet bed. A room without one gets it at the
+// pet's old spot, or at the first free spot when that is taken.
+function addPetBed(items) {
+  if (items.some(isPetBed)) return;
+  const bed = { id: 'pet-bed', type: 'pet-bed', x: PET_HOME.x, z: PET_HOME.z, rotation: 0 };
+  if (!validatePlacement(items, bed).valid) Object.assign(bed, findFreePosition(items, 'pet-bed') || {});
+  if (validatePlacement(items, bed).valid) items.push(bed);
 }
 
 export function findFreePosition(items, type, rotation = 0) {
@@ -189,7 +203,7 @@ export function normalizeLayout(raw) {
   const ids = new Set();
   // Bound even malformed persisted input before doing collision checks.
   for (const [index, saved] of raw.items.slice(0, 100).entries()) {
-    if (items.length >= MAX_ITEMS) break;
+    if (pieceCount(items) >= MAX_ITEMS && !getFurniture(saved?.type)?.unique) continue;
     if (!saved || typeof saved !== 'object' || !getFurniture(saved.type) || !Number.isFinite(saved.x) || !Number.isFinite(saved.z)) continue;
     let id = typeof saved.id === 'string' && saved.id.length > 0 && saved.id.length <= 80 ? saved.id : `restored-${index}`;
     if (ids.has(id)) id = `restored-${index}`;
@@ -198,6 +212,7 @@ export function normalizeLayout(raw) {
       id, type: saved.type, x: snap(saved.x), z: snap(saved.z),
       rotation: Number.isInteger(saved.rotation) && saved.rotation >= 0 && saved.rotation <= 3 ? saved.rotation : 0,
     };
+    if (isPetBed(candidate) && items.some(isPetBed)) continue;
     if (validatePlacement(items, candidate).valid) { items.push(candidate); ids.add(id); }
   }
   const presetId = PRESETS.some(preset => preset.id === raw.presetId) ? raw.presetId : null;
@@ -205,5 +220,6 @@ export function normalizeLayout(raw) {
   // A usable study station is the room's anchor. Recover a complete arrangement
   // when a malformed or older save has lost its last desk.
   if (!activeDeskId) return createLayout(presetId);
+  addPetBed(items);
   return { presetId, items, activeDeskId };
 }

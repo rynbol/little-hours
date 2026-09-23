@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
-import { createLayout, footprintBounds } from '../src/layout.js';
+import { createLayout, footprintBounds, pieceCount } from '../src/layout.js';
 
 class Surface {
   listeners = new Map();
@@ -93,18 +93,21 @@ try {
   assert.ok(scene.meshes.length > 20);
   assert.equal(canvas.style.touchAction, 'pan-y');
   console.log(`PASS engine: native Babylon scene, orthographic camera, ${scene.meshes.length} meshes, mobile pan-y.`);
-  const nativePick = scene.pickWithRay; let hoverPicks = 0;
+  // Outside Decorate a hover only tests the pet's three soft spheres; count
+  // those tests with the scene picks.
+  const nativePick = scene.pickWithRay, petModel = diagnostics().petModel, nativeHitTest = petModel.hitTest; let hoverPicks = 0;
   scene.pickWithRay = function (...args) { hoverPicks++; return nativePick.apply(this, args); };
+  petModel.hitTest = (...args) => { hoverPicks++; return nativeHitTest(...args); };
   for (let i = 0; i < 40; i++) canvas.emit('pointermove', { clientX: 150 + i, clientY: 180, pointerType: 'mouse' });
   assert.equal(hoverPicks, 0, 'raw pointer events only queue their latest coordinates');
   advance(); assert.equal(hoverPicks, 1, 'hover events coalesce into one pick per rendered frame');
   canvas.emit('pointerdown', { clientX: 200, clientY: 180, pointerType: 'mouse' });
   canvas.emit('pointermove', { clientX: 250, clientY: 180, pointerType: 'mouse' }); advance();
   canvas.emit('pointerup', { clientX: 250, clientY: 180, pointerType: 'mouse' });
-  assert.equal(hoverPicks, 1, 'orbit dragging skips hover raycasts');
+  assert.equal(hoverPicks, 2, 'orbit dragging skips hover raycasts; the press only asks whether it landed on the pet');
   room.beginPlacement('plant'); canvas.emit('pointermove', { clientX: 330, clientY: 230, pointerType: 'mouse' }); advance();
-  assert.equal(hoverPicks, 1, 'a placement preview only intersects the mathematical floor');
-  room.cancelPlacement(); room.setEditMode(false); scene.pickWithRay = nativePick;
+  assert.equal(hoverPicks, 2, 'a placement preview only intersects the mathematical floor');
+  room.cancelPlacement(); room.setEditMode(false); scene.pickWithRay = nativePick; petModel.hitTest = nativeHitTest;
   const effects = scene.meshes.filter(mesh => mesh.metadata?.effect && mesh.isEnabled());
   const steam = effects.find(mesh => mesh.metadata.effect === 'tea-steam'), flames = effects.find(mesh => mesh.metadata.effect === 'hearth-flames');
   assert.ok(steam && flames, 'the furnished room contains tea and hearth effects');
@@ -114,12 +117,8 @@ try {
   const shadowCasters = scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList;
   const glowMeshes = scene.effectLayers.find(layer => layer.name === 'candlelight-bloom').mainTexture.renderList;
   for (const mesh of effects) if (mesh.metadata.effect === 'tea-steam') { assert.equal(mesh.isPickable, false); assert.ok(!shadowCasters.includes(mesh) && !glowMeshes.includes(mesh)); }
-  const catMeshes = scene.meshes.filter(mesh => mesh.metadata?.cat);
-  assert.ok(catMeshes.length > 0);
-  for (const mesh of catMeshes) {
-    assert.equal(mesh.receiveShadows, false, 'moving cat fur must not sample a stale cached shadow pose');
-    assert.ok(shadowCasters.includes(mesh), 'the cat still casts its grounding shadow onto the floor');
-  }
+  assert.equal(petModel.body.receiveShadows, false, 'moving fur must not sample a stale cached shadow pose');
+  assert.ok(shadowCasters.includes(petModel.body), 'the napping pet casts its grounding shadow onto the floor');
   console.log('PASS animation cost: hover picks coalesce; orbit/placement skip mesh picking; steam stays out of shadows and bloom.');
   const particles = particleNames.map(name => scene.getMeshByName(name));
   assert.deepEqual(particles.map(mesh => mesh.thinInstanceCount), [48, 20], 'ambient particles stay in two instanced batches');
@@ -258,8 +257,8 @@ try {
   const beforeInvalid = JSON.stringify(diagnostics().layout); room.moveSelection(20, 0);
   assert.equal(JSON.stringify(diagnostics().layout), beforeInvalid); assert.ok(notices.length);
   room.rotateSelection(); assert.equal(changes.at(-1).items.find(item => item.id === 'test-plant').rotation, 1);
-  room.removeSelection(); assert.equal(diagnostics().layout.items.length, 1);
-  room.selectItem(desk.id); room.removeSelection(); assert.equal(diagnostics().layout.items.length, 1, 'last study station stays');
+  room.removeSelection(); assert.equal(pieceCount(diagnostics().layout.items), 1);
+  room.selectItem(desk.id); room.removeSelection(); assert.equal(pieceCount(diagnostics().layout.items), 1, 'last study station stays');
   function clickFloor(x, z) {
     advance(2); scene.render();
     const pixel = Vector3.Project(new Vector3(x, 0.22, z), Matrix.Identity(), scene.getTransformMatrix(), { x: 0, y: 0, width: canvas.clientWidth, height: canvas.clientHeight });
@@ -267,8 +266,8 @@ try {
     canvas.emit('pointerdown', event); canvas.emit('pointerup', event);
   }
   room.beginPlacement('plant'); clickFloor(2, -2);
-  assert.equal(diagnostics().layout.items.length, 2, 'clicking the visible floor preview should commit a piece');
-  const placed = diagnostics().layout.items.find(item => item.id !== desk.id);
+  assert.equal(pieceCount(diagnostics().layout.items), 2, 'clicking the visible floor preview should commit a piece');
+  const placed = diagnostics().layout.items.find(item => item.id !== desk.id && item.type !== 'pet-bed');
   assert.equal(placed.x, 2); assert.equal(placed.z, -2);
   const placedNode = scene.transformNodes.find(node => node.metadata?.itemId === placed.id);
   const savedAfterPlacement = JSON.stringify(diagnostics().layout);
@@ -279,7 +278,7 @@ try {
   advance(20);
   assert.deepEqual(placedNode.scaling.asArray(), [1, 1, 1], 'settling finishes at exact catalog size');
   room.beginPlacement('plant'); clickFloor(desk.x, desk.z);
-  assert.equal(diagnostics().layout.items.length, 2, 'a pointer click on occupied floor must not place furniture');
+  assert.equal(pieceCount(diagnostics().layout.items), 2, 'a pointer click on occupied floor must not place furniture');
   room.cancelPlacement(); assert.equal(diagnostics().placement, null);
   console.log('PASS editing: pointer placement/picking, collision rejection, move/rotate/remove, last desk guard and cancellation.');
   const layoutBeforeDragChecks = structuredClone(diagnostics().layout);
@@ -366,56 +365,62 @@ try {
   assert.equal(canvas.style.touchAction, 'pan-y'); assert.ok(plantMeshes.every(mesh => !mesh.renderOutline));
   room.setEditMode(true);
   beginPlantDrag(); canvas.emit('pointerup', trayPointer);
-  assert.equal(diagnostics().layout.items.length, 1); assert.equal(dragStates.at(-1), null);
+  assert.equal(pieceCount(diagnostics().layout.items), 1); assert.equal(dragStates.at(-1), null);
   assert.equal(changes.length, writesBeforeDrag + 2, 'cancelled drags do not overwrite Undo');
   const deskPointer = pointerAt(desk.x, 1.8, desk.z);
   canvas.emit('pointerdown', deskPointer); canvas.emit('pointermove', trayPointer); advance(2);
   assert.equal(diagnostics().dragging?.id, desk.id); assert.equal(dragStates.at(-1).removable, false);
   canvas.emit('pointerup', trayPointer);
-  assert.equal(diagnostics().layout.items.length, 1, 'last study desk cannot be returned');
+  assert.equal(pieceCount(diagnostics().layout.items), 1, 'last study desk cannot be returned');
   assert.equal(changes.length, writesBeforeDrag + 2);
   room.setLayout(layoutBeforeDragChecks); room.selectItem(null);
   console.log('PASS drag editor: hover outlines, captured gestures, one-save drops, invalid snapback, faded returns, last desk guard, cancellation and no per-frame meshes/materials/picks.');
-  const torso = scene.getTransformNodeByName('miso-breathing'), catHead = scene.getTransformNodeByName('miso-head'), catTail = scene.getTransformNodeByName('miso-tail'), catTailTip = scene.getTransformNodeByName('miso-tail-tip'), catPaw = scene.getMeshByName('miso-resting-paw'), heart = scene.getTransformNodeByName('pet-heart');
-  const headPosition = catHead.getAbsolutePosition().asArray(), pawPosition = catPaw.getAbsolutePosition().asArray(), tailPosition = catTail.getAbsolutePosition().asArray();
+  // The pet naps in its bed and breathes; a pet brings a heart that ends;
+  // a drag carries it, and set down it sits, then walks home to nap again.
+  room.setEditMode(true); room.setEditMode(false); advance(3);
+  const bed = diagnostics().layout.items.find(item => item.type === 'pet-bed');
+  const petBone = name => petModel.body.skeleton.bones.find(bone => bone.name === name).getLocalMatrix();
+  const petRig = () => petModel.body.skeleton.bones.map(bone => Array.from(bone.getLocalMatrix().m));
+  const petCasts = () => scene.getLightByName('window-sun').getShadowGenerator().getShadowMap().renderList.includes(petModel.body);
+  assert.deepEqual([petModel.root.position.x, petModel.root.position.z], [bed.x, bed.z], 'the pet naps in its bed');
+  assert.ok(Math.abs(petModel.root.position.y - (0.22 + 0.095)) < 1e-6, 'on its cushion');
   let smallestBreath = Infinity, largestBreath = -Infinity;
   for (let i = 0; i < 300; i++) {
-    advance(); smallestBreath = Math.min(smallestBreath, torso.scaling.y); largestBreath = Math.max(largestBreath, torso.scaling.y);
-    assert.deepEqual(catHead.getAbsolutePosition().asArray(), headPosition, 'sleeping head stays grounded instead of bobbing');
-    assert.deepEqual(catHead.rotation.asArray(), [0, 0, 0], 'resting head never rocks repetitively');
-    assert.deepEqual(catPaw.getAbsolutePosition().asArray(), pawPosition, 'paws stay planted while the flank breathes');
-    assert.deepEqual(catTail.getAbsolutePosition().asArray(), tailPosition);
-    assert.deepEqual(catTail.rotation.asArray(), [0, 0, 0], 'the curled tail base never wags');
-    assert.ok(Math.abs(-0.03 * torso.scaling.y + torso.position.y + 0.03) < 1e-10, 'breathing anchors the lower torso');
-    assert.ok(Math.abs(catTailTip.rotation.y) <= 0.111, 'tail movement stays confined to a small tip flex');
+    advance(); const m = petBone('chest').m, breath = Math.hypot(m[4], m[5], m[6]);
+    smallestBreath = Math.min(smallestBreath, breath); largestBreath = Math.max(largestBreath, breath);
+    assert.deepEqual([petModel.root.position.x, petModel.root.position.z], [bed.x, bed.z], 'a napping pet stays in its bed');
   }
-  assert.ok(largestBreath - smallestBreath > 0.07, 'Miso has a visible inhale and exhale across a full breath');
-  assert.ok(smallestBreath >= 1 && largestBreath <= 1.076, 'breathing stays within the authored flank expansion');
+  assert.ok(largestBreath - smallestBreath > 0.03 && smallestBreath >= 0.999 && largestBreath <= 1.05, 'a visible, gentle breath');
+  assert.ok(petModel.sleepLetters.isEnabled() && !petModel.heart.isEnabled() && petCasts(), 'nap letters float; a still pet casts its shadow');
   room.pet(); advance(30);
-  assert.deepEqual(catHead.getAbsolutePosition().asArray(), headPosition, 'petting does not lift the head');
-  assert.deepEqual(catPaw.getAbsolutePosition().asArray(), pawPosition, 'petting keeps paws planted');
-  assert.deepEqual(catTail.rotation.asArray(), [0, 0, 0]);
-  assert.ok(Math.abs(catHead.rotation.z) < 0.026 && catTailTip.rotation.y > 0, 'pet response is a restrained lean and tail-tip flex');
-  assert.ok(heart.isEnabled(), 'pet feedback remains visible during the reaction');
-  advance(75);
-  assert.ok(!heart.isEnabled(), 'pet feedback ends');
-  assert.deepEqual(catHead.rotation.asArray(), [0, 0, 0], 'pet reaction returns exactly to the resting head pose');
+  assert.ok(petModel.heart.isEnabled() && !petModel.sleepLetters.isEnabled(), 'a pet brings a heart');
+  advance(150); assert.ok(!petModel.heart.isEnabled() && diagnostics().pet.petAge === Infinity, 'the reaction ends');
+  const petPoint = () => { advance(2); scene.render(); const head = petModel.headPoint(new Vector3()); const pixel = Vector3.Project(head, Matrix.Identity(), scene.getTransformMatrix(), { x: 0, y: 0, width: canvas.clientWidth, height: canvas.clientHeight }); return { clientX: pixel.x, clientY: pixel.y, pointerId: 3, pointerType: 'mouse', button: 0 }; };
+  const grab = petPoint(), carry = { ...grab, clientX: grab.clientX - 90, clientY: grab.clientY + 30 };
+  canvas.emit('pointerdown', grab); canvas.emit('pointermove', carry); advance(12);
+  assert.equal(diagnostics().pet.state, 'held'); assert.equal(canvas.capturedPointer, 3, 'the carry keeps the pointer');
+  assert.ok(!petCasts() && petModel.root.position.y > 0.4, 'a carried pet is lifted and casts no stale shadow');
+  assert.equal(camera.inertialAlphaOffset, 0, 'carrying the pet never turns the room');
+  canvas.emit('pointerup', carry); advance(2);
+  assert.equal(diagnostics().pet.state, 'sitting', 'set down, it sits a moment');
+  for (let i = 0; i < 60 * 40 && diagnostics().pet.state !== 'sleeping'; i++) advance();
+  assert.equal(diagnostics().pet.state, 'sleeping', 'then it walks home and naps');
+  assert.deepEqual([petModel.root.position.x, petModel.root.position.z], [bed.x, bed.z]);
+  const writesBeforeTap = changes.length; canvas.emit('pointerdown', petPoint()); canvas.emit('pointerup', petPoint()); advance(2);
+  assert.ok(petModel.heart.isEnabled() && changes.length === writesBeforeTap, 'a tap pets it and saves nothing');
   room.beginPlacement('side-table'); clickFloor(3, 0);
   const pendingSettle = diagnostics().layout.items.find(item => item.type === 'side-table');
   const pendingNode = scene.transformNodes.find(node => node.metadata?.itemId === pendingSettle.id);
   assert.ok(pendingNode.scaling.x < 1);
   motion.matches = true; motion.emit('change', { matches: true }); advance(2);
   assert.deepEqual(pendingNode.scaling.asArray(), [1, 1, 1], 'reduced motion immediately completes settling');
-  assert.deepEqual(torso.scaling.asArray(), [1, 1, 1]);
-  assert.equal(torso.position.y, 0); assert.equal(catHead.position.y, 0.26); assert.equal(catTail.rotation.y, 0); assert.equal(catTailTip.rotation.y, 0);
-  assert.deepEqual(catHead.rotation.asArray(), [0, 0, 0]);
-  assert.deepEqual(scene.getMeshByName('miso-ear-left').rotation.asArray(), [0.12, 0.15, 0.16]);
-  assert.deepEqual(scene.getMeshByName('miso-ear-right').rotation.asArray(), [0.12, -0.15, -0.16]);
+  advance(200); const restingRig = petRig(); room.resetView(); advance(40);
+  assert.deepEqual(petRig(), restingRig, 'reduced motion holds the pet perfectly still');
   assert.deepEqual(particleBuffers.map(buffer => Array.from(buffer)), particleRestMatrices, 'reduced motion restores every particle to its exact authored position');
   assert.equal(moths.isEnabled(), false); assert.equal(shootingStar.isEnabled(), false);
   assert.deepEqual(Array.from(mothBuffer), restingMothPositions);
   room.selectItem(pendingSettle.id); room.removeSelection();
-  console.log('PASS animations: timed settling preserves saved layout; pet reaction ends; reduced motion restores neutral poses.');
+  console.log('PASS animations: the pet naps in its bed and breathes, a pet brings a heart that ends, a carry sets it down and it walks home; settling keeps the saved layout; reduced motion holds still.');
   const savedRoutineLayout = diagnostics().layout;
   motion.matches = false; motion.emit('change', { matches: false });
   room.setEditMode(false); room.setLayout(createLayout('writers-loft')); room.setActivity('working'); advance(3);
@@ -560,9 +565,9 @@ try {
     intersection.callback([{ isIntersecting: true }]); assert.equal(frames.size, 1, 'the room draws again when visible');
     room.setFocused(false); advance(3);
     // Enter-key placement: the preview spot becomes a real piece.
-    room.setEditMode(true); const count = diagnostics().layout.items.length;
+    room.setEditMode(true); const count = pieceCount(diagnostics().layout.items);
     room.beginPlacement('plant'); assert.equal(room.confirmPlacement(), true); advance(2);
-    assert.equal(diagnostics().layout.items.length, count + 1, 'confirming a placement adds the piece');
+    assert.equal(pieceCount(diagnostics().layout.items), count + 1, 'confirming a placement adds the piece');
     assert.equal(room.confirmPlacement(), false, 'nothing to confirm afterwards');
     room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
     console.log('PASS review fixes: shade 2 mm above rugs and floor, grounded companion, no metro moths, unstretched stars, off-screen pause, keyboard placement.');
@@ -597,11 +602,11 @@ try {
     still(); room.beginPlacement('plant');
     const place = pointerAt(-4, .22, 3); canvas.emit('pointermove', place); advance(2);
     assert.equal(canvas.style.cursor, 'crosshair');
-    const count = diagnostics().layout.items.length;
+    const count = pieceCount(diagnostics().layout.items);
     canvas.emit('pointerdown', place); canvas.emit('pointermove', { ...place, clientX: place.clientX - 50 });
     assert.ok(camera.inertialAlphaOffset > 0, 'placement mode can turn the room too');
     canvas.emit('pointerup', { ...place, clientX: place.clientX - 50 }); advance(2);
-    assert.equal(diagnostics().layout.items.length, count, 'a drag never places the preview');
+    assert.equal(pieceCount(diagnostics().layout.items), count, 'a drag never places the preview');
     assert.equal(canvas.style.cursor, 'crosshair');
     room.cancelPlacement(); room.setEditMode(false); room.resetView(); room.setLayout(beforeDesignLayout); advance(3);
     console.log('PASS decorate fixes: room-owned cursor, grab over empty space, empty-space drags turn the room, piece drags stay piece drags.');
@@ -619,12 +624,20 @@ try {
     assert.equal(diagnostics().dragging?.id, 'rug-under'); canvas.emit('pointerup', to); advance(2);
     assert.equal(diagnostics().layout.items.at(-1).id, 'rug-under', 'the rug put down last goes to the top of the stack');
     assert.ok(node('rug-over').metadata.body.scaling.y < 0.2 && node('rug-under').metadata.body.scaling.y === 1, 'the stack follows the new order');
-    // Miso sinks with a flattened rug and keeps the authored height on the top rug.
-    const miso = scene.getTransformNodeByName('sleeping-cat');
-    room.setLayout(createLayout('midnight-metro')); advance(3);
-    assert.ok(Math.abs(miso.position.y - (0.29 - (0.056 - 0.0055))) < 1e-9, 'the cat lies on its flattened rug');
-    room.setLayout(createLayout('ember-library')); advance(3);
-    assert.equal(miso.position.y, 0.29, 'on the top rug, the cat keeps its height');
+    // The pet stands on what is under it: its bed's cushion, then a rug top
+    // that sinks when a later rug flattens it.
+    const pet = diagnostics().petModel.root, soloRug = { id: 'solo-rug', type: 'rug', x: 3, z: 2, rotation: 0 };
+    room.setEditMode(false); room.setLayout({ presetId: null, items: [desk, soloRug], activeDeskId: desk.id }); advance(3);
+    assert.ok(Math.abs(pet.position.y - (0.22 + 0.095)) < 1e-6, 'in its bed, the pet lies on the cushion');
+    const lift = () => { advance(2); scene.render(); const head = diagnostics().petModel.headPoint(new Vector3()); return Vector3.Project(head, Matrix.Identity(), scene.getTransformMatrix(), { x: 0, y: 0, width: canvas.clientWidth, height: canvas.clientHeight }); };
+    const above = Vector3.Project(new Vector3(3, 0.22 + 0.95, 2), Matrix.Identity(), scene.getTransformMatrix(), { x: 0, y: 0, width: canvas.clientWidth, height: canvas.clientHeight });
+    const start = lift(), press = { clientX: start.x, clientY: start.y, pointerId: 4, pointerType: 'mouse', button: 0 };
+    canvas.emit('pointerdown', press); canvas.emit('pointermove', { ...press, clientX: above.x, clientY: above.y }); advance(2); canvas.emit('pointerup', { ...press, clientX: above.x, clientY: above.y }); advance(40);
+    assert.equal(diagnostics().pet.state, 'sitting'); assert.ok(Math.hypot(pet.position.x - 3, pet.position.z - 2) < 0.05, 'set down on the rug');
+    assert.ok(Math.abs(pet.position.y - (0.22 + 0.056)) < 1e-3, `on the rug top (${pet.position.y.toFixed(4)})`);
+    room.setLayout({ presetId: null, items: [desk, soloRug, { id: 'cover-rug', type: 'rug', x: 0, z: 2, rotation: 0 }], activeDeskId: desk.id }); advance(40);
+    assert.ok(Math.abs(pet.position.y - (0.22 + 0.0055)) < 1e-3, 'a flattened rug lowers the pet with it');
+    room.setEditMode(true);
     // A drop that overlaps a neighbour lands on the closest free spot.
     room.setLayout(dragLayout); advance(3);
     const slide = beginPlantDrag(-0.25, -2.5);
@@ -646,7 +659,7 @@ try {
     const turned = diagnostics().layout.items.find(item => item.id === 'wall-sofa');
     assert.deepEqual([turned.x, turned.z, turned.rotation], [3.75, -2.5, 1], 'the sofa turns and steps off the wall');
     room.setEditMode(false); room.setLayout(beforeDesignLayout); advance(3);
-    console.log('PASS placement fixes: rugs stack in drop order, covered rugs flatten, the cat follows its rug, blocked drops and turns find a free spot, floor clicks only deselect.');
+    console.log('PASS placement fixes: rugs stack in drop order, covered rugs flatten, the pet stands on its bed or rug, blocked drops and turns find a free spot, floor clicks only deselect.');
   }
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);

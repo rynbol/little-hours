@@ -64,7 +64,17 @@ h1 { font-family: Georgia, 'Times New Roman', serif; margin: 0; font-size: clamp
 .room-hint { position: absolute; bottom: 2px; max-width: calc(100% - 20px); font-size: 11px; line-height: 1.4; color: #bdac99; text-align: center; pointer-events: none; }
 .room-hint span { padding: 0 10px; color: #8a735c; }
 .loading-note { position: relative; z-index: 2; pointer-events: none; max-width: 260px; text-align: center; color: #ecd9b8; font-size: 13px; background: #332938ed; border: 1px solid #795d45; border-radius: 12px; padding: 13px 18px; }
-.pet-bubble { position: absolute; bottom: 25%; left: 43%; background: #f4e5c5; color: #66503b; border: 1px solid #c7a374; border-radius: 14px 14px 14px 2px; padding: 11px 14px; font-size: 12px; box-shadow: 0 8px 25px #120a1940; pointer-events: none; }
+/* Speech bubbles float above the pet's and the companion's heads. */
+.speech-layer { position: absolute; inset: 0; z-index: 2; overflow: visible; pointer-events: none; }
+.speech-bubble { position: absolute; left: 0; top: 0; translate: -50% -100%; will-change: transform; }
+.speech-bubble.is-offstage { visibility: hidden; }
+.speech-text { position: relative; display: block; width: max-content; max-width: 230px; padding: 7px 12px 8px; border: 1px solid #d6b98c; border-radius: 14px; background: #f7ecd4; color: #5d4632; font-size: 12.5px; line-height: 1.35; text-align: center; box-shadow: 0 6px 18px #140b1a45; opacity: 0; transform: translateY(6px) scale(0.86); transform-origin: 50% 100%; transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1); }
+.speech-text::after { content: ''; position: absolute; left: 50%; bottom: -6px; width: 10px; height: 10px; border-right: 1px solid #d6b98c; border-bottom: 1px solid #d6b98c; background: inherit; transform: translateX(-50%) rotate(45deg); }
+.speech-bubble.is-visible .speech-text { opacity: 1; transform: none; }
+.speech-bubble[data-speaker='pet'] .speech-text { border-color: #e6b3a6; background: #fbe8e2; color: #7a4a45; font-size: 12px; }
+.speech-bubble[data-speaker='pet'] .speech-text::after { border-color: #e6b3a6; }
+.stage.is-mini .speech-layer, .is-decorating .speech-bubble[data-speaker='avatar'] { display: none; }
+@media (prefers-reduced-motion: reduce) { .speech-text { transform: none; transition: opacity 0.01s; } }
 .room-bottom { display: flex; justify-content: space-between; gap: 15px; align-items: center; min-height: 44px; }
 .room-company { color: #c1ad94; font-size: 11px; display: flex; align-items: center; gap: 7px; white-space: nowrap; padding-left: 6px; }
 .room-company svg { width: 14px; height: 14px; color: #b39670; }
@@ -246,7 +256,6 @@ h2 em { color: #a07147; font-weight: 400; }
   .room-bottom { margin-top: 2px; }
   .room-tools { width: 100%; }
   .tool { padding: 8px 3px; flex-direction: column; gap: 4px; }
-  .pet-bubble { font-size: 11px; left: 30%; bottom: 25%; }
   .focus-card { display: block; padding: 22px; }
   .focus-card h2 { font-size: 35px; }
   #task { font-size: 16px; }

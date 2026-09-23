@@ -1,5 +1,5 @@
 import { getFurniture } from './catalog.js';
-import { ROOM_BOUNDS, CAT_BOUNDS } from './layout.js';
+import { ROOM_BOUNDS } from './layout.js';
 import { sessionPhase } from './session.js';
 
 export const COMPANION_RADIUS = 0.24;
@@ -14,19 +14,25 @@ export function localPoint(item, x, z) {
   const angle = item.rotation * Math.PI / 2, c = Math.cos(angle), s = Math.sin(angle);
   return { x: item.x + x * c + z * s, z: item.z - x * s + z * c };
 }
-export function navigationObstacles(layout, ignoredId) {
-  const boxes = [CAT_BOUNDS];
+// Solid furniture, grown by the walker's clearance. The pet bed is solid
+// like any piece; the pet leaves out its own bed (`ignored` by type or id),
+// and `extra` boxes (for example, where the pet sits) join them.
+export function navigationObstacles(layout, ignoredId, radius = COMPANION_RADIUS, extra = []) {
+  const boxes = [...extra];
   for (const item of layout.items) {
     const definition = getFurniture(item.type);
-    if (!definition?.blocking || item.id === ignoredId) continue;
+    if (!definition?.blocking || item.id === ignoredId || item.type === ignoredId) continue;
     const [w, d] = item.rotation % 2 ? [...definition.footprint].reverse() : definition.footprint;
     boxes.push({ minX: item.x - w / 2, maxX: item.x + w / 2, minZ: item.z - d / 2, maxZ: item.z + d / 2 });
   }
-  return boxes.map(box => ({ minX: box.minX - COMPANION_RADIUS, maxX: box.maxX + COMPANION_RADIUS, minZ: box.minZ - COMPANION_RADIUS, maxZ: box.maxZ + COMPANION_RADIUS }));
+  const grown = boxes.map(box => ({ minX: box.minX - radius, maxX: box.maxX + radius, minZ: box.minZ - radius, maxZ: box.maxZ + radius }));
+  grown.radius = radius;
+  return grown;
 }
 export function walkable(point, obstacles) {
-  return point.x >= ROOM_BOUNDS.minX + COMPANION_RADIUS && point.x <= ROOM_BOUNDS.maxX - COMPANION_RADIUS
-    && point.z >= ROOM_BOUNDS.minZ + COMPANION_RADIUS && point.z <= ROOM_BOUNDS.maxZ - COMPANION_RADIUS
+  const radius = obstacles.radius ?? COMPANION_RADIUS;
+  return point.x >= ROOM_BOUNDS.minX + radius && point.x <= ROOM_BOUNDS.maxX - radius
+    && point.z >= ROOM_BOUNDS.minZ + radius && point.z <= ROOM_BOUNDS.maxZ - radius
     && !obstacles.some(box => point.x > box.minX && point.x < box.maxX && point.z > box.minZ && point.z < box.maxZ);
 }
 export function clearSegment(a, b, obstacles) {
@@ -47,8 +53,7 @@ export function clearSegment(a, b, obstacles) {
 }
 // Small floor grid, searched only when a trip begins or its destination changes.
 // Every diagonal and shortcut is checked with the companion's clearance radius.
-export function findWalkingPath(layout, start, end) {
-  const obstacles = navigationObstacles(layout);
+export function findWalkingPath(layout, start, end, obstacles = navigationObstacles(layout)) {
   if (!walkable(start, obstacles) || !walkable(end, obstacles)) return null;
   if (clearSegment(start, end, obstacles)) return [start, end];
   const width = 56, height = 43, total = width * height;

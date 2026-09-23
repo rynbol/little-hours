@@ -16,6 +16,8 @@ export const FURNITURE = [
   { id: 'daybed', name: 'Velvet dreaming sofa', category: 'Seating', description: 'A deep plum daybed with moss velvet pillows, carved feet and a draped golden throw.', footprint: [3.1, 1.65], height: 1.34, color: '#795765', blocking: true },
   { id: 'moon-tree', name: 'Moonleaf tree', category: 'Plants', description: 'A branching indoor tree with hand-shaped leaves, a brass pot and tiny hanging stars.', footprint: [1.8, 1.8], height: 3.22, color: '#68816a', blocking: true },
   { id: 'lantern-cluster', name: 'Wandering lanterns', category: 'Lighting', description: 'Three little brass lanterns, beeswax candles and glowing stars for the quiet hours.', footprint: [1.05, 1.05], height: 1.03, color: '#d1a458', blocking: true },
+  // The pet's own bed: one per room, always kept, never counted as a piece.
+  { id: 'pet-bed', name: 'Cozy pet bed', category: 'Pets', description: 'A soft, low cushion bed where your pet naps and comes home to.', footprint: [1.2, 0.8], height: 0.18, color: '#dfd1b2', blocking: true, unique: true },
   { id: 'moon-rug', name: 'Midnight constellation rug', category: 'Rugs', description: 'A round indigo rug with a woven moon, tiny stars and a warm tasseled border.', footprint: [3.6, 3.6], height: 0.08, color: '#676779', blocking: false },
 ];
 

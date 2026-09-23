@@ -3,8 +3,10 @@ import { createRoom } from './room.js';
 import { createSession, remainingAt, formatTime, sessionPhase, displayedRemaining } from './session.js';
 import { createStateStore, localDate, storageKey } from './state.js';
 import { FURNITURE, getFurniture } from './catalog.js';
-import { PRESETS, normalizeLayout, MAX_ITEMS, roomDesign } from './layout.js';
+import { PRESETS, normalizeLayout, MAX_ITEMS, pieceCount, roomDesign } from './layout.js';
 import { companionIntent } from './companion.js';
+import { PETS } from './pet.js';
+import { createSpeech, PET_LINES } from './speech.js';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -39,7 +41,7 @@ let audioContext, noiseNode, gainNode;
 let soundEnabled = false;
 let storageWarningShown = false;
 let toastTimeout;
-let petTimeout;
+let speech = null;
 let editMode = false;
 let collectionTab = 'collection';
 let category = 'All';
@@ -73,14 +75,13 @@ document.querySelector('#app').innerHTML = `
           <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
           <div class="mini-caption" id="mini-caption" hidden>Mini view preview · inside this page</div>
           <div class="room-hint" id="room-hint">Drag to look around<span>·</span>Try petting the cat</div>
-          <div class="pet-bubble" id="pet-bubble" hidden>Miso is happy you’re here.</div>
         </div>
         <div class="room-bottom">
-          <div class="room-company">${icon('cat')}<span>You & Miso</span></div>
+          <div class="room-company">${icon('cat')}<span id="pet-company">You & Miso</span></div>
           <nav class="room-tools" aria-label="Room controls">
             <button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Atmosphere</span></button>
             <button class="tool" data-panel="performance" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Performance</span></button>
-            <button class="tool" id="pet-button">${icon('cat')}<span>Miso</span></button>
+            <button class="tool" id="pet-button">${icon('cat')}<span id="pet-button-label">Miso</span></button>
             <button class="tool" id="mini-button" aria-pressed="false">${icon('mini')}<span>Mini view</span></button>
           </nav>
         </div>
@@ -143,6 +144,7 @@ function applyState(next, force = false) {
     $('#time-toggle').title = nextLabel;
   }
   if ($('#task').value !== state.task) $('#task').value = state.task;
+  if (force || previous.pet !== state.pet) { room?.setPet?.(state.pet); renderPetName(); renderInspector(); }
   for (const [key, visible] of Object.entries(state.decor)) {
     if (key === 'lights' && (force || previous.decor[key] !== visible)) room?.setDecor(key, visible);
   }
@@ -154,7 +156,7 @@ function applyState(next, force = false) {
     renderInspector();
     if (editMode && collectionTab === 'presets') renderCollection();
   }
-  $('#item-count').textContent = `${state.layout.items.length} / ${MAX_ITEMS} pieces`;
+  $('#item-count').textContent = `${pieceCount(state.layout.items)} / ${MAX_ITEMS} pieces`;
   syncCompanionIntent();
   document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', button.dataset.themeChoice === state.theme));
   document.querySelectorAll('[data-decor]').forEach(input => { input.checked = state.decor[input.dataset.decor]; });
@@ -171,10 +173,16 @@ function acceptUpdate(result) {
   }
   renderSession();
 }
-function petFeedback() {
-  $('#pet-bubble').hidden = false;
-  clearTimeout(petTimeout);
-  petTimeout = setTimeout(() => { $('#pet-bubble').hidden = true; }, 2600);
+// A pet gets a cute line in a bubble just above its head.
+function petFeedback({ species = state.pet, state: mood } = {}) {
+  const lines = PET_LINES[species] || PET_LINES.cat;
+  if (speech) speech.say('pet', mood === 'sleeping' ? lines.sleepy : lines.pet);
+  else toast(`${PETS[species]?.name || 'Miso'} is happy you’re here.`);
+}
+function renderPetName() {
+  const name = PETS[state.pet]?.name || PETS.cat.name;
+  $('#pet-company').textContent = `You & ${name}`; $('#pet-button-label').textContent = name;
+  $('#pet-button').setAttribute('aria-label', `Pet ${name}`);
 }
 // The decorator needs a ready room: both entry buttons wait for it.
 const setDecorEntry = enabled => { $('#decorate-button').disabled = !enabled; $('#rooms-button').disabled = !enabled; };
@@ -185,7 +193,10 @@ try {
       $('#loading-note').hidden = true;
       setDecorEntry(true);
     },
+    pet: state.pet,
     onPet: petFeedback,
+    onPetCarry({ species, held }) { if (held) speech?.say('pet', (PET_LINES[species] || PET_LINES.cat).carry); },
+    onFrame() { speech?.update(); },
     onCompanionState({ state: activity }) {
       companionActivity = activity;
       const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', 'resting-at-desk': 'Resting at the desk' };
@@ -208,6 +219,9 @@ try {
     onNotice: toast,
     onStats(stats) { performanceStats = stats; renderPerformance(); },
   });
+  const speechLayer = document.createElement('div'); speechLayer.className = 'speech-layer';
+  $('#room-canvas').appendChild(speechLayer);
+  speech = createSpeech(speechLayer, { anchor: who => room?.anchor(who), reducedMotion: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
 } catch (error) {
   $('#loading-note').textContent = 'The room couldn’t load. Try reloading; your focus timer is still ready.';
   console.error('Could not create the room:', error);
@@ -454,12 +468,13 @@ function renderCollection() {
     restoreControlFocus(content, rememberedFocus);
     return;
   }
-  const categories = ['All', ...new Set(FURNITURE.map(item => item.category))];
-  const items = FURNITURE.filter(item => category === 'All' || item.category === category);
+  const collection = FURNITURE.filter(item => !item.unique);
+  const categories = ['All', ...new Set(collection.map(item => item.category))];
+  const items = collection.filter(item => category === 'All' || item.category === category);
   content.innerHTML = `<div class="category-list" aria-label="Furniture categories">${categories.map(name => `<button data-category="${name}" aria-pressed="${category === name}">${name}</button>`).join('')}</div><div class="furniture-grid">${items.map(item => `<button class="furniture-card" data-furniture="${item.id}" aria-pressed="${placement?.type === item.id}" aria-label="Place ${item.name}" title="${item.description}">${furnitureArt(item.id)}<span class="furniture-name">${item.name}</span><span class="furniture-detail">${item.category}<span class="furniture-add">${icon('plus')}</span></span></button>`).join('')}</div>`;
   content.querySelectorAll('[data-category]').forEach(button => button.addEventListener('click', () => { category = button.dataset.category; renderCollection(); }));
   content.querySelectorAll('[data-furniture]').forEach(button => button.addEventListener('click', () => {
-    if (state.layout.items.length >= MAX_ITEMS) { toast(`Your room has ${MAX_ITEMS} pieces. Remove one to make a little space.`); return; }
+    if (pieceCount(state.layout.items) >= MAX_ITEMS) { toast(`Your room has ${MAX_ITEMS} pieces. Remove one to make a little space.`); return; }
     room?.beginPlacement?.(button.dataset.furniture);
     revealRoomForPlacement();
   }));
@@ -490,8 +505,9 @@ function renderDragState(drag) {
   if (draggedItemId !== drag.id) {
     draggedItemId = drag.id;
     preview.innerHTML = furnitureArt(drag.type);
-    $('#return-label').textContent = drag.removable ? 'Return to your collection' : 'Every room needs a study spot';
-    $('#return-detail').textContent = drag.removable ? 'Release here to put this piece away · Undo brings it back' : 'Add another desk before putting this one away';
+    const bed = getFurniture(drag.type)?.unique, petName = PETS[state.pet]?.name || PETS.cat.name;
+    $('#return-label').textContent = drag.removable ? 'Return to your collection' : bed ? `${petName}’s bed stays` : 'Every room needs a study spot';
+    $('#return-detail').textContent = drag.removable ? 'Release here to put this piece away · Undo brings it back' : bed ? 'Drop it anywhere in the room instead' : 'Add another desk before putting this one away';
   }
   if (drag.overCollection) preview.style.transform = `translate3d(${drag.clientX - 44}px, ${drag.clientY - 76}px, 0)`;
   const hint = drag.overCollection ? (drag.removable ? 'Release to put it away · Undo brings it back' : drag.reason)
@@ -505,7 +521,7 @@ function renderInspector() {
   const selected = selectedItem && getFurniture(selectedItem.type);
   const pending = placement && getFurniture(placement.type);
   if (!editMode) {
-    $('#room-hint').innerHTML = 'Drag to look around<span>·</span>Try petting the cat';
+    $('#room-hint').innerHTML = `Drag to look around<span>·</span>Tap ${PETS[state.pet]?.name || PETS.cat.name} to pet, or drag to carry`;
     return;
   }
   const rememberedFocus = rememberControlFocus(inspector);
@@ -517,8 +533,8 @@ function renderInspector() {
   }
   const item = pending || selected;
   const currentDesk = selectedItem?.id === state.layout.activeDeskId;
-  const hint = pending ? (placement.valid === false && placement.reason ? placement.reason : 'Move over the floor to find a spot. Click to place.') : 'Drag to move or put away. Arrow buttons work too.';
-  inspector.innerHTML = `<div class="selection-copy">${icon(pending ? 'plus' : 'build')}<span><strong>${pending ? 'Placing ' : ''}${item.name}${!pending && currentDesk ? '<span class="active-desk-tag">Study spot</span>' : ''}</strong><small>${hint}</small></span></div><div class="selection-actions"><button class="small-button" id="rotate-item" aria-label="Rotate ${item.name}">${icon('rotate')}<span>Rotate</span></button>${!pending ? `<div class="nudge-buttons" aria-label="Move selected furniture"><button data-nudge="0,-0.25" aria-label="Move toward back wall">↑</button><button data-nudge="-0.25,0" aria-label="Move left">←</button><button data-nudge="0.25,0" aria-label="Move right">→</button><button data-nudge="0,0.25" aria-label="Move toward front">↓</button></div>${item.category === 'Study' ? `<button class="small-button study-here" id="study-here" aria-label="${currentDesk ? 'Studying here' : 'Study here'}" ${currentDesk ? 'disabled' : ''}>${icon('check')}<span>${currentDesk ? 'Studying here' : 'Study here'}</span></button>` : ''}<button class="small-button remove-item" id="remove-item" aria-label="Remove ${item.name}">${icon('trash')}</button>` : ''}<button class="small-button" id="cancel-item" aria-label="${pending ? 'Cancel placement' : 'Deselect furniture'}">${icon('close')}</button></div>`;
+  const hint = pending ? (placement.valid === false && placement.reason ? placement.reason : 'Move over the floor to find a spot. Click to place.') : item.unique ? `Drag to move. ${PETS[state.pet]?.name || PETS.cat.name} will find it.` : 'Drag to move or put away. Arrow buttons work too.';
+  inspector.innerHTML = `<div class="selection-copy">${icon(pending ? 'plus' : 'build')}<span><strong>${pending ? 'Placing ' : ''}${item.name}${!pending && currentDesk ? '<span class="active-desk-tag">Study spot</span>' : ''}</strong><small>${hint}</small></span></div><div class="selection-actions"><button class="small-button" id="rotate-item" aria-label="Rotate ${item.name}">${icon('rotate')}<span>Rotate</span></button>${!pending ? `<div class="nudge-buttons" aria-label="Move selected furniture"><button data-nudge="0,-0.25" aria-label="Move toward back wall">↑</button><button data-nudge="-0.25,0" aria-label="Move left">←</button><button data-nudge="0.25,0" aria-label="Move right">→</button><button data-nudge="0,0.25" aria-label="Move toward front">↓</button></div>${item.category === 'Study' ? `<button class="small-button study-here" id="study-here" aria-label="${currentDesk ? 'Studying here' : 'Study here'}" ${currentDesk ? 'disabled' : ''}>${icon('check')}<span>${currentDesk ? 'Studying here' : 'Study here'}</span></button>` : ''}${item.unique ? '' : `<button class="small-button remove-item" id="remove-item" aria-label="Remove ${item.name}">${icon('trash')}</button>`}` : ''}<button class="small-button" id="cancel-item" aria-label="${pending ? 'Cancel placement' : 'Deselect furniture'}">${icon('close')}</button></div>`;
   $('#rotate-item').addEventListener('click', () => room?.rotateSelection?.());
   $('#remove-item')?.addEventListener('click', () => room?.removeSelection?.());
   $('#study-here')?.addEventListener('click', () => room?.setActiveDesk?.(selectedItem.id));
@@ -630,7 +646,6 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   clearInterval(tickInterval);
   clearTimeout(toastTimeout);
-  clearTimeout(petTimeout);
   room?.dispose?.();
   noiseNode?.stop();
   audioContext?.close();

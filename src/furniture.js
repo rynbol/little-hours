@@ -433,6 +433,19 @@ function daybed(parent) {
     box(parent, [0.016, 0.008, 1.10], [0.42 + i * 0.073, 0.779, 0.16], '#ddc89b', 0.003);
   }
 }
+// A soft, low donut bed. The pet naps on its cushion; the colors come from
+// the shared palette, so every room design recolors it to match.
+export const PET_BED_SURFACE = 0.095;
+function petBed(parent) {
+  const base = cylinder(parent, 0.5, 0.5, 0.05, [0, 0.025, 0], C.darkWood); base.scaling.set(1.1, 1, 0.72);
+  const cushion = cylinder(parent, 0.43, 0.43, 0.07, [0, 0.06, 0], C.linen); cushion.scaling.set(1.08, 1, 0.7);
+  const bolster = torus(parent, 0.45, 0.075, [0, 0.105, 0], C.sage); bolster.rotation.x = Math.PI / 2; bolster.scaling.set(1.1, 0.72, 1);
+  const piping = torus(parent, 0.45, 0.012, [0, 0.172, 0], C.edge); piping.rotation.x = Math.PI / 2; piping.scaling.set(1.1, 0.72, 1);
+  // A little bone-shaped tag stitched to the front of the bolster.
+  const tag = group(parent, [0, 0.115, 0.372]);
+  box(tag, [0.12, 0.035, 0.018], [0, 0, 0], C.cream, 0.008);
+  for (const x of [-0.06, 0.06]) for (const y of [-0.016, 0.016]) sphere(tag, [0.02, 0.02, 0.012], [x, y, 0], C.cream);
+}
 function leafBlade(parent, start, end, width, color) {
   const direction = new Vector3(...end).subtract(new Vector3(...start));
   const length = direction.length();
@@ -992,7 +1005,7 @@ export function createMobileCompanion(scene) {
     out.set(x * Math.cos(roll) - y * Math.sin(roll), hip + ry * Math.cos(lean) - z * Math.sin(lean), -.08 + ry * Math.sin(lean) + z * Math.cos(lean));
   };
   return {
-    root, contact,
+    root, contact, head,
     animate(pose, seconds, reducedMotion) {
       const visible = !pose.atDesk;
       root.setEnabled(visible); contact.setEnabled(visible);
@@ -1058,7 +1071,7 @@ export function createFurniture(type, scene) {
       'study-desk': parent => studyStation(parent, false), 'writing-desk': parent => studyStation(parent, true),
       bookcase, 'lounge-chair': loungeChair, 'side-table': sideTable, 'floor-lamp': floorLamp,
       plant, rug, ottoman, 'low-cabinet': cabinet,
-      fireplace, daybed, 'moon-tree': moonTree, 'lantern-cluster': lanternCluster, 'moon-rug': moonRug,
+      fireplace, daybed, 'moon-tree': moonTree, 'lantern-cluster': lanternCluster, 'moon-rug': moonRug, 'pet-bed': petBed,
     };
     builders[type](source);
     const template = batch(source); template.setEnabled(false); templates.set(type, template);
@@ -1074,6 +1087,7 @@ export function createFurniture(type, scene) {
     const body = parts.body.clone('grounded-trousers-and-shoes', avatar); body.setEnabled(true);
     const articulateUpper = createArticulatedUpperBody(avatar, parts.upper);
     const head = parts.head.clone('headphones', avatar); head.position.set(0, 1.80, -0.17); head.setEnabled(true);
+    result.metadata.avatarHead = head;
     const writing = type === 'writing-desk';
     const hands = [-1, 1].map(side => {
       const template = writing && side === 1 ? parts.writingHand : parts.hand;
