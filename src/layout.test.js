@@ -7,6 +7,7 @@ import { FURNITURE, getFurniture } from './catalog.js';
 import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, createLayout, validatePlacement, normalizeLayout, findFreePosition, nearestValidPlacement, rugsOverlap } from './layout.js';
 import { createFurniture, disposeFurnitureAssets } from './furniture.js';
 import { cutRect, subtractRect, openings, OPENING_INSET } from './walls.js';
+import { SURFACES } from './surfaces.js';
 
 const placement = (type, x, z, rotation = 0, id = 'test-item') => ({ id, type, x, z, rotation });
 
@@ -619,4 +620,33 @@ test('windows cut exact openings in their wall and follow the wall-piece rules',
   assert.match(validatePlacement([], { id: 'win', type: 'cottage-window', wall: 'back', u: 2.8, v: 4.15 }).reason, /vine/, 'but not into the vine');
   assert.match(validatePlacement([{ id: 'books', type: 'bookcase', x: 2.75, z: -3.75, rotation: 0 }], { id: 'win', type: 'cottage-window', wall: 'back', u: 2.8, v: 3.2 }).reason, /in front/, 'a bookcase keeps a window clear');
   assert.equal(validatePlacement([], { id: 'win', type: 'round-window', wall: 'side', u: 2, v: 3 }, 'sakura').valid, true, 'the sakura shoji can take a window');
+});
+
+test('every design offers its own walls and floor and three more of each; a room keeps only its own', () => {
+  const hex = /^#[0-9a-f]{6}$/;
+  assert.deepEqual(Object.keys(SURFACES).sort(), ['cloud', 'metro', 'retreat', 'sakura']);
+  for (const [style, kinds] of Object.entries(SURFACES)) for (const kind of ['walls', 'floor']) {
+    const choices = kinds[kind];
+    assert.equal(choices.length, 4, `${style} ${kind}`);
+    assert.equal(choices[0].id, ''); assert.deepEqual(choices[0].paint, {}, `${style} ${kind} starts as designed`);
+    assert.equal(new Set(choices.map(entry => entry.id)).size, 4, `${style} ${kind} ids are unique`);
+    for (const entry of choices) {
+      assert.ok(entry.name && entry.swatch.length === 2 && entry.swatch.every(color => hex.test(color)), `${style} ${entry.id}`);
+      if (entry.id) assert.ok(Object.keys(entry.paint).length && Object.entries(entry.paint).every(([from, to]) => hex.test(from) && hex.test(to) && from !== to), `${style} ${kind} ${entry.id} repaints`);
+    }
+    // Every choice of a kind repaints the same design colors.
+    const keys = JSON.stringify(Object.keys(choices[1].paint).sort());
+    for (const entry of choices.slice(2)) assert.equal(JSON.stringify(Object.keys(entry.paint).sort()), keys, `${style} ${kind} ${entry.id}`);
+  }
+  const retreat = createLayout('ember-library'), sakura = createLayout('sakura-studio');
+  assert.ok(!('walls' in retreat) && !('floor' in retreat), 'a new room is as designed');
+  const keep = (layout, walls, floor) => normalizeLayout(JSON.parse(JSON.stringify({ ...layout, walls, floor })));
+  const kept = keep(retreat, 'rose', 'walnut');
+  assert.equal(kept.walls, 'rose'); assert.equal(kept.floor, 'walnut');
+  const other = keep(sakura, 'rose', 'fresh');
+  assert.ok(!('walls' in other), 'Sakura has no rose walls'); assert.equal(other.floor, 'fresh');
+  for (const value of ['', 'teal', 42, null, {}, ['rose']]) {
+    const dropped = keep(retreat, value, value);
+    assert.ok(!('walls' in dropped) && !('floor' in dropped), JSON.stringify(value));
+  }
 });

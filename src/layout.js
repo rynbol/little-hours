@@ -1,6 +1,7 @@
 import { getFurniture } from './catalog.js';
 import { isWallPiece, wallPlacementReason, wallClearanceReason, nearestWallSpot, findFreeWallSpot } from './walls.js';
 import { tintPaint } from './tints.js';
+import { surfacePaint } from './surfaces.js';
 
 export const ROOM_BOUNDS = Object.freeze({ minX: -5.5, maxX: 5.5, minZ: -4.2, maxZ: 4.2 });
 export const MAX_ITEMS = 32;
@@ -259,5 +260,8 @@ export function normalizeLayout(raw) {
   // A usable study station is the room's anchor. Recover a complete arrangement
   // when a malformed or older save has lost its last desk.
   if (!activeDeskId) return createLayout(presetId);
-  return { presetId, items, activeDeskId, v: LAYOUT_VERSION };
+  const layout = { presetId, items, activeDeskId, v: LAYOUT_VERSION };
+  // A room keeps its wall and floor choices when its design offers them.
+  for (const kind of ['walls', 'floor']) if (surfacePaint(style, kind, raw[kind])) layout[kind] = raw[kind];
+  return layout;
 }
