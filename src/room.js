@@ -969,6 +969,8 @@ export function createRoom(container, options = {}) {
     cancelDrag(); hoverItem(null);
     if (next) {
       avatarPreviewRotation = 0;
+      camera.getViewMatrix(true);
+      const cameraPosition = camera.position.clone();
       savedAvatarCamera = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone(), height: camera.orthoTop - camera.orthoBottom };
       camera.detachControl(); avatarCameraControl = true; avatarCameraEditing = true;
       // Keep the portrait fill among the four lights StandardMaterial draws.
@@ -987,7 +989,10 @@ export function createRoom(container, options = {}) {
       const walkYaw = Math.hypot(dx, dz) > 0.05 ? Math.atan2(-dx, -dz) : pose.yaw;
       avatarPoseTransition = {
         elapsed: 0, duration: reducedMotion ? 0 : 1.25, fromSit: entry?.fromSit ?? pose.sit, fromYaw: entry?.fromYaw ?? pose.yaw,
-        fromX, fromZ, toX, toZ, fromStep: pose.step, distance: Math.hypot(dx, dz), walkYaw, toYaw: camera.alpha + Math.PI,
+        fromX, fromZ, toX, toZ, fromStep: pose.step, distance: Math.hypot(dx, dz), walkYaw,
+        // The avatar's face points along local -Z. Aim that direction toward
+        // the camera's actual world position, even after the user orbits.
+        toYaw: Math.atan2(toX - cameraPosition.x, toZ - cameraPosition.z),
       };
       avatarCameraTransition = {
         elapsed: 0, duration: reducedMotion ? 0 : 1.25,
