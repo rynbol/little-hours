@@ -1,13 +1,14 @@
 import { createSession, remainingAt, startSession, pauseSession } from './session.js';
 import { createLayout, normalizeLayout, PRESETS } from './layout.js';
 import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCoins, cleanName } from './house.js';
+import { AVATAR_DEFAULT, normalizeAvatarAppearance } from './avatar.js';
 
 export const storageKey = 'little-hours-v1';
 const durations = [25, 50, 90];
 
 export function freshState() {
   const layout = createLayout();
-  return { theme: 'dusk', pet: 'cat', seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [] };
+  return { theme: 'dusk', pet: 'cat', avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [] };
 }
 
 export function localDate(timestamp = Date.now()) {
@@ -22,6 +23,7 @@ export function restoreState(raw) {
   if (!saved || typeof saved !== 'object') return initial;
   if (['dusk', 'rain', 'day'].includes(saved.theme)) initial.theme = saved.theme;
   if (typeof saved.task === 'string') initial.task = saved.task.slice(0, 180);
+  initial.avatar = normalizeAvatarAppearance(saved.avatar);
   if (['cat', 'dog'].includes(saved.pet)) initial.pet = saved.pet;
   if (Number.isSafeInteger(saved.seenAt) && saved.seenAt > 0) initial.seenAt = saved.seenAt;
   for (const key of Object.keys(initial.decor)) {

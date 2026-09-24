@@ -271,7 +271,7 @@ export function activitySpots(layout, { night = false, windowX = -2.7, pet = nul
 
 export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, random = Math.random } = {}) {
   const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null, goal: null, seated: false, portal: null, to: null, seatId: null };
-  let layout, intent = 'idle', editing = false, anchor = null, trip = null, legs = [], legIndex = 0, elapsed = 0, restTime = 0;
+  let layout, intent = 'idle', editing = false, avatarEditing = false, anchor = null, trip = null, legs = [], legIndex = 0, elapsed = 0, restTime = 0;
   // One activity per break; `reduced` is the last reduced-motion setting,
   // which skips standing activities. A lamp or record player is switched on
   // at most once per visit (`switched`), so one switched off on purpose stays off.
@@ -380,7 +380,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     status(end.desk ? intent === 'working' ? 'working' : 'idle' : end.activity ? 'busy' : 'resting'); reconcile();
   }
   function reconcile() {
-    if (!layout || editing) return;
+    if (!layout || editing || avatarEditing) return;
     // Keep the legacy neutral startup intent parked at the desk until the
     // session controller supplies its explicit non-focus `rest` state.
     const toDesk = intent === 'working' || intent === 'idle';
@@ -395,6 +395,10 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     if (toDesk && !pose.atDesk) { if (!startTrip(anchor, true)) deskPose(); }
     else if (!toDesk && pose.atDesk) {
       const started = intent === 'rest' ? startRest() : startBreak();
+      if (!started) status('resting-at-desk');
+    }
+    else if (!toDesk && !pose.atDesk && !trip && !pose.seated && !pose.activity) {
+      const started = intent === 'rest' ? startRest(anchor) : startBreak();
       if (!started) status('resting-at-desk');
     }
     else if (pose.atDesk) status(intent === 'working' ? 'working' : 'idle');
@@ -426,11 +430,42 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       intent = next; if (next !== 'break') breakUsed = false; reconcile();
     },
     setEditing(value) { if (editing === value) return; editing = value; if (editing) deskPose(); else reconcile(); },
+    beginAvatarEditing() {
+      if (avatarEditing) return null;
+      let exit = null;
+      if (trip) {
+        // If the avatar was between destinations, keep the visible floor
+        // position as the edit starting point instead of finishing the trip
+        // invisibly under the close-up.
+        anchor = { x: pose.x, z: pose.z }; trip = null; legs = []; legIndex = 0; elapsed = 0;
+        pose.sit = 0; pose.seated = false; pose.seatId = null;
+        exit = { x: pose.x + Math.sin(pose.yaw + Math.PI) * .72, z: pose.z + Math.cos(pose.yaw + Math.PI) * .72 };
+      } else if (pose.atDesk) {
+        const desk = layout?.items.find(item => item.id === layout.activeDeskId), seat = seatsFor(desk)[0];
+        // The editor portrait needs clear floor in front of the chair: a
+        // small forward step stops the chair back from covering the avatar.
+        exit = seat ? { x: seat.seat.x + Math.sin(seat.yaw) * 1.15, z: seat.seat.z + Math.cos(seat.yaw) * 1.15 } : null;
+      } else if (anchor?.seat) {
+        exit = anchor.side || anchor.portal || null;
+      }
+      const entry = { fromX: pose.x, fromZ: pose.z, fromSit: pose.sit, fromYaw: pose.yaw, toX: exit?.x ?? pose.x, toZ: exit?.z ?? pose.z };
+      avatarEditing = true;
+      Object.assign(pose, { atDesk: false, moving: false, activity: null, goal: null, to: null, doze: 0 });
+      status('customizing');
+      return entry;
+    },
+    endAvatarEditing() {
+      if (!avatarEditing) return;
+      avatarEditing = false;
+      Object.assign(pose, { atDesk: false, sit: 0, seatHeight: .8, moving: false, activity: null, goal: null, to: null, doze: 0, seated: false, seatId: null });
+      anchor = { x: pose.x, z: pose.z };
+      reconcile();
+    },
     // Night, the window and the pet decide which activities there are.
     setContext(next) { context = { ...context, ...next }; },
     update(dt, reducedMotion) {
       reduced = reducedMotion;
-      if (!layout || editing) return pose;
+      if (!layout || editing || avatarEditing) return pose;
       if (trip && reducedMotion) {
         const end = trip.end;
         Object.assign(pose, { x: end.seat.x, z: end.seat.z, yaw: end.yaw, sit: end.activity ? 0 : 1, seatHeight: end.seatHeight || .80, atDesk: end.desk, moving: false });

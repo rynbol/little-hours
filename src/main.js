@@ -14,6 +14,7 @@ import { designPaint } from './architecture.js';
 import { createHouseUI } from './house-ui.js';
 import { activeHouseRoom, nextExpansion, focusCoins } from './house.js';
 import { createHouseView } from './house-view.js';
+import { AVATAR_OPTIONS } from './avatar.js';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -34,6 +35,7 @@ const icons = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   gauge: '<path d="M4 18a9 9 0 1 1 16 0M12 13l5-5M5 18h14"/><circle cx="12" cy="13" r="1"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  avatar: '<circle cx="12" cy="8" r="3.5"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/><path d="M8.5 14.5c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2"/>',
 };
 const icon = (name) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || icons.home}</svg>`;
 const store = createStateStore((import.meta.env.DEV && window.__littleHoursTest?.storage) || {
@@ -45,7 +47,7 @@ let room;
 let houseUI;
 let houseOpen = false;
 let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false;
-let currentPanel = null;
+let currentPanel = null, avatarPanelActive = false;
 let compact = false;
 let audioContext, noiseNode, gainNode;
 let soundEnabled = false;
@@ -97,6 +99,7 @@ document.querySelector('#app').innerHTML = `
             <button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Atmosphere</span></button>
             <button class="tool" data-panel="performance" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Performance</span></button>
             <button class="tool" id="pet-button" data-panel="pet" aria-expanded="false" aria-controls="room-panel">${icon('cat')}<span id="pet-button-label">Miso</span></button>
+            <button class="tool" id="avatar-button" data-panel="avatar" aria-expanded="false" aria-controls="room-panel">${icon('avatar')}<span>Avatar</span></button>
             <button class="tool" id="mini-button" aria-pressed="false">${icon('mini')}<span>Mini view</span></button>
           </nav>
         </div>
@@ -173,6 +176,7 @@ function applyState(next, force = false) {
   }
   if ($('#task').value !== state.task) $('#task').value = state.task;
   if (force || previous.pet !== state.pet) { room?.setPet?.(state.pet); renderPetName(); renderInspector(); }
+  room?.setAvatarAppearance?.(state.avatar);
   for (const [key, visible] of Object.entries(state.decor)) {
     if (key === 'lights' && (force || previous.decor[key] !== visible)) room?.setDecor(key, visible);
   }
@@ -248,7 +252,7 @@ try {
     onFrame() { speech?.update(); },
     onCompanionState({ state: activity, activity: doing }) {
       companionActivity = activity;
-      const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', 'resting-at-desk': 'Resting at the desk', busy: 'Taking a little break' };
+      const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', customizing: 'Choosing a look', 'resting-at-desk': 'Resting at the desk', busy: 'Taking a little break' };
       const pet = PETS[state.pet]?.name || PETS.cat.name;
       const tasks = { warm: 'Warming up by the fire', window: 'Looking out of the window', water: 'Watering the plants', record: 'Putting on a record', pet: `Petting ${pet}`, lamp: 'Switching on a lamp', read: 'Reading in the armchair' };
       const task = (activity === 'busy' || (activity === 'resting' && doing === 'read')) && tasks[doing];
@@ -334,6 +338,7 @@ function renderConnections(updateModel = true) {
 }
 function setConnectedView(open) {
   if (open === Boolean(connectedView)) return;
+  if (open && currentPanel === 'avatar') closePanel();
   if (open && editMode) setEditMode(false);
   if (open) {
     $('#house-in-room').hidden = false;
@@ -345,6 +350,7 @@ function setConnectedView(open) {
 }
 function visitRoom(id, decorate = editMode) {
   if (travelling) return;
+  if (currentPanel === 'avatar') closePanel();
   const entry = state.house.rooms.find(room => room.id === id);
   if (!entry) { setHouseOpen(true, id); return; }
   setConnectedView(false);
@@ -462,6 +468,7 @@ $('#rooms-button').addEventListener('click', () => setHouseOpen(true));
 $('#coin-wallet').addEventListener('click', () => setHouseOpen(!houseOpen));
 $('#decorate-button').addEventListener('click', () => setEditMode(!editMode));
 $('#mini-button').addEventListener('click', () => {
+  if (currentPanel === 'avatar') closePanel();
   if (editMode) setEditMode(false);
   compact = !compact;
   $('#stage').classList.toggle('is-mini', compact);
@@ -761,10 +768,16 @@ function renderPerformance() {
 
 function renderPanel() {
   const panel = $('#room-panel');
+  if (currentPanel === 'avatar' && !avatarPanelActive) {
+    avatarPanelActive = true; room?.setAvatarEditing?.(true); avatarSay('customize', { force: true });
+  } else if (currentPanel !== 'avatar' && avatarPanelActive) {
+    avatarPanelActive = false; room?.setAvatarEditing?.(false); avatarSay('customizeDone', { force: true });
+  }
+  document.body.classList.toggle('is-avatar-editing', currentPanel === 'avatar');
   panel.hidden = !currentPanel;
   document.querySelectorAll('[data-panel]').forEach(button => button.setAttribute('aria-expanded', button.dataset.panel === currentPanel));
   if (!currentPanel) return;
-  panel.innerHTML = `<div class="panel-heading"><span>${({ atmosphere: 'Find your kind of quiet', pet: 'Your little companion' })[currentPanel] || 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
+  panel.innerHTML = `<div class="panel-heading"><span>${({ atmosphere: 'Find your kind of quiet', pet: 'Your little companion', avatar: 'Meet your avatar' })[currentPanel] || 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
   if (currentPanel === 'atmosphere') {
     panel.insertAdjacentHTML('beforeend', `<div class="theme-options">${[['day', 'sun', 'Daylight'], ['dusk', 'moon', 'Night'], ['rain', 'rain', 'Rainy afternoon']].map(([key, symbol, title]) => `<button class="theme-option ${key}" data-theme-choice="${key}" aria-pressed="${state.theme === key}">${icon(symbol)}<span>${title}</span></button>`).join('')}</div>`);
     panel.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click', () => {
@@ -783,6 +796,16 @@ function renderPanel() {
       speech?.say('pet', (PET_LINES[state.pet] || PET_LINES.cat).hello);
     }));
     $('#pet-now').addEventListener('click', () => { if (room) room.pet(); else petFeedback(); });
+  } else if (currentPanel === 'avatar') {
+    const partNames = { skin: 'Skin tone', hair: 'Hair color', style: 'Hairstyle', top: 'Top', bottom: 'Trousers' };
+    const choices = Object.entries(AVATAR_OPTIONS).map(([part, options]) => `<fieldset class="avatar-choice"><legend>${partNames[part]}</legend><div class="avatar-swatches ${part === 'style' ? 'avatar-styles' : ''}" role="group" aria-label="${partNames[part]}">${options.map(option => `<button class="avatar-swatch ${part === 'style' ? 'avatar-style' : ''}" data-avatar-part="${part}" data-avatar-value="${option.id}" aria-pressed="${state.avatar[part] === option.id}" aria-label="${option.name}" title="${option.name}">${part === 'style' ? `<span>${option.name}</span>` : `<span class="avatar-color" style="--avatar-color:${option.color}"></span><span class="avatar-swatch-name">${option.name}</span>`}</button>`).join('')}</div></fieldset>`).join('');
+    panel.insertAdjacentHTML('beforeend', `<div class="avatar-editor-lead"><span class="avatar-editor-mark" aria-hidden="true">✧</span><span><strong>A little more you.</strong><small>Your look saves as you choose. All the room's handmade details stay in place.</small></span></div><div class="avatar-customizer">${choices}</div><button class="quiet-button avatar-done" id="avatar-done">${icon('check')} Done</button>`);
+    panel.querySelectorAll('[data-avatar-part]').forEach(button => button.addEventListener('click', () => {
+      const part = button.dataset.avatarPart, value = button.dataset.avatarValue;
+      acceptUpdate(store.update(draft => { draft.avatar[part] = value; }));
+      panel.querySelectorAll(`[data-avatar-part="${part}"]`).forEach(option => option.setAttribute('aria-pressed', String(option.dataset.avatarValue === value)));
+    }));
+    $('#avatar-done').addEventListener('click', closePanel);
   } else {
     panel.insertAdjacentHTML('beforeend', `<div class="quality-options" aria-label="Room rendering quality">${[['auto', 'Adaptive'], ['high', 'Crisp'], ['battery', 'Save energy']].map(([id, label]) => `<button data-quality="${id}" aria-pressed="${quality === id}">${label}</button>`).join('')}</div><p class="performance-note">Adaptive balances detail and motion. Save energy limits animation to 30 frames per second.</p><dl class="performance-metrics" id="performance-metrics"></dl><p class="performance-note">Babylon.js engine · live measurements while this tab is visible. CPU measurements exclude GPU time.</p>`);
     panel.querySelectorAll('[data-quality]').forEach(button => button.addEventListener('click', () => {

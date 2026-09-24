@@ -13,6 +13,7 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import { getFurniture } from './catalog.js';
+import { AVATAR_DEFAULT, avatarAppearanceKey, avatarPaint, normalizeAvatarAppearance } from './avatar.js';
 
 // Hand-built forms, real joinery, small deliberate details. No downloaded models,
 // generated pictures or texture files: even the notebook and screen are geometry.
@@ -1208,9 +1209,10 @@ function createArticulatedUpperBody(avatar, template) {
 // The companion's trousers meet the sweater in soft hips, and its shoes are
 // rounded, on a darker sole. The desk and walking companions share them.
 const TROUSERS = '#777e72';
-function hips(parent) { return sphere(parent, [.255, .135, .215], [0, .79, -.08], TROUSERS, 8); }
+function hips(parent, trousers = TROUSERS) { return sphere(parent, [.255, .135, .215], [0, .79, -.08], trousers, 8); }
 function shoe(parent, x) { return [sphere(parent, [.1, .072, .175], [x, .102, -.77], C.cream, 8), sphere(parent, [.106, .028, .182], [x, .048, -.768], '#b39c80', 6)]; }
-function sweater(parent) {
+function sweater(parent, appearance = AVATAR_DEFAULT) {
+  const knit = avatarPaint(appearance, 'top');
   // Elliptical rings give the knit a soft waist and sloping shoulders, rather
   // than reusing the sharp furniture-box silhouette for a person.
   const profile = [[0.83, 0.20, 0.155], [0.87, 0.245, 0.185], [0.95, 0.27, 0.205],
@@ -1234,34 +1236,36 @@ function sweater(parent) {
   VertexData.ComputeNormals(positions, indices, normals);
   const data = new VertexData(); Object.assign(data, { positions, indices, normals });
   const shape = new Mesh('soft-knit-sweater', parent.getScene()); data.applyToMesh(shape);
-  mesh(parent, shape, '#b88770', [0, 0, 0]);
-  const hem = cylinder(parent, 0.238, 0.218, 0.045, [0, 0.859, -0.085], '#a67863'); hem.scaling.z = 0.77;
-  const collar = torus(parent, 0.107, 0.025, [0, 1.515, -0.14], '#cb9b7d'); collar.rotation.x = Math.PI / 2;
+  mesh(parent, shape, knit.color, [0, 0, 0]);
+  const hem = cylinder(parent, 0.238, 0.218, 0.045, [0, 0.859, -0.085], knit.shade); hem.scaling.z = 0.77;
+  const collar = torus(parent, 0.107, 0.025, [0, 1.515, -0.14], knit.trim); collar.rotation.x = Math.PI / 2;
 }
 
-function avatarTemplate(scene) {
+function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
+  const appearance = normalizeAvatarAppearance(choice), key = `avatar:${avatarAppearanceKey(appearance)}`;
   const templates = cacheFor(scene).templates;
-  if (templates.has('avatar')) return templates.get('avatar');
+  if (templates.has(key)) return templates.get(key);
+  const skin = avatarPaint(appearance, 'skin').color, hair = avatarPaint(appearance, 'hair').color, trousers = avatarPaint(appearance, 'bottom').color;
   const body = new TransformNode('avatar-part', scene);
-  hips(body);
+  hips(body, trousers);
   for (const x of [-0.15, 0.15]) {
-    taper(body, [x, 0.75, -0.08], [x, 0.65, -0.57], 0.118, 0.1, TROUSERS);
-    sphere(body, [0.1, 0.1, 0.1], [x, 0.65, -0.57], TROUSERS);
-    taper(body, [x, 0.65, -0.57], [x, 0.17, -0.67], 0.098, 0.082, TROUSERS);
+    taper(body, [x, 0.75, -0.08], [x, 0.65, -0.57], 0.118, 0.1, trousers);
+    sphere(body, [0.1, 0.1, 0.1], [x, 0.65, -0.57], trousers);
+    taper(body, [x, 0.65, -0.57], [x, 0.17, -0.67], 0.098, 0.082, trousers);
     shoe(body, x);
   }
   const upperSource = new TransformNode('avatar-upper-body-source', scene);
-  sweater(upperSource);
-  cylinder(upperSource, 0.10, 0.12, 0.14, [0, 1.565, -0.14], C.skin);
+  sweater(upperSource, appearance);
+  cylinder(upperSource, 0.10, 0.12, 0.14, [0, 1.565, -0.14], skin);
   for (const side of [-1, 1]) {
     const shoulder = [side * 0.255, 1.43, -0.12], elbow = [side * 0.37, 1.40, -0.46], wrist = [side * 0.21, 1.37, -0.87];
-    sphere(upperSource, [0.10, 0.10, 0.10], shoulder, '#b88770');
-    const elbowJoint = sphere(upperSource, [0.086, 0.086, 0.086], elbow, '#b88770');
+    sphere(upperSource, [0.10, 0.10, 0.10], shoulder, avatarPaint(appearance, 'top').color);
+    const elbowJoint = sphere(upperSource, [0.086, 0.086, 0.086], elbow, avatarPaint(appearance, 'top').color);
     elbowJoint.metadata = { joint: 'elbow', side, center: elbow };
-    const upperArm = rod(upperSource, shoulder, elbow, 0.092, '#b88770');
+    const upperArm = rod(upperSource, shoulder, elbow, 0.092, avatarPaint(appearance, 'top').color);
     upperArm.metadata = { arm: true, a: shoulder, b: elbow, side, forearm: false };
     const start = new Vector3(...elbow), end = new Vector3(...wrist), direction = end.subtract(start);
-    const forearm = mesh(upperSource, CreateCylinder('tapered-sleeve', { diameterTop: 0.104, diameterBottom: 0.156, height: direction.length(), tessellation: 10 }, scene), '#b88770', start.add(end).scale(0.5).asArray());
+    const forearm = mesh(upperSource, CreateCylinder('tapered-sleeve', { diameterTop: 0.104, diameterBottom: 0.156, height: direction.length(), tessellation: 10 }, scene), avatarPaint(appearance, 'top').color, start.add(end).scale(0.5).asArray());
     forearm.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), direction.normalize(), new Quaternion());
     forearm.metadata = { arm: true, a: elbow, b: wrist, side, forearm: true };
   }
@@ -1282,42 +1286,62 @@ function avatarTemplate(scene) {
   }
   upper.metadata = { ranges };
   const head = new TransformNode('avatar-part', scene);
-  sphere(head, [0.232, 0.245, 0.22], [0, 0, 0], C.skin, 14);
+  sphere(head, [0.232, 0.245, 0.22], [0, 0, 0], skin, 14);
   // A soft face: big dark eyes with a glint, rosy cheeks and a small smile.
   for (const x of [-.08, .08]) {
     sphere(head, [.026, .034, .02], [x, -.03, -.196], '#3a2b24', 10);
     sphere(head, [.008, .009, .006], [x + .009, -.017, -.2145], '#fff4e6');
     sphere(head, [.042, .026, .03], [x * 1.62, -.088, -.152], '#e59b85', 10);
   }
-  sphere(head, [.02, .017, .016], [0, -.062, -.214], C.skin, 8);
+  sphere(head, [.02, .017, .016], [0, -.062, -.214], skin, 8);
   torus(head, .022, .0055, [0, -.082, -.203], '#7a4a3c', Math.PI).rotation.z = Math.PI;
   // The hair: a smooth crown, a fringe over the forehead, a lock beside each
   // cheek and a bun.
-  const hair = '#674d3b';
   sphere(head, [0.24, 0.237, 0.23], [0, 0.066, 0.05], hair, 14);
-  // The fringe is three soft scallops that follow the forehead.
-  sphere(head, [.095, .085, .05], [0, .14, -.18], hair, 10).rotation.x = .55;
-  for (const side of [-1, 1]) { const lock = sphere(head, [.09, .08, .05], [side * .105, .125, -.16], hair, 10); lock.rotation.set(.5, side * -.55, side * .25); }
-  for (const x of [-.212, .212]) sphere(head, [.038, .1, .048], [x, -.01, -.055], hair, 10);
-  sphere(head, [0.12, 0.12, 0.10], [0, 0.19, 0.20], hair, 12);
+  if (appearance.style === 'bob') {
+    sphere(head, [.23, .205, .13], [0, -.075, .10], hair, 12);
+    sphere(head, [.09, .13, .07], [-.18, -.08, -.015], hair, 10);
+    sphere(head, [.09, .13, .07], [.18, -.08, -.015], hair, 10);
+    for (const x of [-.08, 0, .08]) sphere(head, [.08, .068, .05], [x, .14, -.18], hair, 10).rotation.x = .5;
+  } else if (appearance.style === 'waves') {
+    sphere(head, [.11, .09, .055], [0, .14, -.18], hair, 10).rotation.x = .5;
+    for (const side of [-1, 1]) for (let i = 0; i < 4; i++) {
+      const y = .12 - i * .095, x = side * (.13 - (i % 2) * .018), z = -.105 + (i % 2) * .035;
+      sphere(head, [.068, .105, .07], [x, y, z], hair, 10).rotation.z = side * -.16;
+    }
+    sphere(head, [.11, .12, .10], [0, .18, .19], hair, 10);
+  } else if (appearance.style === 'crop') {
+    for (const x of [-.105, 0, .105]) sphere(head, [.088, .065, .05], [x, .15, -.175], hair, 10).rotation.x = .54;
+    for (const x of [-.212, .212]) sphere(head, [.038, .072, .045], [x, .005, -.05], hair, 10);
+  } else {
+    // The soft bun and scalloped fringe are the room's original look.
+    for (const x of [-.095, 0, .095]) sphere(head, [.075, .075, .05], [x, .14, -.18], hair, 10).rotation.x = .55;
+    for (const side of [-1, 1]) {
+      const lock = sphere(head, [.09, .08, .05], [side * .105, .125, -.16], hair, 10);
+      lock.rotation.set(.5, side * -.55, side * .25);
+      sphere(head, [.038, .1, .048], [side * .212, -.01, -.055], hair, 10);
+    }
+    sphere(head, [0.12, 0.12, 0.10], [0, 0.19, 0.20], hair, 12);
+  }
   torus(head, 0.25, 0.026, [0, 0.017, 0.014], C.dark, Math.PI);
   for (const x of [-0.244, 0.244]) sphere(head, [0.044, 0.091, 0.08], [x, 0.022, 0.014], C.sage, 10);
-  const hand = new TransformNode('avatar-part', scene); sphere(hand, [0.074, 0.044, 0.10], [0, 0, 0], C.skin);
+  const hand = new TransformNode('avatar-part', scene); sphere(hand, [0.074, 0.044, 0.10], [0, 0, 0], skin);
   const writingHand = new TransformNode('avatar-part', scene);
-  sphere(writingHand, [0.074, 0.044, 0.10], [0, 0, 0], C.skin);
+  sphere(writingHand, [0.074, 0.044, 0.10], [0, 0, 0], skin);
   rod(writingHand, [0.015, -0.048, -0.045], [0.075, 0.15, 0.025], 0.009, '#bb9b61');
   rod(writingHand, [0.011, -0.058, -0.049], [0.015, -0.048, -0.045], 0.005, '#514e3b');
   const value = { body: batch(body), upper, head: batch(head), hand: batch(hand), writingHand: batch(writingHand) };
   Object.values(value).forEach(part => part.setEnabled(false));
-  templates.set('avatar', value); return value;
+  templates.set(key, value); return value;
 }
 
 // One independently posed body buffer plus the shared head. The same sweater,
 // palette and proportions carry the desk companion through walks and breaks.
-export function createMobileCompanion(scene) {
+export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
+  const appearance = normalizeAvatarAppearance(choice), skin = avatarPaint(appearance, 'skin').color, trousers = avatarPaint(appearance, 'bottom').color;
   const root = new TransformNode('Walking companion', scene), source = new TransformNode('companion-rig-source', scene);
-  sweater(source); cylinder(source, .10, .12, .14, [0, 1.565, -.14], C.skin);
-  hips(source);
+  sweater(source, appearance); cylinder(source, .10, .12, .14, [0, 1.565, -.14], skin);
+  hips(source, trousers);
   source.getChildMeshes().forEach(part => { part.metadata = { bone: 'torso' }; });
   const joints = {}, bones = {};
   for (const side of [-1, 1]) {
@@ -1325,12 +1349,12 @@ export function createMobileCompanion(scene) {
     const anchors = { shoulder: [side * .255, 1.43, -.12], elbow: [side * .34, 1.10, -.14], wrist: [side * .30, .89, -.18], hip: [side * .15, .76, -.08], knee: [side * .15, .65, -.57], ankle: [side * .15, .17, -.67] };
     for (const [name, point] of Object.entries(anchors)) joints[name + key] = new Vector3(...point);
     // Limbs narrow toward the hands and feet, with a round joint at the top of each.
-    for (const [name, a, b, radius, end, tint] of [['upperArm', 'shoulder', 'elbow', .092, .082, '#b88770'], ['forearm', 'elbow', 'wrist', .08, .068, '#b88770'], ['thigh', 'hip', 'knee', .118, .1, TROUSERS], ['shin', 'knee', 'ankle', .1, .082, TROUSERS]]) {
+    for (const [name, a, b, radius, end, tint] of [['upperArm', 'shoulder', 'elbow', .092, .082, avatarPaint(appearance, 'top').color], ['forearm', 'elbow', 'wrist', .08, .068, avatarPaint(appearance, 'top').color], ['thigh', 'hip', 'knee', .118, .1, trousers], ['shin', 'knee', 'ankle', .1, .082, trousers]]) {
       const bone = name + key, part = taper(source, anchors[a], anchors[b], radius, end, tint);
       part.metadata = { bone }; bones[bone] = { a: a + key, b: b + key, start: new Vector3(...anchors[a]), end: new Vector3(...anchors[b]) };
       const joint = sphere(source, [radius, radius, radius], anchors[a], tint); joint.metadata = { joint: a + key };
     }
-    const hand = sphere(source, [.074, .082, .066], anchors.wrist, C.skin, 8); hand.metadata = { joint: 'wrist' + key };
+      const hand = sphere(source, [.074, .082, .066], anchors.wrist, skin, 8); hand.metadata = { joint: 'wrist' + key };
     for (const part of shoe(source, side * .15)) part.metadata = { joint: 'ankle' + key, pitch: key };
   }
   const ranges = []; let vertex = 0;
@@ -1349,7 +1373,7 @@ export function createMobileCompanion(scene) {
   }
   body.metadata = { dynamic: true, castShadow: false, companion: true, rig: { joints } };
   body.setBoundingInfo(new BoundingInfo(new Vector3(-.6, 0, -.95), new Vector3(.6, 2.1, .65)));
-  const head = avatarTemplate(scene).head.clone('companion-head', root); head.setEnabled(true);
+  const head = avatarTemplate(scene, appearance).head.clone('companion-head', root); head.setEnabled(true);
   const sleepLetters = CreateLineSystem('companion-sleep-letters', { lines: [0, 1].map(i => {
     const x = i * .19, y = i * .22, size = i ? .10 : .14;
     return [new Vector3(x, y + size, 0), new Vector3(x + size, y + size, 0), new Vector3(x, y, 0), new Vector3(x + size, y, 0)];
@@ -1402,6 +1426,7 @@ export function createMobileCompanion(scene) {
   const blendArm = (key, w) => { blendJoint('elbow' + key, elbow.x, elbow.y, elbow.z, w); blendJoint('wrist' + key, wrist.x, wrist.y, wrist.z, w); };
   return {
     root, contact, head, book, can,
+    dispose() { root.dispose(false, false); contact.dispose(); },
     animate(pose, seconds, reducedMotion, ground = .22) {
       const visible = !pose.atDesk;
       root.setEnabled(visible); contact.setEnabled(visible);
@@ -1523,7 +1548,15 @@ export function createMobileCompanion(scene) {
   };
 }
 
-export function createFurniture(type, scene) {
+export function disposeAvatarTemplates(scene) {
+  const templates = cacheFor(scene).templates;
+  for (const [key, value] of templates) {
+    if (!key.startsWith('avatar:')) continue;
+    Object.values(value).forEach(node => node.dispose(false, false)); templates.delete(key);
+  }
+}
+
+export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) {
   const definition = getFurniture(type);
   if (!definition) throw new Error(`Unknown furniture type: ${type}`);
   if (!scene) throw new Error('createFurniture requires a Babylon Scene.');
@@ -1551,7 +1584,7 @@ export function createFurniture(type, scene) {
   const staticParts = templates.get(type).clone(`${type}-details`, result); staticParts.setEnabled(true);
   result.metadata.body = staticParts;
   if (definition.category === 'Study') {
-    const parts = avatarTemplate(scene);
+    const parts = avatarTemplate(scene, avatarAppearance);
     const avatar = group(result, [0, 0, 0.52]); avatar.metadata = { dynamic: true }; avatar.name = 'Study companion';
     const body = parts.body.clone('grounded-trousers-and-shoes', avatar); body.setEnabled(true);
     const articulateUpper = createArticulatedUpperBody(avatar, parts.upper);

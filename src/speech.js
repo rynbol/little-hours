@@ -26,6 +26,8 @@ export const AVATAR_LINES = {
   finish: ['We did it! ✧', 'That was a good one.', 'Look at us go. Time for a break.', 'Well done, you.'],
   welcome: ['Welcome back! ✧', 'Oh, hi! I kept your seat warm.', 'There you are. The room missed you.'],
   rest: ['Ahh, cozy.', 'This is the best seat in the room.', 'Mm, just a quiet minute.'],
+  customize: ['Okay, I’m ready for a little glow-up. ✨', 'Let’s find a look that feels like me.', 'Ooh, a little getting-ready moment.'],
+  customizeDone: ['Cute. Let’s get comfy again. ✨', 'All ready. Back to my little corner.'],
   doze: ['(yawns) Just resting my eyes…', 'Zzz… five more minutes…'],
   // One small thing in the room at the start of a break.
   activity: {
