@@ -5,6 +5,9 @@
 // player's localStorage. Clock controls exercise real completion/purchase UI.
 if (!import.meta.env.DEV) throw new Error('Development check only');
 const originalNow = Date.now;
+const nativeMatchMedia = window.matchMedia.bind(window), testMotion = new EventTarget();
+testMotion.matches = false;
+window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? testMotion : nativeMatchMedia(query);
 let offset = Number(sessionStorage.getItem('house-check-clock')) || 0;
 Date.now = () => originalNow() + offset;
 window.__littleHoursTest = { storage: {
@@ -15,15 +18,16 @@ await import('../src/main.js');
 const controls = document.createElement('nav');
 controls.setAttribute('aria-label', 'Isolated test controls');
 controls.style.cssText = 'position:fixed;bottom:6px;left:6px;max-width:calc(100% - 12px);z-index:1000;display:flex;flex-wrap:wrap;gap:5px;padding:6px;background:#eee;color:#222;border:1px solid #333;border-radius:5px;font:11px sans-serif';
-controls.innerHTML = '<span>TEST SAVE</span><button id="advance">Advance 25 minutes</button><button id="reset-check">Reset test save</button><button id="measure">Measure overview</button><output id="measurement"></output>';
+controls.innerHTML = '<span>TEST SAVE</span><button id="advance">Advance 25 minutes</button><button id="reset-check">Reset test save</button><button id="reduce-motion" aria-pressed="false">Reduce motion</button><button id="measure">Measure overview</button><output id="measurement"></output>';
 document.body.append(controls);
 document.querySelector('#advance').onclick = () => { offset += 25 * 60_000; sessionStorage.setItem('house-check-clock', offset); document.dispatchEvent(new Event('visibilitychange')); };
 document.querySelector('#reset-check').onclick = () => { sessionStorage.removeItem('house-check-save'); sessionStorage.removeItem('house-check-clock'); location.reload(); };
+document.querySelector('#reduce-motion').onclick = event => { testMotion.matches = !testMotion.matches; testMotion.dispatchEvent(new Event('change')); event.target.setAttribute('aria-pressed', String(testMotion.matches)); };
 document.querySelector('#measure').onclick = async () => {
-  const app = window.__littleHours, start = app.house.diagnostics(), roomFrame = app.room.diagnostics().scene.getFrameId();
+  const app = window.__littleHours, overview = app.connected || app.house, start = overview.diagnostics(), roomFrame = app.room.diagnostics().scene.getFrameId();
   if (!start) { document.querySelector('#measurement').textContent = 'Open the house first'; return; }
   await new Promise(resolve => setTimeout(resolve, 2000));
-  const end = app.house.diagnostics();
-  document.querySelector('#measurement').textContent = end ? `${end.drawCalls} draw calls · ${Math.round(end.triangles)} triangles · ${end.renderCount - start.renderCount} idle overview frames · ${app.room.diagnostics().scene.getFrameId() - roomFrame} background room frames in 2s` : 'House closed';
+  const end = overview.diagnostics();
+  document.querySelector('#measurement').textContent = end ? `${end.drawCalls} draw calls · ${Math.round(end.triangles)} triangles · ${end.renderCount - start.renderCount} overview frames · ${app.room.diagnostics().scene.getFrameId() - roomFrame} background room frames in 2s` : 'House closed';
 };
 </script></body></html>

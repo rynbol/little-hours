@@ -37,6 +37,13 @@ export function normalizeHouse(raw, layout, history = []) {
 
 export const activeHouseRoom = house => house.rooms.find(room => room.id === house.activeId) || house.rooms[0];
 export const nextExpansion = house => HOUSE_SLOTS[house.rooms.length] || null;
+export function houseConnections(house) {
+  const next = nextExpansion(house);
+  return HOUSE_SLOTS.filter(slot => slot.id !== house.activeId).map(slot => {
+    const room = house.rooms.find(entry => entry.id === slot.id);
+    return { id: slot.id, name: room?.name || slot.label, built: Boolean(room), upstairs: slot.id === 'loft', price: slot.price, ready: !room && next?.id === slot.id && house.coins >= slot.price, next: next?.id === slot.id };
+  });
+}
 export function expansionVerdict(house, slotId, presetId) {
   const slot = nextExpansion(house);
   if (!slot || slot.id !== slotId) return { ok: false, reason: 'That space is already built or is not the next extension.' };

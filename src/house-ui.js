@@ -1,6 +1,6 @@
 import { createHouseView } from './house-view.js';
 import { HOUSE_SLOTS, nextExpansion, expansionVerdict } from './house.js';
-import { PRESETS, roomDesign } from './layout.js';
+import { PRESETS, roomDesign, createLayout } from './layout.js';
 
 const escape = text => String(text).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onFocus, art, icon, notice }) {
@@ -26,6 +26,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
   }
   function render() {
     if (!shown) return;
+    view?.setFocused(store.state.session.running);
     const house = store.state.house, next = nextExpansion(house);
     const key = JSON.stringify([house, selectedId, chosenDesign, store.state.theme]);
     if (key === signature) return;
@@ -64,12 +65,17 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
       $('#focus-for-house')?.addEventListener('click', onFocus);
       $('#show-garden')?.addEventListener('click', () => select('garden'));
     }
-    const nextModel = JSON.stringify([house.rooms, house.activeId, selectedId, store.state.theme]);
+    const previewing = !entry && next?.id === selectedId;
+    const previewLayout = previewing ? createLayout(chosenDesign) : null;
+    const modelHouse = previewing ? { ...house, rooms: [...house.rooms, { id: selectedId, name: slot.label, layout: previewLayout }] } : house;
+    $('#house-canvas').setAttribute('aria-label', previewing ? `Preview of ${roomDesign(previewLayout).name} in your new ${slot.label}` : 'Your connected rooms');
+    $('.house-map-hint').textContent = previewing ? `Previewing ${roomDesign(previewLayout).name} · build this room to keep it` : 'Your rooms, together. Choose one to step inside.';
+    const nextModel = JSON.stringify([modelHouse.rooms, house.activeId, selectedId, store.state.theme]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
       try {
-        if (view) view.update(house, selectedId, store.state.theme);
-        else view = createHouseView($('#house-canvas'), { house, selectedId, theme: store.state.theme, onSelect: select });
+        if (view) view.update(modelHouse, selectedId, store.state.theme);
+        else view = createHouseView($('#house-canvas'), { house: modelHouse, selectedId, theme: store.state.theme, focused: store.state.session.running, onSelect: select });
       } catch (error) {
         console.error('Could not show the cottage:', error);
         $('#house-canvas').textContent = 'Your rooms are safe. Use the room buttons below to enter or expand your house.';
@@ -83,7 +89,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     else if (focusDesign) root.querySelector(`[data-house-design="${focusDesign}"]`)?.focus({ preventScroll: true });
   }
   return {
-    show() { shown = true; root.hidden = false; selectedId = store.state.house.activeId; signature = ''; render(); $('#house-detail').scrollTop = 0; },
+    show(id = store.state.house.activeId) { shown = true; root.hidden = false; selectedId = id; signature = ''; render(); $('#house-detail').scrollTop = 0; },
     hide() { shown = false; root.hidden = true; view?.dispose(); view = null; signature = ''; modelSignature = ''; $('#house-name-form').hidden = true; },
     render,
     diagnostics: () => view?.diagnostics(),

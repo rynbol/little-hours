@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import { createStateStore, restoreState, freshState } from './state.js';
 import { createLayout } from './layout.js';
 import { createSession } from './session.js';
-import { activeHouseRoom, nextExpansion } from './house.js';
+import { activeHouseRoom, nextExpansion, houseConnections } from './house.js';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
+import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
+import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js';
+import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { createHouseModel } from './house-model.js';
 
 function fixture(initial) {
@@ -115,18 +119,38 @@ test('a stale decorating callback saves its own room after another tab changes r
   stale.enterHouseRoom('studio'); assert.equal(stale.state.layout.walls, 'blue');
 });
 
-test('overview batches the complete cottage into at most four finite meshes and releases them', () => {
+test('door destinations follow the active room and the next affordable expansion', () => {
+  const f = fixture();
+  assert.deepEqual(houseConnections(f.store.state.house).map(link => [link.id, link.built, link.next, link.ready]), [['garden', false, true, false], ['loft', false, false, false]]);
+  finish(f); assert.equal(houseConnections(f.store.state.house)[0].ready, true);
+  f.store.buildRoom('garden', 'cloud-loft'); f.store.enterHouseRoom('garden');
+  assert.deepEqual(houseConnections(f.store.state.house).map(link => [link.id, link.built, link.next]), [['studio', true, false], ['loft', false, true]]);
+});
+
+test('house uses real furniture and architecture, batches static paint and releases its models', () => {
+  const previousDocument = globalThis.document;
+  const context = new Proxy({}, { get: (_, key) => String(key).includes('Gradient') ? () => ({ addColorStop() {} }) : key === 'measureText' ? () => ({ width: 20 }) : () => {} });
+  globalThis.document = { addEventListener() {}, removeEventListener() {}, createElement: () => ({ width: 256, height: 256, getContext: () => context }) };
   const engine = new NullEngine(), scene = new Scene(engine), f = fixture();
-  for (let count = 1; count <= 3; count++) {
-    const model = createHouseModel(scene, f.store.state.house, 'studio');
-    assert.ok(model.meshes.length <= 4);
-    const vertices = model.meshes.reduce((total, mesh) => total + mesh.getTotalVertices(), 0);
-    assert.ok(vertices > 0 && vertices < 100_000);
-    for (const mesh of model.meshes) assert.ok(mesh.getVerticesData('position').every(Number.isFinite));
-    assert.ok(model.meshes.some(m => m.metadata.houseSlot === 'studio'));
-    if (count < 3) assert.ok(model.meshes.some(m => m.metadata.houseSlot === nextExpansion(f.store.state.house).id));
-    model.dispose(); assert.equal(scene.meshes.length, 0); assert.equal(scene.materials.length, 0);
-    if (count < 3) { finish(f, 90); f.store.buildRoom(nextExpansion(f.store.state.house).id, count === 1 ? 'moonlit-greenhouse' : 'cloud-loft'); }
-  }
-  scene.dispose(); engine.dispose();
+  const shadows = new ShadowGenerator(64, new DirectionalLight('house-test-sun', new Vector3(0, -1, 0), scene));
+  try {
+    for (let count = 1; count <= 3; count++) {
+      const model = createHouseModel(scene, f.store.state.house, 'studio');
+      assert.ok(model.meshes.length <= 4);
+      const vertices = model.meshes.reduce((total, mesh) => total + mesh.getTotalVertices(), 0);
+      assert.ok(vertices > 10_000 && vertices < 1_000_000);
+      for (const mesh of model.meshes) assert.ok(mesh.getVerticesData('position').every(Number.isFinite));
+      assert.ok(model.meshes.some(m => m.metadata.houseSlot === 'studio'));
+      if (count < 3) assert.ok(model.meshes.some(m => m.metadata.houseSlot === nextExpansion(f.store.state.house).id));
+      assert.equal(model.live.length, 1, 'only the occupied desk has a live companion');
+      if (count === 3) assert.ok(scene.getMeshByName('cloud-window-view'), 'the real Cloud loft architecture is retained');
+      const originalMeshes = [...model.meshes];
+      // Exercise Babylon's automatic caster removal without letting a shrinking
+      // render list skip an old room when the design preview changes.
+      shadows.getShadowMap().renderList = model.meshes;
+      model.dispose(); assert.ok(originalMeshes.every(mesh => mesh.isDisposed()));
+      assert.ok(model.live.every(root => root.isDisposed()));
+      if (count < 3) { finish(f, 90); f.store.buildRoom(nextExpansion(f.store.state.house).id, count === 1 ? 'moonlit-greenhouse' : 'cloud-loft'); }
+    }
+  } finally { scene.dispose(); engine.dispose(); globalThis.document = previousDocument; }
 });

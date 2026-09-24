@@ -19,7 +19,7 @@ Start with one furnished studio, with the whole room visible and immediately usa
 
 The house overview shows those three authored spaces together, with a doorway and an exterior stair connecting them. Each extension arrives furnished in a chosen design, and every room keeps its own furniture, colors and name. Designs are decorating styles, not additional owned rooms. Furniture and style changes remain free. Older saved designs remain available, and the current room becomes the starter studio; previously recorded completed sessions receive their coins once.
 
-The overview is a small static model of the saved layouts. Opening it suspends the detailed room; entering a room restores the full scene and its animations. This keeps the growing house from multiplying the cost of rendering three animated rooms. All progression is saved locally for now, with no accounts, real-money purchases or shared wallet.
+The connected house reuses the authored furniture and themed architecture, with a working companion and drifting motes. It can open directly in the room view. Physical porch doors and stairs link the destinations, and room navigation keeps decorating active when moving between owned rooms. New designs receive a furnished preview before purchase. The overview batches static geometry and caps animation at 30 FPS; opening it suspends the detailed room, and entering a room restores that scene. All progression is saved locally for now, with no accounts, real-money purchases or shared wallet.
 
 ## Optional companion surfaces
 

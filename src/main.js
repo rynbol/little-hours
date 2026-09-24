@@ -13,6 +13,7 @@ import { surfaceChoices } from './surfaces.js';
 import { designPaint } from './architecture.js';
 import { createHouseUI } from './house-ui.js';
 import { activeHouseRoom, nextExpansion, focusCoins } from './house.js';
+import { createHouseView } from './house-view.js';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -43,6 +44,7 @@ let state = store.state;
 let room;
 let houseUI;
 let houseOpen = false;
+let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false;
 let currentPanel = null;
 let compact = false;
 let audioContext, noiseNode, gainNode;
@@ -78,8 +80,11 @@ document.querySelector('#app').innerHTML = `
     <main class="workspace">
       <section id="room-section" class="room-section" aria-labelledby="room-title">
         <div class="room-heading"><div><p class="eyebrow">YOUR QUIET LITTLE WORLD</p><h1 id="room-title">The twilight retreat</h1><p class="room-subtitle" id="room-subtitle">The fire is warm. The night is yours.</p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Visit your house" aria-controls="house-page">${icon('home')}<span>House</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
+        <nav id="home-connections" class="home-connections" aria-label="Move around your house"></nav>
         <div class="stage" id="stage">
           <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a pet. Drag to turn the room."></div>
+          <div id="house-in-room" class="house-in-room" hidden></div>
+          <div id="room-travel" class="room-travel" role="status" hidden><span>✧</span><strong id="travel-label"></strong><small>A different corner of home.</small></div>
           <div class="loading-note" id="loading-note">Making room for you…</div>
           <div class="stage-presence" id="stage-presence" data-presence="idle" role="status" aria-live="polite" aria-atomic="true" aria-label="Your local focus status: In your room" title="Your focus status in this browser."><span id="presence-icon" aria-hidden="true">${icon('home')}</span><span id="room-status">In your room</span></div>
           <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
@@ -136,20 +141,27 @@ const themeCopy = {
   rain: 'Raindrops, candlelight, and nowhere else to be.',
   day: 'Sunlight on the books. A fresh little chapter.',
 };
+function renderRoomHeading() {
+  const design = roomDesign(state.layout), entry = activeHouseRoom(state.house);
+  $('#room-title').textContent = connectedView ? state.house.name : entry.name === 'Your studio' ? design.name : entry.name;
+  $('#room-subtitle').textContent = connectedView ? 'Your rooms, together. Choose a corner to step inside.' : design.style ? ({ sakura: 'Soft light. Cherry blossoms. Room to breathe.', cloud: 'Head in the clouds. Feet on a soft little rug.', metro: 'The city hums. Your little corner is quiet.' })[design.style] : themeCopy[state.theme];
+}
 function applyState(next, force = false) {
   const previous = state;
   state = next;
   const design = roomDesign(state.layout);
   document.body.dataset.design = design.style || 'retreat';
-  $('#room-title').textContent = activeHouseRoom(state.house).name === 'Your studio' ? design.name : activeHouseRoom(state.house).name;
+
   $('#coin-balance').textContent = state.house.coins;
   $('#coin-wallet').setAttribute('aria-label', `${state.house.coins} coins · Visit your house`);
   renderFocusReward();
   houseUI?.render();
+  room?.setHouse(state.house);
+  renderConnections();
   // An open Atmosphere panel keeps its lights label in step with the room.
   const lightsLabel = $('#room-panel .fairy-lights span');
   if (lightsLabel) lightsLabel.textContent = design.style ? 'Accent lights' : 'Fairy lights';
-  $('#room-subtitle').textContent = design.style ? ({ sakura: 'Soft light. Cherry blossoms. Room to breathe.', cloud: 'Head in the clouds. Feet on a soft little rug.', metro: 'The city hums. Your little corner is quiet.' })[design.style] : themeCopy[state.theme];
+  renderRoomHeading();
   if (force || previous.theme !== state.theme) {
     document.body.dataset.theme = state.theme;
     room?.setTheme(state.theme);
@@ -261,6 +273,10 @@ try {
       return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
     },
     onDragState: renderDragState,
+    onHouseNavigate: visitRoom,
+    onHouseHover(id) {
+      document.querySelectorAll('[data-house-go]').forEach(button => button.classList.toggle('door-hover', button.dataset.houseGo === id));
+    },
     onNotice: toast,
     onStats(stats) { performanceStats = stats; renderPerformance(); },
   });
@@ -276,17 +292,13 @@ applyState(state, true);
 houseUI = createHouseUI($('#house-page'), {
   store, acceptUpdate, art: roomDesignArt, icon, notice: toast,
   onClose: () => setHouseOpen(false),
-  onEnter: (id, decorate) => {
-    room?.cancelPlacement(); room?.selectItem(null); selectedItem = null; undoLayout = null; $('#undo-layout').disabled = true;
-    acceptUpdate(store.enterHouseRoom(id));
-    setHouseOpen(false);
-    if (decorate) { collectionTab = 'collection'; setEditMode(true); }
-  },
+  onEnter: visitRoom,
   onFocus: () => { setHouseOpen(false); focusCollapsed = false; syncFocusDock(); revealFocusDock(); $('#start-button').focus(); },
 });
-function setHouseOpen(open) {
+function setHouseOpen(open, selectedId) {
   if (open === houseOpen) return;
   if (open) {
+    setConnectedView(false);
     if (editMode) setEditMode(false);
     currentPanel = null; renderPanel();
   }
@@ -294,9 +306,61 @@ function setHouseOpen(open) {
   document.body.classList.toggle('is-house', open);
   $('#room-section').hidden = open;
   room?.setSuspended(open);
-  if (open) { houseUI.show(); $('#back-to-room').focus({ preventScroll: true }); }
+  if (open) { houseUI.show(selectedId); $('#back-to-room').focus({ preventScroll: true }); }
   else { houseUI.hide(); $('#rooms-button').focus({ preventScroll: true }); }
   syncFocusDock();
+}
+function renderConnections(updateModel = true) {
+  connectedView?.setFocused(state.session.running);
+  const key = JSON.stringify([state.house, state.theme, Boolean(connectedView)]);
+  if (connectionsKey === key) return;
+  connectionsKey = key;
+  const nav = $('#home-connections'); nav.replaceChildren();
+  const caption = document.createElement('span'); caption.className = 'home-address'; caption.textContent = state.house.name; nav.append(caption);
+  for (const entry of state.house.rooms) {
+    const button = document.createElement('button'); button.dataset.houseGo = entry.id;
+    button.textContent = entry.name; button.setAttribute('aria-current', entry.id === state.house.activeId && !connectedView ? 'location' : 'false');
+    button.addEventListener('click', () => visitRoom(entry.id)); nav.append(button);
+  }
+  const next = nextExpansion(state.house);
+  if (next) {
+    const button = document.createElement('button'); button.className = 'home-next'; button.dataset.houseGo = next.id;
+    button.textContent = state.house.coins >= next.price ? `＋ Build ${next.short}` : `＋ ${next.short} · ${state.house.coins}/${next.price}`;
+    button.addEventListener('click', () => visitRoom(next.id)); nav.append(button);
+  }
+  const wide = document.createElement('button'); wide.className = 'home-wide'; wide.textContent = connectedView ? 'Back to my room' : 'See connected house'; wide.setAttribute('aria-pressed', String(Boolean(connectedView)));
+  wide.addEventListener('click', () => setConnectedView(!connectedView)); nav.append(wide);
+  if (connectedView && updateModel) connectedView.update(state.house, state.house.activeId, state.theme);
+}
+function setConnectedView(open) {
+  if (open === Boolean(connectedView)) return;
+  if (open && editMode) setEditMode(false);
+  if (open) {
+    $('#house-in-room').hidden = false;
+    connectedView = createHouseView($('#house-in-room'), { house: state.house, selectedId: state.house.activeId, theme: state.theme, focused: state.session.running, onSelect: visitRoom });
+  } else { connectedView.dispose(); connectedView = null; $('#house-in-room').hidden = true; }
+  $('#room-canvas').hidden = open;
+  document.body.classList.toggle('is-connected', open); renderRoomHeading();
+  room?.setSuspended(open); syncFocusDock(); connectionsKey = ''; renderConnections(false);
+}
+function visitRoom(id, decorate = editMode) {
+  if (travelling) return;
+  const entry = state.house.rooms.find(room => room.id === id);
+  if (!entry) { setHouseOpen(true, id); return; }
+  setConnectedView(false);
+  if (houseOpen) setHouseOpen(false);
+  if (editMode) setEditMode(false);
+  const arrive = () => {
+    room?.cancelPlacement(); room?.selectItem(null); selectedItem = null; undoLayout = null; $('#undo-layout').disabled = true;
+    acceptUpdate(store.enterHouseRoom(id));
+    if (decorate) { collectionTab = 'collection'; setEditMode(true); }
+    $('#room-travel').hidden = true; document.body.classList.remove('is-travelling'); travelling = false;
+    $('#stage').classList.remove('room-arrival'); void $('#stage').offsetWidth; $('#stage').classList.add('room-arrival');
+    clearTimeout(arrivalTimer); arrivalTimer = setTimeout(() => $('#stage').classList.remove('room-arrival'), 650);
+  };
+  if (id === state.house.activeId || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { arrive(); return; }
+  travelling = true; $('#travel-label').textContent = `On to ${entry.name}`; $('#room-travel').hidden = false; document.body.classList.add('is-travelling');
+  travelTimer = setTimeout(arrive, 220);
 }
 function renderFocusReward() {
   const reward = focusCoins(state.session.duration / 60_000), next = nextExpansion(state.house);
@@ -385,7 +449,11 @@ $('#time-toggle').addEventListener('click', () => {
 });
 $('#reset-view').addEventListener('click', () => room?.resetView());
 $('#focus-toggle').addEventListener('click', () => {
-  if (houseOpen) { setHouseOpen(false); focusCollapsed = false; syncFocusDock(); revealFocusDock(); return; }
+  if (houseOpen || connectedView) {
+    if (houseOpen) setHouseOpen(false);
+    if (connectedView) setConnectedView(false);
+    focusCollapsed = false; syncFocusDock(); revealFocusDock(); return;
+  }
   if (editMode) { focusCollapsed = false; setEditMode(false); }
   else { focusCollapsed = !focusCollapsed; syncFocusDock(); }
   if (!focusCollapsed) revealFocusDock();
@@ -404,6 +472,7 @@ $('#mini-button').addEventListener('click', () => {
 
 function setEditMode(enabled) {
   if (enabled && !room) return;
+  if (enabled && connectedView) setConnectedView(false);
   editMode = enabled;
   if (enabled && compact) {
     compact = false;
@@ -428,7 +497,7 @@ function setEditMode(enabled) {
 }
 
 function syncFocusDock() {
-  const visible = !houseOpen && !editMode && !focusCollapsed;
+  const visible = !houseOpen && !connectedView && !editMode && !focusCollapsed;
   $('#focus-card').hidden = !visible;
   document.body.classList.toggle('focus-collapsed', focusCollapsed);
   $('#focus-toggle').setAttribute('aria-expanded', String(visible));
@@ -802,11 +871,13 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
 // Development builds expose the room to end-to-end checks; production strips it.
-if (import.meta.env.DEV) window.__littleHours = { get room() { return room; }, get state() { return state; }, get speech() { return speech; }, get house() { return houseUI; } };
+if (import.meta.env.DEV) window.__littleHours = { get room() { return room; }, get state() { return state; }, get speech() { return speech; }, get house() { return houseUI; }, get connected() { return connectedView; } };
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
+  document.body.classList.remove('is-connected', 'is-travelling');
   clearInterval(tickInterval);
   clearTimeout(toastTimeout);
+  clearTimeout(travelTimer); clearTimeout(arrivalTimer); connectedView?.dispose();
   houseUI?.dispose();
   room?.dispose?.();
   noiseNode?.stop();

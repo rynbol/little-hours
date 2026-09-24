@@ -5,6 +5,7 @@ import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { createLayout, footprintBounds, pieceCount, LAYOUT_VERSION, rugStack, rugTouches, groundAt, standHeight } from '../src/layout.js';
+import { createHouse } from '../src/house.js';
 import { SURFACES } from '../src/surfaces.js';
 
 class Surface {
@@ -55,7 +56,7 @@ globalThis.IntersectionObserver = class {
 const { createRoom } = await import('../src/room.js');
 let engine;
 const container = { clientWidth: 800, clientHeight: 600, appendChild(canvas) { this.canvas = canvas; } };
-const changes = [], notices = [], stats = [], dragStates = [], lightTaps = [], companionTaps = [];
+const changes = [], notices = [], stats = [], dragStates = [], lightTaps = [], companionTaps = [], houseTrips = [];
 const room = createRoom(container, {
   engineFactory(canvas) {
     engine = new NullEngine({ renderWidth: 800, renderHeight: 600, textureSize: 512, deterministicLockstep: true, lockstepMaxSteps: 1 });
@@ -65,6 +66,7 @@ const room = createRoom(container, {
     engine.setSize = (w, h, force) => { engine._options.renderWidth = w; engine._options.renderHeight = h; return setSize(w, h, force); };
     return engine;
   },
+  onHouseNavigate: id => houseTrips.push(id),
   onLayoutChange: value => changes.push(structuredClone(value)),
   onNotice: value => notices.push(value),
   onStats: value => stats.push(value),
@@ -1183,6 +1185,30 @@ try {
     console.log('PASS new pieces: aquarium, globe, easel, bean bag, monstera and tea cart go down with a click; lamp, spin, steam, squish and rustle end at rest; shadows and reduced motion.');
   }
   motion.matches = false; motion.emit('change', { matches: false }); advance(2);
+  {
+    room.setEditMode(false); room.resetView(); advance(3);
+    const layoutBefore = structuredClone(diagnostics().layout), house = createHouse(layoutBefore);
+    house.rooms.push({ id: 'garden', name: 'Garden wing', layout: createLayout('cloud-loft') });
+    room.setHouse(house); advance(3);
+    const passage = diagnostics().passages;
+    assert.equal(passage.meshes.length, 5, 'the porch adds five batched meshes');
+    assert.equal(passage.root.isEnabled(), true);
+    const point = pointerAt(7.83, 1.7, 2.35);
+    canvas.emit('pointermove', point); advance(25);
+    assert.ok(scene.getTransformNodeByName('door-hinge-garden').rotation.y < -.5, 'hover opens the built door');
+    canvas.emit('pointerdown', point); canvas.emit('pointerup', point); advance(2);
+    assert.equal(houseTrips.at(-1), 'garden', 'the physical doorway enters the correct room');
+    const count = houseTrips.length, dragged = { ...point, clientX: point.clientX + 60 };
+    canvas.emit('pointerdown', point); canvas.emit('pointermove', dragged); canvas.emit('pointerup', dragged); advance(2);
+    assert.equal(houseTrips.length, count, 'turning the camera does not enter a room');
+    room.setEditMode(true); advance(2);
+    assert.equal(passage.root.isEnabled(), false, 'the porch stays outside furniture editing');
+    assert.deepEqual(diagnostics().layout, layoutBefore, 'navigation geometry never changes furniture');
+    room.setEditMode(false); room.setHouse({ ...house, activeId: 'garden' }); advance(2);
+    assert.ok(passage.root.isDisposed(), 'the old doors are disposed on room change');
+    assert.deepEqual(diagnostics().passages.links.map(link => link.id), ['studio', 'loft']);
+    console.log('PASS connected doors: hover, destination picking, camera-drag guard, edit-mode isolation and disposal.');
+  }
   const beforeHouse = scene.getFrameId();
   room.setSuspended(true); advance(60);
   assert.equal(frames.size, 0, 'the house view cancels the detailed room animation');
