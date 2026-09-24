@@ -797,19 +797,57 @@ function renderPanel() {
     }));
     $('#pet-now').addEventListener('click', () => { if (room) room.pet(); else petFeedback(); });
   } else if (currentPanel === 'avatar') {
-    const partNames = { skin: 'Skin tone', hair: 'Hair color', style: 'Hair style', top: 'Sweater', bottom: 'Trousers' };
-    const parts = avatarSection === 'face' ? ['skin', 'hair', 'style'] : ['top', 'bottom'];
+    const partNames = {
+      skin: 'Skin tone', hair: 'Hair color', style: 'Hair style',
+      outfit: 'Outfit design', top: 'Sweater color', bottomStyle: 'Bottom design', bottom: 'Trouser color',
+      accessory: 'Personal detail',
+    };
+    const parts = avatarSection === 'face' ? ['skin', 'hair', 'style'] : avatarSection === 'outfit' ? ['outfit', 'top', 'bottomStyle', 'bottom'] : ['accessory'];
     const hairShapes = {
       bun: 'M8 19v-5a8 8 0 0 1 16 0v5c-2-2-5-3-8-3s-6 1-8 3Zm11-11a3 3 0 1 1 6 0 3 3 0 0 1-6 0Z',
       bob: 'M7 18V14a9 9 0 0 1 18 0v12h-4v-9H11v9H7V18Z',
       waves: 'M7 18V14a9 9 0 0 1 18 0v5c-2-2-2-3-4-2s-2 4-4 3-2-4-4-3-2 3-4 2H7Z',
       crop: 'M8 16v-3a8 8 0 0 1 16 0v3c-2-2-4-2-6-1s-4 1-6 0-2-1-4 1Z',
     };
+    const designShapes = {
+      outfit: {
+        cardigan: '<path class="design-fill" d="m11 5-6 4 4 6v16h18V15l4-6-6-4-4 7h-6z"/><path class="design-accent" d="M16 12v18m3-12h.1m-.1 5h.1m-.1 5h.1"/>',
+        hoodie: '<path class="design-fill" d="M11 8a5 5 0 0 1 10 0l6 3 3 5-4 2v13H8V18l-4-2 3-5z"/><path class="design-accent" d="M13 20h6l2 5h-10zm1-10 2 3 2-3"/>',
+        overalls: '<path class="design-fill" d="m9 7 4 2h6l4-2 5 4-3 5v15H7V16l-3-5z"/><path class="design-accent" d="M11 8v8h10V8m-10 8 1 6h8l1-6m-5-6v12"/>',
+        sailor: '<path class="design-fill" d="m11 5-6 4 4 6v16h18V15l4-6-6-4-4 7h-6z"/><path class="design-accent" d="m10 11 6 5 6-5m-6 5v14m-4-9h.1"/>',
+      },
+      bottomStyle: {
+        trousers: '<path class="design-fill" d="M9 5h14l2 26h-7l-2-14-2 14H7z"/><path class="design-accent" d="M16 7v9"/>',
+        skirt: '<path class="design-fill" d="M10 5h12l5 26H5z"/><path class="design-accent" d="m12 9-2 18m6-18v18m4-18 2 18"/>',
+        shorts: '<path class="design-fill" d="M9 5h14l3 16h-8l-2-5-2 5H6z"/><path class="design-accent" d="M16 7v9m-8 5h7m2 0h8"/>',
+      },
+      accessory: {
+        none: '<path class="design-face" d="M8 18a8 8 0 1 1 16 0v4a8 8 0 0 1-16 0z"/><path class="design-accent" d="M25 8h.1"/>',
+        glasses: '<path class="design-face" d="M8 18a8 8 0 1 1 16 0v4a8 8 0 0 1-16 0z"/><circle class="design-accent" cx="12" cy="19" r="3.4"/><circle class="design-accent" cx="20" cy="19" r="3.4"/><path class="design-accent" d="M15.4 19h1.2"/>',
+        blossom: '<path class="design-face" d="M8 18a8 8 0 1 1 16 0v4a8 8 0 0 1-16 0z"/><path class="design-flower" d="M9 10c-2-3 2-5 4-2 1-4 5-3 5 0 4-2 6 2 3 4 3 2 1 6-3 5-1 4-5 3-5 0-4 2-6-2-3-4-3-1-3-4-1-3Z"/>',
+        'moon-clips': '<path class="design-face" d="M8 18a8 8 0 1 1 16 0v4a8 8 0 0 1-16 0z"/><path class="design-star" d="m9 11 1.3 2.3 2.5.4-1.8 1.8.4 2.5-2.4-1.2-2.3 1.2.4-2.5-1.8-1.8 2.5-.4zm14 0 1.3 2.3 2.5.4-1.8 1.8.4 2.5-2.4-1.2-2.3 1.2.4-2.5-1.8-1.8 2.5-.4z"/>',
+      },
+    };
     const choices = parts.map(part => {
       const options = AVATAR_OPTIONS[part], activeHair = AVATAR_OPTIONS.hair.find(option => option.id === state.avatar.hair)?.color;
-      return `<fieldset class="avatar-choice"><legend>${partNames[part]}</legend><div class="avatar-swatches ${part === 'style' ? 'avatar-styles' : ''}" style="--avatar-count:${options.length}" role="group" aria-label="${partNames[part]}">${options.map(option => `<button class="avatar-swatch ${part === 'style' ? 'avatar-style' : ''}" data-avatar-part="${part}" data-avatar-value="${option.id}" aria-pressed="${state.avatar[part] === option.id}" aria-label="${option.name}" title="${option.name}">${part === 'style' ? `<svg class="avatar-hair-preview" viewBox="0 0 32 32" aria-hidden="true" style="--hair-tone:${activeHair};--skin-tone:${AVATAR_OPTIONS.skin.find(tone => tone.id === state.avatar.skin)?.color}"><ellipse cx="16" cy="19" rx="8" ry="10"/><path d="${hairShapes[option.id]}"/></svg><span>${option.name}</span>` : `<span class="avatar-color" style="--avatar-color:${option.color}"></span><span class="avatar-swatch-name">${option.name}</span>`}</button>`).join('')}</div></fieldset>`;
+      const activeSkin = AVATAR_OPTIONS.skin.find(option => option.id === state.avatar.skin)?.color;
+      const activeTop = AVATAR_OPTIONS.top.find(option => option.id === state.avatar.top);
+      const activeBottom = AVATAR_OPTIONS.bottom.find(option => option.id === state.avatar.bottom);
+      const preview = option => {
+        if (part === 'style') return `<svg class="avatar-hair-preview" viewBox="0 0 32 32" aria-hidden="true" style="--hair-tone:${activeHair};--skin-tone:${activeSkin}"><ellipse cx="16" cy="19" rx="8" ry="10"/><path d="${hairShapes[option.id]}"/></svg>`;
+        if (designShapes[part]) {
+          const colors = part === 'outfit'
+            ? `--design-tone:${activeTop.color};--design-accent:${activeTop.trim}`
+            : part === 'bottomStyle' ? `--design-tone:${activeBottom.color};--design-accent:${activeBottom.color}`
+              : `--hair-tone:${activeHair};--skin-tone:${activeSkin}`;
+          return `<svg class="avatar-design-preview avatar-design-${part}" viewBox="0 0 36 36" aria-hidden="true" style="${colors}">${designShapes[part][option.id]}</svg>`;
+        }
+        return `<span class="avatar-color" style="--avatar-color:${option.color}"></span>`;
+      };
+      const design = part === 'style' || Boolean(designShapes[part]);
+      return `<fieldset class="avatar-choice"><legend>${partNames[part]}</legend><div class="avatar-swatches ${design ? 'avatar-styles avatar-designs' : ''}" style="--avatar-count:${options.length}" role="group" aria-label="${partNames[part]}">${options.map(option => `<button class="avatar-swatch ${design ? 'avatar-style avatar-design-choice' : ''}" data-avatar-part="${part}" data-avatar-value="${option.id}" aria-pressed="${state.avatar[part] === option.id}" aria-label="${option.name}" title="${option.name}">${preview(option)}<span>${option.name}</span></button>`).join('')}</div></fieldset>`;
     }).join('');
-    panel.insertAdjacentHTML('beforeend', `<div class="avatar-editor-lead"><span class="avatar-editor-mark" aria-hidden="true">✧</span><span><strong>Find your kind of cozy.</strong><small>Try any look. It saves as you go.</small></span></div><div class="avatar-editor-tabs" role="group" aria-label="Customize your avatar"><button data-avatar-section="face" aria-pressed="${avatarSection === 'face'}">Face &amp; hair</button><button data-avatar-section="outfit" aria-pressed="${avatarSection === 'outfit'}">Clothes</button></div><div class="avatar-customizer">${choices}</div><div class="avatar-editor-footer"><button class="avatar-reset" id="avatar-reset">Start over</button><button class="quiet-button avatar-done" id="avatar-done">${icon('check')} Done</button></div>`);
+    panel.insertAdjacentHTML('beforeend', `<div class="avatar-editor-lead"><span class="avatar-editor-mark" aria-hidden="true">✧</span><span><strong>Make it your own.</strong><small>Pick a shape, then give it your colors.</small></span></div><div class="avatar-editor-tabs" role="group" aria-label="Customize your avatar"><button data-avatar-section="face" aria-pressed="${avatarSection === 'face'}">Face &amp; hair</button><button data-avatar-section="outfit" aria-pressed="${avatarSection === 'outfit'}">Outfits</button><button data-avatar-section="details" aria-pressed="${avatarSection === 'details'}">Extras</button></div><div class="avatar-customizer">${choices}</div><div class="avatar-editor-footer"><button class="avatar-reset" id="avatar-reset">Start over</button><button class="quiet-button avatar-done" id="avatar-done">${icon('check')} Done</button></div>`);
     panel.querySelectorAll('[data-avatar-section]').forEach(button => button.addEventListener('click', () => {
       avatarSection = button.dataset.avatarSection; renderPanel(); panel.querySelector(`[data-avatar-section="${avatarSection}"]`)?.focus();
     }));
@@ -817,9 +855,18 @@ function renderPanel() {
       const part = button.dataset.avatarPart, value = button.dataset.avatarValue;
       acceptUpdate(store.update(draft => { draft.avatar[part] = value; }));
       panel.querySelectorAll(`[data-avatar-part="${part}"]`).forEach(option => option.setAttribute('aria-pressed', String(option.dataset.avatarValue === value)));
-      if (part === 'hair' || part === 'skin') panel.querySelectorAll('.avatar-hair-preview').forEach(preview => {
-        preview.style.setProperty('--hair-tone', AVATAR_OPTIONS.hair.find(option => option.id === state.avatar.hair).color);
-        preview.style.setProperty('--skin-tone', AVATAR_OPTIONS.skin.find(option => option.id === state.avatar.skin).color);
+      const hairTone = AVATAR_OPTIONS.hair.find(option => option.id === state.avatar.hair).color;
+      const skinTone = AVATAR_OPTIONS.skin.find(option => option.id === state.avatar.skin).color;
+      panel.querySelectorAll('.avatar-hair-preview, .avatar-design-preview').forEach(preview => {
+        preview.style.setProperty('--hair-tone', hairTone); preview.style.setProperty('--skin-tone', skinTone);
+        if (part === 'top') {
+          const top = AVATAR_OPTIONS.top.find(option => option.id === state.avatar.top);
+          preview.style.setProperty('--design-tone', top.color); preview.style.setProperty('--design-accent', top.trim);
+        }
+        if (part === 'bottom') {
+          const bottom = AVATAR_OPTIONS.bottom.find(option => option.id === state.avatar.bottom);
+          preview.style.setProperty('--design-tone', bottom.color); preview.style.setProperty('--design-accent', bottom.color);
+        }
       });
     }));
     $('#avatar-reset').addEventListener('click', () => {

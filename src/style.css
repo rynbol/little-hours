@@ -125,6 +125,14 @@ h1 { font-family: Georgia, 'Times New Roman', serif; margin: 0; font-size: clamp
 .avatar-hair-preview { width: 32px; height: 32px; overflow: visible; }
 .avatar-hair-preview ellipse { fill: var(--skin-tone); stroke: #876c52; stroke-width: .7; }
 .avatar-hair-preview path { fill: var(--hair-tone); stroke: color-mix(in srgb, var(--hair-tone), #473729 24%); stroke-width: .8; stroke-linejoin: round; }
+.avatar-designs { grid-template-columns: repeat(var(--avatar-count, 4), minmax(0, 1fr)); }
+.avatar-design-choice { min-height: 76px; }
+.avatar-design-preview { width: 34px; height: 34px; overflow: visible; }
+.avatar-design-preview .design-fill { fill: var(--design-tone, #bd8290); stroke: #715a45; stroke-width: .65; stroke-linejoin: round; }
+.avatar-design-preview .design-accent { fill: none; stroke: var(--design-accent, #e0c58d); stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.avatar-design-preview .design-face { fill: var(--skin-tone, #d6ad87); stroke: #80634a; stroke-width: .8; }
+.avatar-design-preview .design-flower { fill: #d98f94; stroke: #9c6470; stroke-width: .6; }
+.avatar-design-preview .design-star { fill: #d3b674; stroke: #9b7949; stroke-width: .5; }
 .avatar-editor-footer { position: sticky; bottom: -16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px 0 0; border-top: 1px solid #dfceb0; background: #f1e5ce; }
 .avatar-reset { padding: 8px 4px; border: 0; background: transparent; color: #806548; font-size: 11px; text-decoration: underline; text-decoration-color: #c6ad83; text-underline-offset: 3px; }
 .avatar-reset:hover { color: #594831; }
@@ -327,6 +335,8 @@ h2 em { color: #a07147; font-weight: 400; }
   .avatar-color { width: 22px; height: 22px; }
   .avatar-style { min-height: 52px; }
   .avatar-hair-preview { width: 24px; height: 24px; }
+  .avatar-design-choice { min-height: 60px; }
+  .avatar-design-preview { width: 25px; height: 25px; }
   .avatar-editor-footer { bottom: -10px; margin-top: 7px; padding-top: 6px; }
   .avatar-done { min-height: 32px; }
   .focus-card { display: block; padding: 22px; }
