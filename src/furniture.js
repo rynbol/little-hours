@@ -1239,6 +1239,8 @@ function sweater(parent, appearance = AVATAR_DEFAULT) {
   mesh(parent, shape, knit.color, [0, 0, 0]);
   const hem = cylinder(parent, 0.238, 0.218, 0.045, [0, 0.859, -0.085], knit.shade); hem.scaling.z = 0.77;
   const collar = torus(parent, 0.107, 0.025, [0, 1.515, -0.14], knit.trim); collar.rotation.x = Math.PI / 2;
+  rod(parent, [0, 0.96, -0.282], [0, 1.43, -0.275], 0.006, knit.trim);
+  for (const y of [1.04, 1.18, 1.32]) sphere(parent, [0.012, 0.012, 0.007], [0.026, y, -0.278], knit.trim, 8);
 }
 
 function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
@@ -1286,45 +1288,52 @@ function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
   }
   upper.metadata = { ranges };
   const head = new TransformNode('avatar-part', scene);
-  sphere(head, [0.232, 0.245, 0.22], [0, 0, 0], skin, 14);
-  // A soft face: big dark eyes with a glint, rosy cheeks and a small smile.
+  sphere(head, [0.214, 0.232, 0.19], [0, 0, 0], skin, 16);
+  // A friendly face with room around the eyes and a little visible cheek.
   for (const x of [-.08, .08]) {
-    sphere(head, [.026, .034, .02], [x, -.03, -.196], '#3a2b24', 10);
-    sphere(head, [.008, .009, .006], [x + .009, -.017, -.2145], '#fff4e6');
-    sphere(head, [.042, .026, .03], [x * 1.62, -.088, -.152], '#e59b85', 10);
+    sphere(head, [.027, .037, .019], [x, -.018, -.174], '#352924', 10);
+    sphere(head, [.008, .010, .006], [x + .009, -.008, -.191], '#fff4e6');
+    sphere(head, [.034, .021, .012], [x * 1.65, -.088, -.157], '#d99782', 10);
   }
-  sphere(head, [.02, .017, .016], [0, -.062, -.214], skin, 8);
-  torus(head, .022, .0055, [0, -.082, -.203], '#7a4a3c', Math.PI).rotation.z = Math.PI;
-  // The hair: a smooth crown, a fringe over the forehead, a lock beside each
-  // cheek and a bun.
-  sphere(head, [0.24, 0.237, 0.23], [0, 0.066, 0.05], hair, 14);
+  sphere(head, [.018, .018, .013], [0, -.060, -.181], '#a8735e', 8);
+  torus(head, .021, .0045, [0, -.083, -.166], '#734c43', Math.PI).rotation.z = Math.PI;
+  // A close-fitting crown leaves the forehead and eyes clear. Delicate
+  // swept locks give each cut a distinct outline without a shiny helmet look.
+  const fullCut = appearance.style === 'bob' || appearance.style === 'waves';
+  sphere(head, fullCut ? [.211, .15, .18] : [.202, .12, .169], [0, fullCut ? .095 : .112, .014], hair, 20);
+  const fringe = () => tube(head, [
+    [-.174, .058, -.119], [-.125, .032, -.157], [-.065, .009, -.181], [0, -.001, -.191],
+    [.068, .006, -.181], [.13, .031, -.153], [.174, .052, -.12],
+  ], .019, hair);
   if (appearance.style === 'bob') {
-    sphere(head, [.23, .205, .13], [0, -.075, .10], hair, 12);
-    sphere(head, [.09, .13, .07], [-.18, -.08, -.015], hair, 10);
-    sphere(head, [.09, .13, .07], [.18, -.08, -.015], hair, 10);
-    for (const x of [-.08, 0, .08]) sphere(head, [.08, .068, .05], [x, .14, -.18], hair, 10).rotation.x = .5;
+    sphere(head, [.205, .17, .115], [0, -.075, .09], hair, 16);
+    for (const side of [-1, 1]) tube(head, [
+      [side * .166, .09, -.095], [side * .19, .035, -.114], [side * .188, -.045, -.126],
+      [side * .17, -.13, -.124], [side * .145, -.225, -.105],
+    ], .034, hair);
+    fringe();
   } else if (appearance.style === 'waves') {
-    sphere(head, [.11, .09, .055], [0, .14, -.18], hair, 10).rotation.x = .5;
-    for (const side of [-1, 1]) for (let i = 0; i < 4; i++) {
-      const y = .12 - i * .095, x = side * (.13 - (i % 2) * .018), z = -.105 + (i % 2) * .035;
-      sphere(head, [.068, .105, .07], [x, y, z], hair, 10).rotation.z = side * -.16;
-    }
-    sphere(head, [.11, .12, .10], [0, .18, .19], hair, 10);
+    sphere(head, [.205, .19, .112], [0, -.085, .085], hair, 16);
+    for (const side of [-1, 1]) tube(head, [
+      [side * .164, .11, -.078], [side * .186, .045, -.092], [side * .17, -.035, -.108],
+      [side * .194, -.12, -.11], [side * .172, -.21, -.101], [side * .19, -.30, -.086],
+      [side * .167, -.39, -.075],
+    ], .026, hair);
+    fringe();
   } else if (appearance.style === 'crop') {
-    for (const x of [-.105, 0, .105]) sphere(head, [.088, .065, .05], [x, .15, -.175], hair, 10).rotation.x = .54;
-    for (const x of [-.212, .212]) sphere(head, [.038, .072, .045], [x, .005, -.05], hair, 10);
+    tube(head, [[-.15, .052, -.128], [-.09, .025, -.16], [-.025, .026, -.179], [.055, .038, -.174], [.14, .06, -.137]], .017, hair);
+    for (const x of [-.199, .199]) sphere(head, [.029, .056, .03], [x, .012, -.052], hair, 12);
   } else {
-    // The soft bun and scalloped fringe are the room's original look.
-    for (const x of [-.095, 0, .095]) sphere(head, [.075, .075, .05], [x, .14, -.18], hair, 10).rotation.x = .55;
-    for (const side of [-1, 1]) {
-      const lock = sphere(head, [.09, .08, .05], [side * .105, .125, -.16], hair, 10);
-      lock.rotation.set(.5, side * -.55, side * .25);
-      sphere(head, [.038, .1, .048], [side * .212, -.01, -.055], hair, 10);
-    }
-    sphere(head, [0.12, 0.12, 0.10], [0, 0.19, 0.20], hair, 12);
+    fringe();
+    for (const side of [-1, 1]) tube(head, [
+      [side * .177, .078, -.075], [side * .188, .015, -.09], [side * .18, -.06, -.092],
+      [side * .174, -.13, -.085],
+    ], .024, hair);
+    sphere(head, [.062, .076, .058], [0, .234, .045], hair, 16);
   }
-  torus(head, 0.25, 0.026, [0, 0.017, 0.014], C.dark, Math.PI);
-  for (const x of [-0.244, 0.244]) sphere(head, [0.044, 0.091, 0.08], [x, 0.022, 0.014], C.sage, 10);
+  // Small uncovered ears keep the side silhouette human without oversized
+  // hardware competing with the eyes and hair.
+  for (const x of [-.205, .205]) sphere(head, [.027, .048, .022], [x, -.005, .012], skin, 10);
   const hand = new TransformNode('avatar-part', scene); sphere(hand, [0.074, 0.044, 0.10], [0, 0, 0], skin);
   const writingHand = new TransformNode('avatar-part', scene);
   sphere(writingHand, [0.074, 0.044, 0.10], [0, 0, 0], skin);

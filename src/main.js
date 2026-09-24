@@ -14,7 +14,7 @@ import { designPaint } from './architecture.js';
 import { createHouseUI } from './house-ui.js';
 import { activeHouseRoom, nextExpansion, focusCoins } from './house.js';
 import { createHouseView } from './house-view.js';
-import { AVATAR_OPTIONS } from './avatar.js';
+import { AVATAR_DEFAULT, AVATAR_OPTIONS } from './avatar.js';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -47,7 +47,7 @@ let room;
 let houseUI;
 let houseOpen = false;
 let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false;
-let currentPanel = null, avatarPanelActive = false;
+let currentPanel = null, avatarPanelActive = false, avatarSection = 'face';
 let compact = false;
 let audioContext, noiseNode, gainNode;
 let soundEnabled = false;
@@ -769,7 +769,7 @@ function renderPerformance() {
 function renderPanel() {
   const panel = $('#room-panel');
   if (currentPanel === 'avatar' && !avatarPanelActive) {
-    avatarPanelActive = true; room?.setAvatarEditing?.(true); avatarSay('customize', { force: true });
+    avatarPanelActive = true; avatarSection = 'face'; room?.setAvatarEditing?.(true); avatarSay('customize', { force: true });
   } else if (currentPanel !== 'avatar' && avatarPanelActive) {
     avatarPanelActive = false; room?.setAvatarEditing?.(false); avatarSay('customizeDone', { force: true });
   }
@@ -797,14 +797,35 @@ function renderPanel() {
     }));
     $('#pet-now').addEventListener('click', () => { if (room) room.pet(); else petFeedback(); });
   } else if (currentPanel === 'avatar') {
-    const partNames = { skin: 'Skin tone', hair: 'Hair color', style: 'Hairstyle', top: 'Top', bottom: 'Trousers' };
-    const choices = Object.entries(AVATAR_OPTIONS).map(([part, options]) => `<fieldset class="avatar-choice"><legend>${partNames[part]}</legend><div class="avatar-swatches ${part === 'style' ? 'avatar-styles' : ''}" role="group" aria-label="${partNames[part]}">${options.map(option => `<button class="avatar-swatch ${part === 'style' ? 'avatar-style' : ''}" data-avatar-part="${part}" data-avatar-value="${option.id}" aria-pressed="${state.avatar[part] === option.id}" aria-label="${option.name}" title="${option.name}">${part === 'style' ? `<span>${option.name}</span>` : `<span class="avatar-color" style="--avatar-color:${option.color}"></span><span class="avatar-swatch-name">${option.name}</span>`}</button>`).join('')}</div></fieldset>`).join('');
-    panel.insertAdjacentHTML('beforeend', `<div class="avatar-editor-lead"><span class="avatar-editor-mark" aria-hidden="true">✧</span><span><strong>A little more you.</strong><small>Your look saves as you choose. All the room's handmade details stay in place.</small></span></div><div class="avatar-customizer">${choices}</div><button class="quiet-button avatar-done" id="avatar-done">${icon('check')} Done</button>`);
+    const partNames = { skin: 'Skin tone', hair: 'Hair color', style: 'Hair style', top: 'Sweater', bottom: 'Trousers' };
+    const parts = avatarSection === 'face' ? ['skin', 'hair', 'style'] : ['top', 'bottom'];
+    const hairShapes = {
+      bun: 'M8 19v-5a8 8 0 0 1 16 0v5c-2-2-5-3-8-3s-6 1-8 3Zm11-11a3 3 0 1 1 6 0 3 3 0 0 1-6 0Z',
+      bob: 'M7 18V14a9 9 0 0 1 18 0v12h-4v-9H11v9H7V18Z',
+      waves: 'M7 18V14a9 9 0 0 1 18 0v5c-2-2-2-3-4-2s-2 4-4 3-2-4-4-3-2 3-4 2H7Z',
+      crop: 'M8 16v-3a8 8 0 0 1 16 0v3c-2-2-4-2-6-1s-4 1-6 0-2-1-4 1Z',
+    };
+    const choices = parts.map(part => {
+      const options = AVATAR_OPTIONS[part], activeHair = AVATAR_OPTIONS.hair.find(option => option.id === state.avatar.hair)?.color;
+      return `<fieldset class="avatar-choice"><legend>${partNames[part]}</legend><div class="avatar-swatches ${part === 'style' ? 'avatar-styles' : ''}" style="--avatar-count:${options.length}" role="group" aria-label="${partNames[part]}">${options.map(option => `<button class="avatar-swatch ${part === 'style' ? 'avatar-style' : ''}" data-avatar-part="${part}" data-avatar-value="${option.id}" aria-pressed="${state.avatar[part] === option.id}" aria-label="${option.name}" title="${option.name}">${part === 'style' ? `<svg class="avatar-hair-preview" viewBox="0 0 32 32" aria-hidden="true" style="--hair-tone:${activeHair};--skin-tone:${AVATAR_OPTIONS.skin.find(tone => tone.id === state.avatar.skin)?.color}"><ellipse cx="16" cy="19" rx="8" ry="10"/><path d="${hairShapes[option.id]}"/></svg><span>${option.name}</span>` : `<span class="avatar-color" style="--avatar-color:${option.color}"></span><span class="avatar-swatch-name">${option.name}</span>`}</button>`).join('')}</div></fieldset>`;
+    }).join('');
+    panel.insertAdjacentHTML('beforeend', `<div class="avatar-editor-lead"><span class="avatar-editor-mark" aria-hidden="true">✧</span><span><strong>Find your kind of cozy.</strong><small>Try any look. It saves as you go.</small></span></div><div class="avatar-editor-tabs" role="group" aria-label="Customize your avatar"><button data-avatar-section="face" aria-pressed="${avatarSection === 'face'}">Face &amp; hair</button><button data-avatar-section="outfit" aria-pressed="${avatarSection === 'outfit'}">Clothes</button></div><div class="avatar-customizer">${choices}</div><div class="avatar-editor-footer"><button class="avatar-reset" id="avatar-reset">Start over</button><button class="quiet-button avatar-done" id="avatar-done">${icon('check')} Done</button></div>`);
+    panel.querySelectorAll('[data-avatar-section]').forEach(button => button.addEventListener('click', () => {
+      avatarSection = button.dataset.avatarSection; renderPanel(); panel.querySelector(`[data-avatar-section="${avatarSection}"]`)?.focus();
+    }));
     panel.querySelectorAll('[data-avatar-part]').forEach(button => button.addEventListener('click', () => {
       const part = button.dataset.avatarPart, value = button.dataset.avatarValue;
       acceptUpdate(store.update(draft => { draft.avatar[part] = value; }));
       panel.querySelectorAll(`[data-avatar-part="${part}"]`).forEach(option => option.setAttribute('aria-pressed', String(option.dataset.avatarValue === value)));
+      if (part === 'hair' || part === 'skin') panel.querySelectorAll('.avatar-hair-preview').forEach(preview => {
+        preview.style.setProperty('--hair-tone', AVATAR_OPTIONS.hair.find(option => option.id === state.avatar.hair).color);
+        preview.style.setProperty('--skin-tone', AVATAR_OPTIONS.skin.find(option => option.id === state.avatar.skin).color);
+      });
     }));
+    $('#avatar-reset').addEventListener('click', () => {
+      acceptUpdate(store.update(draft => { draft.avatar = { ...AVATAR_DEFAULT }; }));
+      avatarSection = 'face'; renderPanel(); $('#avatar-reset')?.focus();
+    });
     $('#avatar-done').addEventListener('click', closePanel);
   } else {
     panel.insertAdjacentHTML('beforeend', `<div class="quality-options" aria-label="Room rendering quality">${[['auto', 'Adaptive'], ['high', 'Crisp'], ['battery', 'Save energy']].map(([id, label]) => `<button data-quality="${id}" aria-pressed="${quality === id}">${label}</button>`).join('')}</div><p class="performance-note">Adaptive balances detail and motion. Save energy limits animation to 30 frames per second.</p><dl class="performance-metrics" id="performance-metrics"></dl><p class="performance-note">Babylon.js engine · live measurements while this tab is visible. CPU measurements exclude GPU time.</p>`);

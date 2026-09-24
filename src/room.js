@@ -160,6 +160,8 @@ export function createRoom(container, options = {}) {
   shadow.getShadowMap().refreshRate = 0;
   const windowGlow = new PointLight('window-lamplight', new Vector3(-2.7, 2.7, -3.3), scene); windowGlow.diffuse = color('#ffc178'); windowGlow.intensity = 1.0; windowGlow.range = 6;
   const hearthGlow = new PointLight('hearth-lamplight', new Vector3(3.25, 1.0, -2.9), scene); hearthGlow.diffuse = color('#ffa555'); hearthGlow.intensity = 1.0; hearthGlow.range = 6;
+  const portraitFill = new PointLight('avatar-portrait-fill', new Vector3(0, 2.1, 3), scene);
+  portraitFill.diffuse = color('#ffe4c8'); portraitFill.specular = color('#ffe4c8'); portraitFill.range = 5.2; portraitFill.intensity = 0;
   const bloom = new GlowLayer('candlelight-bloom', scene, { mainTextureFixedSize: 512, blurKernelSize: 24 }); bloom.intensity = 0.34;
   const glowingMeshes = new Set();
 
@@ -968,11 +970,18 @@ export function createRoom(container, options = {}) {
     if (next) {
       savedAvatarCamera = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone(), height: camera.orthoTop - camera.orthoBottom };
       camera.detachControl(); avatarCameraControl = true; avatarCameraEditing = true;
-      savedAvatarEffects = [fireflies, skyStars, moths, shootingStar, rain].map(effect => [effect, effect.isEnabled()]);
+      // Keep the portrait fill among the four lights StandardMaterial draws.
+      // The room's two local glows are decorative and can pause for the close-up.
+      savedAvatarEffects = [fireflies, skyStars, moths, shootingStar, rain, windowGlow, hearthGlow].map(effect => [effect, effect.isEnabled()]);
       for (const [effect] of savedAvatarEffects) effect.setEnabled(false);
       const entry = companionRoutine.beginAvatarEditing();
       const pose = companionRoutine.pose;
       const fromX = entry?.fromX ?? pose.x, fromZ = entry?.fromZ ?? pose.z, toX = entry?.toX ?? pose.x, toZ = entry?.toZ ?? pose.z;
+      // The posed companion turns toward +Z in world space; keep this warm
+      // fill on its face so the features stay readable in candlelight.
+      portraitFill.position.set(toX, 2.0, toZ + 1.8); portraitFill.intensity = 1.2;
+      const compactPortrait = canvasAspect < 0.82, portraitHeight = compactPortrait ? 3.15 : avatarFrameHeight;
+      activeAvatarFrameHeight = portraitHeight;
       const dx = toX - fromX, dz = toZ - fromZ;
       const walkYaw = Math.hypot(dx, dz) > 0.05 ? Math.atan2(-dx, -dz) : pose.yaw;
       avatarPoseTransition = {
@@ -982,10 +991,11 @@ export function createRoom(container, options = {}) {
       avatarCameraTransition = {
         elapsed: 0, duration: reducedMotion ? 0 : 1.25,
         from: { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone(), height: camera.orthoTop - camera.orthoBottom },
-        to: { alpha: camera.alpha, beta: Math.min(camera.beta, 0.94), radius: camera.radius, target: new Vector3(toX, 1.13, toZ), height: avatarFrameHeight },
+        to: { alpha: camera.alpha, beta: Math.min(camera.beta, 0.94), radius: camera.radius, target: new Vector3(toX, compactPortrait ? 0.30 : 1.13, toZ), height: portraitHeight },
       };
     } else {
       avatarCameraEditing = false; avatarPoseTransition = null;
+      portraitFill.intensity = 0;
       companionRoutine.endAvatarEditing();
       if (savedAvatarCamera) avatarCameraTransition = {
         elapsed: 0, duration: reducedMotion ? 0 : 0.88,
@@ -1301,7 +1311,8 @@ export function createRoom(container, options = {}) {
   const connectedCorners = []; for (const x of [-6.19, 8.25]) for (const y of [-0.32, 6.02]) for (const z of [-4.78, 4.78]) connectedCorners.push(new Vector3(x, y, z));
   const projectedCorner = new Vector3(); let canvasAspect = 1, fitAlpha = NaN, fitBeta = NaN;
   let avatarCameraEditing = false, avatarCameraTransition = null, savedAvatarCamera = null, savedAvatarEffects = null, avatarPoseTransition = null;
-  const avatarFrameHeight = 3.35;
+  const avatarFrameHeight = 3.0;
+  let activeAvatarFrameHeight = avatarFrameHeight;
   const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
   const smoothStep = t => t * t * (3 - 2 * t);
   function restoreAvatarEffects() {
@@ -1340,7 +1351,7 @@ export function createRoom(container, options = {}) {
   let avatarCameraControl = false;
   function fitRoom() {
     if (avatarCameraControl) {
-      if (!avatarCameraTransition) setCameraHeight(avatarCameraEditing ? avatarFrameHeight : camera.orthoTop - camera.orthoBottom);
+      if (!avatarCameraTransition) setCameraHeight(avatarCameraEditing ? activeAvatarFrameHeight : camera.orthoTop - camera.orthoBottom);
       fitAlpha = camera.alpha; fitBeta = camera.beta; return;
     }
     const view = camera.getViewMatrix(true); let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -1360,7 +1371,7 @@ export function createRoom(container, options = {}) {
     else {
       const head = companionRoutine.pose.atDesk ? placedObjects.get(layout.activeDeskId)?.metadata.avatarHead : mobileCompanion.head;
       if (!head?.isEnabled()) return null;
-      anchorPoint.copyFrom(head.getAbsolutePosition()); anchorPoint.y += 0.5;
+      anchorPoint.copyFrom(head.getAbsolutePosition()); anchorPoint.y += avatarCameraEditing ? 0.28 : 0.5;
     }
     const width = engine.getRenderWidth(), height = engine.getRenderHeight();
     camera.viewport.toGlobalToRef(width, height, anchorViewport);

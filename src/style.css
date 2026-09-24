@@ -100,28 +100,39 @@ h1 { font-family: Georgia, 'Times New Roman', serif; margin: 0; font-size: clamp
 .pet-option[aria-pressed='true'] { border-color: #8f7048; box-shadow: inset 0 0 0 1px #8f7048; background: #ecdcb9; }
 .pet-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #d7c3a4; }
 .pet-actions .quiet-button { align-self: flex-start; }
-.avatar-editor-lead { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border: 1px solid #dcc8a7; border-radius: 12px; background: linear-gradient(135deg, #eee0c5, #e8d8b8); }
-.avatar-editor-mark { width: 39px; height: 39px; flex: none; display: grid; place-items: center; border: 1px solid #c3a778; border-radius: 50%; color: #9c7546; background: #f6ebd4; font-size: 20px; }
+.avatar-editor-lead { display: flex; align-items: center; gap: 12px; padding: 12px 13px; border: 1px solid #dcc8a7; border-radius: 14px; background: linear-gradient(135deg, #f3e8d3, #e8d8b8); box-shadow: inset 0 1px #fff9e9; }
+.avatar-editor-mark { width: 39px; height: 39px; flex: none; display: grid; place-items: center; border: 1px solid #c3a778; border-radius: 50%; color: #9c7546; background: #fbf2df; font-size: 20px; }
 .avatar-editor-lead > span:last-child { display: flex; flex-direction: column; gap: 3px; }
 .avatar-editor-lead strong { font-family: Georgia, 'Times New Roman', serif; font-size: 18px; font-weight: 400; color: #594831; }
 .avatar-editor-lead small { color: #7b6549; font-size: 11px; line-height: 1.4; }
-.avatar-customizer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; margin-top: 14px; }
+.avatar-editor-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 11px 0 14px; padding: 4px; border: 1px solid #dfceb0; border-radius: 11px; background: #e9dcc5; }
+.avatar-editor-tabs button { min-height: 35px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #766249; font-size: 11px; }
+.avatar-editor-tabs button:hover { background: #f4e9d4; }
+.avatar-editor-tabs button[aria-pressed='true'] { border-color: #c6ad83; background: #f7edd9; color: #594831; box-shadow: 0 1px 2px #72563418; }
+.avatar-customizer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 13px; }
 .avatar-choice { min-width: 0; margin: 0; padding: 0; border: 0; }
 .avatar-choice legend { margin: 0 0 7px; color: #705a40; font-size: 11px; font-weight: 600; }
-.avatar-swatches { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 5px; }
-.avatar-swatch { display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; gap: 4px; min-width: 48px; padding: 3px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #705a40; font-size: 9px; }
+.avatar-swatches { display: grid; grid-template-columns: repeat(var(--avatar-count, 5), minmax(0, 1fr)); gap: 5px; }
+.avatar-swatch { display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 5px 2px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #705a40; font-size: 9px; }
 .avatar-swatch:hover { background: #ead9bb; }
-.avatar-color { width: 27px; height: 27px; border: 2px solid #fff3dd; outline: 1px solid #b9a17f; border-radius: 50%; background: var(--avatar-color); box-shadow: inset 0 -2px 3px #1c14201c; }
+.avatar-color { width: 29px; height: 29px; border: 2px solid #fff3dd; outline: 1px solid #b9a17f; border-radius: 50%; background: var(--avatar-color); box-shadow: inset 0 -2px 3px #1c14201c; }
 .avatar-swatch[aria-pressed='true'] { border-color: #96744c; background: #e8d7b7; }
 .avatar-swatch[aria-pressed='true'] .avatar-color { outline: 2px solid #8f6d46; outline-offset: 2px; }
-.avatar-swatch-name { max-width: 56px; text-align: center; white-space: nowrap; }
-.avatar-styles { gap: 6px; }
-.avatar-style { min-width: auto; min-height: 34px; padding: 7px 9px; border: 1px solid #d5bf9c; border-radius: 16px; background: #ecddc1; font-size: 10px; }
-.avatar-style[aria-pressed='true'] { border-color: #8f7048; background: #dac49e; box-shadow: inset 0 0 0 1px #8f7048; }
-.avatar-done { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; padding: 8px 13px; }
+.avatar-swatch-name { max-width: 100%; text-align: center; white-space: nowrap; }
+.avatar-styles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.avatar-style { min-height: 68px; padding: 5px 2px; border: 1px solid #d5bf9c; border-radius: 11px; background: #ecddc1; font-size: 9px; }
+.avatar-style[aria-pressed='true'] { border-color: #8f7048; background: #f0e0c3; box-shadow: inset 0 0 0 1px #8f7048; }
+.avatar-hair-preview { width: 32px; height: 32px; overflow: visible; }
+.avatar-hair-preview ellipse { fill: var(--skin-tone); stroke: #876c52; stroke-width: .7; }
+.avatar-hair-preview path { fill: var(--hair-tone); stroke: color-mix(in srgb, var(--hair-tone), #473729 24%); stroke-width: .8; stroke-linejoin: round; }
+.avatar-editor-footer { position: sticky; bottom: -16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px 0 0; border-top: 1px solid #dfceb0; background: #f1e5ce; }
+.avatar-reset { padding: 8px 4px; border: 0; background: transparent; color: #806548; font-size: 11px; text-decoration: underline; text-decoration-color: #c6ad83; text-underline-offset: 3px; }
+.avatar-reset:hover { color: #594831; }
+.avatar-done { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 108px; min-height: 38px; margin: 0; padding: 8px 13px; border-color: #886b46; background: #876447; color: #fff2d9; }
+.avatar-done:hover { background: #73553f; }
 .avatar-done svg { width: 14px; height: 14px; }
 .is-avatar-editing #focus-card { visibility: hidden; }
-.is-avatar-editing .room-panel { position: fixed; z-index: 8; top: 82px; right: max(18px, calc((100vw - 2100px) / 2 + 26px)); width: min(320px, calc(100vw - 36px)); max-height: calc(100svh - 100px); margin: 0; overflow-y: auto; overscroll-behavior: contain; }
+.is-avatar-editing .room-panel { position: fixed; z-index: 8; top: 82px; right: max(18px, calc((100vw - 2100px) / 2 + 26px)); width: min(360px, calc(100vw - 36px)); max-height: calc(100svh - 100px); margin: 0; overflow-y: auto; overscroll-behavior: contain; }
 .fairy-lights { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid #d7c3a4; font-size: 12px; }
 input[type='checkbox'] { accent-color: #9b7650; width: 18px; height: 18px; }
 .focus-card { position: relative; align-self: start; margin-top: 71px; background: #f1e5ce; color: #5e4b35; padding: 19px 19px 17px; border: 1px solid #c7a97c; border-radius: 15px; box-shadow: 0 20px 45px #08060e35, inset 0 1px #fff4da; }
@@ -298,7 +309,26 @@ h2 em { color: #a07147; font-weight: 400; }
   .room-bottom { margin-top: 2px; }
   .room-tools { width: 100%; }
   .tool { padding: 8px 3px; flex-direction: column; gap: 4px; }
-  .avatar-customizer { grid-template-columns: minmax(0, 1fr); }
+  .is-avatar-editing .room-panel { inset: auto 12px max(8px, env(safe-area-inset-bottom)); width: auto; max-height: min(50svh, 430px); padding: 10px 12px; border-radius: 20px 20px 15px 15px; box-shadow: 0 18px 60px #09071185, 0 2px 12px #08050c3d; }
+  .is-avatar-editing .room-heading { min-height: 50px; align-items: center; }
+  .is-avatar-editing .room-heading .eyebrow, .is-avatar-editing .room-subtitle, .is-avatar-editing .heading-actions,
+  .is-avatar-editing .home-connections, .is-avatar-editing .room-bottom { display: none; }
+  .is-avatar-editing .stage { height: min(42svh, 360px); min-height: 320px; }
+  .is-avatar-editing .panel-heading { margin-bottom: 6px; }
+  .avatar-editor-lead { padding: 7px 9px; gap: 8px; }
+  .avatar-editor-mark { width: 29px; height: 29px; }
+  .avatar-editor-lead strong { font-size: 15px; }
+  .avatar-editor-lead small { font-size: 9px; }
+  .avatar-editor-tabs { margin: 6px 0 8px; }
+  .avatar-editor-tabs button { min-height: 32px; }
+  .avatar-customizer { gap: 6px; }
+  .avatar-choice legend { margin-bottom: 4px; }
+  .avatar-swatch { gap: 2px; padding: 3px 1px; font-size: 8px; }
+  .avatar-color { width: 22px; height: 22px; }
+  .avatar-style { min-height: 52px; }
+  .avatar-hair-preview { width: 24px; height: 24px; }
+  .avatar-editor-footer { bottom: -10px; margin-top: 7px; padding-top: 6px; }
+  .avatar-done { min-height: 32px; }
   .focus-card { display: block; padding: 22px; }
   .focus-card h2 { font-size: 35px; }
   #task { font-size: 16px; }
