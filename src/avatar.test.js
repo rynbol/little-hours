@@ -53,3 +53,25 @@ test('garment cuts and personal accessories change the modeled companion; older 
     scene.dispose(); engine.dispose();
   }
 });
+
+test('every avatar option builds finite geometry inside the character bounds', () => {
+  const engine = new NullEngine({ renderWidth: 640, renderHeight: 480, deterministicLockstep: true });
+  const scene = new Scene(engine);
+  try {
+    for (const part of ['skin', 'hair', 'top', 'bottom', 'style', 'outfit', 'bottomStyle', 'accessory']) {
+      for (const option of AVATAR_OPTIONS[part]) {
+        const avatar = createMobileCompanion(scene, { ...AVATAR_DEFAULT, [part]: option.id });
+        try {
+          for (const mesh of avatar.root.getChildMeshes()) {
+            for (const kind of ['position', 'normal']) {
+              const data = mesh.getVerticesData(kind);
+              if (!data) continue;
+              assert.ok(Array.from(data).every(Number.isFinite), `${part}:${option.id} has finite ${kind} values`);
+              if (kind === 'position') assert.ok(Array.from(data).every(value => Math.abs(value) < 3), `${part}:${option.id} stays inside the avatar bounds`);
+            }
+          }
+        } finally { avatar.dispose(); }
+      }
+    }
+  } finally { scene.dispose(); engine.dispose(); }
+});

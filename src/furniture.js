@@ -1217,29 +1217,22 @@ function createArticulatedUpperBody(avatar, template) {
 // rounded, on a darker sole. The desk and walking companions share them.
 const TROUSERS = '#777e72';
 function pleatedSkirt(parent, color, trim) {
-  const positions = [], indices = [], normals = [], sides = 16;
-  const rings = [[.75, .235], [.57, .31], [.34, .43]];
-  for (const [y, radius] of rings) for (let side = 0; side < sides; side++) {
-    const angle = side / sides * Math.PI * 2, fold = side % 2 ? .89 : 1.11;
-    positions.push(Math.cos(angle) * radius * fold, y, -.15 + Math.sin(angle) * radius * fold * .68);
-  }
-  for (let ring = 0; ring < rings.length - 1; ring++) for (let side = 0; side < sides; side++) {
-    const a = ring * sides + side, b = ring * sides + (side + 1) % sides, c = a + sides, d = b + sides;
-    indices.push(a, b, c, b, d, c);
-  }
-  VertexData.ComputeNormals(positions, indices, normals);
-  const shape = new Mesh('avatar-pleated-skirt', parent.getScene());
-  const data = new VertexData(); Object.assign(data, { positions, indices, normals }); data.applyToMesh(shape);
-  mesh(parent, shape, color, [0, 0, 0]);
-  // Four fine woven ribs catch the light across the front pleats, so the
-  // skirt reads as fabric rather than a plain cone at room scale.
-  for (const angle of [-2.65, -2.2, -1.75, -1.3, -.85, -.4]) {
-    const x = Math.cos(angle), z = Math.sin(angle) * .68;
-    rod(parent, [x * .255, .67, -.17 + z * .255], [x * .45, .36, -.17 + z * .45], .006, trim);
+  // Use Babylon's closed, smooth frustum so the cloth stays visible from every
+  // camera angle and can't disappear when the avatar turns toward the camera.
+  const skirt = cylinder(parent, .22, .315, .30, [0, .665, -.08], color, { segments: 24 });
+  skirt.scaling.z = .7;
+  const waist = cylinder(parent, .218, .218, .035, [0, .795, -.08], trim, { segments: 24 });
+  waist.scaling.z = .7;
+  const hem = cylinder(parent, .316, .316, .018, [0, .524, -.08], trim, { segments: 24 });
+  hem.scaling.z = .7;
+  // A few quiet front seams suggest pleats without drawing long rigid spokes.
+  for (const angle of [-2.1, -1.57, -.99]) {
+    const x = Math.cos(angle), z = Math.sin(angle) * .7;
+    rod(parent, [x * .23, .75, -.08 + z * .23], [x * .31, .54, -.08 + z * .31], .003, trim);
   }
 }
 function hips(parent, trousers = TROUSERS, bottomStyle = 'trousers', trim = '#a4ac94') {
-  sphere(parent, [.255, .135, .215], [0, .79, -.08], trousers, 8);
+  sphere(parent, [.225, .105, .19], [0, .785, -.08], trousers, 10);
   if (bottomStyle === 'skirt') pleatedSkirt(parent, trousers, trim);
 }
 function shoe(parent, x) { return [sphere(parent, [.1, .072, .175], [x, .102, -.77], C.cream, 8), sphere(parent, [.106, .028, .182], [x, .048, -.768], '#b39c80', 6)]; }
@@ -1247,8 +1240,8 @@ function sweater(parent, appearance = AVATAR_DEFAULT) {
   const knit = avatarPaint(appearance, 'top'), outfit = appearance.outfit || 'cardigan';
   // Elliptical rings give the knit a soft waist and sloping shoulders, rather
   // than reusing the sharp furniture-box silhouette for a person.
-  const profile = [[0.83, 0.20, 0.155], [0.87, 0.245, 0.185], [0.95, 0.27, 0.205],
-    [1.22, 0.285, 0.20], [1.39, 0.26, 0.185], [1.49, 0.20, 0.145], [1.51, 0.12, 0.11]];
+  const profile = [[0.83, 0.19, 0.15], [0.88, 0.225, 0.175], [0.98, 0.245, 0.19],
+    [1.22, 0.255, 0.19], [1.39, 0.235, 0.17], [1.49, 0.18, 0.14], [1.51, 0.12, 0.11]];
   const positions = [], indices = [], normals = [], sides = 16;
   for (const [y, width, depth] of profile) for (let side = 0; side < sides; side++) {
     const angle = side / sides * Math.PI * 2;
@@ -1280,18 +1273,19 @@ function sweater(parent, appearance = AVATAR_DEFAULT) {
     rod(parent, [-.084, 1.115, -.328], [.084, 1.115, -.328], .005, knit.trim);
     for (const side of [-1, 1]) rod(parent, [side * .045, 1.45, -.258], [side * .05, 1.22, -.321], .009, knit.trim);
   } else if (outfit === 'overalls') {
-    sphere(parent, [.174, .152, .035], [0, 1.235, -.316], knit.shade, 12);
-    for (const side of [-1, 1]) rod(parent, [side * .148, 1.465, -.235], [side * .105, 1.28, -.321], .026, knit.trim);
-    box(parent, [.105, .062, .012], [0, 1.205, -.361], knit.color, .012);
-    rod(parent, [-.045, 1.229, -.37], [.045, 1.229, -.37], .004, knit.trim);
-    for (const x of [-.105, .105]) sphere(parent, [.014, .014, .009], [x, 1.285, -.358], knit.trim, 8);
+    // A flat, softly beveled bib sits against the sweater; a sphere here used
+    // to protrude like a pouch and swallowed the overall straps and pocket.
+    box(parent, [.31, .29, .026], [0, 1.28, -.292], knit.shade, .045);
+    for (const side of [-1, 1]) rod(parent, [side * .12, 1.45, -.25], [side * .12, 1.355, -.318], .02, knit.trim);
+    box(parent, [.115, .078, .012], [0, 1.205, -.314], knit.color, .018);
+    rod(parent, [-.045, 1.224, -.324], [.045, 1.224, -.324], .004, knit.trim);
+    for (const x of [-.12, .12]) sphere(parent, [.012, .012, .008], [x, 1.414, -.317], knit.trim, 8);
   } else if (outfit === 'sailor') {
     for (const side of [-1, 1]) {
-      const flap = sphere(parent, [.105, .047, .024], [side * .093, 1.445, -.268], knit.trim, 10);
-      flap.rotation.z = side * -.38;
-      rod(parent, [side * .06, 1.42, -.31], [0, 1.20, -.329], .008, knit.shade);
+      const flap = box(parent, [.15, .052, .016], [side * .078, 1.444, -.294], knit.trim, .022);
+      flap.rotation.z = side * -.22;
     }
-    sphere(parent, [.025, .031, .016], [0, 1.378, -.332], knit.shade, 8);
+    sphere(parent, [.018, .018, .01], [0, 1.408, -.31], knit.shade, 8);
   }
 }
 
@@ -1313,6 +1307,9 @@ function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
     shoe(body, x);
   }
   const upperSource = new TransformNode('avatar-upper-body-source', scene);
+  const hairMaterial = material(scene, hair);
+  hairMaterial.specularColor.set(0.012, 0.010, 0.008);
+  hairMaterial.specularPower = 32;
   sweater(upperSource, appearance);
   cylinder(upperSource, 0.10, 0.12, 0.14, [0, 1.565, -0.14], skin);
   for (const side of [-1, 1]) {
@@ -1344,30 +1341,47 @@ function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
   }
   upper.metadata = { ranges };
   const head = new TransformNode('avatar-part', scene);
-  sphere(head, [0.214, 0.232, 0.19], [0, 0, 0], skin, 16);
-  // A friendly face with room around the eyes and a little visible cheek.
+  sphere(head, [0.214, 0.232, 0.19], [0, 0, 0], skin, 20);
+  // Keep the face open and readable under every cut: eyes, cheeks and smile
+  // sit below the hairline instead of being squeezed into a tiny gap.
   for (const x of [-.08, .08]) {
-    sphere(head, [.027, .037, .019], [x, -.018, -.174], '#352924', 10);
-    sphere(head, [.008, .010, .006], [x + .009, -.008, -.191], '#fff4e6');
-    sphere(head, [.034, .021, .012], [x * 1.65, -.088, -.157], '#d99782', 10);
+    sphere(head, [.026, .032, .018], [x, -.026, -.175], '#352924', 12);
+    sphere(head, [.007, .009, .005], [x + .008, -.017, -.191], '#fff4e6', 8);
+    sphere(head, [.031, .018, .01], [x * 1.7, -.104, -.16], '#d99782', 10);
   }
-  sphere(head, [.018, .018, .013], [0, -.060, -.181], '#a8735e', 8);
-  torus(head, .021, .0045, [0, -.083, -.166], '#734c43', Math.PI).rotation.z = Math.PI;
-  // A close-fitting crown leaves the forehead and eyes clear. Delicate
-  // swept locks give each cut a distinct outline without a shiny helmet look.
-  const fullCut = appearance.style === 'bob' || appearance.style === 'waves';
-  sphere(head, fullCut ? [.211, .15, .18] : [.202, .12, .169], [0, fullCut ? .095 : .112, .014], hair, 20);
-  const fringe = () => tube(head, [
-    [-.174, .058, -.119], [-.125, .032, -.157], [-.065, .009, -.181], [0, -.001, -.191],
-    [.068, .006, -.181], [.13, .031, -.153], [.174, .052, -.12],
-  ], .019, hair);
+  sphere(head, [.014, .012, .009], [0, -.073, -.185], '#a8735e', 10);
+  tube(head, [[-.026, -.128, -.173], [-.014, -.139, -.18], [0, -.142, -.182], [.014, -.139, -.18], [.026, -.128, -.173]], .004, '#734c43');
+  // A hand-built ellipsoid cap follows the skull and ends at a curved
+  // hairline. Using a full flattened sphere here made the bun read as a cap.
+  {
+    const positions = [], indices = [], normals = [], columns = 48, rows = 16;
+    const backCoverage = appearance.style === 'bob' ? .88 : appearance.style === 'waves' ? .82 : .46;
+    for (let row = 0; row <= rows; row++) for (let column = 0; column <= columns; column++) {
+      const phi = column / columns * Math.PI * 2;
+      const front = Math.max(0, -Math.sin(phi));
+      const theta = (row / rows) * (1.08 + backCoverage * (1 - front));
+      const lift = 1.014;
+      positions.push(
+        .214 * Math.sin(theta) * Math.cos(phi) * lift,
+        .232 * Math.cos(theta) * lift,
+        .19 * Math.sin(theta) * Math.sin(phi) * lift,
+      );
+    }
+    for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+      const a = row * (columns + 1) + column, b = a + 1, c = a + columns + 1, d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+    VertexData.ComputeNormals(positions, indices, normals);
+    const cap = new Mesh('avatar-shaped-hair-cap', scene);
+    const data = new VertexData(); Object.assign(data, { positions, indices, normals }); data.applyToMesh(cap);
+    mesh(head, cap, hair, [0, 0, 0]);
+  }
   if (appearance.style === 'bob') {
     sphere(head, [.205, .17, .115], [0, -.075, .09], hair, 16);
     for (const side of [-1, 1]) tube(head, [
       [side * .166, .09, -.095], [side * .19, .035, -.114], [side * .188, -.045, -.126],
       [side * .17, -.13, -.124], [side * .145, -.225, -.105],
     ], .034, hair);
-    fringe();
   } else if (appearance.style === 'waves') {
     sphere(head, [.205, .19, .112], [0, -.085, .085], hair, 16);
     for (const side of [-1, 1]) tube(head, [
@@ -1375,20 +1389,22 @@ function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
       [side * .194, -.12, -.11], [side * .172, -.21, -.101], [side * .19, -.30, -.086],
       [side * .167, -.39, -.075],
     ], .026, hair);
-    fringe();
   } else if (appearance.style === 'crop') {
     tube(head, [[-.15, .052, -.128], [-.09, .025, -.16], [-.025, .026, -.179], [.055, .038, -.174], [.14, .06, -.137]], .017, hair);
     for (const x of [-.199, .199]) sphere(head, [.029, .056, .03], [x, .012, -.052], hair, 12);
   } else {
-    fringe();
     for (const side of [-1, 1]) tube(head, [
       [side * .177, .078, -.075], [side * .188, .015, -.09], [side * .18, -.06, -.092],
       [side * .174, -.13, -.085],
     ], .024, hair);
-    sphere(head, [.062, .076, .058], [0, .234, .045], hair, 16);
+    // Overlapping form at the rear creates a tied silhouette without a ball
+    // perched on the crown in the front-facing editor portrait.
+    sphere(head, [.09, .10, .08], [0, .21, .17], hair, 18);
   }
   if (appearance.accessory === 'glasses') {
-    for (const x of [-.078, .078]) torus(head, .052, .006, [x, -.018, -.188], '#55453b', Math.PI * 2).rotation.x = Math.PI / 2;
+    // Torus already lies in the face plane (XY); tipping it onto XZ made the
+    // frames edge-on, so they looked like two stray brows instead of glasses.
+    for (const x of [-.078, .078]) torus(head, .052, .006, [x, -.026, -.19], '#55453b', Math.PI * 2);
     rod(head, [-.027, -.018, -.19], [.027, -.018, -.19], .005, '#55453b');
     for (const side of [-1, 1]) rod(head, [side * .126, -.018, -.184], [side * .205, -.004, -.075], .004, '#55453b');
   } else if (appearance.accessory === 'blossom') {
