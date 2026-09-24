@@ -19,7 +19,9 @@ const ease = t => t * t * (3 - 2 * t);
 // The companion faces -z at yaw 0.
 const facing = (from, to) => Math.atan2(-(to.x - from.x), -(to.z - from.z));
 export function companionIntent(session, now = Date.now()) {
-  return { focusing: 'working', break: 'break', idle: 'idle' }[sessionPhase(session, now)];
+  // The companion is only at the desk during a real, running focus session.
+  // A paused or completed timer means it heads to the sofa to rest.
+  return sessionPhase(session, now) === 'focusing' ? 'working' : 'rest';
 }
 export function localPoint(item, x, z) {
   const angle = item.rotation * Math.PI / 2, c = Math.cos(angle), s = Math.sin(angle);
@@ -358,6 +360,12 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     }
     return startTrip(null, false);
   }
+  // A quiet, non-focus visit goes directly to the sofa. Other seats remain a
+  // fallback for rooms without a reachable daybed.
+  function startRest(from = anchor) {
+    const plan = aroundPet(obstacles => planCompanionTrip(layout, from, false, ['daybed', ...SEATS.filter(type => type !== 'daybed')], { canReach, obstacles }));
+    return plan ? startTrip(from, false, plan) : false;
+  }
   // Done here: on to a seat, or back to the desk when none is free.
   function leaveActivity() {
     const here = { x: pose.x, z: pose.z };
@@ -373,7 +381,9 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   }
   function reconcile() {
     if (!layout || editing) return;
-    const toDesk = intent !== 'break';
+    // Keep the legacy neutral startup intent parked at the desk until the
+    // session controller supplies its explicit non-focus `rest` state.
+    const toDesk = intent === 'working' || intent === 'idle';
     if (trip) {
       if (trip.end.desk !== toDesk && legs[legIndex]?.kind === 'walk') {
         // Re-plan from the current clear floor position when focus resumes.
@@ -383,7 +393,10 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       return;
     }
     if (toDesk && !pose.atDesk) { if (!startTrip(anchor, true)) deskPose(); }
-    else if (!toDesk && pose.atDesk) { if (!startBreak()) status('resting-at-desk'); }
+    else if (!toDesk && pose.atDesk) {
+      const started = intent === 'rest' ? startRest() : startBreak();
+      if (!started) status('resting-at-desk');
+    }
     else if (pose.atDesk) status(intent === 'working' ? 'working' : 'idle');
   }
   return {
@@ -409,7 +422,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     // the companion keeps its plan and reads the new object.
     useLayout(next) { layout = next; },
     setIntent(next) {
-      if (!['idle', 'working', 'break'].includes(next) || next === intent) return;
+      if (!['idle', 'working', 'break', 'rest'].includes(next) || next === intent) return;
       intent = next; if (next !== 'break') breakUsed = false; reconcile();
     },
     setEditing(value) { if (editing === value) return; editing = value; if (editing) deskPose(); else reconcile(); },

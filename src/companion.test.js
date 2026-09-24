@@ -13,14 +13,23 @@ const advance = (routine, seconds, reduced = false) => { for (let i = 0; i < Mat
 // Advances until the routine reaches `state`, for at most `seconds`.
 const until = (routine, state, seconds = 60, reduced = false) => { for (let i = 0; i < seconds * 60 && routine.pose.state !== state; i++) routine.update(1 / 60, reduced); return routine.pose.state; };
 test('companion intent distinguishes new visits, working, paused and completed sessions', () => {
-  assert.equal(companionIntent({ running: false, remaining: 1500, duration: 1500 }), 'idle');
+  assert.equal(companionIntent({ running: false, remaining: 1500, duration: 1500 }), 'rest');
   assert.equal(companionIntent({ running: true, remaining: 1300, duration: 1500 }), 'working');
-  assert.equal(companionIntent({ running: false, remaining: 1300, duration: 1500 }), 'break');
-  // A finished session is a short break, then an idle desk again.
+  assert.equal(companionIntent({ running: false, remaining: 1300, duration: 1500 }), 'rest');
+  // A finished session rests like any other non-focus state.
   const finished = { running: false, remaining: 0, duration: 1500, completedAt: 10_000 };
-  assert.equal(companionIntent(finished, 10_000 + 60_000), 'break');
-  assert.equal(companionIntent(finished, 10_000 + 16 * 60_000), 'idle', 'yesterday\'s finished session no longer keeps the companion on a break');
-  assert.equal(companionIntent({ running: false, remaining: 0, duration: 1500 }), 'idle', 'an old save without a finish time reads as idle');
+  assert.equal(companionIntent(finished, 10_000 + 60_000), 'rest');
+  assert.equal(companionIntent(finished, 10_000 + 16 * 60_000), 'rest', 'a finished session leaves the companion resting');
+  assert.equal(companionIntent({ running: false, remaining: 0, duration: 1500 }), 'rest', 'an old save without a finish time rests too');
+});
+test('a non-focus visit rests on the sofa without detouring through an activity', () => {
+  const layout = createLayout('ember-library'), routine = createCompanionRoutine();
+  routine.setLayout(layout); routine.setIntent('rest');
+  assert.equal(routine.pose.state, 'walking');
+  assert.equal(until(routine, 'resting', 60), 'resting');
+  assert.equal(routine.pose.seated, true);
+  assert.equal(layout.items.find(item => item.id === routine.pose.seatId).type, 'daybed');
+  assert.equal(routine.pose.activity, null);
 });
 test('every preset has a sofa route with clearance around solids and the sleeping cat', () => {
   for (const preset of PRESETS) {
