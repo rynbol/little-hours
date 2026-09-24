@@ -47,7 +47,7 @@ let room;
 let houseUI;
 let houseOpen = false;
 let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false;
-let currentPanel = null, avatarPanelActive = false, avatarSection = 'face';
+let currentPanel = null, avatarPanelActive = false, avatarEditorResumeTimer = false, avatarSection = 'face';
 let compact = false;
 let audioContext, noiseNode, gainNode;
 let soundEnabled = false;
@@ -222,9 +222,13 @@ function petFeedback({ species = state.pet, state: mood, by = 'you' } = {}) {
 // The room's accessible name says how to use it, with the current pet.
 function renderRoomLabel() {
   const pet = state.pet === 'dog' ? 'Mochi the puppy' : 'Miso the ginger cat';
-  $('#room-canvas').setAttribute('aria-label', editMode
+  const label = avatarPanelActive
+    ? 'Avatar preview. Drag left or right over the character to turn them. Your focus timer is paused while editing.'
+    : editMode
     ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
-    : `Interactive 3D cutaway study room. Drag to turn the room. Tap a lamp, the fire or the record player to switch it, tap your companion, or tap ${pet}.`);
+    : `Interactive 3D cutaway study room. Drag to turn the room. Tap a lamp, the fire or the record player to switch it, tap your companion, or tap ${pet}.`;
+  $('#room-canvas').setAttribute('aria-label', label);
+  $('#room-canvas canvas')?.setAttribute('aria-label', label);
 }
 function renderPetName() {
   const name = PETS[state.pet]?.name || PETS.cat.name; renderRoomLabel();
@@ -395,7 +399,7 @@ function renderSession() {
   syncCompanionIntent();
   const today = localDate();
   const minutes = state.history.filter(h => h.date === today).reduce((sum, h) => sum + h.minutes, 0);
-  const renderKey = `${formatted}:${presence}:${state.session.duration}:${today}:${minutes}`;
+  const renderKey = `${formatted}:${presence}:${state.session.duration}:${today}:${minutes}:${avatarPanelActive}`;
   // The clock polls for deadlines twice a second, but idle rooms and unchanged
   // displayed seconds do not need another set of DOM mutations.
   if (renderKey === lastSessionRender) return;
@@ -407,7 +411,9 @@ function renderSession() {
   $('#session-label').textContent = state.session.running ? 'ONE LITTLE THING AT A TIME' : ms < state.session.duration && ms > 0 ? 'TAKE YOUR TIME' : ms === 0 ? 'A LITTLE PROGRESS, MADE' : 'SETTLE IN';
   const label = state.session.running ? 'Pause a moment' : ms === 0 ? 'Begin another session' : ms < state.session.duration ? 'Keep going' : 'Start focusing';
   $('#start-button span').textContent = label;
+  $('#start-button').disabled = avatarPanelActive;
   $('#reset-session').hidden = !state.session.running && ms === state.session.duration;
+  $('#reset-session').disabled = avatarPanelActive;
   const presenceBadge = $('#stage-presence');
   if (presenceBadge.dataset.presence !== presence) {
     const [status, symbol] = presence === 'focusing' ? ['Focusing', 'clock'] : presence === 'break' ? ['On a break', 'moon'] : ['In your room', 'home'];
@@ -419,7 +425,7 @@ function renderSession() {
   document.body.classList.toggle('is-focusing', state.session.running);
   document.querySelectorAll('[data-minutes]').forEach(button => {
     button.setAttribute('aria-pressed', Number(button.dataset.minutes) * 60000 === state.session.duration);
-    button.disabled = state.session.running;
+    button.disabled = state.session.running || avatarPanelActive;
   });
   renderCompanionNote();
 }
@@ -769,11 +775,25 @@ function renderPerformance() {
 function renderPanel() {
   const panel = $('#room-panel');
   if (currentPanel === 'avatar' && !avatarPanelActive) {
-    avatarPanelActive = true; avatarSection = 'face'; room?.setAvatarEditing?.(true); avatarSay('customize', { force: true });
+    avatarPanelActive = true; avatarSection = 'face'; room?.setAvatarEditing?.(true);
+    avatarEditorResumeTimer = state.session.running;
+    if (avatarEditorResumeTimer) {
+      const result = store.setRunning(false);
+      avatarEditorResumeTimer = !result.completed;
+      acceptUpdate(result);
+    } else renderSession();
+    avatarSay('customize', { force: true });
   } else if (currentPanel !== 'avatar' && avatarPanelActive) {
-    avatarPanelActive = false; room?.setAvatarEditing?.(false); avatarSay('customizeDone', { force: true });
+    avatarPanelActive = false; room?.setAvatarEditing?.(false);
+    const resumeTimer = avatarEditorResumeTimer; avatarEditorResumeTimer = false;
+    if (resumeTimer && !state.session.running) acceptUpdate(store.setRunning(true));
+    else renderSession();
+    avatarSay('customizeDone', { force: true });
   }
   document.body.classList.toggle('is-avatar-editing', currentPanel === 'avatar');
+  renderRoomLabel();
+  if (avatarPanelActive) $('#room-hint').textContent = 'Drag left or right over your avatar to turn them';
+  else if (!editMode) $('#room-hint').innerHTML = `Drag to look around<span>·</span>Tap a lamp, the fire or ${PETS[state.pet]?.name || PETS.cat.name}`;
   panel.hidden = !currentPanel;
   document.querySelectorAll('[data-panel]').forEach(button => button.setAttribute('aria-expanded', button.dataset.panel === currentPanel));
   if (!currentPanel) return;
@@ -847,7 +867,7 @@ function renderPanel() {
       const design = part === 'style' || Boolean(designShapes[part]);
       return `<fieldset class="avatar-choice"><legend>${partNames[part]}</legend><div class="avatar-swatches ${design ? 'avatar-styles avatar-designs' : ''}" style="--avatar-count:${options.length}" role="group" aria-label="${partNames[part]}">${options.map(option => `<button class="avatar-swatch ${design ? 'avatar-style avatar-design-choice' : ''}" data-avatar-part="${part}" data-avatar-value="${option.id}" aria-pressed="${state.avatar[part] === option.id}" aria-label="${option.name}" title="${option.name}">${preview(option)}<span>${option.name}</span></button>`).join('')}</div></fieldset>`;
     }).join('');
-    panel.insertAdjacentHTML('beforeend', `<div class="avatar-editor-lead"><span class="avatar-editor-mark" aria-hidden="true">✧</span><span><strong>Make it your own.</strong><small>Pick a shape, then give it your colors.</small></span></div><div class="avatar-editor-tabs" role="group" aria-label="Customize your avatar"><button data-avatar-section="face" aria-pressed="${avatarSection === 'face'}">Face &amp; hair</button><button data-avatar-section="outfit" aria-pressed="${avatarSection === 'outfit'}">Outfits</button><button data-avatar-section="details" aria-pressed="${avatarSection === 'details'}">Extras</button></div><div class="avatar-customizer">${choices}</div><div class="avatar-editor-footer"><button class="avatar-reset" id="avatar-reset">Start over</button><button class="quiet-button avatar-done" id="avatar-done">${icon('check')} Done</button></div>`);
+    panel.insertAdjacentHTML('beforeend', `<div class="avatar-editor-lead"><span class="avatar-editor-mark" aria-hidden="true">✧</span><span><strong>Make it your own.</strong><small>Pick a shape, then give it your colors. Drag the avatar to turn them.</small></span></div><div class="avatar-editor-tabs" role="group" aria-label="Customize your avatar"><button data-avatar-section="face" aria-pressed="${avatarSection === 'face'}">Face &amp; hair</button><button data-avatar-section="outfit" aria-pressed="${avatarSection === 'outfit'}">Outfits</button><button data-avatar-section="details" aria-pressed="${avatarSection === 'details'}">Extras</button></div><div class="avatar-customizer">${choices}</div><div class="avatar-editor-footer"><button class="avatar-reset" id="avatar-reset">Start over</button><button class="quiet-button avatar-done" id="avatar-done">${icon('check')} Done</button></div>`);
     panel.querySelectorAll('[data-avatar-section]').forEach(button => button.addEventListener('click', () => {
       avatarSection = button.dataset.avatarSection; renderPanel(); panel.querySelector(`[data-avatar-section="${avatarSection}"]`)?.focus();
     }));

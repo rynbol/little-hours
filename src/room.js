@@ -968,6 +968,7 @@ export function createRoom(container, options = {}) {
     if (next === avatarCameraEditing) return;
     cancelDrag(); hoverItem(null);
     if (next) {
+      avatarPreviewRotation = 0;
       savedAvatarCamera = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone(), height: camera.orthoTop - camera.orthoBottom };
       camera.detachControl(); avatarCameraControl = true; avatarCameraEditing = true;
       // Keep the portrait fill among the four lights StandardMaterial draws.
@@ -994,7 +995,7 @@ export function createRoom(container, options = {}) {
         to: { alpha: camera.alpha, beta: Math.min(camera.beta, 0.94), radius: camera.radius, target: new Vector3(toX, compactPortrait ? 0.30 : 1.13, toZ), height: portraitHeight },
       };
     } else {
-      avatarCameraEditing = false; avatarPoseTransition = null;
+      avatarCameraEditing = false; avatarPoseTransition = null; avatarPreviewRotation = 0;
       portraitFill.intensity = 0;
       companionRoutine.endAvatarEditing();
       if (savedAvatarCamera) avatarCameraTransition = {
@@ -1204,23 +1205,24 @@ export function createRoom(container, options = {}) {
     if (event.isPrimary === false || (event.button != null && event.button !== 0) || downPosition) return;
     const ray = editing && !placement ? castPointer(event) : null, floor = ray && floorPosition(ray), wall = ray && wallPosition(ray, 1.5);
     downPosition = { x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, pointerId: event.pointerId,
-      itemId: ray ? decorHit(ray) : null, floor: floor ? { x: floor.x, z: floor.z } : null, wall, pet: !editing && hitPet(castPointer(event)) };
+      itemId: ray ? decorHit(ray) : null, floor: floor ? { x: floor.x, z: floor.z } : null, wall, pet: !editing && !avatarCameraEditing && hitPet(castPointer(event)), avatarRotation: avatarCameraEditing };
     // A press on the pet can become a carry, so the room does not turn.
     if (downPosition.pet && !options.engineFactory) camera.detachControl();
-    if ((editing || downPosition.pet) && event.pointerId != null) canvas.setPointerCapture(event.pointerId);
+    if ((editing || downPosition.pet || downPosition.avatarRotation) && event.pointerId != null) canvas.setPointerCapture(event.pointerId);
+    if (downPosition.avatarRotation) canvas.style.cursor = 'grab';
     requestRender();
   };
   const onPointerUp = event => {
     if (!downPosition || (event.pointerId != null && downPosition.pointerId != null && event.pointerId !== downPosition.pointerId)) return;
     hasPendingPointer = false;
-    const clicked = Math.hypot(event.clientX - downPosition.x, event.clientY - downPosition.y) < 7;
+    const clicked = Math.hypot(event.clientX - downPosition.x, event.clientY - downPosition.y) < 7, avatarRotation = downPosition.avatarRotation;
     if (downPosition.pet) { const carried = releasePet(event); if (!carried && clicked) pet(); return; }
     if (editing && downPosition.itemId && !clicked && !drag) startDrag();
     if (drag) { finishDrag(event); return; }
     const pointerId = downPosition.pointerId; downPosition = null; releasePointer(pointerId);
     // The next frame sets the hover cursor again, so 'grabbing' ends with the gesture.
     pendingPointer.clientX = event.clientX; pendingPointer.clientY = event.clientY; pendingPointer.pointerType = event.pointerType; hasPendingPointer = true;
-    requestRender(); if (!clicked) return;
+    requestRender(); if (avatarRotation || !clicked) return;
     const ray = castPointer(event);
     if (!editing) { const target = playTarget(ray); if (target?.house) options.onHouseNavigate?.(target.house); else if (target?.cat) pet(); else if (target?.avatar) options.onCompanionTap?.({ state: companionRoutine.pose.state, activity: companionRoutine.pose.activity }); else if (target?.id) useItem(target.id); else if (target?.lights) options.onToggleLights?.(); return; }
     if (placement) {
@@ -1239,6 +1241,11 @@ export function createRoom(container, options = {}) {
   const onPointerLeave = () => { if (!downPosition) { hasPendingPointer = false; hoverItem(null); hoverPlay(null); } };
   const onPointerMove = event => {
     if (downPosition && event.pointerId != null && downPosition.pointerId != null && event.pointerId !== downPosition.pointerId) return;
+    if (avatarCameraEditing && downPosition?.avatarRotation) {
+      avatarPreviewRotation += (event.clientX - downPosition.lastX) * 0.009;
+      downPosition.lastX = event.clientX; downPosition.lastY = event.clientY;
+      canvas.style.cursor = 'grabbing'; requestRender(); return;
+    }
     if (!editing && downPosition?.pet) { carryPet(event); return; }
     if (!editing && downPosition) { canvas.style.cursor = 'grabbing'; requestRender(); return; }
     if (editing && downPosition && !downPosition.itemId) {
@@ -1310,7 +1317,7 @@ export function createRoom(container, options = {}) {
   const roomCorners = []; for (const x of [-6.19, 6.19]) for (const y of [-0.32, 6.02]) for (const z of [-4.78, 4.78]) roomCorners.push(new Vector3(x, y, z));
   const connectedCorners = []; for (const x of [-6.19, 8.25]) for (const y of [-0.32, 6.02]) for (const z of [-4.78, 4.78]) connectedCorners.push(new Vector3(x, y, z));
   const projectedCorner = new Vector3(); let canvasAspect = 1, fitAlpha = NaN, fitBeta = NaN;
-  let avatarCameraEditing = false, avatarCameraTransition = null, savedAvatarCamera = null, savedAvatarEffects = null, avatarPoseTransition = null;
+  let avatarCameraEditing = false, avatarCameraTransition = null, savedAvatarCamera = null, savedAvatarEffects = null, avatarPoseTransition = null, avatarPreviewRotation = 0;
   const avatarFrameHeight = 3.0;
   let activeAvatarFrameHeight = avatarFrameHeight;
   const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
@@ -1456,6 +1463,7 @@ export function createRoom(container, options = {}) {
       companionY = companionY === null || reducedMotion ? goal : companionY + (goal - companionY) * Math.min(1, companionDelta * 12);
     } else companionY = null;
     mobileCompanion.animate(companionPose, seconds, reducedMotion, companionY ?? FLOOR_Y);
+    if (avatarCameraEditing) mobileCompanion.root.rotation.y = companionPose.yaw + avatarPreviewRotation;
     if (!companionPose.atDesk) {
       pointArea.minX = pointArea.maxX = companionPose.x; pointArea.minZ = pointArea.maxZ = companionPose.z;
       mobileCompanion.contact.position.y = surfaceBelow(pointArea);
