@@ -1182,6 +1182,16 @@ try {
     room.setLayout(beforeDesignLayout); motion.matches = motionBefore; motion.emit('change', { matches: motionBefore }); advance(3);
     console.log('PASS new pieces: aquarium, globe, easel, bean bag, monstera and tea cart go down with a click; lamp, spin, steam, squish and rustle end at rest; shadows and reduced motion.');
   }
+  motion.matches = false; motion.emit('change', { matches: false }); advance(2);
+  const beforeHouse = scene.getFrameId();
+  room.setSuspended(true); advance(60);
+  assert.equal(frames.size, 0, 'the house view cancels the detailed room animation');
+  assert.equal(scene.getFrameId(), beforeHouse, 'the detailed room draws no background frames');
+  room.setTheme('day'); advance(4);
+  assert.equal(scene.getFrameId(), beforeHouse, 'theme updates cannot wake a suspended room');
+  room.setSuspended(false); advance(2);
+  assert.ok(scene.getFrameId() > beforeHouse, 'entering a room resumes its animation');
+  console.log('PASS house suspension: no background frames, including theme changes, and animation resumes on entry.');
   doc.hidden = true; doc.emit('visibilitychange'); assert.equal(frames.size, 0);
   doc.hidden = false; doc.emit('visibilitychange'); assert.ok(frames.size <= 1);
   room.dispose(); assert.equal(frames.size, 0); assert.equal(motion.listenerCount, 0); assert.equal(doc.listenerCount, 0); assert.equal(canvas.listenerCount, 0); assert.equal(win.listenerCount, 0);

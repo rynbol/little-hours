@@ -13,6 +13,14 @@ Presence should be obvious without needing to open a profile. **Online** means a
 
 The current prototype shows only the owner's local focus state. Friends, online availability and synchronized room visits require real shared state; the interface must not invent connected people or report local timer activity as network presence.
 
+## A house grown through focus
+
+Start with one furnished studio, with the whole room visible and immediately usable. Completed focus sessions earn one coin per minute (25, 50 or 90); paused, abandoned or reset sessions earn none. The first 25 coins build a garden wing alongside the studio. Another 75 build a hideaway upstairs. These are prototype prices to test, not a commitment to a larger economy.
+
+The house overview shows those three authored spaces together, with a doorway and an exterior stair connecting them. Each extension arrives furnished in a chosen design, and every room keeps its own furniture, colors and name. Designs are decorating styles, not additional owned rooms. Furniture and style changes remain free. Older saved designs remain available, and the current room becomes the starter studio; previously recorded completed sessions receive their coins once.
+
+The overview is a small static model of the saved layouts. Opening it suspends the detailed room; entering a room restores the full scene and its animations. This keeps the growing house from multiplying the cost of rendering three animated rooms. All progression is saved locally for now, with no accounts, real-money purchases or shared wallet.
+
 ## Optional companion surfaces
 
 The website/app remains complete on its own. The native Mac notch is an optional extension of the same room and presence experience: a small recognizable room/avatar while collapsed, expanding to show friends and their current study state. A desktop companion can use the same approach. These are additional views into the product, rather than separate social systems.
@@ -20,6 +28,7 @@ The website/app remains complete on its own. The native Mac notch is an optional
 ## Implementation sequence
 
 - Refine room graphics, furniture placement, focus sessions and performance.
+- Test whether earning and personalizing three rooms makes returning to focus more appealing; tune the progression before expanding it.
 - Establish a shared presence model and invite-based friend rooms.
 - Add the optional native notch/desktop surface against that same room, focus and presence state.
 

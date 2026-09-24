@@ -497,7 +497,7 @@ export function createRoom(container, options = {}) {
   const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782'), playOutline = color('#d9b98a');
   const ghostMaterial = new StandardMaterial('placement-preview', scene); ghostMaterial.diffuseColor = color('#85ac80'); ghostMaterial.emissiveColor = color('#42653f'); ghostMaterial.alpha = 0.43; ghostMaterial.disableLighting = true;
   let theme = 'dusk', focused = false, petStart = -Infinity, disposed = false, readyReported = false;
-  let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true;
+  let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true, suspended = false;
   // Adaptive and Crisp both start at the display's own density (capped at 2×),
   // so one canvas pixel lands on one screen pixel; only Adaptive steps down.
   const nativeRatio = () => Math.min(window.devicePixelRatio || 1, 2);
@@ -515,7 +515,7 @@ export function createRoom(container, options = {}) {
     if (disposed) return;
     needsRender = true;
     if (shadows) shadow.getShadowMap()?.resetRefreshCounter();
-    if (visible && onScreen && !frame) frame = requestAnimationFrame(tick);
+    if (visible && onScreen && !suspended && !frame) frame = requestAnimationFrame(tick);
   }
   // With reduced motion the room draws only on change, so a clock wakes it
   // once a minute, at the turn of the minute, to move its hands. In full
@@ -523,7 +523,7 @@ export function createRoom(container, options = {}) {
   let clockWake = 0;
   function wakeForClock() {
     clearTimeout(clockWake); clockWake = 0;
-    if (disposed || !reducedMotion || !visible || !layout?.items.some(item => getFurniture(item.type)?.clock)) return;
+    if (disposed || suspended || !reducedMotion || !visible || !layout?.items.some(item => getFurniture(item.type)?.clock)) return;
     clockWake = setTimeout(() => { clockWake = 0; requestRender(); wakeForClock(); }, 60000 - Date.now() % 60000 + 20);
   }
   function refreshShadows() {
@@ -1408,7 +1408,7 @@ export function createRoom(container, options = {}) {
     statsStart = now; sampleFrames = 0; rafCalls = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0;
   }
   function tick(now) {
-    frame = 0; if (disposed || !visible || !onScreen) return;
+    frame = 0; if (disposed || suspended || !visible || !onScreen) return;
     // Raw display callbacks, skipped ones included, show whether this screen
     // can deliver 60 Hz at all.
     rafCalls++; if (lastRafAt && now - lastRafAt > 4 && now - lastRafAt < 1000 / 55) fastRafFrames++; lastRafAt = now;
@@ -1433,6 +1433,7 @@ export function createRoom(container, options = {}) {
   requestRender();
 
   return {
+    setSuspended(value) { suspended = Boolean(value); if (suspended) { cancelDrag(); cancelAnimationFrame(frame); frame = 0; clearTimeout(petWake); } else { resize(); resumeFrames(); } wakeForClock(); },
     setTheme, setLayout, setEditMode, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setSurface, setQuality,
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet,

@@ -15,6 +15,7 @@ The development server binds to `127.0.0.1`. Open the local URL Vite prints. Run
 
 ## Play and decorate
 
+- **House** opens a miniature cottage that grows with your focus time. Start with your furnished studio, earn one coin per completed focus minute, build the garden wing for 25 coins, then the upstairs hideaway for 75. Choose any of the six furnished designs for each new space. Name your house and rooms, enter them from the model or room buttons, and decorate each independently. Your current room and past completed sessions carry into the house when an older save is opened.
 - A spacious orthographic fantasy retreat with an arched forest window, deep timber floors, climbing greenery, candles, lanterns, layered rugs and a resident pet.
 - **Decorate** opens a collection of thirty-eight original JavaScript-modeled pieces, including study stations, a glowing fireplace, a cushioned daybed, moonleaf trees, lanterns, patterned rugs, bookshelves and smaller comforts, a little aquarium, a floor globe, a painter's easel, a bean bag, a Swiss cheese plant and a tea cart, and fourteen **Wall decor** pieces: three picture frames, a moon clock and a round wall clock that keep the local time (Sakura studio, Cloud loft and Midnight metro hang the wall clock), a potion shelf, a book shelf, a trailing planter, two cloud shelves, a blossom scroll, a neon sign, a framed record and a felt rainbow, and three windows.
 - **Decorate** keeps the collection in a bottom tray. Hover furniture to highlight its outline, then drag it to a new spot. Drag empty space to turn the room. Drag a piece over the collection to see a faded piece and dashed return preview; release to put it away. **Undo** restores the last move or removal. Invalid drops and `Escape` return the piece to where it started.
@@ -44,7 +45,7 @@ The development server binds to `127.0.0.1`. Open the local URL Vite prints. Run
 - An optional Performance panel shows measured frame cadence, CPU submission, drawing cost and quality controls.
 - Buttons press in softly and spring back, the room's own buttons lift a little under a mouse, a choice that turns on settles into place, the Night and Daylight icon turns, and panels ease in. Reduced motion keeps them still.
 
-Everything is available in the prototype collection; there are no purchases. This is an early playable prototype with no accounts, cross-device sync, multiplayer, native always-on-top window, notch integration or coding-agent integration. No competitor code, models or music are included. The furniture, room geometry and decorative details are authored in JavaScript; no generated raster furniture assets or Blender files are required. Google Fonts is the only external presentation request; fallback fonts work without it.
+All furniture and design changes remain free; earned coins buy the two house extensions. There are no real-money purchases. This is an early playable prototype with no accounts, cross-device sync, multiplayer, native always-on-top window, notch integration or coding-agent integration. No competitor code, models or music are included. The furniture, room geometry and decorative details are authored in JavaScript; no generated raster furniture assets or Blender files are required. Google Fonts is the only external presentation request; fallback fonts work without it.
 
 ## Engine and art
 
@@ -66,7 +67,11 @@ npm run verify:room
 npm run build
 ```
 
-`npm test` covers wall-clock sessions, expiry accounting, storage failure, cross-tab edits, saved-layout migration, placement rules, presets and procedural furniture bounds.
+`npm test` covers wall-clock sessions, expiry accounting, storage failure, cross-tab edits, saved-layout migration, house rewards and purchases, independent rooms, placement rules, presets and procedural furniture bounds.
+
+The development-only `/checks/house.html` page runs the real app with a separate session save and clock controls. Use it to check earning and spending coins without changing your own room or waiting through a session. It also measures idle overview frames and background room frames. It is not included in the production bundle.
+
+See [growing house notes](docs/growing-house.md) for save behavior, rendering limits and the browser verification results.
 
 `npm run verify:room` imports the production runtime into Babylon's **NullEngine**. It exercises the real scene graph, camera math, editor operations, reduced motion and lifecycle cleanup without a GPU. Browser checks separately cover appearance, frame rate, placement/picking, themes, pet interaction, mini view, audio, timer controls, refresh restoration and keyboard use. Native touch scrolling still needs physical-device testing.
 
@@ -75,7 +80,7 @@ npm run build
 ## Proposed next milestones
 
 1. Refine the furniture art and room game with the user; validate the placement flow at desktop and mobile sizes.
-2. Expand the deliberate furniture collection, room shapes and palettes; validate a focus-earned progression loop before adding an economy.
+2. Validate the three-room progression loop and tune extension prices with players; expand the deliberate furniture collection, room shapes and palettes.
 3. Validate repeat use with a small pilot. Measure time to first focus session, repeat completed sessions, and observed memory/frame/battery performance.
 4. Add invite-only study visits with visible presence: distinguish online availability, active focus and breaks. Synchronize room and focus state for invited friends.
 5. Add an optional expandable native Mac notch/desktop companion using that same room, pet, focus and presence state. Show which friends are studying and let the companion expand into their rooms. This needs native implementation and device testing.

@@ -1,11 +1,13 @@
 import { createSession, remainingAt, startSession, pauseSession } from './session.js';
 import { createLayout, normalizeLayout, PRESETS } from './layout.js';
+import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCoins, cleanName } from './house.js';
 
 export const storageKey = 'little-hours-v1';
 const durations = [25, 50, 90];
 
 export function freshState() {
-  return { theme: 'dusk', pet: 'cat', seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout: createLayout(), rooms: {}, session: createSession(), history: [] };
+  const layout = createLayout();
+  return { theme: 'dusk', pet: 'cat', seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [] };
 }
 
 export function localDate(timestamp = Date.now()) {
@@ -49,6 +51,9 @@ export function restoreState(raw) {
       && typeof entry.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry.date) && durations.includes(entry.minutes))
       .slice(-365).map(({ date, minutes }) => ({ date, minutes }));
   }
+  initial.house = normalizeHouse(saved.house, initial.layout, initial.history);
+  if (saved.layout !== undefined) activeHouseRoom(initial.house).layout = structuredClone(initial.layout);
+  else initial.layout = structuredClone(activeHouseRoom(initial.house).layout);
   return initial;
 }
 
@@ -59,6 +64,7 @@ function completeDueSession(state, now) {
   state.session = { ...state.session, remaining: 0, running: false, endsAt: null, completedAt: endsAt };
   state.history.push({ date: localDate(endsAt), minutes: duration / 60_000 });
   state.history = state.history.slice(-365);
+  state.house.coins = Math.min(1_000_000_000, state.house.coins + focusCoins(duration / 60_000));
   return true;
 }
 
@@ -82,10 +88,13 @@ export function createStateStore(storage, now = () => Date.now()) {
     const timestamp = now();
     const next = structuredClone(readLatest());
     const completed = completeDueSession(next, timestamp);
+    const earned = completed ? focusCoins(next.session.duration / 60_000) : 0;
     next.rooms ||= {};
     if (next.layout.presetId) next.rooms[next.layout.presetId] = structuredClone(next.layout);
+    activeHouseRoom(next.house).layout = structuredClone(next.layout);
     mutate(next, { now: timestamp });
     if (next.layout.presetId) next.rooms[next.layout.presetId] = structuredClone(next.layout);
+    activeHouseRoom(next.house).layout = structuredClone(next.layout);
     state = next;
     let persisted = false;
     try {
@@ -94,7 +103,7 @@ export function createStateStore(storage, now = () => Date.now()) {
       lastPersisted = raw;
       persisted = true;
     } catch { /* The current visit remains usable without storage. */ }
-    return { state, completed, persisted };
+    return { state, completed, earned, persisted };
   }
 
   return {
@@ -105,6 +114,35 @@ export function createStateStore(storage, now = () => Date.now()) {
       if (!PRESETS.some(preset => preset.id === presetId)) return update();
       return update(draft => { draft.layout = structuredClone(!reset && draft.rooms[presetId] || createLayout(presetId)); });
     },
+    saveLayout(layout, roomId) {
+      return update(draft => {
+        const owner = draft.house.rooms.find(entry => entry.id === roomId);
+        if (!owner) return;
+        owner.layout = normalizeLayout(layout);
+        if (draft.house.activeId === roomId) draft.layout = structuredClone(owner.layout);
+      });
+    },
+    enterHouseRoom(id) {
+      return update(draft => {
+        const destination = draft.house.rooms.find(room => room.id === id);
+        if (!destination) return;
+        draft.house.activeId = id;
+        draft.layout = structuredClone(destination.layout);
+      });
+    },
+    buildRoom(slotId, presetId) {
+      let verdict;
+      const result = update(draft => {
+        verdict = expansionVerdict(draft.house, slotId, presetId);
+        if (!verdict.ok) return;
+        draft.house.coins -= verdict.slot.price;
+        // Start from the chosen furnished design, leaving archived arrangements intact.
+        draft.house.rooms.push({ id: slotId, name: verdict.slot.label, layout: createLayout(presetId) });
+      });
+      return { ...result, built: verdict.ok, reason: verdict.reason };
+    },
+    renameHouse(name) { return update(draft => { draft.house.name = cleanName(name, draft.house.name); }); },
+    renameRoom(id, name) { return update(draft => { const room = draft.house.rooms.find(entry => entry.id === id); if (room) room.name = cleanName(name, room.name); }); },
     setRunning(running) {
       return update((draft, { now: timestamp }) => {
         draft.session = running ? startSession(draft.session, timestamp) : pauseSession(draft.session, timestamp);

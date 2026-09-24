@@ -11,6 +11,8 @@ import { ARTWORKS, SLEEVES, artName } from './art.js';
 import { tintsFor } from './tints.js';
 import { surfaceChoices } from './surfaces.js';
 import { designPaint } from './architecture.js';
+import { createHouseUI } from './house-ui.js';
+import { activeHouseRoom, nextExpansion, focusCoins } from './house.js';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -33,12 +35,14 @@ const icons = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
 };
 const icon = (name) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || icons.home}</svg>`;
-const store = createStateStore({
+const store = createStateStore((import.meta.env.DEV && window.__littleHoursTest?.storage) || {
   getItem: key => localStorage.getItem(key),
   setItem: (key, value) => localStorage.setItem(key, value),
 });
 let state = store.state;
 let room;
+let houseUI;
+let houseOpen = false;
 let currentPanel = null;
 let compact = false;
 let audioContext, noiseNode, gainNode;
@@ -69,11 +73,11 @@ document.querySelector('#app').innerHTML = `
   <div class="app-shell">
     <header class="app-header">
       <a class="brand" href="/" aria-label="Little Hours home"><span class="brand-mark">${icon('home')}</span><span>little hours<span class="brand-dot">.</span></span></a>
-      <div class="header-right"><span class="room-label">A little world, all your own.</span><button class="time-toggle" id="time-toggle" aria-label="Switch to daylight" title="Switch to daylight">${icon('moon')}<span>Night</span></button><button class="focus-toggle" id="focus-toggle" aria-expanded="true" aria-controls="focus-card" aria-label="Hide focus panel">${icon('clock')}<span>Focus</span><span id="dock-timer">25:00</span></button></div>
+      <div class="header-right"><button class="coin-wallet" id="coin-wallet" aria-label="Your house and coins">${icon('sun')}<span id="coin-balance">0</span><span>coins</span></button><button class="time-toggle" id="time-toggle" aria-label="Switch to daylight" title="Switch to daylight">${icon('moon')}<span>Night</span></button><button class="focus-toggle" id="focus-toggle" aria-expanded="true" aria-controls="focus-card" aria-label="Hide focus panel">${icon('clock')}<span>Focus</span><span id="dock-timer">25:00</span></button></div>
     </header>
     <main class="workspace">
-      <section class="room-section" aria-labelledby="room-title">
-        <div class="room-heading"><div><p class="eyebrow">YOUR QUIET LITTLE WORLD</p><h1 id="room-title">The twilight retreat</h1><p class="room-subtitle" id="room-subtitle">The fire is warm. The night is yours.</p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Choose a room" aria-controls="builder-panel">${icon('home')}<span>Rooms</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
+      <section id="room-section" class="room-section" aria-labelledby="room-title">
+        <div class="room-heading"><div><p class="eyebrow">YOUR QUIET LITTLE WORLD</p><h1 id="room-title">The twilight retreat</h1><p class="room-subtitle" id="room-subtitle">The fire is warm. The night is yours.</p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Visit your house" aria-controls="house-page">${icon('home')}<span>House</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
         <div class="stage" id="stage">
           <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a pet. Drag to turn the room."></div>
           <div class="loading-note" id="loading-note">Making room for you…</div>
@@ -100,6 +104,7 @@ document.querySelector('#app').innerHTML = `
           <div class="collection-return-target" id="collection-return-target" aria-hidden="true"><span>${icon('build')}</span><strong id="return-label">Return to your collection</strong><small id="return-detail">Drop here to put this piece away · Undo brings it back</small></div>
         </section>
       </section>
+      <section id="house-page" class="house-page" aria-label="Your growing house" hidden></section>
       <aside class="focus-card" id="focus-card" aria-labelledby="focus-title">
         <div class="card-top"><span class="eyebrow">YOUR QUIET CHAPTER</span><span class="tiny-flower" aria-hidden="true">✳</span></div>
         <h2 id="focus-title">Stay a <em>while.</em></h2>
@@ -109,6 +114,7 @@ document.querySelector('#app').innerHTML = `
         <button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
         <button class="reset-session" id="reset-session" hidden>Reset session</button>
         <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="30" aria-label="Rain volume" /></div>
+        <div id="focus-reward" class="focus-reward"></div>
         <div class="daily-note" id="daily-note">Good things begin with a little time.</div>
       </aside>
     </main>
@@ -135,7 +141,11 @@ function applyState(next, force = false) {
   state = next;
   const design = roomDesign(state.layout);
   document.body.dataset.design = design.style || 'retreat';
-  $('#room-title').textContent = design.name;
+  $('#room-title').textContent = activeHouseRoom(state.house).name === 'Your studio' ? design.name : activeHouseRoom(state.house).name;
+  $('#coin-balance').textContent = state.house.coins;
+  $('#coin-wallet').setAttribute('aria-label', `${state.house.coins} coins · Visit your house`);
+  renderFocusReward();
+  houseUI?.render();
   // An open Atmosphere panel keeps its lights label in step with the room.
   const lightsLabel = $('#room-panel .fairy-lights span');
   if (lightsLabel) lightsLabel.textContent = design.style ? 'Accent lights' : 'Fairy lights';
@@ -179,7 +189,7 @@ function acceptUpdate(result) {
   applyState(result.state);
   if (result.completed) {
     room?.pet(); avatarSay('finish', { force: true });
-    toast('A little progress, made. Stretch, breathe, and take a break.');
+    toast(`+${result.earned} coins for your house. A little progress, made.`);
   }
   if (!result.persisted && !storageWarningShown) {
     storageWarningShown = true;
@@ -263,6 +273,38 @@ try {
   setDecorEntry(false);
 }
 applyState(state, true);
+houseUI = createHouseUI($('#house-page'), {
+  store, acceptUpdate, art: roomDesignArt, icon, notice: toast,
+  onClose: () => setHouseOpen(false),
+  onEnter: (id, decorate) => {
+    room?.cancelPlacement(); room?.selectItem(null); selectedItem = null; undoLayout = null; $('#undo-layout').disabled = true;
+    acceptUpdate(store.enterHouseRoom(id));
+    setHouseOpen(false);
+    if (decorate) { collectionTab = 'collection'; setEditMode(true); }
+  },
+  onFocus: () => { setHouseOpen(false); focusCollapsed = false; syncFocusDock(); revealFocusDock(); $('#start-button').focus(); },
+});
+function setHouseOpen(open) {
+  if (open === houseOpen) return;
+  if (open) {
+    if (editMode) setEditMode(false);
+    currentPanel = null; renderPanel();
+  }
+  houseOpen = open;
+  document.body.classList.toggle('is-house', open);
+  $('#room-section').hidden = open;
+  room?.setSuspended(open);
+  if (open) { houseUI.show(); $('#back-to-room').focus({ preventScroll: true }); }
+  else { houseUI.hide(); $('#rooms-button').focus({ preventScroll: true }); }
+  syncFocusDock();
+}
+function renderFocusReward() {
+  const reward = focusCoins(state.session.duration / 60_000), next = nextExpansion(state.house);
+  const name = next?.id === 'garden' ? 'garden wing' : 'upstairs hideaway';
+  const progress = !next ? 'A little more saved for your home' : state.house.coins >= next.price ? `Your ${name} is ready to build` : `${next.price - state.house.coins} coins to your ${name}`;
+  $('#focus-reward').innerHTML = `${icon('sun')}<span><strong>+${reward} coins when you finish</strong>${progress}</span>`;
+}
+
 
 // Tell the room only when the companion's intent changes, not on every key
 // press, storage refresh or timer tick; each call also requests a frame.
@@ -343,11 +385,13 @@ $('#time-toggle').addEventListener('click', () => {
 });
 $('#reset-view').addEventListener('click', () => room?.resetView());
 $('#focus-toggle').addEventListener('click', () => {
+  if (houseOpen) { setHouseOpen(false); focusCollapsed = false; syncFocusDock(); revealFocusDock(); return; }
   if (editMode) { focusCollapsed = false; setEditMode(false); }
   else { focusCollapsed = !focusCollapsed; syncFocusDock(); }
   if (!focusCollapsed) revealFocusDock();
 });
-$('#rooms-button').addEventListener('click', () => { collectionTab = 'presets'; setEditMode(true); });
+$('#rooms-button').addEventListener('click', () => setHouseOpen(true));
+$('#coin-wallet').addEventListener('click', () => setHouseOpen(!houseOpen));
 $('#decorate-button').addEventListener('click', () => setEditMode(!editMode));
 $('#mini-button').addEventListener('click', () => {
   if (editMode) setEditMode(false);
@@ -384,7 +428,7 @@ function setEditMode(enabled) {
 }
 
 function syncFocusDock() {
-  const visible = !editMode && !focusCollapsed;
+  const visible = !houseOpen && !editMode && !focusCollapsed;
   $('#focus-card').hidden = !visible;
   document.body.classList.toggle('focus-collapsed', focusCollapsed);
   $('#focus-toggle').setAttribute('aria-expanded', String(visible));
@@ -422,7 +466,7 @@ function commitLayout(layout, remember = true) {
   const next = normalizeLayout(layout);
   if (JSON.stringify(next) === JSON.stringify(state.layout)) return;
   if (remember) undoLayout = structuredClone(state.layout);
-  acceptUpdate(store.update(draft => { draft.layout = next; }));
+  acceptUpdate(store.saveLayout(next, state.house.activeId));
   $('#undo-layout').disabled = !undoLayout;
   renderInspector();
 }
@@ -528,14 +572,14 @@ function renderCollection() {
   const content = $('#collection-content');
   const rememberedFocus = rememberControlFocus(content);
   $('.collection-footnote').textContent = collectionTab === 'presets'
-    ? 'Each room keeps your decorations. Come back whenever the mood changes.'
+    ? 'Choose a style for this room. Your other house rooms stay just as you left them.'
     : 'Pick a piece to add it. Drag furniture back here to put it away.';
   if (collectionTab === 'presets') {
     const designs = [...PRESETS.filter(preset => preset.style), ...PRESETS.filter(preset => !preset.style)];
     content.innerHTML = `<div class="preset-grid">${designs.map(preset => {
       const active = state.layout.presetId === preset.id, saved = Boolean(state.rooms[preset.id]);
-      return `<article class="preset-card" data-design="${preset.style || 'retreat'}" data-active="${active}"><div class="preset-art" aria-hidden="true">${roomDesignArt(preset)}</div><div><span class="preset-label">${active ? 'YOUR CURRENT ROOM' : saved ? 'SAVED ROOM' : preset.style ? 'A DIFFERENT LITTLE WORLD' : 'TIMBER RETREAT'}</span><h3>${preset.name}</h3><p>${preset.description}</p></div><button class="quiet-button" data-preset="${preset.id}" ${active ? 'disabled' : ''} aria-label="${saved ? 'Return to' : 'Enter'} ${preset.name}">${active ? "You’re here" : saved ? 'Return to room' : 'Enter room'} ${icon('arrow')}</button>${active ? `<button class="preset-reset" data-reset-design="${preset.id}">Reset layout</button>` : ''}</article>`;
-    }).join('')}</div><p class="preset-note">Six furnished rooms. Your timer travels with you; your decorations stay in each room.</p>`;
+      return `<article class="preset-card" data-design="${preset.style || 'retreat'}" data-active="${active}"><div class="preset-art" aria-hidden="true">${roomDesignArt(preset)}</div><div><span class="preset-label">${active ? 'CURRENT STYLE' : saved ? 'SAVED DESIGN' : preset.style ? 'A DIFFERENT LITTLE WORLD' : 'TIMBER RETREAT'}</span><h3>${preset.name}</h3><p>${preset.description}</p></div><button class="quiet-button" data-preset="${preset.id}" ${active ? 'disabled' : ''} aria-label="${saved ? 'Use saved' : 'Use'} ${preset.name} design">${active ? "Current design" : saved ? 'Use saved design' : 'Use this design'} ${icon('arrow')}</button>${active ? `<button class="preset-reset" data-reset-design="${preset.id}">Reset layout</button>` : ''}</article>`;
+    }).join('')}</div><p class="preset-note">Six furnished designs for this space. Build additional rooms from your House to keep more spaces side by side.</p>`;
     const useDesign = (presetId, reset = false) => {
       room?.cancelPlacement?.(); room?.selectItem?.(null); selectedItem = null;
       undoLayout = structuredClone(state.layout);
@@ -690,6 +734,7 @@ document.querySelectorAll('[data-panel]').forEach(button => button.addEventListe
   renderPanel();
 }));
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && houseOpen && !event.target.closest('input')) { setHouseOpen(false); return; }
   if (event.key === 'Escape' && room?.cancelDrag?.()) { event.preventDefault(); return; }
   // Escape while typing (or composing) belongs to the text field, not the panel.
   const typing = event.isComposing || event.target.closest('textarea, [contenteditable="true"], input:not([type="range"], [type="checkbox"], [type="radio"], [type="button"])');
@@ -757,11 +802,12 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
 // Development builds expose the room to end-to-end checks; production strips it.
-if (import.meta.env.DEV) window.__littleHours = { get room() { return room; }, get state() { return state; }, get speech() { return speech; } };
+if (import.meta.env.DEV) window.__littleHours = { get room() { return room; }, get state() { return state; }, get speech() { return speech; }, get house() { return houseUI; } };
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   clearInterval(tickInterval);
   clearTimeout(toastTimeout);
+  houseUI?.dispose();
   room?.dispose?.();
   noiseNode?.stop();
   audioContext?.close();
