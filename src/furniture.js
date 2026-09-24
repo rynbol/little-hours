@@ -135,6 +135,8 @@ function cuffBand(parent, a, b, fraction, radius, thickness, color) {
   band.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), direction.normalize(), new Quaternion());
   return band;
 }
+const SHORTS_HEM_FRACTION = 0.46;
+const pointAlong = (a, b, amount) => a.map((value, index) => value + (b[index] - value) * amount);
 function torus(parent, radius, tube, position, color, arc = Math.PI * 2) {
   const positions = [], normals = [], indices = [], rings = 20, sides = 6;
   for (let i = 0; i <= rings; i++) {
@@ -1299,11 +1301,18 @@ function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
   const body = new TransformNode('avatar-part', scene);
   hips(body, trousers, bottomStyle, bottomPaint.trim);
   for (const x of [-0.15, 0.15]) {
-    const thighColor = bottomStyle === 'shorts' ? trousers : legColor;
-    taper(body, [x, 0.75, -0.08], [x, 0.65, -0.57], 0.118, 0.1, thighColor);
-    sphere(body, [0.1, 0.1, 0.1], [x, 0.65, -0.57], thighColor);
-    if (bottomStyle === 'shorts') cuffBand(body, [x, .75, -.08], [x, .65, -.57], .88, .103, .024, bottomPaint.trim);
-    taper(body, [x, 0.65, -0.57], [x, 0.17, -0.67], 0.098, 0.082, legColor);
+    const hip = [x, 0.75, -0.08], knee = [x, 0.65, -0.57], ankle = [x, 0.17, -0.67];
+    if (bottomStyle === 'shorts') {
+      const hem = pointAlong(hip, knee, SHORTS_HEM_FRACTION);
+      taper(body, hip, hem, 0.118, 0.108, trousers);
+      cuffBand(body, hip, hem, 0.91, 0.108, 0.024, bottomPaint.trim);
+      taper(body, hem, knee, 0.108, 0.1, legColor);
+      sphere(body, [0.1, 0.1, 0.1], knee, legColor);
+    } else {
+      taper(body, hip, knee, 0.118, 0.1, legColor);
+      sphere(body, [0.1, 0.1, 0.1], knee, legColor);
+    }
+    taper(body, knee, ankle, 0.098, 0.082, legColor);
     shoe(body, x);
   }
   const upperSource = new TransformNode('avatar-upper-body-source', scene);
@@ -1447,16 +1456,19 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
   for (const side of [-1, 1]) {
     const key = side < 0 ? 'L' : 'R';
     const anchors = { shoulder: [side * .255, 1.43, -.12], elbow: [side * .34, 1.10, -.14], wrist: [side * .30, .89, -.18], hip: [side * .15, .76, -.08], knee: [side * .15, .65, -.57], ankle: [side * .15, .17, -.67] };
+    if (bottomStyle === 'shorts') anchors.shortsHem = pointAlong(anchors.hip, anchors.knee, SHORTS_HEM_FRACTION);
     for (const [name, point] of Object.entries(anchors)) joints[name + key] = new Vector3(...point);
     // Limbs narrow toward the hands and feet, with a round joint at the top of each.
-    const legUpper = bottomStyle === 'shorts' ? trousers : legColor;
-    for (const [name, a, b, radius, end, tint] of [['upperArm', 'shoulder', 'elbow', .092, .082, avatarPaint(appearance, 'top').color], ['forearm', 'elbow', 'wrist', .08, .068, avatarPaint(appearance, 'top').color], ['thigh', 'hip', 'knee', .118, .1, legUpper], ['shin', 'knee', 'ankle', .1, .082, legColor]]) {
+    const legSegments = bottomStyle === 'shorts'
+      ? [['thigh', 'hip', 'shortsHem', .118, .108, trousers], ['exposed-thigh', 'shortsHem', 'knee', .108, .1, legColor], ['shin', 'knee', 'ankle', .1, .082, legColor]]
+      : [['thigh', 'hip', 'knee', .118, .1, legColor], ['shin', 'knee', 'ankle', .1, .082, legColor]];
+    for (const [name, a, b, radius, end, tint] of [['upperArm', 'shoulder', 'elbow', .092, .082, avatarPaint(appearance, 'top').color], ['forearm', 'elbow', 'wrist', .08, .068, avatarPaint(appearance, 'top').color], ...legSegments]) {
       const bone = name + key, part = taper(source, anchors[a], anchors[b], radius, end, tint);
       part.metadata = { bone }; bones[bone] = { a: a + key, b: b + key, start: new Vector3(...anchors[a]), end: new Vector3(...anchors[b]) };
       const joint = sphere(source, [radius, radius, radius], anchors[a], tint); joint.metadata = { joint: a + key };
     }
     if (bottomStyle === 'shorts') {
-      const cuff = cuffBand(source, anchors.hip, anchors.knee, .88, .103, .024, bottomPaint.trim);
+      const cuff = cuffBand(source, anchors.hip, anchors.shortsHem, .91, .108, .024, bottomPaint.trim);
       cuff.metadata = { bone: 'thigh' + key };
     }
       const hand = sphere(source, [.074, .082, .066], anchors.wrist, skin, 8); hand.metadata = { joint: 'wrist' + key };
@@ -1579,6 +1591,7 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
         // bends further as the foot swings through.
         const ankleY = .15 + lift * g, ankleZ = foot * g;
         joints['knee' + key].set(side * .15, (hip - .02 + ankleY) / 2 * (1 - sit) + (pose.seatHeight - .13) * sit, ((-.08 + ankleZ) / 2 - .035 - bend * g - drop * 1.5) * (1 - sit) - .63 * sit);
+        if (bottomStyle === 'shorts') Vector3.LerpToRef(joints['hip' + key], joints['knee' + key], SHORTS_HEM_FRACTION, joints['shortsHem' + key]);
         joints['ankle' + key].set(side * .15, ankleY * (1 - sit) + .17 * sit, ankleZ * (1 - sit) - .67 * sit);
         if (!w) continue;
         const shoulder = joints['shoulder' + key], H = hip;

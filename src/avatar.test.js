@@ -54,6 +54,36 @@ test('garment cuts and personal accessories change the modeled companion; older 
   }
 });
 
+test('cuffed shorts expose the upper thigh while soft trousers cover it', () => {
+  const engine = new NullEngine({ renderWidth: 640, renderHeight: 480, deterministicLockstep: true });
+  const scene = new Scene(engine), created = [];
+  const exposesUpperThigh = avatar => {
+    const body = avatar.root.getChildMeshes().find(mesh => mesh.name === 'companion-articulated-body');
+    const positions = body.getVerticesData('position'), colors = body.getVerticesData('color');
+    const skin = avatarPaint({ skin: 'cocoa' }, 'skin').color;
+    const tone = [1, 3, 5].map(offset => parseInt(skin.slice(offset, offset + 2), 16) / 255);
+    for (let vertex = 0; vertex < colors.length / 4; vertex++) {
+      const i = vertex * 3, colorIndex = vertex * 4;
+      const isSkin = tone.every((channel, axis) => Math.abs(colors[colorIndex + axis] - channel) < 0.005);
+      if (isSkin && Math.abs(positions[i]) > 0.06 && Math.abs(positions[i]) < 0.24
+        && positions[i + 1] > 0.73 && positions[i + 1] < 0.82
+        && positions[i + 2] > -0.2 && positions[i + 2] < 0.06) return true;
+    }
+    return false;
+  };
+  try {
+    const standingPose = { atDesk: false, x: 0, z: 0, yaw: 0, sit: 0, seatHeight: 0.8, doze: 0, step: 0, moving: false, activity: null, activityTime: 0 };
+    const shorts = createMobileCompanion(scene, { ...AVATAR_DEFAULT, skin: 'cocoa', bottomStyle: 'shorts' }); created.push(shorts);
+    const trousers = createMobileCompanion(scene, { ...AVATAR_DEFAULT, skin: 'cocoa', bottomStyle: 'trousers' }); created.push(trousers);
+    shorts.animate(standingPose, 0, true); trousers.animate(standingPose, 0, true);
+    assert.equal(exposesUpperThigh(shorts), true, 'skin is visible between the short hem and knee');
+    assert.equal(exposesUpperThigh(trousers), false, 'full-length trousers do not expose the upper thigh');
+  } finally {
+    for (const avatar of created) avatar.dispose();
+    scene.dispose(); engine.dispose();
+  }
+});
+
 test('every avatar option builds finite geometry inside the character bounds', () => {
   const engine = new NullEngine({ renderWidth: 640, renderHeight: 480, deterministicLockstep: true });
   const scene = new Scene(engine);
