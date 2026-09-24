@@ -226,6 +226,44 @@ export function planCompanionTrip(layout, source, toDesk, seatTypes = SEATS, { c
 export function planActivityTrip(layout, source, spot, obstacles = navigationObstacles(layout)) {
   return bestRoute(layout, routeStarts(layout, source), [{ itemId: spot.itemId, desk: false, activity: spot.kind, seat: spot, portal: spot, yaw: spot.yaw, reach: spot.reach }], obstacles);
 }
+// The porch is beyond the editable room bounds, so plan a normal, collision-
+// checked route to its threshold, then follow the clear porch and (for the
+// loft) stair centerline to the selected door.
+export function planDoorwayTrip(layout, source, link, obstacles = navigationObstacles(layout)) {
+  if (!Number.isFinite(link?.z)) return null;
+  const starts = routeStarts(layout, source), approachZ = [];
+  for (let z = ROOM_BOUNDS.minZ + COMPANION_RADIUS + .1; z <= ROOM_BOUNDS.maxZ - COMPANION_RADIUS - .1; z += .2) approachZ.push(z);
+  approachZ.sort((a, b) => Math.abs(a - link.z) - Math.abs(b - link.z));
+  let best = null;
+  for (const z of approachZ) {
+    const approach = { x: 5.1, z, height: 0 };
+    const route = bestRoute(layout, starts, [{ seat: approach, portal: approach, yaw: 0 }], obstacles);
+    if (!route) continue;
+    const outside = [{ x: 5.82, z: approach.z, height: 0 }, { x: 6.08, z: approach.z, height: 0 }, { x: 6.08, z: link.z, height: 0 }];
+    if (outside.some((point, index) => crosses(index ? outside[index - 1] : approach, point, obstacles))) continue;
+    const path = route.path.map(point => ({ ...point, height: point.height || 0 }));
+    const append = point => {
+      const previous = path[path.length - 1];
+      if (Math.hypot(point.x - previous.x, point.z - previous.z, (point.height || 0) - (previous.height || 0)) > 1e-4) path.push(point);
+    };
+    outside.forEach(append);
+    let end;
+    if (link.upstairs) {
+      // The modeled stair has five low risers, each 0.19 m high.
+      for (let step = 0; step < 5; step++) append({ x: 6.15 + step * .31, z: link.z, height: (step + 1) * .19 });
+      append({ x: 7.28, z: link.z, height: .95 });
+      end = path[path.length - 1];
+    } else {
+      append({ x: 6.55, z: link.z, height: 0 });
+      append({ x: 7.05, z: link.z, height: 0 });
+      end = path[path.length - 1];
+    }
+    const length = path.reduce((sum, point, index) => index ? sum + Math.hypot(point.x - path[index - 1].x, point.z - path[index - 1].z, point.height - path[index - 1].height) : 0, 0);
+    const candidate = { start: route.start, end: { door: true, link, portal: end, yaw: facing(end, { x: 8.2, z: link.z }) }, path, length };
+    if (!best || candidate.length < best.length) best = candidate;
+  }
+  return best;
+}
 // Where the companion can stand for each activity: before a lit fire, beside
 // a plant, at the record player, at the window, beside a still pet, and at
 // night beside an unlit floor lamp. `reach` is where its hand goes (y above
@@ -268,8 +306,8 @@ export function activitySpots(layout, { night = false, windowX = -2.7, pet = nul
 }
 
 export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, random = Math.random } = {}) {
-  const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null, goal: null, seated: false, portal: null, to: null, seatId: null };
-  let layout, intent = 'idle', editing = false, anchor = null, trip = null, legs = [], legIndex = 0, elapsed = 0, restTime = 0;
+  const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, walkHeight: 0, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null, goal: null, seated: false, portal: null, to: null, seatId: null };
+  let layout, intent = 'idle', editing = false, anchor = null, trip = null, legs = [], legIndex = 0, elapsed = 0, restTime = 0, doorArrival = null;
   // One activity per break; `reduced` is the last reduced-motion setting,
   // which skips standing activities. A lamp or record player is switched on
   // at most once per visit (`switched`), so one switched off on purpose stays off.
@@ -306,8 +344,14 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     const along = ((pet.x - pose.x) * dx + (pet.z - pose.z) * dz) / length, across = Math.abs((pet.x - pose.x) * dz - (pet.z - pose.z) * dx) / length;
     if (along < 0 || along > Math.min(length + 0.3, 1.5) || across > PET_CLEARANCE + COMPANION_RADIUS) return;
     dodged = { x: pet.x, z: pet.z };
-    const here = { x: pose.x, z: pose.z }, path = findWalkingPath(layout, here, trip.end.portal, navigationObstacles(layout, undefined, COMPANION_RADIUS, [petBox(pet)]));
-    if (path) startTrip(null, trip.end.desk, { start: { portal: here }, end: trip.end, path });
+    const here = { x: pose.x, z: pose.z }, obstacles = navigationObstacles(layout, undefined, COMPANION_RADIUS, [petBox(pet)]);
+    if (trip.end.door) {
+      const planned = planDoorwayTrip(layout, here, trip.end.link, obstacles);
+      if (planned) startTrip(here, false, planned);
+    } else {
+      const path = findWalkingPath(layout, here, trip.end.portal, obstacles);
+      if (path) startTrip(null, trip.end.desk, { start: { portal: here }, end: trip.end, path });
+    }
   }
   function status(state) { if (pose.state !== state) { pose.state = state; onChange({ state, atDesk: pose.atDesk, activity: pose.activity }); } }
   const seatType = end => layout.items.find(item => item.id === end.itemId)?.type;
@@ -315,7 +359,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     const desk = layout?.items.find(item => item.id === layout.activeDeskId);
     if (!desk) return;
     const seat = seatsFor(desk)[0];
-    Object.assign(pose, { x: seat.seat.x, z: seat.seat.z, yaw: seat.yaw, atDesk: true, sit: 1, seatHeight: .80, doze: 0, moving: false, activity: null, goal: null, seated: false, portal: null, to: null, seatId: desk.id });
+    Object.assign(pose, { x: seat.seat.x, z: seat.seat.z, yaw: seat.yaw, atDesk: true, sit: 1, seatHeight: .80, walkHeight: 0, doze: 0, moving: false, activity: null, goal: null, seated: false, portal: null, to: null, seatId: desk.id });
     anchor = null; trip = null; legs = []; restTime = 0;
     status(intent === 'working' ? 'working' : intent === 'break' ? 'resting-at-desk' : 'idle');
   }
@@ -329,17 +373,36 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       if (planned.start.side) add(planned.start.side, planned.start.portal, 'walk');
     }
     for (let i = 1; i < planned.path.length; i++) add(planned.path[i - 1], planned.path[i], 'walk');
-    if (planned.end.activity) add(planned.end.seat, planned.end.seat, 'turn', 0, 0, planned.end.yaw);
+    if (planned.end.activity || planned.end.door) add(planned.end.portal, planned.end.portal, 'turn', 0, 0, planned.end.yaw);
     else {
       if (planned.end.side) add(planned.end.portal, planned.end.side, 'walk');
       add(planned.end.side || planned.end.portal, planned.end.seat, 'sit', 0, 1, planned.end.yaw);
     }
     // `goal` tells the pet that the companion is on its way to pet it, and
     // `to` where it will stand, so the pet keeps out of its way.
-    pose.atDesk = false; pose.doze = 0; pose.moving = true; pose.activity = null; pose.goal = planned.end.activity || null; pose.seated = false; pose.portal = null;
+    pose.atDesk = false; pose.doze = 0; pose.moving = true; pose.activity = null; pose.goal = planned.end.door ? 'door' : planned.end.activity || null; pose.seated = false; pose.portal = null;
     pose.to = planned.end.desk ? null : { x: planned.end.portal.x, z: planned.end.portal.z };
     status(toDesk ? 'returning' : 'walking');
     return true;
+  }
+  function doorSource() {
+    if (pose.atDesk && !trip) return null;
+    if (trip) {
+      const leg = legs[legIndex];
+      if (leg?.kind === 'rise') return trip.start;
+      if (leg?.kind === 'sit') return trip.end;
+      const here = { x: pose.x, z: pose.z };
+      if (walkable(here, navigationObstacles(layout))) return here;
+      if (trip.start.seat || trip.start.portal) return trip.start;
+      return null;
+    }
+    return anchor?.seat ? anchor : { x: pose.x, z: pose.z };
+  }
+  function finishDoor(end) {
+    trip = null; legs = []; legIndex = 0; elapsed = 0; anchor = null;
+    Object.assign(pose, { x: end.portal.x, z: end.portal.z, yaw: end.yaw, walkHeight: end.portal.height || 0, atDesk: false, sit: 0, moving: false, activity: null, goal: null, seated: false, portal: null, to: null, seatId: null, doze: 0 });
+    status('at-door');
+    const arrive = doorArrival; doorArrival = null; arrive?.(end.link);
   }
   // A break starts with one activity when one can be reached: at night an
   // unlit lamp comes first, then a new thing each break, reading in the
@@ -365,7 +428,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     if (!startTrip(here, false) && !startTrip(here, true)) deskPose();
   }
   function arrive(end) {
-    anchor = end; trip = null; legs = []; pose.atDesk = end.desk; pose.moving = false; pose.yaw = end.yaw; pose.goal = null; pose.to = null; pose.seatId = end.activity ? null : end.itemId;
+    anchor = end; trip = null; legs = []; pose.atDesk = end.desk; pose.moving = false; pose.yaw = end.yaw; pose.walkHeight = 0; pose.goal = null; pose.to = null; pose.seatId = end.activity ? null : end.itemId;
     // Seated away from the desk, the pet may curl up at its feet, clear of its way out.
     pose.seated = !end.desk && !end.activity; pose.portal = pose.seated ? end.portal : null;
     pose.activity = end.activity || (!end.desk && seatType(end) === 'lounge-chair' ? 'read' : null); pose.activityTime = 0; pose.reach = end.reach || null; pose.useAt = ACTIVITIES[end.activity]?.useAt ?? null; used = false;
@@ -375,6 +438,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     if (!layout || editing) return;
     const toDesk = intent !== 'break';
     if (trip) {
+      if (trip.end.door) return;
       if (trip.end.desk !== toDesk && legs[legIndex]?.kind === 'walk') {
         // Re-plan from the current clear floor position when focus resumes.
         const current = { x: pose.x, z: pose.z };
@@ -389,6 +453,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   return {
     pose,
     setLayout(next) {
+      if (doorArrival) { const cancel = doorArrival; this.cancelDoorWalk({ returnToDesk: true }); cancel({ cancelled: true }); }
       layout = next; deskFloor = null;
       // A resting or busy companion stays put when its seat or spot is
       // unchanged and still clear, e.g. when another tab moves an unrelated
@@ -410,7 +475,28 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     useLayout(next) { layout = next; },
     setIntent(next) {
       if (!['idle', 'working', 'break'].includes(next) || next === intent) return;
+      if (next === 'working' && doorArrival) {
+        const cancel = doorArrival;
+        this.cancelDoorWalk({ returnToDesk: true });
+        cancel({ cancelled: true });
+      }
       intent = next; if (next !== 'break') breakUsed = false; reconcile();
+    },
+    walkToDoor(link, onArrive = () => {}) {
+      if (!layout || !link || doorArrival) return false;
+      const from = doorSource();
+      const planned = aroundPet(obstacles => planDoorwayTrip(layout, from, link, obstacles));
+      if (!planned) return false;
+      doorArrival = onArrive;
+      if (!startTrip(from, false, planned)) { doorArrival = null; return false; }
+      return true;
+    },
+    cancelDoorWalk({ returnToDesk = false } = {}) {
+      if (!doorArrival) return false;
+      doorArrival = null; trip = null; legs = []; legIndex = 0; elapsed = 0; restTime = 0;
+      if (returnToDesk) deskPose();
+      else { pose.moving = false; pose.activity = null; pose.goal = null; pose.to = null; pose.walkHeight = 0; }
+      return true;
     },
     setEditing(value) { if (editing === value) return; editing = value; if (editing) deskPose(); else reconcile(); },
     // Night, the window and the pet decide which activities there are.
@@ -420,15 +506,18 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       if (!layout || editing) return pose;
       if (trip && reducedMotion) {
         const end = trip.end;
-        Object.assign(pose, { x: end.seat.x, z: end.seat.z, yaw: end.yaw, sit: end.activity ? 0 : 1, seatHeight: end.seatHeight || .80, atDesk: end.desk, moving: false });
-        arrive(end);
+        if (end.door) finishDoor(end);
+        else {
+          Object.assign(pose, { x: end.seat.x, z: end.seat.z, yaw: end.yaw, sit: end.activity ? 0 : 1, seatHeight: end.seatHeight || .80, atDesk: end.desk, moving: false });
+          arrive(end);
+        }
       } else if (trip) {
         if (legs[legIndex].kind === 'walk') walkAroundPet(legs[legIndex]);
         const leg = legs[legIndex]; elapsed += Math.min(dt, .1);
         const t = Math.min(1, elapsed / Math.max(.001, leg.duration)), amount = leg.kind === 'walk' ? t : ease(t);
         const x = leg.a.x + (leg.b.x - leg.a.x) * amount, z = leg.a.z + (leg.b.z - leg.a.z) * amount;
         if (leg.kind === 'walk') pose.step += Math.hypot(x - pose.x, z - pose.z) * 8;
-        pose.x = x; pose.z = z; pose.sit = leg.sitFrom + (leg.sitTo - leg.sitFrom) * amount;
+        pose.x = x; pose.z = z; pose.walkHeight = (leg.a.height || 0) + ((leg.b.height || 0) - (leg.a.height || 0)) * amount; pose.sit = leg.sitFrom + (leg.sitTo - leg.sitFrom) * amount;
         pose.seatHeight = leg.kind === 'sit' ? trip.end.seatHeight || .80 : trip.start.seatHeight || .80;
         // The seat that `sit` blends onto: its piece may stand on a rug.
         pose.seatId = leg.kind === 'sit' ? trip.end.itemId : leg.kind === 'rise' ? trip.start.itemId : null;
@@ -437,7 +526,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
         pose.yaw += turn * Math.min(1, dt * 10); pose.moving = leg.kind === 'walk';
         if (t === 1) {
           elapsed = 0; legIndex++;
-          if (legIndex === legs.length) arrive(trip.end);
+          if (legIndex === legs.length) trip.end.door ? finishDoor(trip.end) : arrive(trip.end);
           else reconcile();
         }
       } else if (pose.state === 'busy') {

@@ -44,7 +44,7 @@ let state = store.state;
 let room;
 let houseUI;
 let houseOpen = false;
-let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false;
+let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
 let currentPanel = null;
 let compact = false;
 let audioContext, noiseNode, gainNode;
@@ -130,11 +130,24 @@ document.querySelector('#app').innerHTML = `
 
 const $ = (selector) => document.querySelector(selector);
 $('#task').value = state.task;
-function toast(message) {
+function toast(message, warning = false) {
   $('#toast').textContent = message;
+  $('#toast').classList.toggle('is-warning', warning);
+  $('#toast').setAttribute('role', warning ? 'alert' : 'status');
   $('#toast').hidden = false;
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => { $('#toast').hidden = true; }, 4200);
+}
+function cancelDoorTravel(message) {
+  if (!doorWalking) return false;
+  doorWalking = false; travelling = false;
+  clearTimeout(travelTimer); travelTimer = 0;
+  $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking');
+  room?.setDoorActive?.(null);
+  room?.cancelDoorWalk?.({ returnToDesk: true });
+  renderSession();
+  if (message) toast(message, true);
+  return true;
 }
 const themeCopy = {
   dusk: 'The candles are lit. Stay a little longer.',
@@ -149,6 +162,10 @@ function renderRoomHeading() {
 function applyState(next, force = false) {
   const previous = state;
   state = next;
+  if (doorWalking) {
+    if (state.session.running) cancelDoorTravel('Focusing started in another tab, so the walk to the door stopped.');
+    else if (previous.house.activeId !== state.house.activeId || JSON.stringify(previous.layout) !== JSON.stringify(state.layout)) cancelDoorTravel('Your room changed. Tap the door again when you’re ready.');
+  }
   const design = roomDesign(state.layout);
   document.body.dataset.design = design.style || 'retreat';
 
@@ -220,7 +237,7 @@ function renderRoomLabel() {
   const pet = state.pet === 'dog' ? 'Mochi the puppy' : 'Miso the ginger cat';
   $('#room-canvas').setAttribute('aria-label', editMode
     ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
-    : `Interactive 3D cutaway study room. Drag to turn the room. Tap a lamp, the fire or the record player to switch it, tap your companion, or tap ${pet}.`);
+    : `Interactive 3D cutaway study room. Drag to turn the room. Tap a lamp, the fire or the record player to switch it, tap your companion or ${pet}, or tap a built doorway to walk to another room while your focus timer is paused.`);
 }
 function renderPetName() {
   const name = PETS[state.pet]?.name || PETS.cat.name; renderRoomLabel();
@@ -248,7 +265,7 @@ try {
     onFrame() { speech?.update(); },
     onCompanionState({ state: activity, activity: doing }) {
       companionActivity = activity;
-      const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', 'resting-at-desk': 'Resting at the desk', busy: 'Taking a little break' };
+      const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', 'resting-at-desk': 'Resting at the desk', busy: 'Taking a little break', 'at-door': 'At the doorway' };
       const pet = PETS[state.pet]?.name || PETS.cat.name;
       const tasks = { warm: 'Warming up by the fire', window: 'Looking out of the window', water: 'Watering the plants', record: 'Putting on a record', pet: `Petting ${pet}`, lamp: 'Switching on a lamp', read: 'Reading in the armchair' };
       const task = (activity === 'busy' || (activity === 'resting' && doing === 'read')) && tasks[doing];
@@ -273,7 +290,7 @@ try {
       return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
     },
     onDragState: renderDragState,
-    onHouseNavigate: visitRoom,
+    onHouseNavigate: visitDoor,
     onHouseHover(id) {
       document.querySelectorAll('[data-house-go]').forEach(button => button.classList.toggle('door-hover', button.dataset.houseGo === id));
     },
@@ -296,7 +313,7 @@ houseUI = createHouseUI($('#house-page'), {
   onFocus: () => { setHouseOpen(false); focusCollapsed = false; syncFocusDock(); revealFocusDock(); $('#start-button').focus(); },
 });
 function setHouseOpen(open, selectedId) {
-  if (open === houseOpen) return;
+  if (travelling || open === houseOpen) return;
   if (open) {
     setConnectedView(false);
     if (editMode) setEditMode(false);
@@ -333,7 +350,7 @@ function renderConnections(updateModel = true) {
   if (connectedView && updateModel) connectedView.update(state.house, state.house.activeId, state.theme);
 }
 function setConnectedView(open) {
-  if (open === Boolean(connectedView)) return;
+  if (travelling || open === Boolean(connectedView)) return;
   if (open && editMode) setEditMode(false);
   if (open) {
     $('#house-in-room').hidden = false;
@@ -343,24 +360,54 @@ function setConnectedView(open) {
   document.body.classList.toggle('is-connected', open); renderRoomHeading();
   room?.setSuspended(open); syncFocusDock(); connectionsKey = ''; renderConnections(false);
 }
-function visitRoom(id, decorate = editMode) {
-  if (travelling) return;
+function visitRoom(id, decorate = editMode, fromDoor = false) {
+  if (travelling && !fromDoor) return;
+  if (!fromDoor && id !== state.house.activeId) {
+    acceptUpdate(store.update());
+    if (state.session.running) { toast('Pause your focus session before walking to another room.', true); return; }
+  }
   const entry = state.house.rooms.find(room => room.id === id);
   if (!entry) { setHouseOpen(true, id); return; }
-  setConnectedView(false);
+  if (!fromDoor) setConnectedView(false);
   if (houseOpen) setHouseOpen(false);
   if (editMode) setEditMode(false);
   const arrive = () => {
     room?.cancelPlacement(); room?.selectItem(null); selectedItem = null; undoLayout = null; $('#undo-layout').disabled = true;
     acceptUpdate(store.enterHouseRoom(id));
     if (decorate) { collectionTab = 'collection'; setEditMode(true); }
-    $('#room-travel').hidden = true; document.body.classList.remove('is-travelling'); travelling = false;
+    $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking'); travelling = false; renderSession();
     $('#stage').classList.remove('room-arrival'); void $('#stage').offsetWidth; $('#stage').classList.add('room-arrival');
     clearTimeout(arrivalTimer); arrivalTimer = setTimeout(() => $('#stage').classList.remove('room-arrival'), 650);
   };
   if (id === state.house.activeId || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { arrive(); return; }
-  travelling = true; $('#travel-label').textContent = `On to ${entry.name}`; $('#room-travel').hidden = false; document.body.classList.add('is-travelling');
+  travelling = true; $('#travel-label').textContent = `On to ${entry.name}`; $('#room-travel small').textContent = 'A different corner of home.'; $('#room-travel').hidden = false; document.body.classList.add('is-travelling'); renderSession();
   travelTimer = setTimeout(arrive, 220);
+}
+function visitDoor(id) {
+  if (travelling) return;
+  acceptUpdate(store.update());
+  if (state.session.running) { toast('Pause your focus session before walking to another room.', true); return; }
+  const entry = state.house.rooms.find(room => room.id === id);
+  if (!entry) { setHouseOpen(true, id); return; }
+  doorWalking = true; travelling = true;
+  $('#travel-label').textContent = `Walking to ${entry.name}`;
+  $('#room-travel small').textContent = 'A little walk through your home.';
+  $('#room-travel').hidden = false; document.body.classList.add('is-travelling', 'is-door-walking'); renderSession();
+  room?.setDoorActive?.(id);
+  const started = room?.walkToDoor?.(id, result => {
+    if (result?.cancelled) { cancelDoorTravel('Your room changed. Tap the door again when you’re ready.'); return; }
+    if (!doorWalking) return;
+    doorWalking = false;
+    room?.setDoorActive?.(null);
+    document.body.classList.remove('is-door-walking');
+    $('#travel-label').textContent = `On to ${entry.name}`;
+    $('#room-travel small').textContent = 'A different corner of home.';
+    visitRoom(id, false, true);
+  });
+  if (!started) {
+    cancelDoorTravel();
+    toast('There isn’t a clear path to that door. Move a little furniture and try again.', true);
+  }
 }
 function renderFocusReward() {
   const reward = focusCoins(state.session.duration / 60_000), next = nextExpansion(state.house);
@@ -379,7 +426,7 @@ function syncCompanionIntent() {
 }
 function renderCompanionNote() {
   const minutes = state.history.filter(h => h.date === localDate()).reduce((sum, h) => sum + h.minutes, 0);
-  const notes = { idle: 'Start focusing to work alongside your companion.', working: 'Your companion is working alongside you.', walking: 'A little stretch. Your companion is finding a cozy spot.', returning: 'Your companion is on the way back to the desk.', resting: 'A soft seat and a little breather. Take your time.', sleeping: 'Your companion has drifted off. Resume whenever you’re ready.', 'resting-at-desk': 'Your companion is taking a quiet break at the desk.', busy: 'A little break. Your companion is tending to the room.' };
+  const notes = { idle: 'Start focusing to work alongside your companion.', working: 'Your companion is working alongside you.', walking: 'A little stretch. Your companion is finding a cozy spot.', returning: 'Your companion is on the way back to the desk.', resting: 'A soft seat and a little breather. Take your time.', sleeping: 'Your companion has drifted off. Resume whenever you’re ready.', 'resting-at-desk': 'Your companion is taking a quiet break at the desk.', busy: 'Your companion is tending to the room.', 'at-door': 'Your companion is ready at the doorway.' };
   $('#daily-note').textContent = minutes ? `${minutes} quiet minutes made today. Look at you go.` : notes[companionActivity];
 }
 function renderSession() {
@@ -389,9 +436,10 @@ function renderSession() {
   syncCompanionIntent();
   const today = localDate();
   const minutes = state.history.filter(h => h.date === today).reduce((sum, h) => sum + h.minutes, 0);
-  const renderKey = `${formatted}:${presence}:${state.session.duration}:${today}:${minutes}`;
+  const renderKey = `${formatted}:${presence}:${state.session.duration}:${today}:${minutes}:${travelling}`;
   // The clock polls for deadlines twice a second, but idle rooms and unchanged
   // displayed seconds do not need another set of DOM mutations.
+  $('#start-button').disabled = travelling;
   if (renderKey === lastSessionRender) return;
   lastSessionRender = renderKey;
   $('#timer').textContent = formatted;
@@ -422,6 +470,7 @@ function tick() {
   else renderSession();
 }
 $('#start-button').addEventListener('click', () => {
+  if (travelling) { toast('Please wait until you arrive before starting a focus session.', true); return; }
   const resuming = !state.session.running && remainingAt(state.session) > 0 && remainingAt(state.session) < state.session.duration;
   // Preserve the action shown on the button if the deadline just passed.
   acceptUpdate(store.setRunning(!state.session.running));
@@ -471,6 +520,7 @@ $('#mini-button').addEventListener('click', () => {
 });
 
 function setEditMode(enabled) {
+  if (travelling) return;
   if (enabled && !room) return;
   if (enabled && connectedView) setConnectedView(false);
   editMode = enabled;
@@ -874,7 +924,7 @@ window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 if (import.meta.env.DEV) window.__littleHours = { get room() { return room; }, get state() { return state; }, get speech() { return speech; }, get house() { return houseUI; }, get connected() { return connectedView; } };
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
-  document.body.classList.remove('is-connected', 'is-travelling');
+  document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking');
   clearInterval(tickInterval);
   clearTimeout(toastTimeout);
   clearTimeout(travelTimer); clearTimeout(arrivalTimer); connectedView?.dispose();
