@@ -139,6 +139,24 @@ test('starting focus during a door walk cancels the trip and reports that no roo
   assert.equal(routine.pose.atDesk, true); assert.equal(routine.pose.moving, false);
   advance(routine, 2); assert.deepEqual(result, { cancelled: true }, 'the cancelled walk cannot arrive later');
 });
+test('entering edit mode during a door walk cancels the pending arrival and unlocks the next trip', () => {
+  const routine = createCompanionRoutine(() => {}), layout = createLayout('writers-loft');
+  routine.setLayout(layout); routine.setIntent('idle');
+  let result = null, openings = 0, arrivals = 0;
+  const garden = { id: 'garden', built: true, upstairs: false, z: 2.35 };
+  assert.equal(routine.walkToDoor(garden, value => { result = value; }, () => openings++), true);
+  advance(routine, .5);
+  routine.setEditing(true);
+  assert.deepEqual(result, { cancelled: true });
+  assert.equal(routine.pose.atDesk, true); assert.equal(routine.pose.moving, false);
+  advance(routine, 5);
+  assert.deepEqual(result, { cancelled: true }, 'the edited trip cannot arrive after it was cancelled');
+  assert.equal(openings, 0, 'a cancelled approach never opens its door');
+  routine.setEditing(false);
+  assert.equal(routine.walkToDoor(garden, () => arrivals++), true, 'editing releases the pending-door lock');
+  routine.cancelDoorWalk(); advance(routine, 5);
+  assert.equal(arrivals, 0, 'cancelling the replacement trip does not call it later');
+});
 test('reduced motion completes a door walk without leaving the companion or callback in a traveling state', () => {
   const routine = createCompanionRoutine(() => {}), layout = createLayout('writers-loft');
   routine.setLayout(layout); routine.setIntent('idle');

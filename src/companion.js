@@ -521,7 +521,17 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       else { pose.moving = false; pose.activity = null; pose.goal = null; pose.to = null; pose.walkHeight = 0; }
       return true;
     },
-    setEditing(value) { if (editing === value) return; editing = value; if (editing) deskPose(); else reconcile(); },
+    setEditing(value) {
+      if (editing === value) return;
+      editing = value;
+      if (editing) {
+        if (doorArrival) {
+          const cancel = doorArrival;
+          this.cancelDoorWalk({ returnToDesk: true });
+          cancel({ cancelled: true });
+        } else deskPose();
+      } else reconcile();
+    },
     // Night, the window and the pet decide which activities there are.
     setContext(next) { context = { ...context, ...next }; },
     update(dt, reducedMotion) {
