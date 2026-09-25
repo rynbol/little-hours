@@ -6,6 +6,9 @@ export const COMPANION_RADIUS = 0.24;
 // Half the room a sitting pet takes up, for walks around it.
 const PET_CLEARANCE = 0.2;
 export const DOZE_AFTER = 30;
+export const DOOR_TRIP_SECONDS = 4.5;
+export const DOOR_OPEN_SECONDS = 0.65;
+const COMPANION_WALK_SPEED = 1.8;
 const STEP = 0.2;
 const SEATS = ['daybed', 'lounge-chair', 'ottoman'];
 // On a break the companion first does one small thing in the room, then
@@ -236,30 +239,33 @@ export function planDoorwayTrip(layout, source, link, obstacles = navigationObst
   approachZ.sort((a, b) => Math.abs(a - link.z) - Math.abs(b - link.z));
   let best = null;
   for (const z of approachZ) {
-    const approach = { x: 5.1, z, height: 0 };
-    const route = bestRoute(layout, starts, [{ seat: approach, portal: approach, yaw: 0 }], obstacles);
+    const roomApproach = { x: 5.1, z, height: 0 };
+    const route = bestRoute(layout, starts, [{ seat: roomApproach, portal: roomApproach, yaw: 0 }], obstacles);
     if (!route) continue;
-    const outside = [{ x: 5.82, z: approach.z, height: 0 }, { x: 6.08, z: approach.z, height: 0 }, { x: 6.08, z: link.z, height: 0 }];
-    if (outside.some((point, index) => crosses(index ? outside[index - 1] : approach, point, obstacles))) continue;
+    const doorZ = link.z + 0.45;
+    const outside = [{ x: 5.82, z: roomApproach.z, height: 0 }, { x: 6.08, z: roomApproach.z, height: 0 }, { x: 6.08, z: doorZ, height: 0 }];
+    if (outside.some((point, index) => crosses(index ? outside[index - 1] : roomApproach, point, obstacles))) continue;
     const path = route.path.map(point => ({ ...point, height: point.height || 0 }));
     const append = point => {
       const previous = path[path.length - 1];
       if (Math.hypot(point.x - previous.x, point.z - previous.z, (point.height || 0) - (previous.height || 0)) > 1e-4) path.push(point);
     };
     outside.forEach(append);
-    let end;
+    let doorApproach;
+    const rise = link.upstairs ? .95 : 0;
     if (link.upstairs) {
       // The modeled stair has five low risers, each 0.19 m high.
-      for (let step = 0; step < 5; step++) append({ x: 6.15 + step * .31, z: link.z, height: (step + 1) * .19 });
-      append({ x: 7.28, z: link.z, height: .95 });
-      end = path[path.length - 1];
+      for (let step = 0; step < 5; step++) append({ x: 6.15 + step * .31, z: doorZ, height: (step + 1) * .19 });
+      doorApproach = path[path.length - 1];
     } else {
-      append({ x: 6.55, z: link.z, height: 0 });
-      append({ x: 7.05, z: link.z, height: 0 });
-      end = path[path.length - 1];
+      append({ x: 6.55, z: doorZ, height: 0 });
+      append({ x: 7.44, z: doorZ, height: 0 });
+      doorApproach = path[path.length - 1];
     }
     const length = path.reduce((sum, point, index) => index ? sum + Math.hypot(point.x - path[index - 1].x, point.z - path[index - 1].z, point.height - path[index - 1].height) : 0, 0);
-    const candidate = { start: route.start, end: { door: true, link, portal: end, yaw: facing(end, { x: 8.2, z: link.z }) }, path, length };
+    const exit = { x: 8.08, z: link.z, height: rise };
+    const reach = { x: 7.9, y: 1.43 + rise, z: link.z + .54 };
+    const candidate = { start: route.start, end: { door: true, link, portal: exit, yaw: facing(doorApproach, exit) }, path, doorApproach, doorReach: reach, length };
     if (!best || candidate.length < best.length) best = candidate;
   }
   return best;
@@ -307,7 +313,7 @@ export function activitySpots(layout, { night = false, windowX = -2.7, pet = nul
 
 export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, random = Math.random } = {}) {
   const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, walkHeight: 0, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null, goal: null, seated: false, portal: null, to: null, seatId: null };
-  let layout, intent = 'idle', editing = false, anchor = null, trip = null, legs = [], legIndex = 0, elapsed = 0, restTime = 0, doorArrival = null;
+  let layout, intent = 'idle', editing = false, anchor = null, trip = null, legs = [], legIndex = 0, elapsed = 0, doorElapsed = 0, doorPlanElapsed = 0, doorActionStarted = false, restTime = 0, doorArrival = null, doorOpening = null;
   // One activity per break; `reduced` is the last reduced-motion setting,
   // which skips standing activities. A lamp or record player is switched on
   // at most once per visit (`switched`), so one switched off on purpose stays off.
@@ -347,7 +353,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     const here = { x: pose.x, z: pose.z }, obstacles = navigationObstacles(layout, undefined, COMPANION_RADIUS, [petBox(pet)]);
     if (trip.end.door) {
       const planned = planDoorwayTrip(layout, here, trip.end.link, obstacles);
-      if (planned) startTrip(here, false, planned);
+      if (planned) startTrip(here, false, planned, true);
     } else {
       const path = findWalkingPath(layout, here, trip.end.portal, obstacles);
       if (path) startTrip(null, trip.end.desk, { start: { portal: here }, end: trip.end, path });
@@ -360,20 +366,36 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     if (!desk) return;
     const seat = seatsFor(desk)[0];
     Object.assign(pose, { x: seat.seat.x, z: seat.seat.z, yaw: seat.yaw, atDesk: true, sit: 1, seatHeight: .80, walkHeight: 0, doze: 0, moving: false, activity: null, goal: null, seated: false, portal: null, to: null, seatId: desk.id });
-    anchor = null; trip = null; legs = []; restTime = 0;
+    anchor = null; trip = null; legs = []; elapsed = 0; doorElapsed = 0; doorPlanElapsed = 0; doorActionStarted = false; restTime = 0;
     status(intent === 'working' ? 'working' : intent === 'break' ? 'resting-at-desk' : 'idle');
   }
-  function startTrip(from, toDesk, planned = aroundPet(obstacles => planCompanionTrip(layout, from, toDesk, SEATS, { canReach, obstacles }))) {
+  function startTrip(from, toDesk, planned = aroundPet(obstacles => planCompanionTrip(layout, from, toDesk, SEATS, { canReach, obstacles })), continueDoor = false) {
     if (!planned) return false;
     trip = planned; legs = []; legIndex = 0; elapsed = 0; restTime = 0;
-    const add = (a, b, kind, sitFrom = 0, sitTo = 0, yaw = null) => legs.push({ a, b, kind, sitFrom, sitTo, yaw, duration: kind === 'walk' ? distance(a, b) / 1.15 : .85 });
+    if (planned.end.door) {
+      if (!continueDoor) { doorElapsed = 0; doorActionStarted = false; }
+      doorPlanElapsed = 0;
+    } else { doorElapsed = 0; doorPlanElapsed = 0; doorActionStarted = false; }
+    const add = (a, b, kind, sitFrom = 0, sitTo = 0, yaw = null) => legs.push({ a, b, kind, sitFrom, sitTo, yaw, duration: kind === 'walk' ? distance(a, b) / COMPANION_WALK_SPEED : kind === 'open-door' ? DOOR_OPEN_SECONDS : .85 });
     // An activity spot is stood at, so leaving it needs no rise.
     if (planned.start.seat && !planned.start.activity) {
       add(planned.start.seat, planned.start.side || planned.start.portal, 'rise', 1, 0, planned.start.yaw);
       if (planned.start.side) add(planned.start.side, planned.start.portal, 'walk');
     }
     for (let i = 1; i < planned.path.length; i++) add(planned.path[i - 1], planned.path[i], 'walk');
-    if (planned.end.activity || planned.end.door) add(planned.end.portal, planned.end.portal, 'turn', 0, 0, planned.end.yaw);
+    if (planned.end.door) {
+      add(planned.doorApproach, planned.doorApproach, 'turn', 0, 0, planned.end.yaw);
+      if (!doorActionStarted) add(planned.doorApproach, planned.doorApproach, 'open-door', 0, 0, planned.end.yaw);
+      add(planned.doorApproach, planned.end.portal, 'walk');
+      // Door trips have one arrival time from every room position. Keep the
+      // opening action at its natural duration and distribute the remaining
+      // time across the walk, rise and turn legs.
+      const doorActionTime = doorActionStarted ? 0 : DOOR_OPEN_SECONDS;
+      const fixedWalkAndPoseTime = Math.max(.01, DOOR_TRIP_SECONDS - doorElapsed - doorActionTime);
+      const otherLegs = legs.filter(leg => leg.kind !== 'open-door');
+      const totalWeight = otherLegs.reduce((sum, leg) => sum + leg.duration, 0);
+      for (const leg of otherLegs) leg.duration = fixedWalkAndPoseTime * leg.duration / totalWeight;
+    } else if (planned.end.activity) add(planned.end.portal, planned.end.portal, 'turn', 0, 0, planned.end.yaw);
     else {
       if (planned.end.side) add(planned.end.portal, planned.end.side, 'walk');
       add(planned.end.side || planned.end.portal, planned.end.seat, 'sit', 0, 1, planned.end.yaw);
@@ -399,8 +421,9 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     return anchor?.seat ? anchor : { x: pose.x, z: pose.z };
   }
   function finishDoor(end) {
-    trip = null; legs = []; legIndex = 0; elapsed = 0; anchor = null;
-    Object.assign(pose, { x: end.portal.x, z: end.portal.z, yaw: end.yaw, walkHeight: end.portal.height || 0, atDesk: false, sit: 0, moving: false, activity: null, goal: null, seated: false, portal: null, to: null, seatId: null, doze: 0 });
+    trip = null; legs = []; legIndex = 0; elapsed = 0; doorElapsed = 0; doorPlanElapsed = 0; anchor = null;
+    doorOpening = null; doorActionStarted = false;
+    Object.assign(pose, { x: end.portal.x, z: end.portal.z, yaw: end.yaw, walkHeight: end.portal.height || 0, atDesk: false, sit: 0, moving: false, activity: null, activityTime: 0, reach: null, goal: null, seated: false, portal: null, to: null, seatId: null, doze: 0 });
     status('at-door');
     const arrive = doorArrival; doorArrival = null; arrive?.(end.link);
   }
@@ -482,18 +505,18 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       }
       intent = next; if (next !== 'break') breakUsed = false; reconcile();
     },
-    walkToDoor(link, onArrive = () => {}) {
+    walkToDoor(link, onArrive = () => {}, onOpen = () => {}) {
       if (!layout || !link || doorArrival) return false;
       const from = doorSource();
       const planned = aroundPet(obstacles => planDoorwayTrip(layout, from, link, obstacles));
       if (!planned) return false;
-      doorArrival = onArrive;
-      if (!startTrip(from, false, planned)) { doorArrival = null; return false; }
+      doorArrival = onArrive; doorOpening = onOpen;
+      if (!startTrip(from, false, planned)) { doorArrival = null; doorOpening = null; return false; }
       return true;
     },
     cancelDoorWalk({ returnToDesk = false } = {}) {
       if (!doorArrival) return false;
-      doorArrival = null; trip = null; legs = []; legIndex = 0; elapsed = 0; restTime = 0;
+      doorArrival = null; doorOpening = null; trip = null; legs = []; legIndex = 0; elapsed = 0; doorElapsed = 0; doorPlanElapsed = 0; doorActionStarted = false; restTime = 0;
       if (returnToDesk) deskPose();
       else { pose.moving = false; pose.activity = null; pose.goal = null; pose.to = null; pose.walkHeight = 0; }
       return true;
@@ -506,15 +529,31 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       if (!layout || editing) return pose;
       if (trip && reducedMotion) {
         const end = trip.end;
-        if (end.door) finishDoor(end);
+        if (end.door) { doorOpening?.(end.link); doorOpening = null; finishDoor(end); }
         else {
           Object.assign(pose, { x: end.seat.x, z: end.seat.z, yaw: end.yaw, sit: end.activity ? 0 : 1, seatHeight: end.seatHeight || .80, atDesk: end.desk, moving: false });
           arrive(end);
         }
       } else if (trip) {
-        if (legs[legIndex].kind === 'walk') walkAroundPet(legs[legIndex]);
-        const leg = legs[legIndex]; elapsed += Math.min(dt, .1);
-        const t = Math.min(1, elapsed / Math.max(.001, leg.duration)), amount = leg.kind === 'walk' ? t : ease(t);
+        const walkingDoor = Boolean(trip.end.door), currentTrip = trip;
+        let leg, t, fixedDoorArrival = false;
+        if (walkingDoor) {
+          doorElapsed += Math.min(dt, .1);
+          doorPlanElapsed += Math.min(dt, .1);
+          let legTime = doorPlanElapsed, nextLeg = 0;
+          while (nextLeg < legs.length - 1 && legTime >= legs[nextLeg].duration) { legTime -= legs[nextLeg].duration; nextLeg++; }
+          legIndex = nextLeg; elapsed = legTime; leg = legs[legIndex];
+          fixedDoorArrival = doorElapsed + 1e-9 >= DOOR_TRIP_SECONDS;
+        } else { leg = legs[legIndex]; elapsed += Math.min(dt, .1); }
+        if (leg.kind === 'walk') {
+          walkAroundPet(leg);
+          if (trip !== currentTrip) { if (walkingDoor && fixedDoorArrival) finishDoor(currentTrip.end); return pose; }
+        }
+        if (leg.kind === 'open-door') {
+          if (pose.activity !== 'door') { pose.activity = 'door'; pose.reach = trip.doorReach; pose.activityTime = 0; doorActionStarted = true; doorOpening?.(trip.end.link); doorOpening = null; }
+          pose.activityTime = elapsed;
+        } else if (pose.activity === 'door') { pose.activity = null; pose.activityTime = 0; pose.reach = null; }
+        t = Math.min(1, elapsed / Math.max(.001, leg.duration)); const amount = leg.kind === 'walk' ? t : ease(t);
         const x = leg.a.x + (leg.b.x - leg.a.x) * amount, z = leg.a.z + (leg.b.z - leg.a.z) * amount;
         if (leg.kind === 'walk') pose.step += Math.hypot(x - pose.x, z - pose.z) * 8;
         pose.x = x; pose.z = z; pose.walkHeight = (leg.a.height || 0) + ((leg.b.height || 0) - (leg.a.height || 0)) * amount; pose.sit = leg.sitFrom + (leg.sitTo - leg.sitFrom) * amount;
@@ -524,9 +563,10 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
         const yaw = leg.yaw ?? Math.atan2(-(leg.b.x - leg.a.x), -(leg.b.z - leg.a.z));
         const turn = Math.atan2(Math.sin(yaw - pose.yaw), Math.cos(yaw - pose.yaw));
         pose.yaw += turn * Math.min(1, dt * 10); pose.moving = leg.kind === 'walk';
-        if (t === 1) {
+        if (walkingDoor) { if (fixedDoorArrival) finishDoor(currentTrip.end); }
+        else if (t === 1) {
           elapsed = 0; legIndex++;
-          if (legIndex === legs.length) trip.end.door ? finishDoor(trip.end) : arrive(trip.end);
+          if (legIndex === legs.length) arrive(trip.end);
           else reconcile();
         }
       } else if (pose.state === 'busy') {

@@ -5,7 +5,7 @@ import { Scene } from '@babylonjs/core/scene.js';
 import { PRESETS, createLayout, validatePlacement } from './layout.js';
 import { createMobileCompanion, disposeFurnitureAssets } from './furniture.js';
 import { petSpots } from './pet.js';
-import { companionIntent, localPoint, planCompanionTrip, planActivityTrip, planDoorwayTrip, activitySpots, navigationObstacles, walkable, clearSegment, createCompanionRoutine, DOZE_AFTER, ACTIVITIES } from './companion.js';
+import { companionIntent, localPoint, planCompanionTrip, planActivityTrip, planDoorwayTrip, activitySpots, navigationObstacles, walkable, clearSegment, createCompanionRoutine, DOOR_TRIP_SECONDS, DOZE_AFTER, ACTIVITIES } from './companion.js';
 
 // A repeatable "random".
 const seeded = (seed = 7) => () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
@@ -62,17 +62,58 @@ test('door walks animate from the current companion pose, face the door and fini
   const layout = createLayout('writers-loft'), link = { id: 'loft', built: true, upstairs: true, z: -2.05 };
   const routine = createCompanionRoutine(() => {});
   routine.setLayout(layout); routine.setIntent('working');
-  let reached = null;
-  assert.equal(routine.walkToDoor(link, value => { reached = value.id; }), true);
+  let reached = null, opened = null, elapsed = 0, elapsedFrames = 0;
+  assert.equal(routine.walkToDoor(link, value => { reached = value.id; }, () => { opened = { x: routine.pose.x, z: routine.pose.z, activity: routine.pose.activity, reach: routine.pose.reach }; }), true);
   const start = { x: routine.pose.x, z: routine.pose.z };
   assert.equal(routine.pose.goal, 'door'); assert.equal(routine.pose.moving, true);
-  advance(routine, .8);
+  for (let i = 0; i < 48; i++, elapsedFrames++, elapsed += 1 / 60) routine.update(1 / 60, false);
   assert.notDeepEqual({ x: routine.pose.x, z: routine.pose.z }, start, 'the companion visibly leaves the desk');
-  assert.equal(reached, null, 'the room is not changed before reaching the door');
-  for (let i = 0; i < 90 * 60 && reached === null; i++) routine.update(1 / 60, false);
+  assert.equal(opened, null, 'the door stays closed while the avatar approaches');
+  while (elapsed < DOOR_TRIP_SECONDS && opened === null) { routine.update(1 / 60, false); elapsedFrames++; elapsed += 1 / 60; }
+  assert.ok(opened, 'the avatar reaches for the handle to open the door');
+  assert.equal(opened.activity, 'door');
+  assert.ok(opened.reach && Math.hypot(opened.reach.x - opened.x, opened.reach.z - opened.z) < .55, 'the reaching hand can reach the door handle');
+  assert.equal(reached, null, 'the room does not change while the door is opening');
+  while (elapsed < DOOR_TRIP_SECONDS + 1 / 60 && reached === null) { routine.update(1 / 60, false); elapsedFrames++; elapsed += 1 / 60; }
   assert.equal(reached, 'loft'); assert.equal(routine.pose.state, 'at-door');
+  assert.equal(elapsedFrames, Math.round(DOOR_TRIP_SECONDS * 60), 'every door trip uses its fixed arrival time');
   assert.equal(routine.pose.moving, false); assert.equal(routine.pose.walkHeight, .95);
   advance(routine, 2); assert.equal(reached, 'loft', 'door arrival fires once');
+});
+test('door arrival time stays fixed from desk, sofa and mid-walk starting positions', () => {
+  const link = { id: 'garden', built: true, upstairs: false, z: 2.35 };
+  const cases = [];
+  const atDesk = createCompanionRoutine(() => {}); atDesk.setLayout(createLayout('writers-loft')); atDesk.setIntent('working'); cases.push(atDesk);
+  const atSofa = createCompanionRoutine(() => {}); atSofa.setLayout(createLayout('writers-loft')); atSofa.setIntent('break');
+  assert.equal(until(atSofa, 'resting', 90), 'resting'); cases.push(atSofa);
+  const midWalk = createCompanionRoutine(() => {}); midWalk.setLayout(createLayout('writers-loft')); midWalk.setIntent('break'); advance(midWalk, .25); cases.push(midWalk);
+  const frames = cases.map(routine => {
+    let arrived = false, opened = false;
+    assert.equal(routine.walkToDoor(link, () => { arrived = true; }, () => { opened = true; }), true);
+    let frame = 0;
+    for (; frame < 360 && !arrived; frame++) routine.update(1 / 60, false);
+    assert.equal(opened, true, 'every starting pose includes the handle interaction');
+    assert.equal(arrived, true, 'every starting pose reaches the door');
+    return frame;
+  });
+  assert.deepEqual(frames, [frames[0], frames[0], frames[0]], 'source position does not affect planned arrival time');
+  assert.equal(frames[0], Math.ceil(DOOR_TRIP_SECONDS * 60));
+});
+test('a moving pet can trigger a door-route detour without restarting the fixed arrival time', () => {
+  const routine = createCompanionRoutine(() => {}), layout = createLayout('writers-loft');
+  routine.setLayout(layout); routine.setIntent('working');
+  let arrived = false, opens = 0, frame = 0;
+  assert.equal(routine.walkToDoor({ id: 'garden', built: true, upstairs: false, z: 2.35 }, () => { arrived = true; }, () => opens++), true);
+  for (; frame < 360 && !arrived; frame++) {
+    if (frame === 60) {
+      const { x, z, to } = routine.pose, dx = to.x - x, dz = to.z - z, length = Math.hypot(dx, dz);
+      routine.setContext({ pet: { x: x + dx / length * .85, z: z + dz / length * .85, yaw: 0, state: 'sleeping', moving: false, held: false } });
+    }
+    routine.update(1 / 60, false);
+  }
+  assert.equal(opens, 1, 'the route detour still opens the door exactly once');
+  assert.equal(arrived, true, 'the re-planned path still reaches the door');
+  assert.equal(frame, Math.ceil(DOOR_TRIP_SECONDS * 60), 'a pet detour keeps the original arrival time');
 });
 test('a paused break can redirect its current walk to a door, and cancelling a door trip returns safely to the desk', () => {
   const layout = createLayout('writers-loft'), link = { id: 'garden', built: true, upstairs: false, z: 2.35 };

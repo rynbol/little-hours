@@ -498,11 +498,11 @@ export function createRoom(container, options = {}) {
   const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782'), playOutline = color('#d9b98a');
   const ghostMaterial = new StandardMaterial('placement-preview', scene); ghostMaterial.diffuseColor = color('#85ac80'); ghostMaterial.emissiveColor = color('#42653f'); ghostMaterial.alpha = 0.43; ghostMaterial.disableLighting = true;
   let theme = 'dusk', focused = false, petStart = -Infinity, disposed = false, readyReported = false;
-  let passages = null, houseKey = '', houseHover = null, lockedDoor = null;
+  let passages = null, houseKey = '', houseHover = null, lockedDoor = null, openingDoor = null;
   function setHouse(house) {
     const key = JSON.stringify([house.activeId, house.coins, house.rooms.map(entry => [entry.id, entry.name])]);
     if (key === houseKey) return;
-    houseKey = key; passages?.dispose(); passages = createRoomPassages(scene, house);
+    houseKey = key; lockedDoor = null; openingDoor = null; houseHover = null; passages?.dispose(); passages = createRoomPassages(scene, house);
     passages.root.setEnabled(!editing); fitRoom(); requestRender();
   }
   let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true, suspended = false;
@@ -1319,7 +1319,7 @@ export function createRoom(container, options = {}) {
     const seconds = now / 1000;
     const companionDelta = companionTime ? Math.max(0, Math.min(.1, (now - companionTime) / 1000)) : 0;
     companionTime = now;
-    passages?.animate(companionDelta, houseHover, reducedMotion);
+    passages?.animate(companionDelta, houseHover, reducedMotion, lockedDoor, openingDoor);
     const companionPose = companionRoutine.update(companionDelta, reducedMotion);
     // The companion stands on the rug under it and sits as high as its seat
     // stands. Its height eases, so a step onto a rug reads.
@@ -1451,10 +1451,11 @@ export function createRoom(container, options = {}) {
   return {
     setHouse,
     setDoorActive(id) { lockedDoor = id || null; hoverPlay(null); requestRender(); },
-    walkToDoor(id, onArrive) {
+    setDoorOpen(id) { openingDoor = id || null; requestRender(); },
+    walkToDoor(id, onArrive, onOpen) {
       const link = passages?.links.find(entry => entry.id === id);
       if (!link?.built) return false;
-      const started = companionRoutine.walkToDoor(link, onArrive);
+      const started = companionRoutine.walkToDoor(link, onArrive, onOpen);
       if (started) requestRender();
       return started;
     },

@@ -144,6 +144,7 @@ function cancelDoorTravel(message) {
   clearTimeout(travelTimer); travelTimer = 0;
   $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking');
   room?.setDoorActive?.(null);
+  room?.setDoorOpen?.(null);
   room?.cancelDoorWalk?.({ returnToDesk: true });
   renderSession();
   if (message) toast(message, true);
@@ -403,7 +404,7 @@ function visitDoor(id) {
     $('#travel-label').textContent = `On to ${entry.name}`;
     $('#room-travel small').textContent = 'A different corner of home.';
     visitRoom(id, false, true);
-  });
+  }, () => room?.setDoorOpen?.(id));
   if (!started) {
     cancelDoorTravel();
     toast('There isn’t a clear path to that door. Move a little furniture and try again.', true);

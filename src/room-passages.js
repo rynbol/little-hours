@@ -67,9 +67,11 @@ export function createRoomPassages(scene, house) {
   }
   return {
     root, meshes, links,
-    animate(dt, hovered, reducedMotion) {
+    animate(dt, hovered, reducedMotion, lockedDoor, openingDoor) {
       for (const door of doors) {
-        const target = door.link.built ? (hovered === door.link.id ? -.82 : -.18) : 0;
+        const avatarOpened = openingDoor === door.link.id;
+        const pointerOpened = lockedDoor !== door.link.id && hovered === door.link.id;
+        const target = door.link.built ? (avatarOpened || pointerOpened ? -.82 : -.18) : 0;
         door.angle = reducedMotion ? target : door.angle + (target - door.angle) * Math.min(1, dt * 9);
         door.hinge.rotation.y = door.angle;
       }
