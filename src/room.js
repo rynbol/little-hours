@@ -502,11 +502,11 @@ export function createRoom(container, options = {}) {
   const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782'), playOutline = color('#d9b98a');
   const ghostMaterial = new StandardMaterial('placement-preview', scene); ghostMaterial.diffuseColor = color('#85ac80'); ghostMaterial.emissiveColor = color('#42653f'); ghostMaterial.alpha = 0.43; ghostMaterial.disableLighting = true;
   let theme = 'dusk', focused = false, petStart = -Infinity, disposed = false, readyReported = false;
-  let passages = null, houseKey = '', houseHover = null;
+  let passages = null, houseKey = '', houseHover = null, lockedDoor = null, openingDoor = null;
   function setHouse(house) {
     const key = JSON.stringify([house.activeId, house.coins, house.rooms.map(entry => [entry.id, entry.name])]);
     if (key === houseKey) return;
-    houseKey = key; passages?.dispose(); passages = createRoomPassages(scene, house);
+    houseKey = key; lockedDoor = null; openingDoor = null; houseHover = null; passages?.dispose(); passages = createRoomPassages(scene, house);
     passages.root.setEnabled(!editing); fitRoom(); requestRender();
   }
   let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true, suspended = false;
@@ -1099,7 +1099,7 @@ export function createRoom(container, options = {}) {
   }
   let playHover = null;
   function hoverPlay(target) {
-    const destination = target?.house || null;
+    const destination = lockedDoor || target?.house || null;
     if (houseHover !== destination) { houseHover = destination; options.onHouseHover?.(destination); requestRender(); }
     const next = target?.id || (target?.lights ? 'room-lights' : null); if (next === playHover) return; playHover = next; updateOutline();
   }
@@ -1438,7 +1438,7 @@ export function createRoom(container, options = {}) {
     const companionDelta = companionTime ? Math.max(0, Math.min(.1, (now - companionTime) / 1000)) : 0;
     companionTime = now;
     animateAvatarCamera(companionDelta);
-    passages?.animate(companionDelta, houseHover, reducedMotion);
+    passages?.animate(companionDelta, houseHover, reducedMotion, lockedDoor, openingDoor);
     const companionPose = companionRoutine.update(companionDelta, reducedMotion);
     if (avatarPoseTransition && avatarCameraEditing) {
       avatarPoseTransition.elapsed += companionDelta;
@@ -1464,7 +1464,7 @@ export function createRoom(container, options = {}) {
     // stands. Its height eases, so a step onto a rug reads.
     if (!companionPose.atDesk) {
       const floor = groundAt(rugSurfaces, companionPose.x, companionPose.z), seat = placedObjects.get(companionPose.seatId)?.position.y ?? floor;
-      const goal = floor + (seat - floor) * companionPose.sit;
+      const goal = floor + (seat - floor) * companionPose.sit + (companionPose.walkHeight || 0);
       companionY = companionY === null || reducedMotion ? goal : companionY + (goal - companionY) * Math.min(1, companionDelta * 12);
     } else companionY = null;
     mobileCompanion.animate(companionPose, seconds, reducedMotion, companionY ?? FLOOR_Y);
@@ -1590,6 +1590,16 @@ export function createRoom(container, options = {}) {
 
   return {
     setHouse,
+    setDoorActive(id) { lockedDoor = id || null; hoverPlay(null); requestRender(); },
+    setDoorOpen(id) { openingDoor = id || null; requestRender(); },
+    walkToDoor(id, onArrive, onOpen) {
+      const link = passages?.links.find(entry => entry.id === id);
+      if (!link?.built) return false;
+      const started = companionRoutine.walkToDoor(link, onArrive, onOpen);
+      if (started) requestRender();
+      return started;
+    },
+    cancelDoorWalk(options) { const cancelled = companionRoutine.cancelDoorWalk(options); if (cancelled) requestRender(); return cancelled; },
     setSuspended(value) { suspended = Boolean(value); if (suspended) { cancelDrag(); cancelAnimationFrame(frame); frame = 0; clearTimeout(petWake); } else { resize(); resumeFrames(); } wakeForClock(); },
     setTheme, setLayout, setEditMode, setAvatarEditing, setAvatarAppearance, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setSurface, setQuality,
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },

@@ -1600,6 +1600,11 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
         else if (kind === 'window') { reachArm(shoulder, target.set(side * .07, H + .12, .19), side, -.2, .5); blendArm(key, w); }
         else if (kind === 'read') { reachArm(shoulder, target.set(side * .13, H + .36 - doze * .22, -.4 + doze * .06), side, -.8, .2); blendArm(key, w); }
         else if (kind === 'water') { reachArm(shoulder, side > 0 ? target.set(.18, H + .12, -.52) : target.set(-.24, H + .02, -.12), side, -.7, .3); blendArm(key, w); }
+        else if (kind === 'door' && side > 0 && pose.reach) {
+          reachLocal(pose, ground, local);
+          local.z -= calm * Math.sin(Math.min(1, pose.activityTime / .65) * Math.PI) * .055;
+          reachArm(shoulder, local, .9, -.6, .3); blendArm(key, w);
+        }
         else if (kind === 'record' || kind === 'lamp' || kind === 'pet') {
           if (side > 0 && pose.reach) {
             reachLocal(pose, ground, local);

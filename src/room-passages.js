@@ -34,9 +34,9 @@ export function createRoomPassages(scene, house) {
     box(7, 1.36, z, 1.9, .11, .13, '#b38a5e');
   }
   batch('connected-porch');
-  const links = houseConnections(house);
+  const links = houseConnections(house).map((link, index) => ({ ...link, z: index === 0 ? 2.35 : -2.05 }));
   for (let i = 0; i < links.length; i++) {
-    const link = links[i], z = i === 0 ? 2.35 : -2.05, rise = link.upstairs ? .95 : 0;
+    const link = links[i], z = link.z, rise = link.upstairs ? .95 : 0;
     if (rise) for (let n = 0; n < 5; n++) box(6.15 + n * .31, .22 + (n + 1) * .095, z, .34, (n + 1) * .19, 1.55, n % 2 ? '#af845b' : '#be9870');
     for (const dz of [-.91, .91]) {
       box(7.75, 1.62 + rise, z + dz, .23, 2.82, .17, '#b08a60');
@@ -67,9 +67,11 @@ export function createRoomPassages(scene, house) {
   }
   return {
     root, meshes, links,
-    animate(dt, hovered, reducedMotion) {
+    animate(dt, hovered, reducedMotion, lockedDoor, openingDoor) {
       for (const door of doors) {
-        const target = door.link.built ? (hovered === door.link.id ? -.82 : -.18) : 0;
+        const avatarOpened = openingDoor === door.link.id;
+        const pointerOpened = lockedDoor !== door.link.id && hovered === door.link.id;
+        const target = door.link.built ? (avatarOpened || pointerOpened ? -.82 : -.18) : 0;
         door.angle = reducedMotion ? target : door.angle + (target - door.angle) * Math.min(1, dt * 9);
         door.hinge.rotation.y = door.angle;
       }
