@@ -551,13 +551,6 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     },
     beginAvatarEditing() {
       if (avatarEditing) return null;
-      if (doorArrival) {
-        // A walk to a door stops where it is: the editor starts from that floor spot.
-        const cancel = doorArrival;
-        this.cancelDoorWalk();
-        cancel({ cancelled: true });
-        anchor = { x: pose.x, z: pose.z };
-      }
       let exit = null;
       if (trip) {
         // If the avatar was between destinations, keep the visible floor

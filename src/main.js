@@ -372,11 +372,13 @@ function setConnectedView(open) {
 }
 function visitRoom(id, decorate = editMode, fromDoor = false) {
   if (travelling && !fromDoor) return;
+  // Closing the avatar editor resumes a timer it paused, so close it before
+  // the focus check.
+  if (currentPanel === 'avatar') closePanel();
   if (!fromDoor && id !== state.house.activeId) {
     acceptUpdate(store.update());
     if (state.session.running) { toast('Pause your focus session before walking to another room.', true); return; }
   }
-  if (currentPanel === 'avatar') closePanel();
   const entry = state.house.rooms.find(room => room.id === id);
   if (!entry) { setHouseOpen(true, id); return; }
   if (!fromDoor) setConnectedView(false);
@@ -450,7 +452,7 @@ function renderSession() {
   const renderKey = `${formatted}:${presence}:${state.session.duration}:${today}:${minutes}:${avatarPanelActive}:${travelling}`;
   // The clock polls for deadlines twice a second, but idle rooms and unchanged
   // displayed seconds do not need another set of DOM mutations.
-  $('#start-button').disabled = travelling;
+  $('#start-button').disabled = travelling || avatarPanelActive;
   if (renderKey === lastSessionRender) return;
   lastSessionRender = renderKey;
   $('#timer').textContent = formatted;
@@ -460,7 +462,7 @@ function renderSession() {
   $('#session-label').textContent = state.session.running ? 'ONE LITTLE THING AT A TIME' : ms < state.session.duration && ms > 0 ? 'TAKE YOUR TIME' : ms === 0 ? 'A LITTLE PROGRESS, MADE' : 'SETTLE IN';
   const label = state.session.running ? 'Pause a moment' : ms === 0 ? 'Begin another session' : ms < state.session.duration ? 'Keep going' : 'Start focusing';
   $('#start-button span').textContent = label;
-  $('#start-button').disabled = avatarPanelActive;
+  $('#start-button').disabled = travelling || avatarPanelActive;
   $('#reset-session').hidden = !state.session.running && ms === state.session.duration;
   $('#reset-session').disabled = avatarPanelActive;
   const presenceBadge = $('#stage-presence');
@@ -826,7 +828,6 @@ function renderPerformance() {
 function renderPanel() {
   const panel = $('#room-panel');
   if (currentPanel === 'avatar' && !avatarPanelActive) {
-    cancelDoorTravel();
     avatarPanelActive = true; avatarSection = 'face'; room?.setAvatarEditing?.(true);
     avatarEditorResumeTimer = state.session.running;
     if (avatarEditorResumeTimer) {
@@ -962,6 +963,8 @@ function closePanel() {
   document.querySelector(`[data-panel="${previous}"]`)?.focus();
 }
 document.querySelectorAll('[data-panel]').forEach(button => button.addEventListener('click', () => {
+  // Like Decorate, the avatar editor waits until a walk or a room change ends.
+  if (travelling && button.dataset.panel === 'avatar' && currentPanel !== 'avatar') return;
   currentPanel = currentPanel === button.dataset.panel ? null : button.dataset.panel;
   renderPanel();
 }));
