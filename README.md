@@ -2,6 +2,8 @@
 
 A browser-first cozy room-decorating study game, built with Babylon.js and procedural JavaScript furniture. Working title only.
 
+![Little Hours: the room changes design, a focus session runs at night, a pouf is dragged to a new spot, the cat is petted, and daylight returns](docs/media/little-hours-film.webp)
+
 ## Run
 
 Use **Node.js 24** (recommended) and its bundled npm. Run these commands from the repository root:
