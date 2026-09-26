@@ -31,6 +31,7 @@ export const AVATAR_LINES = {
   doze: ['(yawns) Just resting my eyes…', 'Zzz… five more minutes…'],
   // One small thing in the room at the start of a break.
   activity: {
+    tea: ['A little sip. A little slower.', 'This is just what I needed.', 'There’s always time for tea.'],
     warm: ['Mm, the fire feels lovely.', 'Warming my hands a minute.', 'Toasty. ✧'],
     window: ['Look at that sky.', 'Watching the world a minute.', 'What a view.'],
     water: ['A little drink for you, plant.', 'There you go, little leaves.', 'Grow, grow, grow.'],

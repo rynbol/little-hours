@@ -893,20 +893,35 @@ try {
     const lanternPoint = tapPoint('ember-lanterns'), flames = node('ember-lanterns').getChildMeshes().filter(mesh => !mesh.metadata?.effect && glow(mesh) > 0.1);
     tap(lanternPoint); assert.ok(flames.length && flames.every(mesh => !mesh.isEnabled()), 'candle flames go out');
     tap(lanternPoint); assert.ok(flames.every(mesh => mesh.isEnabled()));
-    // Reactions end exactly at the rest pose.
+    // A tap chooses a moment; its piece reacts only after the avatar arrives.
+    const untilMoment = (condition, label) => { for (let i = 0; i < 1800 && !condition(); i++) advance(); assert.ok(condition(), label); };
+    room.setActivity('rest'); untilMoment(() => diagnostics().companion.state === 'resting', 'settled before choosing');
     const plantPoint = tapPoint('ember-plant'); tap(plantPoint);
-    assert.ok(node('ember-plant').metadata.rustle > 0.5, 'leaves rustle after a tap'); advance(80);
+    assert.equal(diagnostics().companion.requestedItemId, 'ember-plant', 'a plant tap sends the avatar to that plant');
+    untilMoment(() => (node('ember-plant').metadata.rustle || 0) > .5, 'watering rustles the leaves after arrival');
+    untilMoment(() => diagnostics().companion.state === 'resting', 'watering ends on a seat');
     assert.equal(node('ember-plant').metadata.rustle, 0, 'the rustle fades out');
-    const booksPoint = tapPoint('ember-books-right'), hinge = node('ember-books-right').metadata.book; tap(booksPoint); advance(15);
-    assert.ok(hinge.rotation.x > 0.2 && hinge.position.z > 0.225, 'a book tips out of the shelf'); advance(90);
-    assert.deepEqual([hinge.rotation.x, hinge.position.z], [0, 0.225], 'and slides back');
-    const sofaPoint = tapPoint('ember-sofa'), body = node('ember-sofa').metadata.body; tap(sofaPoint); advance(4);
-    assert.ok(body.scaling.y < 0.99, 'the cushions squash'); advance(60);
-    assert.deepEqual(body.scaling.asArray(), [1, 1, 1], 'and spring back');
-    const teaPoint = tapPoint('ember-table'); tap(teaPoint); advance(30);
-    assert.ok(node('ember-table').metadata.puff > 0.5, 'the tea puffs steam'); advance(80);
+    const booksPoint = tapPoint('ember-books-right'), hinge = node('ember-books-right').metadata.book; tap(booksPoint);
+    assert.equal(diagnostics().companion.requestedItemId, 'ember-books-right');
+    untilMoment(() => hinge.rotation.x > .2, 'a chosen book tips out of the shelf on arrival');
+    assert.equal(diagnostics().companion.activity, 'read');
+    untilMoment(() => diagnostics().companion.state === 'resting', 'reading ends on a seat');
+    assert.deepEqual([hinge.rotation.x, hinge.position.z], [0, .225], 'the book slides back');
+    const sofaPoint = tapPoint('ember-sofa'); tap(sofaPoint);
+    assert.equal(diagnostics().companion.requestedItemId, 'ember-sofa');
+    untilMoment(() => diagnostics().companion.state === 'resting', 'a sofa tap sits on the sofa');
+    assert.equal(diagnostics().companion.seatId, 'ember-sofa');
+    const teaPoint = tapPoint('ember-table'); tap(teaPoint);
+    untilMoment(() => (node('ember-table').metadata.puff || 0) > .5, 'tea puffs steam during the chosen sip');
+    assert.equal(diagnostics().companion.activity, 'tea');
+    assert.equal(diagnostics().companionModel.cup.isEnabled(), true, 'the avatar holds a teacup');
+    untilMoment(() => diagnostics().companion.state === 'resting', 'tea ends on a seat');
     assert.equal(node('ember-table').metadata.puff, 0);
-    assert.equal(JSON.stringify(diagnostics().layout), JSON.stringify(createLayout('ember-library')), 'reactions save nothing');
+    assert.equal(JSON.stringify(diagnostics().layout), JSON.stringify(createLayout('ember-library')), 'moments save nothing');
+    room.setActivity('working'); untilMoment(() => diagnostics().companion.state === 'working', 'focus returns to the desk');
+    tap(teaPoint); assert.equal(diagnostics().companion.state, 'working', 'a tea tap never interrupts focus');
+    assert.match(notices.at(-1), /Pause your timer/);
+    room.setActivity('idle');
     // The fairy lights and lanterns switch through the room lights.
     const lantern = scene.getTransformNodeByName('swaying-lantern-2').getChildMeshes()[0]; lantern.computeWorldMatrix(true);
     const center = lantern.getBoundingInfo().boundingBox.centerWorld, lightsPoint = pointerAt(center.x, center.y, center.z);
@@ -921,7 +936,7 @@ try {
     room.setEditMode(true); advance(2); tap(lampPoint);
     assert.equal(diagnostics().selectedId, 'ember-lamp'); assert.equal(saved('ember-lamp').off, undefined, 'Decorate taps never switch');
     room.setEditMode(false); room.setLayout(beforeDesignLayout); motion.matches = motionBefore; motion.emit('change', { matches: motionBefore }); advance(3);
-    console.log('PASS tap to use: hover outlines, saved switches for lamps, desk lamp, fire, records and candles, room lights, four reactions that end at rest, reduced motion and Decorate taps.');
+    console.log('PASS tap to use: hover outlines, saved switches for lamps, desk lamp, fire, records and candles, room lights, chosen tea, reading, watering and seating moments, reduced motion and Decorate taps.');
   }
   {
     // Wall pieces hang on the back and side walls. They slide along a wall and
@@ -1167,15 +1182,25 @@ try {
     const globe = node(saved('globe').id).metadata.globe; tap(tapPoint(saved('globe').id)); advance(30);
     assert.ok(globe.rotation.y > 1, 'a tap spins the globe'); advance(100);
     assert.equal(globe.rotation.y, 0, 'the globe comes to rest');
-    tap(tapPoint(saved('tea-cart').id)); advance(30);
-    assert.ok(node(saved('tea-cart').id).metadata.puff > 0.5, 'the teapot puffs steam'); advance(80);
+    tap(tapPoint(saved('tea-cart').id));
+    assert.equal(diagnostics().companion.requestedItemId, saved('tea-cart').id, 'a tea cart tap chooses a tea break');
+    for (let i = 0; i < 1800 && !(node(saved('tea-cart').id).metadata.puff > .5); i++) advance();
+    assert.ok(node(saved('tea-cart').id).metadata.puff > .5, 'the teapot puffs steam once the companion arrives');
+    room.setActivity('working');
+    for (let i = 0; i < 1800 && diagnostics().companion.state !== 'working'; i++) advance();
+    room.setActivity('idle'); advance(100);
     assert.equal(node(saved('tea-cart').id).metadata.puff, 0);
     const bag = node(saved('bean-bag').id).metadata.body; tap(tapPoint(saved('bean-bag').id)); advance(4);
     assert.ok(bag.scaling.y < 0.99, 'the bean bag squashes'); advance(60);
     assert.deepEqual(bag.scaling.asArray(), [1, 1, 1], 'and springs back');
     tap(tapPoint(saved('monstera').id));
-    assert.ok(node(saved('monstera').id).metadata.rustle > 0.5, 'the monstera rustles'); advance(80);
+    assert.equal(diagnostics().companion.requestedItemId, saved('monstera').id, 'a monstera tap sends the avatar to water it');
+    for (let i = 0; i < 1800 && !(node(saved('monstera').id).metadata.rustle > .5); i++) advance();
+    assert.ok(node(saved('monstera').id).metadata.rustle > .5, 'the monstera rustles when watered'); advance(80);
     assert.equal(node(saved('monstera').id).metadata.rustle, 0);
+    room.setActivity('working');
+    for (let i = 0; i < 1800 && diagnostics().companion.state !== 'working'; i++) advance();
+    room.setActivity('idle');
     // Reduced motion: the fish keep still and the bubbles hide; the lamp still switches.
     motion.matches = true; motion.emit('change', { matches: true }); advance(3);
     const bubbles = tank.getChildMeshes().find(mesh => mesh.name === 'aquarium-bubble'), still = Array.from(fish._thinInstanceDataStorage.matrixData); advance(12);

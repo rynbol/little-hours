@@ -8,6 +8,7 @@ import { createStateStore, localDate, storageKey } from './state.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { PRESETS, normalizeLayout, MAX_ITEMS, pieceCount, roomDesign } from './layout.js';
 import { companionIntent } from './companion.js';
+import { createMomentsUI } from './moments-ui.js';
 import { PETS } from './pet.js';
 import { createSpeech, PET_LINES, AVATAR_LINES } from './speech.js';
 import { ARTWORKS, SLEEVES, artName } from './art.js';
@@ -50,6 +51,7 @@ const store = createStateStore((import.meta.env.DEV && window.__littleHoursTest?
 let state = store.state;
 let room;
 let houseUI;
+let momentsUI;
 let houseOpen = false;
 let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
 let currentPanel = null, avatarPanelActive = false, avatarEditorResumeTimer = false, avatarSection = 'face';
@@ -97,7 +99,7 @@ document.querySelector('#app').innerHTML = `
           <div class="stage-presence" id="stage-presence" data-presence="idle" role="status" aria-live="polite" aria-atomic="true" aria-label="Your local focus status: In your room" title="Your focus status in this browser."><span id="presence-icon" aria-hidden="true">${icon('home')}</span><span id="room-status">In your room</span></div>
           <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
           <div class="mini-caption" id="mini-caption" hidden>Mini view preview · inside this page</div>
-          <div class="room-hint" id="room-hint">Drag to look around<span>·</span>Tap a lamp, the fire or the cat</div>
+          <div class="room-hint" id="room-hint">Drag to look around<span>·</span>Tap a plant, bookcase or tea table</div>
         </div>
         <div class="room-bottom">
           <div class="room-company">${icon('cat')}<span id="pet-company">You & Miso</span></div>
@@ -262,7 +264,7 @@ function renderRoomLabel() {
     ? 'Avatar preview. Drag left or right over the character to turn them. Your focus timer is paused while editing.'
     : editMode
     ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
-    : `Interactive 3D cutaway study room. Drag to turn the room. Tap a lamp, the fire or the record player to switch it, tap your companion or ${pet}, or tap a built doorway to walk to another room while your focus timer is paused.`;
+    : `Interactive 3D cutaway study room. Drag to turn the room. Tap a plant to water it, a bookcase to read, a tea table for tea, or a seat to get comfortable. Little moments offers the same actions with buttons. Tap a lamp, the fire or the record player to switch it, tap your companion or ${pet}, or tap a built doorway to walk to another room while your focus timer is paused.`;
   $('#room-canvas').setAttribute('aria-label', label);
   $('#room-canvas canvas')?.setAttribute('aria-label', label);
 }
@@ -282,6 +284,11 @@ try {
       // Back after half an hour or more: a small hello.
       if (state.seenAt && Date.now() - state.seenAt > 30 * 60_000) setTimeout(welcome, 1200);
     },
+    onItemInteraction({ kind }) {
+      speech?.hide('avatar');
+      const destination = { tea: 'On the way for tea', water: 'Going to tend the leaves', read: 'Finding a quiet page', rest: 'Finding a soft seat' };
+      $('#companion-status-text').textContent = `Companion · ${destination[kind]}`;
+    },
     onCompanionTap({ state: activity, activity: doing }) {
       const lines = (activity === 'busy' || (activity === 'resting' && doing === 'read')) ? AVATAR_LINES.activity[doing] : AVATAR_LINES.tap[activity];
       if (speech && speech.say('avatar', lines || AVATAR_LINES.tap.idle)) lastAvatarLine = Date.now();
@@ -294,7 +301,7 @@ try {
       companionActivity = activity;
       const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', customizing: 'Choosing a look', 'resting-at-desk': 'Resting at the desk', busy: 'Taking a little break', 'at-door': 'At the doorway' };
       const pet = PETS[state.pet]?.name || PETS.cat.name;
-      const tasks = { warm: 'Warming up by the fire', window: 'Looking out of the window', water: 'Watering the plants', record: 'Putting on a record', pet: `Petting ${pet}`, lamp: 'Switching on a lamp', read: 'Reading in the armchair' };
+      const tasks = { tea: 'Enjoying a little tea', warm: 'Warming up by the fire', window: 'Looking out of the window', water: 'Watering the plants', record: 'Putting on a record', pet: `Petting ${pet}`, lamp: 'Switching on a lamp', read: 'Reading a few pages' };
       const task = (activity === 'busy' || (activity === 'resting' && doing === 'read')) && tasks[doing];
       $('#companion-status').dataset.state = activity;
       $('#companion-status-text').textContent = `Companion · ${task || labels[activity] || 'In the room'}`;
@@ -327,6 +334,7 @@ try {
   const speechLayer = document.createElement('div'); speechLayer.className = 'speech-layer';
   $('#room-canvas').appendChild(speechLayer);
   speech = createSpeech(speechLayer, { anchor: who => room?.anchor(who), reducedMotion: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
+  momentsUI = createMomentsUI($('#stage'), { room, signal: listeners.signal, getState: () => ({ items: state.layout.items, focusing: state.session.running, unavailable: editMode || avatarPanelActive || houseOpen || Boolean(connectedView) || travelling || compact }) });
 } catch (error) {
   $('#loading-note').textContent = 'The room couldn’t load. Try reloading; your focus timer is still ready.';
   console.error('Could not create the room:', error);
@@ -500,6 +508,7 @@ function showSessionCelebration(earned) {
   feedback.celebrate($('.celebration-flower'));
 }
 function renderSession() {
+  momentsUI?.refresh();
   const ms = displayedRemaining(state.session);
   const formatted = formatTime(ms);
   const presence = sessionPhase(state.session);
@@ -866,7 +875,7 @@ function renderInspector() {
   const selected = selectedItem && getFurniture(selectedItem.type);
   const pending = placement && getFurniture(placement.type);
   if (!editMode) {
-    $('#room-hint').innerHTML = `Drag to look around<span>·</span>Tap a lamp, the fire or ${PETS[state.pet]?.name || PETS.cat.name}`;
+    $('#room-hint').innerHTML = `Drag to look around<span>·</span>Tap a plant, bookcase or tea table`;
     return;
   }
   const rememberedFocus = rememberControlFocus(inspector);
@@ -931,7 +940,7 @@ function renderPanel() {
   document.body.classList.toggle('is-avatar-editing', currentPanel === 'avatar');
   renderRoomLabel();
   if (avatarPanelActive) $('#room-hint').textContent = 'Drag left or right over your avatar to turn them';
-  else if (!editMode) $('#room-hint').innerHTML = `Drag to look around<span>·</span>Tap a lamp, the fire or ${PETS[state.pet]?.name || PETS.cat.name}`;
+  else if (!editMode) $('#room-hint').innerHTML = `Drag to look around<span>·</span>Tap a plant, bookcase or tea table`;
   panel.hidden = !currentPanel;
   document.querySelectorAll('[data-panel]').forEach(button => button.setAttribute('aria-expanded', button.dataset.panel === currentPanel));
   if (!currentPanel) return;
@@ -1135,6 +1144,7 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   $('#session-celebration')?.close();
   clearTimeout(travelTimer); clearTimeout(arrivalTimer); connectedView?.dispose();
   houseUI?.dispose();
+  momentsUI?.dispose();
   room?.dispose?.();
   noiseNode?.stop();
   audioContext?.close();

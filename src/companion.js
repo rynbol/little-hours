@@ -1,6 +1,7 @@
 import { getFurniture } from './catalog.js';
 import { ROOM_BOUNDS, FLOOR_Y, rugStack, standHeight, groundAt, footprintBounds, petBed } from './layout.js';
 import { sessionPhase } from './session.js';
+import { interactionFor } from './item-interactions.js';
 
 export const COMPANION_RADIUS = 0.24;
 // Half the room a sitting pet takes up, for walks around it.
@@ -16,6 +17,7 @@ const SEATS = ['daybed', 'lounge-chair', 'ottoman'];
 export const ACTIVITIES = Object.freeze({
   warm: { seconds: 11 }, window: { seconds: 11 }, water: { seconds: 8, useAt: 2.6 },
   record: { seconds: 7, useAt: 2.2 }, pet: { seconds: 8, useAt: 1.4 }, lamp: { seconds: 4.5, useAt: 1.6 },
+  tea: { seconds: 10, useAt: 2.8 }, read: { seconds: 12, useAt: .8 },
 });
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const ease = t => t * t * (3 - 2 * t);
@@ -277,7 +279,7 @@ export function planDoorwayTrip(layout, source, link, obstacles = navigationObst
 // night beside an unlit floor lamp. `reach` is where its hand goes (y above
 // the floor), for the pieces it touches; a piece or pet on a rug is higher.
 // `floor` is where the lowest rug lies (see rugStack).
-export function activitySpots(layout, { night = false, windowX = -2.7, pet = null, canReach = null, floor = FLOOR_Y } = {}) {
+export function activitySpots(layout, { night = false, windowX = -2.7, pet = null, canReach = null, floor = FLOOR_Y, requestedItemId = null } = {}) {
   const obstacles = navigationObstacles(layout), spots = [], rugs = rugStack(layout.items, floor), lift = item => standHeight(item, rugs) - FLOOR_Y;
   // Nothing is done standing on the pet, or where it is going.
   const clearOfPet = point => !pet || pet.held || (distance(point, pet) > 0.6 && (!pet.to || distance(point, pet.to) > 0.6));
@@ -295,14 +297,18 @@ export function activitySpots(layout, { night = false, windowX = -2.7, pet = nul
   // `lift` is how much higher than the floor the piece or the pet stands.
   const raised = (reach, lift) => ({ ...reach, y: reach.y + lift, lift });
   for (const item of layout.items) {
+    if (requestedItemId && item.id !== requestedItemId) continue;
     // Wall pieces have no floor footprint.
     const depth = getFurniture(item.type)?.footprint?.[1] ?? 0;
     // Before the hearth, or beside the middle when the pet has the warm spot.
-    if (item.type === 'fireplace' && !item.off) [0, -0.7, 0.7].some(x => add('warm', localPoint(item, x, depth / 2 + 0.75), localPoint(item, x, 0), item.id));
+    if (requestedItemId && interactionFor(item.type)?.kind === 'tea') around(item, 'tea', .44);
+    else if (requestedItemId && item.type === 'bookcase') [0, -.45, .45].some(x => add('read', localPoint(item, x, depth / 2 + .45), item, item.id));
+    else if (item.type === 'fireplace' && !item.off) [0, -0.7, 0.7].some(x => add('warm', localPoint(item, x, depth / 2 + 0.75), localPoint(item, x, 0), item.id));
     else if (item.type === 'plant' || item.type === 'moon-tree' || item.type === 'monstera') around(item, 'water', 0.45);
     else if (item.type === 'low-cabinet') add('record', localPoint(item, -0.25, depth / 2 + 0.26), localPoint(item, -0.25, 0), item.id, raised({ ...localPoint(item, -0.25, 0.14), y: 1.05 }, lift(item)));
     else if (item.type === 'floor-lamp' && item.off && night) around(item, 'lamp', 0.27, spot => raised(toward(item, spot, 0.07, 1.5), lift(item)));
   }
+  if (requestedItemId) return spots;
   [0.85, 1.3].some(gap => [0, -0.6, 0.6, -1.2, 1.2].some(dx => add('window', { x: windowX + dx, z: ROOM_BOUNDS.minZ + gap }, { x: windowX + dx, z: ROOM_BOUNDS.minZ - 1 })));
   // Beside the pet while it naps or sits, never while it walks or is carried.
   if (pet && !pet.moving && !pet.held && ['sleeping', 'sitting'].includes(pet.state)) {
@@ -320,6 +326,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   // which skips standing activities. A lamp or record player is switched on
   // at most once per visit (`switched`), so one switched off on purpose stays off.
   let context = { night: false, windowX: -2.7, pet: null }, breakUsed = false, used = false, reduced = false;
+  let requestedItemId = null;
   // How often each activity was done this visit: the least done comes first.
   const done = new Map();
   const switched = new Set();
@@ -364,6 +371,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   function status(state) { if (pose.state !== state) { pose.state = state; onChange({ state, atDesk: pose.atDesk, activity: pose.activity }); } }
   const seatType = end => layout.items.find(item => item.id === end.itemId)?.type;
   function deskPose() {
+    requestedItemId = null;
     const desk = layout?.items.find(item => item.id === layout.activeDeskId);
     if (!desk) return;
     const seat = seatsFor(desk)[0];
@@ -454,6 +462,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   }
   // Done here: on to a seat, or back to the desk when none is free.
   function leaveActivity() {
+    requestedItemId = null;
     const here = { x: pose.x, z: pose.z };
     pose.activity = null;
     if (!startTrip(here, false) && !startTrip(here, true)) deskPose();
@@ -467,6 +476,8 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   }
   function reconcile() {
     if (!layout || editing || avatarEditing) return;
+    // A chosen moment holds its destination until it ends or focus resumes.
+    if (requestedItemId && intent !== 'working') return;
     // Keep the legacy neutral startup intent parked at the desk until the
     // session controller supplies its explicit non-focus `rest` state.
     const toDesk = intent === 'working' || intent === 'idle';
@@ -501,7 +512,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       if (!trip && !pose.atDesk && anchor && !editing) {
         if (anchor.activity) {
           const same = spot => spot.kind === anchor.activity && spot.itemId === anchor.itemId && distance(spot, anchor.seat) < 1e-6;
-          if (anchor.activity === 'pet' ? walkable(anchor.seat, navigationObstacles(next)) : activitySpots(next, context).some(same)) reconcile();
+          if (anchor.activity === 'pet' ? walkable(anchor.seat, navigationObstacles(next)) : activitySpots(next, { ...context, requestedItemId }).some(same)) reconcile();
           else leaveActivity();
           return;
         }
@@ -515,6 +526,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     useLayout(next) { layout = next; },
     setIntent(next) {
       if (!['idle', 'working', 'break', 'rest'].includes(next) || next === intent) return;
+      if (next === 'working') requestedItemId = null;
       if (next === 'working' && doorArrival) {
         const cancel = doorArrival;
         this.cancelDoorWalk({ returnToDesk: true });
@@ -522,11 +534,38 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       }
       intent = next; if (next !== 'break') breakUsed = false; reconcile();
     },
+    requestInteraction(itemId) {
+      const item = layout?.items.find(entry => entry.id === itemId), interaction = interactionFor(item?.type);
+      if (!interaction) return { ok: false, reason: 'unsupported' };
+      if (intent === 'working') return { ok: false, reason: 'focusing' };
+      if (editing || avatarEditing) return { ok: false, reason: 'editing' };
+      if (doorArrival || pose.state === 'at-door') return { ok: false, reason: 'travelling' };
+      if (requestedItemId === itemId) return { ok: false, reason: 'already' };
+      // Finish a rise/sit before accepting another target: its position is
+      // still inside furniture. A walk can safely redirect on clear floor.
+      if (trip && legs[legIndex]?.kind !== 'walk') return { ok: false, reason: 'moving' };
+      const from = doorSource();
+      const planned = aroundPet(obstacles => {
+        const seats = seatsFor(item).filter(seat => canReach(seat.portal));
+        if (seats.length) return bestRoute(layout, routeStarts(layout, from), seats, obstacles);
+        const spots = activitySpots(layout, { ...context, canReach, requestedItemId: itemId });
+        for (const spot of spots) {
+          const route = planActivityTrip(layout, from, spot, obstacles);
+          if (route) return route;
+        }
+        return null;
+      });
+      if (!planned) return { ok: false, reason: 'blocked' };
+      requestedItemId = itemId;
+      startTrip(from, false, planned);
+      return { ok: true, itemId, kind: interaction.kind };
+    },
     walkToDoor(link, onArrive = () => {}, onOpen = () => {}) {
       if (!layout || !link || doorArrival || editing || avatarEditing) return false;
       const from = doorSource();
       const planned = aroundPet(obstacles => planDoorwayTrip(layout, from, link, obstacles));
       if (!planned) return false;
+      requestedItemId = null;
       doorArrival = onArrive; doorOpening = onOpen;
       if (!startTrip(from, false, planned)) { doorArrival = null; doorOpening = null; return false; }
       return true;
@@ -551,6 +590,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     },
     beginAvatarEditing() {
       if (avatarEditing) return null;
+      requestedItemId = null;
       let exit = null;
       if (trip) {
         // If the avatar was between destinations, keep the visible floor
@@ -632,20 +672,20 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
         // fire switched off, ends it early.
         const plan = ACTIVITIES[pose.activity], pet = context.pet;
         pose.activityTime += Math.min(dt, .1);
-        if (!used && plan.useAt != null && pose.activityTime >= plan.useAt && !reducedMotion) {
+        if (!used && plan.useAt != null && pose.activityTime >= plan.useAt && (!reducedMotion || requestedItemId)) {
           used = true;
           const toggles = pose.activity === 'lamp' || pose.activity === 'record';
           if (!toggles || !switched.has(anchor.itemId)) { if (toggles) switched.add(anchor.itemId); onUse({ kind: pose.activity, itemId: anchor.itemId }); }
         }
         const petGone = pose.activity === 'pet' && (!pet || pet.moving || pet.held || distance(pet, anchor.seat) > 1.3);
         const cold = pose.activity === 'warm' && layout.items.find(item => item.id === anchor.itemId)?.off;
-        if (reducedMotion || pose.activityTime >= plan.seconds || petGone || cold) leaveActivity();
+        if ((reducedMotion && !requestedItemId) || pose.activityTime >= plan.seconds || petGone || cold) leaveActivity();
       } else if (!pose.atDesk && !reducedMotion) {
         restTime += dt; pose.activityTime += Math.min(dt, .1);
         if (restTime >= DOZE_AFTER) { status('sleeping'); pose.doze = Math.min(1, (restTime - DOZE_AFTER) / 2); }
       }
       return pose;
     },
-    diagnostics() { return { ...pose, intent, destination: trip?.end.itemId || anchor?.itemId || layout?.activeDeskId, path: trip?.path.map(p => ({ ...p })) || [] }; },
+    diagnostics() { return { ...pose, intent, requestedItemId, destination: trip?.end.itemId || anchor?.itemId || layout?.activeDeskId, path: trip?.path.map(p => ({ ...p })) || [] }; },
   };
 }
