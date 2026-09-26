@@ -26,11 +26,11 @@ export default {
       await app.click(spot.x, spot.y); await sleep(400);
       check(`clicking the ${id} selects it`, await app.text('#house-detail h2') === name, await app.text('#house-detail h2'));
     }
-    const count = (await app.house()).renderCount;
+    const { renderCount: count, builds } = await app.house();
     await steps.backToRoom(app);
     await app.clickSel('#rooms-button'); await sleep(150);
     const again = await app.house();
-    check('coming back keeps the built house', again && again.renderCount >= count, `${count} → ${again?.renderCount}`);
+    check('coming back keeps the built house', again && again.renderCount >= count && again.builds === builds, `renders ${count} → ${again?.renderCount}, builds ${builds} → ${again?.builds}`);
     check('and it arrives closed again', again && again.open < .2, again);
     await app.settle();
     check('then opens', (await app.house()).open === 1);

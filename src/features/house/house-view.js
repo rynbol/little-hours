@@ -69,7 +69,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   let dragging = null;
   const homeAngle = Math.PI / 2.8;
   let targetAngle = homeAngle, lastPick = 0, hovering = null, burst = null;
-  let model, frame = 0, disposed = false, suspended = false, renderCount = 0, lastDraw = 0;
+  let model, frame = 0, disposed = false, suspended = false, renderCount = 0, builds = 0, lastDraw = 0;
   // The whole house opens like a dollhouse front. It arrives closed, unless motion is reduced.
   const arrival = () => motion.matches ? 0 : performance.now() + 650;
   let closed = false, openAt = arrival(), lastOpenStep = 0;
@@ -182,6 +182,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     sky.intensity = theme === 'dusk' ? .56 : .62; sun.intensity = theme === 'dusk' ? .8 : .95;
     sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9');
     const previous = model;
+    builds++;
     model = createHouseModel(scene, house, selectedId, theme, avatar, previous);
     previous?.dispose();
     roomMotion.bind(model);
@@ -271,7 +272,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       resize();
     },
     setFocused(value) { if (focused === Boolean(value)) return; focused = Boolean(value); requestRender(); },
-    diagnostics: () => ({ scene, engine, closed, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
+    diagnostics: () => ({ scene, engine, closed, builds, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
     dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); controls.remove(); tags.remove(); note.remove(); },
   };
 }
