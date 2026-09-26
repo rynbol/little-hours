@@ -1,5 +1,14 @@
 /* The wardrobe uses one viewport: an unobstructed portrait and a paper drawer. */
 .avatar-stage-heading, .portrait-backdrop, .avatar-preview-controls { display: none; }
+/* Let the returning portrait settle below the room heading before controls
+   reappear, especially on phones where those two surfaces trade places. */
+body:has(canvas[data-portrait='leaving']) :is(.room-heading, .home-connections, .room-bottom, #focus-card) {
+  animation: wardrobe-controls-return .88s both;
+  pointer-events: none;
+}
+body:has(canvas[data-portrait='leaving']) :is(.speech-layer, .stage-presence, .companion-status, .room-hint) { visibility: hidden; }
+canvas[data-portrait='leaving'] { pointer-events: none; }
+@keyframes wardrobe-controls-return { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }
 .is-avatar-editing { overflow: hidden; }
 .is-avatar-editing .workspace { display: block; padding-top: 18px; }
 .is-avatar-editing .room-section { display: grid; grid-template-columns: minmax(0, 1fr) 376px; grid-template-rows: 42px minmax(0, 1fr); column-gap: 24px; height: calc(100svh - 95px); min-height: 0; }

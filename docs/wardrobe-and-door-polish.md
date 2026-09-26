@@ -52,3 +52,19 @@ Load `wardrobe.css` after general UI styling. Keep the portrait branch of
 `fitRoom` when adjusting ordinary room composition. Item-interaction integration
 adds a sixth mobile-companion child mesh for the mug; retain that updated
 expectation alongside the avatar geometry checks.
+
+## Smooth wardrobe return
+
+The exit now preserves the complete orthographic framing, including its center.
+When closing the drawer changes the canvas bounds, it preserves the avatar's
+screen position and retargets the pullback to the newly fitted room. Main applies
+that resize synchronously to avoid one incorrect frame before ResizeObserver.
+On phones, the drawing surface also moves down with the pullback so the newly
+exposed room heading cannot clip the portrait. Room controls fade in afterward.
+
+Scenery fades into the pullback, the portrait plinth fades away, and the companion
+resumes its routine once the camera has settled. Quick reopen, reduced motion,
+and disposal release the transient visibility and canvas animation state.
+Regression checks cover screen-position continuity after resizing and the final
+projection step. Browser QA covered desktop and 390×844 exits, turned avatars,
+Done/Close/Escape, keyboard reopen during return, focus resume, and reduced motion.
