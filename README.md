@@ -75,6 +75,7 @@ The chosen direction is browser first, with a whole cutaway room visible like Ro
 npm test
 npm run verify:room
 npm run build
+npm run test:e2e   # first time: npx playwright install chromium
 ```
 
 `npm test` covers wall-clock sessions, expiry accounting, storage failure, cross-tab edits, saved-layout migration, house rewards and purchases, independent rooms, placement rules, presets and procedural furniture bounds.
@@ -83,9 +84,11 @@ The development-only `/checks/house.html` page runs the real app with a separate
 
 See [growing house notes](docs/growing-house.md) for save behavior, rendering limits and the browser verification results.
 
+`npm run test:e2e` drives the real app in Chromium with Playwright: a focus session through pause, reload and exactly-once completion (using a fake clock), downloading and restoring a home backup, the remembered chime choice, and automated axe accessibility scans of the focus card and saves panel. The room renders with software WebGL there, so these tests check behavior, not appearance or frame rate.
+
 `npm run verify:room` imports the production runtime into Babylon's **NullEngine**. It exercises the real scene graph, camera math, editor operations, reduced motion and lifecycle cleanup without a GPU. Browser checks separately cover appearance, frame rate, placement/picking, themes, pet interaction, mini view, audio, timer controls, refresh restoration and keyboard use. Native touch scrolling still needs physical-device testing.
 
-[GitHub Actions](.github/workflows/ci.yml) runs dependency installation, both test commands and the production build on pushes and pull requests using Node.js 24.
+[GitHub Actions](.github/workflows/ci.yml) runs dependency installation, the unit and room checks, the production build and, in a separate job, the browser journeys on pushes and pull requests using Node.js 24.
 
 ## Proposed next milestones
 

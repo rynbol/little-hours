@@ -533,3 +533,20 @@ button.furniture-card[aria-pressed='true'] { animation-timing-function: var(--so
 .journey-progress i { display: block; height: 100%; width: 100%; background: #c3cead; transform: scaleX(0); transform-origin: left; }
 .is-door-walking .companion-status, .is-door-walking .room-hint { visibility: hidden; }
 @media (max-width: 640px) { .is-door-walking .room-travel { bottom: 7px; } }
+
+/* Sound and saving. */
+.chime-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 11px; color: #7a6446; }
+.save-status { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.save-status:hover, .save-status[aria-expanded='true'] { text-decoration: underline; text-underline-offset: 3px; }
+.save-status.is-warning { color: #f2b39c; }
+.save-note.is-warning { color: #9a4b32; }
+.save-note { margin: 4px 0 12px; font-size: 12px; line-height: 1.5; color: #6f593c; }
+.save-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.restore-confirm { margin-top: 14px; padding-top: 12px; border-top: 1px solid #d7c3a4; }
+.restore-preview { margin: 6px 0; padding: 10px 12px; border: 1px solid #d7c3a4; border-radius: 8px; background: #fbf3e2; }
+.restore-preview strong { font-size: 13px; color: #5f492e; }
+.restore-preview p { margin: 3px 0 0; font-size: 11px; color: #7a6446; }
+#undo-restore { margin-top: 12px; text-decoration: underline; text-underline-offset: 3px; }
+@media (pointer: coarse) {
+  .durations button, .start-button, .chime-toggle, .save-status { min-height: 44px; }
+}

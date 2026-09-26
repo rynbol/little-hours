@@ -3,8 +3,10 @@ import './ui.css';
 import { createUIFeedback } from './ui-feedback.js';
 import { blossomArt, coinArt, sproutArt } from './ui-art.js';
 import { createRoom } from './room.js';
-import { createSession, remainingAt, formatTime, sessionPhase, displayedRemaining } from './session.js';
+import { createSession, remainingAt, formatTime, spokenTime, sessionPhase, displayedRemaining } from './session.js';
 import { createStateStore, localDate, storageKey } from './state.js';
+import { createAudio } from './audio.js';
+import { createBackup, readBackup, backupFilename } from './backup.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { PRESETS, normalizeLayout, MAX_ITEMS, pieceCount, roomDesign } from './layout.js';
 import { companionIntent } from './companion.js';
@@ -46,10 +48,12 @@ const icons = {
   avatar: '<circle cx="12" cy="8" r="3.5"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/><path d="M8.5 14.5c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2"/>',
 };
 const icon = (name) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || icons.home}</svg>`;
-const store = createStateStore((import.meta.env.DEV && window.__littleHoursTest?.storage) || {
+const deviceStorage = (import.meta.env.DEV && window.__littleHoursTest?.storage) || {
   getItem: key => localStorage.getItem(key),
   setItem: (key, value) => localStorage.setItem(key, value),
-});
+};
+const store = createStateStore(deviceStorage);
+const audio = createAudio(deviceStorage);
 let state = store.state;
 let room;
 let houseUI;
@@ -58,9 +62,9 @@ let houseOpen = false;
 let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
 let currentPanel = null, avatarPanelActive = false, avatarEditorResumeTimer = false, avatarSection = 'looks';
 let compact = false;
-let audioContext, noiseNode, gainNode;
-let soundEnabled = false;
 let storageWarningShown = false;
+let lastSaveOk = true;
+let pendingRestore = null;
 let toastTimeout;
 let speech = null;
 let lastAvatarLine = 0;
@@ -140,13 +144,13 @@ document.querySelector('#app').innerHTML = `
         </div>
         <button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
         <button class="reset-session" id="reset-session" hidden>Start over</button>
-        <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="30" aria-label="Rain volume" disabled /></div>
+        <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="${audio.prefs.volume}" aria-label="Rain volume" disabled /><label class="chime-toggle"><span>Chime when a session ends</span><input type="checkbox" id="chime-toggle" ${audio.prefs.chime ? 'checked' : ''} /></label></div>
         <div id="focus-reward" class="focus-reward"></div>
         <details class="session-journal"><summary><span>Today’s little wins</span><span id="today-total">0 min</span></summary><div id="today-sessions"></div></details>
         <div class="daily-note" id="daily-note">Good things begin with a little time.</div>
       </aside>
     </main>
-    <footer class="app-footer"><span>A softer place to spend your hours.</span><span>Saved on this device <span aria-hidden="true">✧</span></span></footer>
+    <footer class="app-footer"><span>A softer place to spend your hours.</span><button class="save-status" id="save-status" data-panel="saves" aria-expanded="false" aria-controls="room-panel"><span id="save-status-text">Saved on this device</span> <span aria-hidden="true">✧</span></button></footer>
   </div>
   <dialog id="session-celebration" class="session-celebration" aria-labelledby="celebration-title" aria-describedby="celebration-copy">
     <form method="dialog"><button class="celebration-close" aria-label="Close session celebration">${icon('close')}</button><div class="celebration-flower" aria-hidden="true"><img src="/ui/little-bloom.png" width="160" height="160" alt="" /></div><p class="eyebrow">LOOK AT YOU GROW</p><h2 id="celebration-title">A little time.<br><em>A lovely little win.</em></h2><p id="celebration-copy"></p><div class="celebration-coins">${coinArt()}<strong id="celebration-earned"></strong><span>for your home</span></div><button class="start-button" autofocus>Enjoy a little break ${icon('heart')}</button><p class="celebration-note">Your room will be right here.</p></form>
@@ -249,7 +253,10 @@ function acceptUpdate(result) {
   if (result.completed) {
     room?.pet(); avatarSay('finish', { force: true });
     showSessionCelebration(result.earned);
+    // Ring for a session that just ended, not one found finished long ago.
+    if (Date.now() - state.session.completedAt < 90_000) audio.chime();
   }
+  setSaveStatus(result.persisted);
   if (!result.persisted && !storageWarningShown) {
     storageWarningShown = true;
     toast('Your browser couldn’t save this visit. The room still works.');
@@ -544,7 +551,7 @@ function renderSession() {
   lastSessionRender = renderKey;
   $('#timer').textContent = formatted;
   $('#dock-timer').textContent = formatted;
-  $('#timer').setAttribute('aria-label', `${formatted} remaining`);
+  $('#timer').setAttribute('aria-label', `${spokenTime(ms)} remaining`);
   document.title = state.session.running ? `${formatted} · Little Hours` : 'Little Hours — a little place to focus';
   $('#session-label').textContent = state.session.running ? 'IN YOUR OWN TIME' : ms < state.session.duration && ms > 0 ? 'A LITTLE BREATHER' : ms === 0 ? 'YOU DID THAT' : 'SETTLE IN';
   $('#timer-caption').textContent = state.session.running ? 'one thing at a time' : ms === 0 ? 'a little progress, made' : ms < state.session.duration ? 'ready when you are' : 'a small beginning';
@@ -583,6 +590,8 @@ function tick() {
 $('#start-button').addEventListener('click', () => {
   if (travelling) { toast('Please wait until you arrive before starting a focus session.', true); return; }
   const resuming = !state.session.running && remainingAt(state.session) > 0 && remainingAt(state.session) < state.session.duration;
+  // Starting is a gesture, which lets the chime sound when this session ends.
+  if (!state.session.running) audio.unlock();
   // Preserve the action shown on the button if the deadline just passed.
   acceptUpdate(store.setRunning(!state.session.running));
   if (state.session.running) avatarSay(resuming ? 'resume' : 'start', { force: true });
@@ -974,7 +983,7 @@ function renderPanel() {
   // later when ResizeObserver runs after the portrait layout disappears.
   if (leavingAvatar) room?.resize?.();
   if (!currentPanel) return;
-  panel.innerHTML = `<div class="panel-heading"><span>${({ atmosphere: 'Find your kind of quiet', pet: 'Your little companion', avatar: 'Meet your avatar' })[currentPanel] || 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
+  panel.innerHTML = `<div class="panel-heading"><span>${({ atmosphere: 'Find your kind of quiet', pet: 'Your little companion', avatar: 'Meet your avatar', saves: 'Keep your home safe' })[currentPanel] || 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
   if (currentPanel === 'atmosphere') {
     panel.insertAdjacentHTML('beforeend', `<div class="theme-options">${[['day', 'sun', 'Daylight'], ['dusk', 'moon', 'Night'], ['rain', 'rain', 'Rainy afternoon']].map(([key, symbol, title]) => `<button class="theme-option ${key}" data-theme-choice="${key}" aria-pressed="${state.theme === key}">${icon(symbol)}<span>${title}</span></button>`).join('')}</div>`);
     panel.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click', () => {
@@ -1022,6 +1031,8 @@ function renderPanel() {
       renderPanel(); $('#avatar-reset')?.focus({ preventScroll: true });
     });
     $('#avatar-done').addEventListener('click', closePanel);
+  } else if (currentPanel === 'saves') {
+    renderSavesPanel(panel);
   } else {
     panel.insertAdjacentHTML('beforeend', `<div class="quality-options" aria-label="Room rendering quality">${[['auto', 'Adaptive'], ['high', 'Crisp'], ['battery', 'Save energy']].map(([id, label]) => `<button data-quality="${id}" aria-pressed="${quality === id}">${label}</button>`).join('')}</div><p class="performance-note">Adaptive balances detail and motion. Save energy limits animation to 30 frames per second.</p><dl class="performance-metrics" id="performance-metrics"></dl><p class="performance-note">Babylon.js engine · live measurements while this tab is visible. CPU measurements exclude GPU time.</p>`);
     panel.querySelectorAll('[data-quality]').forEach(button => button.addEventListener('click', () => {
@@ -1033,6 +1044,66 @@ function renderPanel() {
   }
   $('#close-panel').addEventListener('click', closePanel);
   if (currentPanel !== 'avatar') $('#close-panel').focus({ preventScroll: true });
+}
+function setSaveStatus(persisted) {
+  if (persisted === lastSaveOk) return;
+  lastSaveOk = persisted;
+  $('#save-status').classList.toggle('is-warning', !persisted);
+  $('#save-status-text').textContent = persisted ? 'Saved on this device' : 'Not saved · this visit only';
+  if (currentPanel === 'saves') renderPanel();
+}
+const dateLabel = timestamp => new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+// Download a copy of the home, or bring one back after previewing it. The
+// home being replaced is kept aside so a restore can be undone.
+function renderSavesPanel(panel) {
+  const busy = state.session.running;
+  const summary = pendingRestore?.summary;
+  const preview = document.createElement('div');
+  preview.className = 'restore-preview';
+  if (summary) {
+    const title = document.createElement('strong');
+    title.textContent = summary.houseName;
+    const detail = document.createElement('p');
+    detail.textContent = `${summary.rooms} ${summary.rooms === 1 ? 'room' : 'rooms'} · ${summary.pieces} pieces · ${summary.coins} coins · ${summary.sessions} ${summary.sessions === 1 ? 'session' : 'sessions'}${summary.exportedAt ? ` · saved ${dateLabel(summary.exportedAt)}` : ''}`;
+    preview.append(title, detail);
+  }
+  panel.insertAdjacentHTML('beforeend', `<p class="save-note${lastSaveOk ? '' : ' is-warning'}" role="status">${lastSaveOk ? 'Everything is saved in this browser. A downloaded copy keeps your home safe if this browser’s data is ever cleared.' : 'This browser couldn’t save your latest changes. Download a copy to keep them.'}</p>
+    <div class="save-actions"><button class="quiet-button" id="download-backup">${icon('check')} Download a copy</button><button class="quiet-button" id="choose-backup" ${busy ? 'disabled' : ''}>${icon('home')} Bring back a copy</button><input type="file" id="backup-file" accept="application/json,.json" hidden></div>
+    ${busy ? '<p class="performance-note">Pause your focus session to bring back a copy.</p>' : ''}
+    ${summary ? `<div class="restore-confirm" role="group" aria-labelledby="restore-heading"><p class="eyebrow" id="restore-heading">REPLACE YOUR HOME WITH THIS COPY?</p><div id="restore-slot"></div><p class="performance-note">Your current home is kept aside, so you can swap back.</p><div class="save-actions"><button class="quiet-button" id="confirm-restore" ${busy ? 'disabled' : ''}>Replace my home</button><button class="quiet-button" id="cancel-restore">Keep my home</button></div></div>` : ''}
+    ${!summary && store.hasRecovery() ? `<button class="text-link" id="undo-restore" ${busy ? 'disabled' : ''}>Swap back to the home from before the last restore</button>` : ''}`);
+  if (summary) $('#restore-slot').replaceWith(preview);
+  $('#download-backup').addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([createBackup(state)], { type: 'application/json' }));
+    const link = Object.assign(document.createElement('a'), { href: url, download: backupFilename() });
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('A copy of your home is on its way to your downloads.');
+  });
+  $('#choose-backup').addEventListener('click', () => $('#backup-file').click());
+  $('#backup-file').addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const result = readBackup(await file.text());
+    if (!result.ok) { pendingRestore = null; toast(result.reason, true); return; }
+    pendingRestore = result;
+    renderPanel(); $('#confirm-restore')?.focus({ preventScroll: true });
+  });
+  $('#confirm-restore')?.addEventListener('click', () => applyRestore(() => store.restore(pendingRestore.state)));
+  $('#cancel-restore')?.addEventListener('click', () => { pendingRestore = null; renderPanel(); $('#choose-backup').focus({ preventScroll: true }); });
+  $('#undo-restore')?.addEventListener('click', () => applyRestore(() => store.undoRestore()));
+  panel.scrollIntoView({ block: 'nearest' });
+}
+function applyRestore(restore) {
+  if (state.session.running) return;
+  if (editMode) setEditMode(false);
+  const result = restore();
+  pendingRestore = null;
+  if (!result.restored) { toast('Your browser couldn’t keep your current home aside, so nothing was changed.', true); renderPanel(); return; }
+  undoLayout = null; $('#undo-layout').disabled = true;
+  acceptUpdate(result);
+  renderPanel(); $('#close-panel').focus({ preventScroll: true });
+  toast(`Welcome home to ${state.house.name}.`);
 }
 function closePanel() {
   const previous = currentPanel; currentPanel = null; renderPanel();
@@ -1071,31 +1142,15 @@ document.addEventListener('keydown', event => {
 
 async function toggleSound() {
   try {
-    if (!audioContext) {
-      audioContext = new AudioContext();
-      const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 3, audioContext.sampleRate);
-      const data = buffer.getChannelData(0);
-      let previous = 0;
-      for (let i = 0; i < data.length; i++) { previous = (previous + 0.025 * (Math.random() * 2 - 1)) / 1.025; data[i] = previous * 6; }
-      noiseNode = audioContext.createBufferSource(); noiseNode.buffer = buffer; noiseNode.loop = true;
-      const filter = audioContext.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1400;
-      gainNode = audioContext.createGain(); gainNode.gain.value = 0;
-      noiseNode.connect(filter).connect(gainNode).connect(audioContext.destination); noiseNode.start();
-    }
-    await audioContext.resume();
-    soundEnabled = !soundEnabled;
-    gainNode.gain.setTargetAtTime(soundEnabled ? Number($('#volume').value) / 130 : 0, audioContext.currentTime, 0.15);
-    // After the fade-out, suspend the context so the audio device can sleep.
-    if (!soundEnabled) setTimeout(() => { if (!soundEnabled) audioContext.suspend().catch(() => {}); }, 800);
-    $('#sound-button').setAttribute('aria-pressed', soundEnabled);
-    $('#sound-state').textContent = soundEnabled ? 'Rain is falling' : 'Sound off';
-    $('#volume').disabled = !soundEnabled;
+    await audio.setRain(!audio.raining);
+    $('#sound-button').setAttribute('aria-pressed', audio.raining);
+    $('#sound-state').textContent = audio.raining ? 'Rain is falling' : 'Sound off';
+    $('#volume').disabled = !audio.raining;
   } catch { toast('Audio isn’t available in this browser. Your quiet room is still here.'); }
 }
 $('#sound-button').addEventListener('click', toggleSound);
-$('#volume').addEventListener('input', event => {
-  if (soundEnabled && gainNode) gainNode.gain.setTargetAtTime(Number(event.target.value) / 130, audioContext.currentTime, 0.1);
-});
+$('#volume').addEventListener('input', event => audio.setVolume(Number(event.target.value)));
+$('#chime-toggle').addEventListener('change', event => audio.setChime(event.target.checked, true));
 syncFocusDock();
 syncCompanionIntent();
 tick();
@@ -1135,6 +1190,5 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   houseUI?.dispose();
   momentsUI?.dispose();
   room?.dispose?.();
-  noiseNode?.stop();
-  audioContext?.close();
+  audio.dispose();
 });

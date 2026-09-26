@@ -36,3 +36,13 @@ export function formatTime(milliseconds) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
+
+// The timer's accessible name, read as words rather than "24:59".
+export function spokenTime(milliseconds) {
+  const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const minutes = Math.floor(seconds / 60), rest = seconds % 60;
+  const parts = [];
+  if (minutes) parts.push(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`);
+  if (rest || !minutes) parts.push(`${rest} ${rest === 1 ? 'second' : 'seconds'}`);
+  return parts.join(', ');
+}

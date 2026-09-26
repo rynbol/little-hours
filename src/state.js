@@ -4,6 +4,8 @@ import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCo
 import { AVATAR_DEFAULT, normalizeAvatarAppearance } from './avatar.js';
 
 export const storageKey = 'little-hours-v1';
+// The save as it was just before a backup replaced it.
+export const recoveryKey = 'little-hours-v1-before-restore';
 const durations = [25, 50, 90];
 
 export function freshState() {
@@ -145,6 +147,23 @@ export function createStateStore(storage, now = () => Date.now()) {
     },
     renameHouse(name) { return update(draft => { draft.house.name = cleanName(name, draft.house.name); }); },
     renameRoom(id, name) { return update(draft => { const room = draft.house.rooms.find(entry => entry.id === id); if (room) room.name = cleanName(name, room.name); }); },
+    // Replace the whole home with a restored copy, keeping the current save
+    // aside first. Nothing changes if that copy cannot be kept.
+    restore(next) {
+      try { storage.setItem(recoveryKey, storage.getItem(storageKey) ?? JSON.stringify(state)); } catch { return { state, persisted: false, restored: false }; }
+      const replacement = structuredClone(next);
+      return { ...update(draft => { for (const key of Object.keys(draft)) delete draft[key]; Object.assign(draft, replacement); }), restored: true };
+    },
+    hasRecovery() {
+      try { return Boolean(storage.getItem(recoveryKey)); } catch { return false; }
+    },
+    // Swap back to the home from before the last restore.
+    undoRestore() {
+      let raw;
+      try { raw = storage.getItem(recoveryKey); } catch { raw = null; }
+      if (!raw) return { state, persisted: false, restored: false };
+      return this.restore(restoreState(raw));
+    },
     setRunning(running) {
       return update((draft, { now: timestamp }) => {
         draft.session = running ? startSession(draft.session, timestamp) : pauseSession(draft.session, timestamp);
