@@ -1209,6 +1209,41 @@ try {
     room.setLayout(beforeDesignLayout); motion.matches = motionBefore; motion.emit('change', { matches: motionBefore }); advance(3);
     console.log('PASS new pieces: aquarium, globe, easel, bean bag, monstera and tea cart go down with a click; lamp, spin, steam, squish and rustle end at rest; shadows and reduced motion.');
   }
+  {
+    room.setEditMode(false); room.setActivity('idle'); room.resetView(); advance(30);
+    const homeAlpha = diagnostics().camera.alpha, homeBeta = diagnostics().camera.beta;
+    const homeMask = diagnostics().camera.layerMask;
+    room.setAvatarEditing(true); advance(100);
+    assert.equal(diagnostics().avatarEditing, true);
+    assert.equal(canvas.getAttribute('data-portrait'), 'ready');
+    assert.notEqual(diagnostics().camera.layerMask, homeMask, 'the portrait hides scenery without deleting it');
+    const count = scene.meshes.length;
+    for (const outfit of ['hoodie', 'overalls', 'sailor', 'cardigan']) {
+      room.setAvatarAppearance({ outfit }); advance(3);
+      assert.equal(scene.getLightByName('window-lamplight').isEnabled(), false, 'rebuilding clothes cannot displace the portrait fill');
+      assert.equal(scene.getLightByName('hearth-lamplight').isEnabled(), false);
+      assert.ok(diagnostics().companionModel.root.getChildMeshes().every(mesh => mesh.layerMask & diagnostics().camera.layerMask), 'every new outfit remains visible in the portrait');
+      assert.equal(scene.meshes.length, count, 'switching looks releases the old model');
+    }
+    room.turnAvatar(Math.PI / 2); advance(35);
+    const rotated = diagnostics().companionModel.root.rotation.y;
+    room.turnAvatar(0, true); advance(40);
+    assert.ok(Math.abs(rotated - diagnostics().companionModel.root.rotation.y) > 1, 'turn and face-me controls rotate the character');
+    room.setTheme('day'); room.setAvatarAppearance({ skin: 'deep', outfit: 'hoodie' }); advance(3);
+    assert.equal(scene.getLightByName('window-lamplight').isEnabled(), false, 'a theme change also preserves portrait lighting');
+    room.setAvatarEditing(false); advance(8); room.setAvatarEditing(true); advance(100);
+    room.setAvatarEditing(false); advance(70);
+    assert.equal(diagnostics().camera.layerMask, homeMask);
+    assert.equal(scene.getLightByName('avatar-portrait-fill').intensity, 0);
+    assert.ok(Math.abs(diagnostics().camera.alpha - homeAlpha) < .001 && Math.abs(diagnostics().camera.beta - homeBeta) < .001, 'quick reopen restores the original room camera');
+    room.setAvatarEditing(true); advance(8);
+    motion.matches = true; motion.emit('change', { matches: true }); advance(3);
+    assert.equal(canvas.getAttribute('data-portrait'), 'ready', 'enabling reduced motion mid-zoom finishes the portrait');
+    room.turnAvatar(.5); advance(2); room.setAvatarEditing(false); advance(3);
+    assert.equal(diagnostics().camera.layerMask, homeMask);
+    room.setAvatarAppearance({}); room.setTheme('dusk');
+    console.log('PASS wardrobe: clear portrait, every outfit visible, stable mesh count and lighting, turning, quick reopen and reduced motion.');
+  }
   motion.matches = false; motion.emit('change', { matches: false }); advance(2);
   {
     room.setEditMode(false); room.resetView(); advance(3);

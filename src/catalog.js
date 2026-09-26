@@ -5,8 +5,8 @@ const FRAME_ARTS = ['herbarium', 'hills', 'sea', 'kitten', 'blossom', 'stars', '
 // `use` is what a tap does outside Decorate: `toggle` switches a light, the
 // fire or the record player (saved as `off`), `react` plays a short motion.
 export const FURNITURE = [
-  { id: 'study-desk', name: 'Oak study station', category: 'Study', description: 'A generous oak desk, laptop, shaded lamp and a chair for your study companion.', footprint: [3, 2.1], height: 2.11, use: { toggle: 'lamp' }, color: '#ac7953', blocking: true },
-  { id: 'writing-desk', name: 'Little writing desk', category: 'Study', description: 'A compact cream desk with a journal, pencil cup and a warm terracotta chair.', footprint: [2.5, 2.1], height: 2.11, use: { toggle: 'lamp' }, color: '#d8ccb1', blocking: true },
+  { id: 'study-desk', name: 'Oak study station', category: 'Study', description: 'A generous oak desk, laptop, shaded lamp and a chair for your study companion.', footprint: [3, 2.1], height: 2.1844, use: { toggle: 'lamp' }, color: '#ac7953', blocking: true },
+  { id: 'writing-desk', name: 'Little writing desk', category: 'Study', description: 'A compact cream desk with a journal, pencil cup and a warm terracotta chair.', footprint: [2.5, 2.1], height: 2.1844, use: { toggle: 'lamp' }, color: '#d8ccb1', blocking: true },
   { id: 'bookcase', name: 'Collected bookcase', category: 'Storage', description: 'Four shelves of well-loved books, a ceramic vase and a linen basket.', footprint: [1.9, 0.65], height: 3.42, use: { react: 'book' }, color: '#9c7150', blocking: true },
   { id: 'lounge-chair', name: 'Sunday armchair', category: 'Seating', description: 'Soft sage cushions, a honey-colored pillow and a tasseled throw.', footprint: [1.7, 1.8], height: 1.38, use: { react: 'squish' }, color: '#82958b', blocking: true },
   { id: 'side-table', name: 'Tea time table', category: 'Storage', description: 'A small turned-wood table, a book and your favorite little cup.', footprint: [0.85, 0.85], height: 0.84, use: { react: 'steam' }, color: '#b7895d', blocking: true },

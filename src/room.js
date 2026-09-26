@@ -162,7 +162,17 @@ export function createRoom(container, options = {}) {
   const windowGlow = new PointLight('window-lamplight', new Vector3(-2.7, 2.7, -3.3), scene); windowGlow.diffuse = color('#ffc178'); windowGlow.intensity = 1.0; windowGlow.range = 6;
   const hearthGlow = new PointLight('hearth-lamplight', new Vector3(3.25, 1.0, -2.9), scene); hearthGlow.diffuse = color('#ffa555'); hearthGlow.intensity = 1.0; hearthGlow.range = 6;
   const portraitFill = new PointLight('avatar-portrait-fill', new Vector3(0, 2.1, 3), scene);
-  portraitFill.diffuse = color('#ffe4c8'); portraitFill.specular = color('#ffe4c8'); portraitFill.range = 5.2; portraitFill.intensity = 0;
+  portraitFill.diffuse = color('#fff1e2'); portraitFill.specular = color('#fff1e2'); portraitFill.range = 8; portraitFill.intensity = 0;
+  // The same in-room avatar gets a clear portrait, without furniture passing
+  // in front of the face. A separate camera layer preserves every room object.
+  const portraitMask = 0x10000000, roomMask = camera.layerMask;
+  const portraitPlinth = MeshBuilder.CreateCylinder('wardrobe-plinth', { diameter: 1.35, height: .075, tessellation: 64 }, scene);
+  portraitPlinth.material = material('#bd9fa9'); portraitPlinth.layerMask = portraitMask;
+  portraitPlinth.isPickable = false; portraitPlinth.setEnabled(false);
+  function preparePortraitModel() {
+    for (const mesh of mobileCompanion.root.getChildMeshes()) mesh.layerMask |= portraitMask;
+    mobileCompanion.contact.layerMask |= portraitMask;
+  }
   const bloom = new GlowLayer('candlelight-bloom', scene, { mainTextureFixedSize: 512, blurKernelSize: 24 }); bloom.intensity = 0.34;
   const glowingMeshes = new Set();
 
@@ -770,9 +780,15 @@ export function createRoom(container, options = {}) {
   // The desk lamp light follows the active desk, and the hearth light the
   // first fire that is lit. A switched-off lamp or fire takes its light along.
   function placeRoomLights() {
-    const desk = layout.items.find(item => item.id === layout.activeDeskId); windowGlow.setEnabled(!desk?.off);
+    const desk = layout.items.find(item => item.id === layout.activeDeskId); windowGlow.setEnabled(!avatarCameraEditing && !desk?.off);
     if (desk) { const offset = Vector3.TransformCoordinates(new Vector3(0.85, 2.08, -0.35), Matrix.RotationY(desk.rotation * Math.PI / 2)); windowGlow.position.set(desk.x + offset.x, offset.y, desk.z + offset.z); }
-    const fireplace = layout.items.find(item => item.type === 'fireplace' && !item.off); hearthGlow.setEnabled(Boolean(fireplace));
+    const fireplace = layout.items.find(item => item.type === 'fireplace' && !item.off); hearthGlow.setEnabled(!avatarCameraEditing && Boolean(fireplace));
+    // Rebuilding an outfit also refreshes furniture. Keep the portrait fill
+    // inside the material's four-light budget throughout every selection.
+    for (const entry of savedAvatarEffects || []) {
+      if (entry[0] === windowGlow) entry[1] = !desk?.off;
+      if (entry[0] === hearthGlow) entry[1] = Boolean(fireplace);
+    }
     if (fireplace) { const offset = Vector3.TransformCoordinates(new Vector3(0, 1.0, 0.70), Matrix.RotationY(fireplace.rotation * Math.PI / 2)); hearthGlow.position.set(fireplace.x + offset.x, offset.y, fireplace.z + offset.z); }
   }
   // A switched-off lamp keeps its shade with an unlit twin of its glowing
@@ -962,6 +978,7 @@ export function createRoom(container, options = {}) {
     }
     mobileCompanion.dispose(); disposeAvatarTemplates(scene);
     mobileCompanion = createMobileCompanion(scene, avatarAppearance);
+    preparePortraitModel();
     syncFurniture(); syncCompanionVisibility(); refreshShadows(); requestRender();
   }
   function setAvatarEditing(value) {
@@ -969,9 +986,17 @@ export function createRoom(container, options = {}) {
     if (next === avatarCameraEditing) return;
     cancelDrag(); hoverItem(null);
     if (next) {
-      avatarPreviewRotation = 0;
+      canvas.setAttribute('data-portrait', 'entering');
+      // A quick reopen uses the original room composition, not an in-between
+      // zoom, and never replaces the saved light states with disabled ones.
+      if (avatarCameraTransition && !avatarCameraEditing) {
+        const restore = avatarCameraTransition.to;
+        camera.alpha = restore.alpha; camera.beta = restore.beta; camera.radius = restore.radius;
+        camera.target.copyFrom(restore.target); setCameraHeight(restore.height);
+        restoreAvatarEffects();
+      }
+      avatarPreviewRotation = avatarPreviewTarget = 0;
       camera.getViewMatrix(true);
-      const cameraPosition = camera.position.clone();
       savedAvatarCamera = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone(), height: camera.orthoTop - camera.orthoBottom };
       camera.detachControl(); avatarCameraControl = true; avatarCameraEditing = true;
       // Keep the portrait fill among the four lights StandardMaterial draws.
@@ -983,25 +1008,29 @@ export function createRoom(container, options = {}) {
       const fromX = entry?.fromX ?? pose.x, fromZ = entry?.fromZ ?? pose.z, toX = entry?.toX ?? pose.x, toZ = entry?.toZ ?? pose.z;
       // The posed companion turns toward +Z in world space; keep this warm
       // fill on its face so the features stay readable in candlelight.
-      portraitFill.position.set(toX, 2.0, toZ + 1.8); portraitFill.intensity = 1.2;
-      const compactPortrait = canvasAspect < 0.82, portraitHeight = compactPortrait ? 3.15 : avatarFrameHeight;
+      portraitFill.position.set(toX + Math.cos(alphaHome) * 3.5, 1.6, toZ + Math.sin(alphaHome) * 3.5); portraitFill.intensity = 1.65;
+      portraitPlinth.position.set(toX, groundAt(rugSurfaces, toX, toZ) - .06, toZ);
+      portraitPlinth.setEnabled(true);
+      const portraitHeight = Math.max(avatarFrameHeight, 1.65 / canvasAspect);
       activeAvatarFrameHeight = portraitHeight;
       const dx = toX - fromX, dz = toZ - fromZ;
       const walkYaw = Math.hypot(dx, dz) > 0.05 ? Math.atan2(-dx, -dz) : pose.yaw;
       avatarPoseTransition = {
         elapsed: 0, duration: reducedMotion ? 0 : 1.25, fromSit: entry?.fromSit ?? pose.sit, fromYaw: entry?.fromYaw ?? pose.yaw,
         fromX, fromZ, toX, toZ, fromStep: pose.step, distance: Math.hypot(dx, dz), walkYaw,
-        // The avatar's face points along local -Z. Aim that direction toward
-        // the camera's actual world position, even after the user orbits.
-        toYaw: Math.atan2(toX - cameraPosition.x, toZ - cameraPosition.z),
+        // Face the final camera direction, not its old position before zoom.
+        toYaw: -Math.PI / 2 - alphaHome,
       };
       avatarCameraTransition = {
         elapsed: 0, duration: reducedMotion ? 0 : 1.25,
         from: { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone(), height: camera.orthoTop - camera.orthoBottom },
-        to: { alpha: camera.alpha, beta: Math.min(camera.beta, 0.94), radius: camera.radius, target: new Vector3(toX, compactPortrait ? 0.30 : 1.13, toZ), height: portraitHeight },
+        to: { alpha: alphaHome, beta: 1.27, radius: camera.radius, target: new Vector3(toX, 1.46 + groundAt(rugSurfaces, toX, toZ) - FLOOR_Y, toZ), height: portraitHeight },
       };
     } else {
-      avatarCameraEditing = false; avatarPoseTransition = null; avatarPreviewRotation = 0;
+      canvas.setAttribute('data-portrait', 'room');
+      companionRoutine.pose.yaw = mobileCompanion.root.rotation.y;
+      avatarCameraEditing = false; avatarPoseTransition = null; avatarPreviewRotation = avatarPreviewTarget = 0;
+      camera.layerMask = roomMask; portraitPlinth.setEnabled(false);
       portraitFill.intensity = 0;
       companionRoutine.endAvatarEditing();
       if (savedAvatarCamera) avatarCameraTransition = {
@@ -1020,6 +1049,7 @@ export function createRoom(container, options = {}) {
     for (const mesh of sillFlames) mesh.setEnabled(decorVisible.lights);
   }
   function setTheme(name) {
+    if (savedAvatarEffects) restoreAvatarEffects();
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
     const daylight = theme === 'day', night = theme === 'dusk';
     companionRoutine?.setContext({ night });
@@ -1036,6 +1066,10 @@ export function createRoom(container, options = {}) {
     applyBulbs(); applyAccents();
     bloom.intensity = daylight ? 0.18 : night ? 0.40 : 0.26;
     shadow.darkness = daylight ? 0.34 : 0.24;
+    if (avatarCameraEditing) {
+      savedAvatarEffects = [fireflies, skyStars, moths, shootingStar, rain, windowGlow, hearthGlow].map(effect => [effect, effect.isEnabled()]);
+      for (const [effect] of savedAvatarEffects) effect.setEnabled(false);
+    }
     // Light direction changes only here, so the shadow map remains cached.
     requestRender(true);
   }
@@ -1273,6 +1307,7 @@ export function createRoom(container, options = {}) {
     if (downPosition && event.pointerId != null && downPosition.pointerId != null && event.pointerId !== downPosition.pointerId) return;
     if (avatarCameraEditing && downPosition?.avatarRotation) {
       avatarPreviewRotation += (event.clientX - downPosition.lastX) * 0.009;
+      avatarPreviewTarget = avatarPreviewRotation;
       downPosition.lastX = event.clientX; downPosition.lastY = event.clientY;
       canvas.style.cursor = 'grabbing'; requestRender(); return;
     }
@@ -1347,8 +1382,8 @@ export function createRoom(container, options = {}) {
   const roomCorners = []; for (const x of [-6.19, 6.19]) for (const y of [-0.32, 6.02]) for (const z of [-4.78, 4.78]) roomCorners.push(new Vector3(x, y, z));
   const connectedCorners = []; for (const x of [-6.19, 8.25]) for (const y of [-0.32, 6.02]) for (const z of [-4.78, 4.78]) connectedCorners.push(new Vector3(x, y, z));
   const projectedCorner = new Vector3(); let canvasAspect = 1, fitAlpha = NaN, fitBeta = NaN;
-  let avatarCameraEditing = false, avatarCameraTransition = null, savedAvatarCamera = null, savedAvatarEffects = null, avatarPoseTransition = null, avatarPreviewRotation = 0;
-  const avatarFrameHeight = 3.0;
+  let avatarCameraEditing = false, avatarCameraTransition = null, savedAvatarCamera = null, savedAvatarEffects = null, avatarPoseTransition = null, avatarPreviewRotation = 0, avatarPreviewTarget = 0;
+  const avatarFrameHeight = 3.45;
   let activeAvatarFrameHeight = avatarFrameHeight;
   const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
   const smoothStep = t => t * t * (3 - 2 * t);
@@ -1375,9 +1410,11 @@ export function createRoom(container, options = {}) {
       transition.from.target.z + (transition.to.target.z - transition.from.target.z) * amount,
     );
     setCameraHeight(transition.from.height + (transition.to.height - transition.from.height) * amount);
+    if (avatarCameraEditing && t >= .65) camera.layerMask = portraitMask;
     fitAlpha = camera.alpha; fitBeta = camera.beta;
     if (t === 1) {
       avatarCameraTransition = null;
+      if (avatarCameraEditing) { canvas.setAttribute('data-portrait', 'ready'); fitRoom(); }
       if (!avatarCameraEditing) {
         avatarCameraControl = false;
         camera.attachControl(canvas, false);
@@ -1388,6 +1425,7 @@ export function createRoom(container, options = {}) {
   let avatarCameraControl = false;
   function fitRoom() {
     if (avatarCameraControl) {
+      if (avatarCameraEditing) activeAvatarFrameHeight = Math.max(avatarFrameHeight, 1.65 / canvasAspect);
       if (!avatarCameraTransition) setCameraHeight(avatarCameraEditing ? activeAvatarFrameHeight : camera.orthoTop - camera.orthoBottom);
       fitAlpha = camera.alpha; fitBeta = camera.beta; return;
     }
@@ -1434,6 +1472,7 @@ export function createRoom(container, options = {}) {
   }) : null;
   viewObserver?.observe(container);
   mobileCompanion = createMobileCompanion(scene);
+  preparePortraitModel();
   companionRoutine = createCompanionRoutine(status => {
     syncCompanionVisibility(); refreshShadows(); options.onCompanionState?.(status);
   }, { onUse: companionUse, random: options.random });
@@ -1493,7 +1532,10 @@ export function createRoom(container, options = {}) {
       companionY = companionY === null || reducedMotion ? goal : companionY + (goal - companionY) * Math.min(1, companionDelta * 12);
     } else companionY = null;
     mobileCompanion.animate(companionPose, seconds, reducedMotion, companionY ?? FLOOR_Y);
-    if (avatarCameraEditing) mobileCompanion.root.rotation.y = companionPose.yaw + avatarPreviewRotation;
+    if (avatarCameraEditing) {
+      avatarPreviewRotation = reducedMotion ? avatarPreviewTarget : avatarPreviewRotation + (avatarPreviewTarget - avatarPreviewRotation) * (1 - Math.exp(-companionDelta * 12));
+      mobileCompanion.root.rotation.y = companionPose.yaw + avatarPreviewRotation;
+    }
     if (!companionPose.atDesk) {
       pointArea.minX = pointArea.maxX = companionPose.x; pointArea.minZ = pointArea.maxZ = companionPose.z;
       mobileCompanion.contact.position.y = surfaceBelow(pointArea);
@@ -1601,12 +1643,13 @@ export function createRoom(container, options = {}) {
     lastFrame = elapsed > interval * 3 ? now : lastFrame + interval; animate(now);
     const start = performance.now(); engine.beginFrame(); scene.render(); engine.endFrame(); reportStats(now, performance.now() - start); lastRenderedAt = now; outlineFrames--;
     options.onFrame?.();
+    if (companionRoutine.doorProgress !== null) options.onDoorProgress?.(companionRoutine.doorProgress);
     if (!readyReported && scene.isReady()) { readyReported = true; requestRender(true); options.onReady?.(); }
     // Until the room reports ready, frames go on: shaders can finish between
     // the two asks, and a still room would stop before it reports.
     if (!reducedMotion || !readyReported || !scene.isReady() || downPosition || Math.abs(camera.inertialAlphaOffset) + Math.abs(camera.inertialBetaOffset) > 0.0001 || now - petStart < PET_REACTION * 1000 + 50 || outlinesPending()) if (!frame) frame = requestAnimationFrame(tick);
   }
-  const onMotionChange = event => { reducedMotion = event.matches; requestRender(); wakeForClock(); }; motionQuery.addEventListener('change', onMotionChange);
+  const onMotionChange = event => { reducedMotion = event.matches; if (reducedMotion) { if (avatarCameraTransition) avatarCameraTransition.duration = 0; if (avatarPoseTransition) avatarPoseTransition.duration = 0; } requestRender(); wakeForClock(); }; motionQuery.addEventListener('change', onMotionChange);
   // Restart timing from scratch after a pause, so the gap never reads as a slow frame.
   function resumeFrames() { companionTime = 0; lastFrame = 0; lastRenderedAt = 0; statsStart = 0; sampleFrames = 0; rafCalls = 0; lastRafAt = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0; requestRender(); }
   const onVisibility = () => { visible = !document.hidden; companionTime = 0; if (visible) resumeFrames(); else { cancelDrag(); hoverItem(null); cancelAnimationFrame(frame); frame = 0; } wakeForClock(); };
@@ -1627,13 +1670,14 @@ export function createRoom(container, options = {}) {
     cancelDoorWalk(options) { const cancelled = companionRoutine.cancelDoorWalk(options); if (cancelled) requestRender(); return cancelled; },
     setSuspended(value) { suspended = Boolean(value); if (suspended) { cancelDrag(); cancelAnimationFrame(frame); frame = 0; clearTimeout(petWake); } else { resize(); resumeFrames(); } wakeForClock(); },
     setTheme, setLayout, setEditMode, setAvatarEditing, setAvatarAppearance, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setSurface, setQuality,
+    turnAvatar(angle, reset = false) { if (!avatarCameraEditing || avatarPoseTransition) return; avatarPreviewTarget = reset ? 0 : avatarPreviewTarget + angle; requestRender(); },
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet, interactWithItem, interactWithKind,
     setPet(species) { const next = species === 'dog' ? 'dog' : 'cat'; if (next === petSpecies) return; if (petRoutine.pose.held) releasePet(); petSpecies = next; buildPet(); requestRender(); },
     anchor,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { if (avatarCameraEditing) return; camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, passages, architectureStyle, layout: copyLayout(), editing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    diagnostics() { return { scene, engine, camera, passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
     dispose() { if (disposed) return; cancelDrag(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); petModel?.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

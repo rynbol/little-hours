@@ -3,6 +3,15 @@ export const AVATAR_DEFAULT = Object.freeze({
   outfit: 'cardigan', bottomStyle: 'trousers', accessory: 'none',
 });
 
+// Outfit recipes leave identity choices alone. They are starting points, not
+// separate inventory items: every part can still be changed individually.
+export const AVATAR_LOOKS = Object.freeze([
+  { id: 'sunday', name: 'Sunday slow', description: 'Tea, a book, no plans.', background: '#e7dfd1', appearance: { outfit: 'cardigan', top: 'sage', bottom: 'cream', bottomStyle: 'trousers', accessory: 'glasses' } },
+  { id: 'blossom', name: 'Blossom hour', description: 'A little spring, always.', background: '#efdbdc', appearance: { outfit: 'cardigan', top: 'rose', bottom: 'cream', bottomStyle: 'skirt', accessory: 'blossom' } },
+  { id: 'stargazer', name: 'After hours', description: 'Just one more chapter.', background: '#dfdcec', appearance: { outfit: 'hoodie', top: 'lavender', bottom: 'midnight', bottomStyle: 'shorts', accessory: 'moon-clips' } },
+  { id: 'studio', name: 'Making things', description: 'A good kind of messy.', background: '#dde6dc', appearance: { outfit: 'overalls', top: 'butter', bottom: 'sage', bottomStyle: 'trousers', accessory: 'none' } },
+]);
+
 export const AVATAR_OPTIONS = Object.freeze({
   skin: [
     { id: 'porcelain', name: 'Porcelain', color: '#f1d4b1' },
