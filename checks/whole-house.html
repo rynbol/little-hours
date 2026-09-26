@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Little Hours · whole house check</title></head>
+<body><div id="app"></div><script type="module">
+if (!import.meta.env.DEV) throw new Error('Development check only');
+const nativeMatchMedia = window.matchMedia.bind(window), motion = new EventTarget();
+motion.matches = false; window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? motion : nativeMatchMedia(query);
+const {freshState} = await import('../src/state.js');
+const {createLayout} = await import('../src/layout.js');
+const state = freshState();
+state.theme = 'day'; state.house.name = 'Our little Sunday';
+state.house.rooms[0].name = 'The reading room';
+state.house.rooms.push({id:'garden',name:'Tea for two',layout:createLayout('sakura-studio')}, {id:'loft',name:'Above the clouds',layout:createLayout('cloud-loft')});
+const count = Math.max(1, Math.min(3, Number(new URLSearchParams(location.search).get('rooms')) || 3));
+state.house.rooms = state.house.rooms.slice(0, count);
+let raw = JSON.stringify(state);
+window.__littleHoursTest = {storage:{getItem:()=>raw,setItem:(_,v)=>{raw=v}}};
+await import('../src/main.js');
+await new Promise(resolve => { const ready = () => { if (!document.querySelector('#decorate-button').disabled) resolve(); else requestAnimationFrame(ready); }; ready(); });
+document.querySelector('.home-wide').click();
+const checks = document.createElement('nav'); checks.setAttribute('aria-label', 'Whole house test controls');
+checks.innerHTML = '<button id="test-motion">Reduce motion</button><button id="test-measure">Measure house</button><output id="test-result"></output>';
+checks.style.cssText = 'padding:14px;display:flex;gap:8px;flex-wrap:wrap;font:12px sans-serif'; document.body.appendChild(checks);
+checks.querySelector('#test-motion').onclick = () => { motion.matches = !motion.matches; motion.dispatchEvent(new Event('change')); checks.querySelector('#test-motion').setAttribute('aria-pressed', String(motion.matches)); };
+checks.querySelector('#test-measure').onclick = async () => {
+  const app = window.__littleHours, overview = app.connected || app.house, start = overview.diagnostics(), roomFrame = app.room.diagnostics().scene.getFrameId();
+  if (!start) return;
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  const end = overview.diagnostics();
+  checks.querySelector('#test-result').textContent = end ? `${end.drawCalls} draw calls · ${Math.round(end.triangles)} triangles · ${end.renderCount - start.renderCount} overview frames · ${app.room.diagnostics().scene.getFrameId() - roomFrame} background room frames in 2s` : 'House closed';
+};
+</script></body></html>

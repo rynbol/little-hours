@@ -51,6 +51,10 @@ The development server binds to `127.0.0.1`. Open the local URL Vite prints. Run
 
 All furniture and design changes remain free; earned coins buy the two house extensions. There are no real-money purchases. This is an early playable prototype with no accounts, cross-device sync, multiplayer, native always-on-top window, notch integration or coding-agent integration. No competitor code, models or music are included. The furniture, room geometry and decorative details are authored in JavaScript; no generated raster furniture assets or Blender files are required. Google Fonts is the only external presentation request; fallback fonts work without it.
 
+### Whole-house view
+
+Choose **Whole house** above the room to see your furnished home together. **Open floors** brings the upstairs room out beside the ground floor on desktop, or lifts it clear on a phone; **Dollhouse** folds it back. Drag to turn, use the view buttons, or choose a room’s name to step inside. The larger room framing keeps the whole cutaway visible. See [whole-house notes](docs/whole-house.md).
+
 ## Engine and art
 
 [Babylon.js](https://www.babylonjs.com/games/) provides the game engine, scene, orthographic camera, picking and rendering. Furniture models live in `src/furniture.js`, the collection in `src/catalog.js`, room placement/presets in `src/layout.js`, wall shells and wall placement in `src/walls.js`, the frame pictures in `src/art.js`, the furniture color choices in `src/tints.js`, the wall and floor choices in `src/surfaces.js`, and the new room architecture, procedural window views and furniture palettes in `src/architecture.js`. The runtime reuses geometry and materials and batches static geometry to limit drawing work.

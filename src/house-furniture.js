@@ -38,7 +38,7 @@ export function houseArchitecture(scene, layout, style, origin, theme, roomId) {
       parts.push(bakeHousePart(mesh)); mesh.setEnabled(false);
     }
   }
-  return { parts, visible, floor: architecture.floorTop * .43 + .012, dispose: () => architecture.dispose() };
+  return { root: architecture.root, parts, visible, floor: architecture.floorTop * .43 + .012, dispose: () => architecture.dispose() };
 }
 
 // The house uses the SAME authored furniture as the room. Static geometry is
