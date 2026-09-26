@@ -14,7 +14,7 @@ import { createLayout } from './layout.js';
 import { AVATAR_DEFAULT } from './avatar.js';
 import { createFurniture } from './furniture.js';
 
-test('opened floors keep all authored geometry framed, picking follows the room, saves stay intact', () => {
+test('the opening dollhouse keeps all authored geometry framed, picking follows the room, saves stay intact', () => {
   const oldDocument = globalThis.document;
   const context = new Proxy({}, {get: (_, key) => String(key).includes('Gradient') ? () => ({addColorStop() {}}) : key === 'measureText' ? () => ({width:20}) : () => {}});
   globalThis.document = {addEventListener() {}, removeEventListener() {}, createElement: () => ({width:256,height:256,getContext:()=>context})};
@@ -34,7 +34,7 @@ test('opened floors keep all authored geometry framed, picking follows the room,
     const studio = model.meshes.find(m => m.metadata.houseSlot === 'studio');
     const meshCount = scene.meshes.length;
     for (const aspect of [.45, .75, 1.5, 2.5]) for (const opened of [0, .5, 1]) for (const alpha of [.65, 1.12, 1.45]) {
-      model.setOpenFloors(opened, aspect < 1.15); camera.alpha = alpha;
+      model.setOpen(opened); camera.alpha = alpha;
       const frame = houseFrame(model.framing, camera.getViewMatrix(true), aspect, .92);
       camera.orthoLeft = frame.x - frame.height * aspect / 2; camera.orthoRight = frame.x + frame.height * aspect / 2;
       camera.orthoBottom = frame.y - frame.height / 2; camera.orthoTop = frame.y + frame.height / 2;
@@ -51,17 +51,20 @@ test('opened floors keep all authored geometry framed, picking follows the room,
         assert.ok(maximum <= .921, `${mesh.name} stays within the view at ${aspect}/${opened}/${alpha}`);
       }
       assert.equal(scene.meshes.length, meshCount, 'changing the view creates no geometry');
-      assert.equal(studio.getWorldMatrix().getTranslation().length(), 0, 'ground floor stays in place');
+      assert.equal(studio.getWorldMatrix().getTranslation().length(), 0, 'the rooms stay in place');
+      assert.equal(loft.getWorldMatrix().getTranslation().length(), 0, 'the upper floor stays in place');
     }
-    model.setOpenFloors(1, false);
-    assert.ok(loft.getBoundingInfo().boundingBox.maximumWorld.x < studio.getBoundingInfo().boundingBox.minimumWorld.x + .2, 'opened upper floor clears the studio');
-    const hit = scene.pickWithRay(new Ray(new Vector3(-8, 9, 0), new Vector3(0, -1, 0)), mesh => mesh === loft);
-    assert.equal(hit.pickedMesh?.metadata.houseSlot, 'loft', 'picking follows the unfolded upper floor');
-    model.setOpenFloors(0);
-    assert.equal(loft.getWorldMatrix().getTranslation().length(), 0, 'dollhouse restores the original home');
+    const front = model.meshes.find(m => m.name === 'house-outside-garden-front');
+    model.setOpen(0); const shut = front.getBoundingInfo().boundingBox.maximumWorld.z;
+    model.setOpen(1);
+    assert.ok(front.getBoundingInfo().boundingBox.maximumWorld.z > shut + 3, 'the garden front swings out');
+    const hit = scene.pickWithRay(new Ray(new Vector3(-2.55, 12, -.45), new Vector3(0, -1, 0)), mesh => mesh.metadata?.houseSlot === 'loft');
+    assert.equal(hit.pickedMesh?.metadata.houseSlot, 'loft', 'picking finds the upper floor of the open house');
+    model.setOpen(0);
+    assert.ok(Math.abs(front.getBoundingInfo().boundingBox.maximumWorld.z - shut) < 1e-6, 'closing restores the front');
     const motion = createHouseMotion(HOUSE_POSITIONS); motion.bind(model);
     for (const aspect of [.45, 1.5, 2.5]) for (const opened of [0, 1]) for (const alpha of [.65, 1.45]) {
-      motion.stop(); model.setOpenFloors(opened, aspect < 1.15); camera.alpha = alpha;
+      motion.stop(); model.setOpen(opened); camera.alpha = alpha;
       const frame = houseFrame(model.framing, camera.getViewMatrix(true), aspect, .92);
       camera.orthoLeft = frame.x - frame.height * aspect / 2; camera.orthoRight = frame.x + frame.height * aspect / 2;
       camera.orthoBottom = frame.y - frame.height / 2; camera.orthoTop = frame.y + frame.height / 2;
@@ -82,8 +85,8 @@ test('opened floors keep all authored geometry framed, picking follows the room,
         }
       }
     }
-    motion.stop(); model.setOpenFloors(1, false); motion.trigger('loft', 'select', 0); motion.update(340);
-    assert.equal(scene.pickWithRay(new Ray(new Vector3(-8, 9, 0), new Vector3(0, -1, 0)), mesh => mesh === loft).pickedMesh, loft, 'picking follows a bouncing room');
+    motion.stop(); model.setOpen(1); motion.trigger('loft', 'select', 0); motion.update(340);
+    assert.equal(scene.pickWithRay(new Ray(new Vector3(-2.55, 12, -.45), new Vector3(0, -1, 0)), mesh => mesh === loft).pickedMesh, loft, 'picking follows a bouncing room');
     motion.dispose();
     assert.equal(JSON.stringify(house), saved);
   } finally { model.dispose(); scene.dispose(); engine.dispose(); globalThis.document = oldDocument; }

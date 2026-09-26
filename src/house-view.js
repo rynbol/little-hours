@@ -17,6 +17,7 @@ import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
 import { createHousePostcard } from './house-postcard.js';
 import { houseFrame } from './house-framing.js';
 import { createHouseMotion } from './house-motion.js';
+import { nextExpansion } from './house.js';
 import './whole-house.css';
 
 export function createHouseView(container, { house, selectedId, theme, avatar, onSelect, focused = false }) {
@@ -44,6 +45,11 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   let layoutKeys = new Map();
   const motes = MeshBuilder.CreateSphere('cottage-fireflies', { diameter: .045, segments: 3 }, scene);
   const motePaint = new StandardMaterial('cottage-firefly-light', scene); motePaint.disableLighting = true; motePaint.emissiveColor = Color3.FromHexString('#efd6a5'); motes.material = motePaint; motes.isPickable = false;
+  // A few soft puffs of chimney smoke, one draw call, animated with the motes.
+  const smoke = MeshBuilder.CreateSphere('cottage-smoke', { diameter: .5, segments: 8 }, scene);
+  const smokePaint = new StandardMaterial('cottage-smoke-paint', scene); smokePaint.disableLighting = true; smokePaint.emissiveColor = Color3.FromHexString('#f3ebe2'); smokePaint.alpha = .3; smoke.material = smokePaint; smoke.isPickable = false;
+  const smokeMatrices = new Float32Array(5 * 16), smokeAt = new Vector3(), smokeLocal = new Vector3();
+  smoke.thinInstanceSetBuffer('matrix', smokeMatrices, 16, false); smoke.alwaysSelectAsActiveMesh = true;
   const moteMatrices = new Float32Array(24 * 16);
   for (let i = 0; i < 24; i++) { const n = i * 16; moteMatrices[n] = moteMatrices[n + 5] = moteMatrices[n + 10] = moteMatrices[n + 15] = 1; }
   motes.thinInstanceSetBuffer('matrix', moteMatrices, 16, false); motes.alwaysSelectAsActiveMesh = true;
@@ -55,33 +61,42 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   for (let i = 0; i < 36; i++) petals[i * 16 + 15] = 1;
   sparkles.thinInstanceSetBuffer('matrix', petals, 16, false); sparkles.setEnabled(false);
   const controls = document.createElement('div'); controls.className = 'house-camera-controls';
-  controls.innerHTML = `<div class="house-camera-group" role="group" aria-label="House view"><button type="button" data-house-view="together" aria-pressed="false">Dollhouse</button><button type="button" data-house-view="open" aria-pressed="true">Open floors</button></div>${container.id === 'house-in-room' ? '<div class="house-camera-group" role="group" aria-label="House angle"><button type="button" class="house-camera-turn" data-turn="-1" aria-label="Turn house left">↶</button><button type="button" data-turn="0" aria-label="Reset house view">Recenter</button><button type="button" class="house-camera-turn" data-turn="1" aria-label="Turn house right">↷</button></div>' : ''}`;
+  controls.innerHTML = `<div class="house-camera-group"><button type="button" data-house-open aria-pressed="true">Close the house</button></div>${container.id === 'house-in-room' ? '<div class="house-camera-group" role="group" aria-label="House angle"><button type="button" class="house-camera-turn" data-turn="-1" aria-label="Turn house left">↶</button><button type="button" data-turn="0" aria-label="Reset house view">Recenter</button><button type="button" class="house-camera-turn" data-turn="1" aria-label="Turn house right">↷</button></div>' : ''}`;
   container.appendChild(controls);
   const tags = document.createElement('div'); tags.className = 'house-room-tags'; container.appendChild(tags);
   const note = document.createElement('span'); note.className = 'house-camera-note'; container.appendChild(note);
   const tagPoint = new Vector3(), tagProjection = new Vector3();
-  let openFloors = true, floorAmount = 1, floorTarget = 1, portrait = false, dragging = null;
+  let dragging = null;
   const homeAngle = Math.PI / 2.8;
   let targetAngle = homeAngle, lastPick = 0, hovering = null, burst = null;
-  let model, frame = 0, disposed = false, renderCount = 0, lastDraw = 0;
+  let model, frame = 0, disposed = false, suspended = false, renderCount = 0, lastDraw = 0;
+  // The whole house opens like a dollhouse front. It arrives closed, unless motion is reduced.
+  const arrival = () => motion.matches ? 0 : performance.now() + 650;
+  let closed = false, openAt = arrival(), lastOpenStep = 0;
+  function stepOpen(now) {
+    const dt = lastOpenStep ? Math.min(.1, (now - lastOpenStep) / 1000) : 0; lastOpenStep = now;
+    const target = !closed && now >= openAt ? 1 : 0, amount = model.openAmount;
+    if (amount === target) return !closed && now < openAt;
+    model.setOpen(motion.matches ? target : amount < target ? Math.min(target, amount + dt / 1.1) : Math.max(target, amount - dt / .7));
+    shadows.getShadowMap().resetRefreshCounter(); fitCamera();
+    return true;
+  }
   function render(now = 0) {
     frame = 0;
-    if (disposed || document.hidden) return;
-    if (!motion.matches && now - lastDraw < 1000 / 30 - 1) { requestRender(); return; }
+    if (disposed || suspended || document.hidden) return;
+    const dt = lastDraw ? Math.min(.1, (now - lastDraw) / 1000) : 0;
+    // Motion you cause runs at 60 fps; the idle drift stays at 30.
+    const lively = dragging?.moved || Math.abs(targetAngle - camera.alpha) > .001 || roomMotion.activeCount > 0 || model.openAmount !== (!closed && now >= openAt ? 1 : 0);
+    if (!motion.matches && now - lastDraw < 1000 / (lively ? 60 : 30) - 1) { requestRender(); return; }
     lastDraw = now;
     const seconds = motion.matches ? 0 : now / 1000;
     const wasReacting = roomMotion.activeCount > 0;
     roomMotion.restore();
     model.animate(seconds, focused, motion.matches);
-    const opening = Math.abs(floorAmount - floorTarget) > .001;
-    if (opening) {
-      floorAmount = motion.matches ? floorTarget : floorAmount + (floorTarget - floorAmount) * .22;
-      if (Math.abs(floorAmount - floorTarget) < .001) floorAmount = floorTarget;
-      model.setOpenFloors(floorAmount, portrait); shadows.getShadowMap().resetRefreshCounter(); fitCamera();
-    }
     const turning = Math.abs(targetAngle - camera.alpha) > .001;
-    if (turning) { camera.alpha = motion.matches ? targetAngle : camera.alpha + (targetAngle - camera.alpha) * .18; fitCamera(); }
+    if (turning) { camera.alpha = motion.matches || dragging?.moved ? targetAngle : targetAngle + (camera.alpha - targetAngle) * Math.exp(-dt * 11); fitCamera(); }
     const reacting = roomMotion.update(now, motion.matches);
+    const swinging = stepOpen(now);
     if (reacting || wasReacting) { shadows.getShadowMap().resetRefreshCounter(); positionTags(); }
     const age = burst ? (now - burst.start) / 1000 : 5;
     sparkles.setEnabled(Boolean(burst) && age < 2.8 && !motion.matches);
@@ -103,16 +118,26 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       moteMatrices[n + 14] = -1.4 + (i * .83 % 4);
     }
     motes.thinInstanceBufferUpdated('matrix');
+    smoke.setEnabled(Boolean(model.chimney) && !motion.matches);
+    if (smoke.isEnabled()) {
+      smokeLocal.fromArray(model.chimney.point); Vector3.TransformCoordinatesToRef(smokeLocal, model.chimney.node.getWorldMatrix(), smokeAt);
+      for (let i = 0; i < 5; i++) {
+        const n = i * 16, t = (seconds * .16 + i / 5) % 1, size = .6 + t * 1.5;
+        smokeMatrices[n] = smokeMatrices[n + 5] = smokeMatrices[n + 10] = size * Math.min(1, t * 6) * (1 - t * .55); smokeMatrices[n + 15] = 1;
+        smokeMatrices[n + 12] = smokeAt.x + Math.sin(t * 5 + i) * .12 + t * .5; smokeMatrices[n + 13] = smokeAt.y + t * 1.9; smokeMatrices[n + 14] = smokeAt.z - t * .2;
+      }
+      smoke.thinInstanceBufferUpdated('matrix');
+    }
     const readyBeforeDraw = scene.isReady();
     engine.beginFrame(); scene.render(); engine.endFrame(); renderCount++;
     // A shader may finish after its mesh was skipped during this draw.
-    if (!motion.matches || turning || opening || reacting || !readyBeforeDraw || !scene.isReady()) requestRender();
+    if (!motion.matches || turning || reacting || swinging || !readyBeforeDraw || !scene.isReady()) requestRender();
   }
-  function requestRender() { if (!disposed && !document.hidden && !frame) frame = requestAnimationFrame(render); }
+  function requestRender() { if (!disposed && !suspended && !document.hidden && !frame) frame = requestAnimationFrame(render); }
   function resize() {
-    if (disposed) return;
+    if (disposed || suspended) return;
     engine.resize();
-    if (model) { roomMotion.restore(); presentFloors(); }
+    if (model) { roomMotion.restore(); present(); }
   }
   function fitCamera() {
     if (!model) return;
@@ -127,29 +152,26 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const width = container.clientWidth, height = container.clientHeight, matrix = camera.getTransformationMatrix();
     for (const button of tags.children) {
       const id = button.dataset.room, base = HOUSE_POSITIONS[id], offset = model.levels[id].position;
-      tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15, base[2] + offset.z + 2.08);
+      tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : 0), base[2] + offset.z + 2.08);
       Vector3.TransformCoordinatesToRef(tagPoint, matrix, tagProjection);
       const half = Math.min(90, width / 4);
       button.style.left = `${Math.max(half, Math.min(width - half, (tagProjection.x + 1) * width / 2))}px`;
       button.style.top = `${Math.max(52, Math.min(height - 57, (1 - tagProjection.y) * height / 2 + 5))}px`;
     }
   }
-  function presentFloors() {
+  function present() {
     roomMotion.restore();
-    const hasLoft = house.rooms.some(room => room.id === 'loft');
-    portrait = container.clientWidth / Math.max(1, container.clientHeight) < 1.15;
-    floorTarget = openFloors && hasLoft ? 1 : 0;
-    if (!hasLoft || motion.matches) floorAmount = floorTarget;
-    model.setOpenFloors(floorAmount, portrait);
-    controls.querySelector('[aria-label="House view"]').hidden = !hasLoft;
-    controls.querySelectorAll('[data-house-view]').forEach(button => button.setAttribute('aria-pressed', String((button.dataset.houseView === 'open') === openFloors)));
-    note.textContent = openFloors && hasLoft ? 'Floors opened out · every little corner, together' : 'Drag to turn · choose a room to step inside';
+    const toggle = controls.querySelector('[data-house-open]');
+    toggle.setAttribute('aria-pressed', String(!closed)); toggle.textContent = closed ? 'Open the house' : 'Close the house';
+    note.textContent = closed ? 'Drag to turn · open the house to peek inside' : 'Drag to turn · choose a room to step inside';
     shadows.getShadowMap().resetRefreshCounter(); fitCamera(); requestRender();
   }
+  // Close the whole house (the postcard look), or open it again.
+  function setClosed(value) { closed = Boolean(value); openAt = 0; lastOpenStep = 0; present(); }
   function turn(direction) { targetAngle = direction === 0 ? homeAngle : Math.max(.65, Math.min(1.45, targetAngle + direction * .22)); requestRender(); }
   controls.addEventListener('click', event => {
     const button = event.target.closest('button'); if (!button) return;
-    if (button.dataset.houseView) { openFloors = button.dataset.houseView === 'open'; presentFloors(); }
+    if (button.dataset.houseOpen !== undefined) setClosed(!closed);
     if (button.dataset.turn !== undefined) turn(Number(button.dataset.turn));
   });
   tags.addEventListener('click', event => { const button = event.target.closest('button'); if (button) onSelect(button.dataset.room); });
@@ -177,6 +199,15 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       button.setAttribute('aria-label', `Visit ${entry.name}`); button.setAttribute('aria-current', entry.id === house.activeId ? 'location' : 'false');
       const level = document.createElement('small'); level.textContent = entry.id === 'loft' ? 'Upstairs' : entry.id === house.activeId ? 'You’re here' : 'Ground floor';
       const name = document.createElement('strong'); name.textContent = entry.name; button.append(level, name); tags.appendChild(button);
+    }
+    // The blueprint's tag: what grows next and how close it is.
+    const site = nextExpansion(house);
+    if (site && container.id === 'house-canvas') {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'house-room-tag is-site'; button.dataset.room = site.id;
+      button.setAttribute('aria-label', `Plan ${site.label}, ${Math.min(house.coins, site.price)} of ${site.price} coins`);
+      const level = document.createElement('small'); level.textContent = 'Room to grow';
+      const name = document.createElement('strong'); name.textContent = `${site.short} · ${Math.min(house.coins, site.price)} / ${site.price}`;
+      button.append(level, name); tags.appendChild(button);
     }
     for (const mesh of model.meshes) mesh.receiveShadows = true;
     // Babylon removes disposed casters from this list. Keep it separate from
@@ -229,8 +260,18 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       engine.beginFrame(); scene.render(); engine.endFrame();
       return createHousePostcard(canvas, name, caption, theme);
     },
+    setClosed,
+    // Keep the house built while its page is away; it arrives closed again.
+    setSuspended(value) {
+      if (suspended === Boolean(value)) return;
+      suspended = Boolean(value); cancelAnimationFrame(frame); frame = 0; onCancel();
+      if (suspended) { roomMotion.stop(); return; }
+      closed = false; openAt = arrival(); lastOpenStep = 0; lastDraw = 0; model.setOpen(motion.matches ? 1 : 0);
+      if (!motion.matches) house.rooms.forEach((entry, index) => roomMotion.trigger(entry.id, 'arrive', performance.now(), index * 110));
+      resize();
+    },
     setFocused(value) { if (focused === Boolean(value)) return; focused = Boolean(value); requestRender(); },
-    diagnostics: () => ({ activeRoomMotions: roomMotion.activeCount, openFloors, portrait, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
+    diagnostics: () => ({ activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
     dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); controls.remove(); tags.remove(); note.remove(); },
   };
 }

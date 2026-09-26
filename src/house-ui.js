@@ -14,7 +14,7 @@ const moods = {
 };
 
 export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onFocus, art, icon, notice }) {
-  let view, shown = false, selectedId = store.state.house.activeId, signature = '', modelSignature = '';
+  let view, firstBuild = 0, shown = false, selectedId = store.state.house.activeId, signature = '', modelSignature = '';
   let preview = true, celebration = null, celebrationTimer, exporting = false, postcardUrl = null;
   const plans = new Map();
   const $ = selector => root.querySelector(selector);
@@ -138,23 +138,32 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     const nextModel = JSON.stringify([modelHouse.rooms, house.activeId, selectedId, store.state.theme, store.state.avatar]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
-      try {
-        if (view) view.update(modelHouse, selectedId, store.state.theme, store.state.avatar);
-        else view = createHouseView($('#house-canvas'), { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: select });
-      } catch (error) {
-        console.error('Could not show the cottage:', error);
-        $('#house-canvas').textContent = 'Your rooms are safe. Use the room buttons below to enter or expand your house.';
-      }
+      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: select };
+      const build = () => {
+        try {
+          if (view) view.update(options.house, options.selectedId, options.theme, options.avatar);
+          else view = createHouseView($('#house-canvas'), options);
+        } catch (error) {
+          console.error('Could not show the cottage:', error);
+          $('#house-canvas').textContent = 'Your rooms are safe. Use the room buttons below to enter or expand your house.';
+        }
+      };
+      // The first build takes a moment: show the page first, then build the house.
+      cancelAnimationFrame(firstBuild); clearTimeout(firstBuild);
+      if (view) build();
+      else firstBuild = requestAnimationFrame(() => { firstBuild = setTimeout(() => { firstBuild = 0; if (shown && !view) build(); }); });
     }
     if (draftName && $(`#${focusId}`)) { $(`#${focusId}`).value = draftName.value; $(`#${focusId}`).setSelectionRange(draftName.start, draftName.end); }
     if (focusId && !$(`#${focusId}`)?.disabled) $(`#${focusId}`)?.focus({ preventScroll: true });
     else if (focusDesign) root.querySelector(`[data-house-design="${focusDesign}"]`)?.focus({ preventScroll: true });
   }
   return {
-    show(id = store.state.house.activeId) { shown = true; root.hidden = false; selectedId = id; preview = true; signature = ''; render(); },
-    hide() { shown = false; postcardDialog.close(); root.hidden = true; view?.dispose(); view = null; signature = ''; modelSignature = ''; celebration = null; clearTimeout(celebrationTimer); $('#house-celebration').hidden = true; root.classList.remove('house-just-built'); $('#house-name-form').hidden = true; },
+    show(id = store.state.house.activeId) { shown = true; root.hidden = false; selectedId = id; preview = true; signature = ''; view?.setSuspended(false); render(); },
+    // The house stays built while away, so coming back is instant.
+    hide() { shown = false; postcardDialog.close(); root.hidden = true; view?.setSuspended(true); if (!view) modelSignature = ''; signature = ''; celebration = null; clearTimeout(celebrationTimer); $('#house-celebration').hidden = true; root.classList.remove('house-just-built'); $('#house-name-form').hidden = true; },
     render,
     diagnostics: () => view?.diagnostics(),
-    dispose() { clearTimeout(celebrationTimer); postcardDialog.close(); if (postcardUrl) URL.revokeObjectURL(postcardUrl); view?.dispose(); },
+    get view() { return view; },
+    dispose() { cancelAnimationFrame(firstBuild); clearTimeout(firstBuild); clearTimeout(celebrationTimer); postcardDialog.close(); if (postcardUrl) URL.revokeObjectURL(postcardUrl); view?.dispose(); },
   };
 }

@@ -10,6 +10,7 @@ import { roomDesign, rugStack, standHeight, FLOOR_Y } from './layout.js';
 import { getFurniture } from './catalog.js';
 import { surfaceChoices } from './surfaces.js';
 import { houseFurniture, houseArchitecture } from './house-furniture.js';
+import { buildExteriorPart, buildBlueprint, exteriorPlan, hingeOf, hingePose, CHIMNEY_TOP } from './house-exterior.js';
 
 // Reuse authored room geometry, batched per room. Only the occupied desk
 // keeps its animated rig; window views retain their illustrated materials.
@@ -20,37 +21,55 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   const meshes = [], buckets = new Map(), live = [], shells = [], framing = [], pieces = new Map(), model = {};
   const shared = previous?.shared || {
     levels: Object.fromEntries(Object.keys(HOUSE_POSITIONS).map(id => [id, new TransformNode(`house-level-${id}`, scene)])),
-    material: new StandardMaterial('house-paint', scene),
+    material: new StandardMaterial('house-paint', scene), hinges: {},
   };
   shared.owner = model;
-  const { levels, material } = shared; let furnitureFloor = .16, rugs = [];
+  const { levels, material, hinges } = shared; let furnitureFloor = .16, rugs = [];
   material.diffuseColor = Color3.White(); material.specularColor.setAll(0); material.emissiveColor.setAll(0.08);
   let bucket = 'grounds', piece = null;
   let origin = [0, 0, 0];
-  function batch(id, key, build, slot = id) {
+  function batch(id, key, build, slot = id, parent = null) {
     const old = previous?.pieces.get(id);
     if (old?.key === key) { old.owner = model; pieces.set(id, old); return; }
-    bucket = id; origin = [0, 0, 0]; piece = { key, slot, owner: model, live: [], shells: [] }; pieces.set(id, piece);
+    bucket = id; origin = [0, 0, 0]; piece = { key, slot, parent, owner: model, live: [], shells: [] }; pieces.set(id, piece);
     build();
   }
-  function paint(mesh, hex) {
+  function paint(mesh, hex, strength = 1) {
     const data = VertexData.ExtractFromMesh(mesh);
     mesh.computeWorldMatrix(true); data.transform(mesh.getWorldMatrix()); mesh.dispose();
     data.uvs = null;
     data.transform(Matrix.Translation(...origin));
-    const c = Color3.FromHexString(hex); data.colors = [];
+    const c = Color3.FromHexString(hex).scale(strength); data.colors = [];
     for (let i = 0; i < data.positions.length / 3; i++) data.colors.push(c.r, c.g, c.b, 1);
     if (!buckets.has(bucket)) buckets.set(bucket, []);
     buckets.get(bucket).push(data);
   }
-  function box(x, y, z, w, h, d, hex, tilt = 0) {
+  function box(x, y, z, w, h, d, hex, tilt = 0, strength = 1) {
     const m = MeshBuilder.CreateBox('part', { width: w, height: h, depth: d }, scene);
-    m.position.set(x, y, z); m.rotation.z = tilt; paint(m, hex);
+    m.position.set(x, y, z); if (Array.isArray(tilt)) m.rotation.set(...tilt); else m.rotation.z = tilt; paint(m, hex, strength);
   }
-  function ball(x, y, z, w, h, d, hex) {
+  function ball(x, y, z, w, h, d, hex, strength = 1) {
     const m = MeshBuilder.CreateSphere('part', { diameter: 1, segments: 4 }, scene);
-    m.position.set(x, y, z); m.scaling.set(w, h, d); paint(m, hex);
+    m.position.set(x, y, z); m.scaling.set(w, h, d); paint(m, hex, strength);
   }
+  // A gable end: a triangle `w` wide and `h` tall, standing on (x, y, z).
+  // `sideways` turns it to face along x, for the ends of the house.
+  function prism(x, y, z, w, h, d, hex, sideways = false) {
+    const at = (u, v, t) => sideways ? [x + t, y + v, z + u] : [x + u, y + v, z + t];
+    const l = [-w / 2, 0], r = [w / 2, 0], t = [0, h], f = d / 2, k = -d / 2;
+    const faces = [[at(...l, f), at(...r, f), at(...t, f)], [at(...r, k), at(...l, k), at(...t, k)]];
+    for (const [a, b] of [[l, r], [r, t], [t, l]]) faces.push([at(...a, k), at(...b, k), at(...b, f)], [at(...a, k), at(...b, f), at(...a, f)]);
+    // Both windings, so the gable reads from either side whatever the handedness.
+    for (const face of [...faces]) faces.push([face[0], face[2], face[1]]);
+    const data = new VertexData(); data.positions = faces.flat(2); data.indices = data.positions.map((_, i) => i).slice(0, data.positions.length / 3);
+    data.normals = []; VertexData.ComputeNormals(data.positions, data.indices, data.normals);
+    const m = new Mesh('part', scene); data.applyToMesh(m); paint(m, hex);
+  }
+  function disc(x, y, z, diameter, depth, hex, strength = 1, sideways = false) {
+    const m = MeshBuilder.CreateCylinder('part', { diameter, height: depth, tessellation: 18 }, scene);
+    m.position.set(x, y, z); if (sideways) m.rotation.z = Math.PI / 2; else m.rotation.x = Math.PI / 2; paint(m, hex, strength);
+  }
+  const outside = { box, ball, prism, disc };
   function cylinder(x, y, z, top, bottom, h, hex) {
     const m = MeshBuilder.CreateCylinder('part', { diameterTop: top, diameterBottom: bottom, height: h, tessellation: 12 }, scene);
     m.position.set(x, y, z); paint(m, hex);
@@ -81,7 +100,8 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   box(0, -.52, 0, 11.8, .48, 6.4, '#63765e'); box(0, -.25, 0, 11.6, .15, 6.2, '#a2af8a');
   box(-2.55, -.12, 2.12, 4.9, .18, .65, wood);
   for (let i = 0; i < 3; i++) box(-2.5, -.13, 2.5 + i * .28, .75, .12, .22, '#cdb995');
-  for (const [x, z, s] of [[-5.2, -2.3, 1.5], [5.2, -2.3, 1.8], [5.15, 2.25, 1.1], [-5.15, 1.4, .9]]) plant(x, -.2, z, s, x > 0);
+  // With the loft, the stair hall fills the left end, so its plants step aside.
+  for (const [x, z, s] of house.rooms.length === 3 ? [[5.2, -2.3, 1.8], [5.15, 2.25, 1.1], [-5.5, 2.55, .6]] : [[-5.2, -2.3, 1.5], [5.2, -2.3, 1.8], [5.15, 2.25, 1.1], [-5.15, 1.4, .9]]) plant(x, -.2, z, s, x > 0);
   // A hand-planted border: each flower stays in the static grounds batch.
   for (let i = 0; i < 32; i++) {
     const x = -4.85 + i * .31, z = 2.67 + Math.sin(i * 2.3) * .18;
@@ -144,12 +164,6 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     }
     rugs = rugStack(entry.layout.items);
     for (const item of [...entry.layout.items].sort((a, b) => (getFurniture(a.type)?.category === 'Rugs' ? -1 : 0) - (getFurniture(b.type)?.category === 'Rugs' ? -1 : 0))) furniture(item);
-    // A small rear roof pitch preserves the dollhouse cutaway and silhouette.
-    if (entry.id !== 'studio' || house.rooms.length === 1) {
-      const roofY = style === 'retreat' ? 2.96 : 2.57;
-      box(0, roofY, -2.1, 5.15, .17, .5, '#526b65', -.02);
-      box(1.55, roofY + .27, -2, .45, .58, .45, '#ae8b70'); box(1.55, roofY + .6, -2, .56, .12, .56, cream);
-    }
   });
   // The selected room's front edge is its own small batch, so choosing a room
   // never rebuilds the rooms themselves.
@@ -157,13 +171,29 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     origin = HOUSE_POSITIONS[selectedId];
     box(0, -.04, 2.08, 4.96, .075, .07, '#f0cf91');
   }, selectedId);
+  // The cottage around the rooms: fronts, side walls and front roofs hang on
+  // hinges, so the house opens without a rebuild. Back roofs stay put.
+  let chimney = null; const moving = [];
+  for (const entry of house.rooms) {
+    const { parts, options } = exteriorPlan(house, entry.id);
+    for (const part of parts) {
+      const key = `${entry.id}-${part}`, hinged = part !== 'roof', at = hingeOf(part, options);
+      if (hinged && !hinges[key]) { hinges[key] = new TransformNode(`house-hinge-${key}`, scene); hinges[key].parent = levels[entry.id]; }
+      if (hinged) { hinges[key].position.set(...HOUSE_POSITIONS[entry.id].map((v, i) => v + at[i])); moving.push({ key, part, options, at }); }
+      if (part === 'roof' && options.chimney && !chimney) chimney = { node: levels[entry.id], point: HOUSE_POSITIONS[entry.id].map((v, i) => v + CHIMNEY_TOP[i]) };
+      batch(`outside-${key}`, JSON.stringify([theme, options]), () => {
+        origin = hinged ? at.map(v => -v) : HOUSE_POSITIONS[entry.id];
+        buildExteriorPart(outside, part, entry.id, theme, options);
+      }, entry.id, hinged ? hinges[key] : null);
+    }
+  }
+  const next = house.rooms.length < 3 ? (house.rooms.length === 1 ? 'garden' : 'loft') : null;
+  if (next) batch('blueprint', next, () => { origin = HOUSE_POSITIONS[next]; buildBlueprint(outside); }, next);
   // Only the next extension is a building site. Future space is garden.
   if (house.rooms.length < 3) batch(house.rooms.length === 1 ? 'garden' : 'loft', 'site', () => {
     origin = HOUSE_POSITIONS[bucket];
     if (bucket === 'garden') {
       box(0, -.02, 0, 4.6, .12, 3.65, '#97a18b');
-      for (let i = 0; i < 10; i++) for (const z of [-1.82, 1.82]) box(-2.15 + i * .48, .06, z, .26, .035, .04, '#e2d3af');
-      for (let i = 0; i < 8; i++) for (const x of [-2.3, 2.3]) box(x, .06, -1.7 + i * .48, .04, .035, .26, '#e2d3af');
       box(0, .5, .1, .09, 1, .09, wood); box(0, 1.02, .1, 1.15, .65, .09, '#d8c4a1');
       box(0, 1.02, .17, .5, .06, .025, trim); box(0, 1.02, .17, .06, .42, .025, trim);
     } else {
@@ -174,25 +204,37 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     }
   });
   for (const [id, parts] of buckets) {
-    const target = pieces.get(id), slot = target.slot;
-    target.framing = { points: boundsPoints(parts), offset: levels[slot]?.position };
+    const target = pieces.get(id), slot = target.slot, hinge = target.parent;
+    // Hinged parts frame in their current pose: their points are relative to the hinge.
+    target.framing = hinge ? { points: boundsPoints(parts), node: hinge } : { points: boundsPoints(parts), offset: levels[slot]?.position };
     const data = parts.shift(); if (parts.length) data.merge(parts, true);
     const mesh = new Mesh(`house-${id}`, scene); data.applyToMesh(mesh); mesh.material = material;
-    mesh.parent = levels[slot] || null; mesh.useVertexColors = true; mesh.metadata = { houseSlot: slot === 'grounds' ? null : slot }; mesh.isPickable = slot !== 'grounds';
+    mesh.parent = hinge || levels[slot] || null; mesh.useVertexColors = true; mesh.metadata = { houseSlot: slot === 'grounds' ? null : slot }; mesh.isPickable = slot !== 'grounds';
     mesh.freezeWorldMatrix(); target.mesh = mesh;
   }
   for (const entry of pieces.values()) { meshes.push(entry.mesh); framing.push(entry.framing); live.push(...entry.live); shells.push(...entry.shells); }
-  return Object.assign(model, { meshes, live, shells, framing, levels, shared, pieces,
-    setOpenFloors(open, portrait = false) {
-      // The upper floor opens like a dollhouse: beside the home on wide screens,
-      // above it on a phone. Room layouts and saved positions never change.
-      levels.loft.position.set(open * (portrait ? 0 : -5.45), open * (portrait ? 2.7 : -1.95), open * (portrait ? 0 : .45));
-      levels.loft.computeWorldMatrix(true);
-      for (const mesh of meshes) { mesh.unfreezeWorldMatrix(); mesh.computeWorldMatrix(true); mesh.freezeWorldMatrix(); }
-    },
+  let openAmount = previous?.openAmount ?? 0;
+  function refresh() {
+    for (const level of Object.values(levels)) level.computeWorldMatrix(true);
+    for (const { key } of moving) hinges[key].computeWorldMatrix(true);
+    for (const mesh of meshes) { mesh.unfreezeWorldMatrix(); mesh.computeWorldMatrix(true); mesh.freezeWorldMatrix(); }
+  }
+  function applyOpen() {
+    const eased = openAmount * openAmount * (3 - 2 * openAmount);
+    for (const { key, part, options, at } of moving) {
+      const pose = hingePose(part, options, eased), hinge = hinges[key];
+      hinge.rotation.set(...pose.rotation); hinge.position.y = HOUSE_POSITIONS[key.split('-')[0]][1] + at[1] + pose.lift;
+    }
+  }
+  applyOpen(); refresh();
+  // A getter, not a copied value: Object.assign would freeze it at 0.
+  Object.defineProperty(model, 'openAmount', { get: () => openAmount });
+  return Object.assign(model, { meshes, live, shells, framing, levels, shared, pieces, refresh, chimney,
+    // 0 is a closed house and 1 is fully open, like a dollhouse.
+    setOpen(amount) { openAmount = amount; applyOpen(); refresh(); },
     animate(seconds, focused, reducedMotion) { for (const root of live) root.metadata.animate?.(seconds, focused, reducedMotion); },
     dispose() {
       for (const entry of pieces.values()) if (entry.owner === model) { entry.shells.forEach(shell => shell.dispose()); entry.live.forEach(root => root.dispose(false, false)); entry.mesh.dispose(); }
-      if (shared.owner === model) { Object.values(levels).forEach(root => root.dispose()); material.dispose(); }
+      if (shared.owner === model) { Object.values(hinges).forEach(root => root.dispose()); Object.values(levels).forEach(root => root.dispose()); material.dispose(); }
     } });
 }

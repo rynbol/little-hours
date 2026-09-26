@@ -136,7 +136,7 @@ test('house uses real furniture and architecture, batches static paint and relea
   try {
     for (let count = 1; count <= 3; count++) {
       const model = createHouseModel(scene, f.store.state.house, 'studio');
-      assert.ok(model.meshes.length <= 5, 'grounds, up to three rooms and the selection edge');
+      assert.ok(model.meshes.length <= 4 + count * 5, 'grounds, the site, its blueprint, the selection edge, and per room its batch and up to four outside parts');
       const vertices = model.meshes.reduce((total, mesh) => total + mesh.getTotalVertices(), 0);
       assert.ok(vertices > 10_000 && vertices < 1_000_000);
       for (const mesh of model.meshes) assert.ok(mesh.getVerticesData('position').every(Number.isFinite));

@@ -19,6 +19,7 @@ export function createHouseMotion(origins) {
   const applied = new Map();
   function matrices() {
     if (!model) return;
+    if (model.refresh) { model.refresh(); return; }
     for (const level of Object.values(model.levels)) level.computeWorldMatrix(true);
     for (const mesh of model.meshes) {
       mesh.unfreezeWorldMatrix(); mesh.computeWorldMatrix(true); mesh.freezeWorldMatrix();
