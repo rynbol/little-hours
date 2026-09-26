@@ -361,7 +361,7 @@ test('walking and seated poses reuse two body/head meshes with grounded feet and
   try {
     const avatar = createMobileCompanion(scene), body = scene.getMeshByName('companion-articulated-body');
     const meshes = scene.meshes.length, materials = scene.materials.length, geometry = body.geometry;
-    assert.equal(avatar.root.getChildMeshes().length, 5, 'body, head, one small sleep-letter batch, a book and a watering can');
+    assert.equal(avatar.root.getChildMeshes().length, 6, 'body, head, sleep letters, book, watering can and teacup');
     const pose = { atDesk: false, x: 0, z: 0, yaw: 0, sit: 0, seatHeight: .80, doze: 0, step: 0, moving: true };
     for (let i = 0; i < 150; i++) {
       pose.step = i * .1; pose.sit = i < 70 ? 0 : Math.min(1, (i - 70) / 30); pose.doze = i > 100 ? 1 : 0;

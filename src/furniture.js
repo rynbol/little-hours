@@ -1506,6 +1506,9 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
   rod(canSource, [0, .03, -.08], [0, .13, -.28], .016, '#6f8f86');
   rod(canSource, [0, .09, .065], [0, .15, .105], .014, '#5a766e'); rod(canSource, [0, .15, .105], [0, .045, .115], .014, '#5a766e');
   const can = batch(canSource); can.name = 'companion-watering-can'; can.parent = root; can.setEnabled(false);
+  const teaSource = new TransformNode('companion-tea-source', scene);
+  mug(teaSource, 0, 0, 0);
+  const cup = batch(teaSource); cup.name = 'companion-teacup'; cup.parent = root; cup.setEnabled(false);
   root.getChildMeshes().forEach(part => { part.isPickable = false; part.receiveShadows = false; part.metadata = { ...part.metadata, castShadow: false, companion: true }; });
   // The same soft pool as the furniture, raised above the thickest rug.
   const contact = createContactShadow('companion-contact-shadow', .26, .26, scene, { soft: .30, strength: .36 });
@@ -1542,7 +1545,7 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
   const blendJoint = (name, x, y, z, w) => { const joint = joints[name]; joint.x += (x - joint.x) * w; joint.y += (y - joint.y) * w; joint.z += (z - joint.z) * w; };
   const blendArm = (key, w) => { blendJoint('elbow' + key, elbow.x, elbow.y, elbow.z, w); blendJoint('wrist' + key, wrist.x, wrist.y, wrist.z, w); };
   return {
-    root, contact, head, book, can,
+    root, contact, head, book, can, cup,
     dispose() { root.dispose(false, false); contact.dispose(); },
     animate(pose, seconds, reducedMotion, ground = .22) {
       const visible = !pose.atDesk;
@@ -1553,6 +1556,7 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
       const goal = pose.activity && pose.activity === act.kind ? 1 : 0;
       act.weight = reducedMotion ? goal : act.weight + (goal - act.weight) * (1 - Math.exp(-dt * 6));
       const kind = act.kind, w = kind ? act.weight : 0, calm = reducedMotion ? 0 : 1, doze = pose.doze;
+      const sip = kind === 'tea' ? calm * Math.sin(Math.min(1, Math.max(0, (pose.activityTime - 2.4) / 4.8)) * Math.PI) ** 2 : 0;
       root.position.set(pose.x, ground, pose.z); root.rotation.y = pose.yaw;
       sleepLetters.setEnabled(pose.doze > .25 && !reducedMotion);
       if (sleepLetters.isEnabled()) { const drift = seconds / 3 % 1; sleepLetters.position.set(.12, 2.08 + drift * .20, 0); sleepLetters.alpha = Math.sin(drift * Math.PI) * .70; }
@@ -1600,6 +1604,11 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
         else if (kind === 'window') { reachArm(shoulder, target.set(side * .07, H + .12, .19), side, -.2, .5); blendArm(key, w); }
         else if (kind === 'read') { reachArm(shoulder, target.set(side * .13, H + .36 - doze * .22, -.4 + doze * .06), side, -.8, .2); blendArm(key, w); }
         else if (kind === 'water') { reachArm(shoulder, side > 0 ? target.set(.18, H + .12, -.52) : target.set(-.24, H + .02, -.12), side, -.7, .3); blendArm(key, w); }
+        else if (kind === 'tea') {
+          // Cradle the cup, then bring its rim to the mouth for one slow sip.
+          reachArm(shoulder, target.set(side > 0 ? .18 : -.10, H + (side > 0 ? .30 : .14) + sip * .48, -.42 + sip * .12), side, -.7, .3);
+          blendArm(key, w);
+        }
         else if (kind === 'door' && side > 0 && pose.reach) {
           reachLocal(pose, ground, local);
           local.z -= calm * Math.sin(Math.min(1, pose.activityTime / .65) * Math.PI) * .055;
@@ -1656,9 +1665,15 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
       const look = w * (LOOK[kind] ?? 0), glance = kind === 'window' ? w * calm * Math.sin(seconds * .31) * .3 : 0;
       // The head stays steadier than the body under it.
       head.rotation.set(lean * (1 - g * .6) - pose.doze * .36 * (kind === 'read' ? .5 : 1) + look, (reducedMotion ? 0 : Math.sin(seconds * .45) * .055 * sit) + glance, roll * .4 + pose.doze * .09);
+      if (kind === 'tea') head.rotation.x -= (.12 - sip * .10) * w;
       // The book sits between the hands; the can hangs from the right hand
       // and tips to pour in the middle of the watering.
       book.setEnabled(kind === 'read' && w > .02); can.setEnabled(kind === 'water' && w > .02);
+      cup.setEnabled(kind === 'tea' && w > .02);
+      if (cup.isEnabled()) {
+        const r = joints.wristR;
+        cup.position.set(r.x - .105, r.y - .10, r.z); cup.rotation.set(sip * .18, 0, 0); cup.scaling.setAll(w);
+      }
       if (book.isEnabled()) {
         const l = joints.wristL, r = joints.wristR;
         book.position.set((l.x + r.x) / 2, (l.y + r.y) / 2 + .07, (l.z + r.z) / 2 - .03); book.rotation.set(.95 - doze * .75, 0, 0); book.scaling.setAll(w);

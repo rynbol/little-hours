@@ -26,6 +26,7 @@ import { AVATAR_DEFAULT, avatarAppearanceKey, normalizeAvatarAppearance } from '
 import { createPetModel } from './pets.js';
 import { createPetRoutine, insideBed, PETS, PET_REACTION } from './pet.js';
 import { createCompanionRoutine } from './companion.js';
+import { interactionFor, INTERACTION_NOTICES } from './item-interactions.js';
 import { createArchitecture, styleFurniture, buildWallMesh } from './architecture.js';
 import { getFurniture } from './catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, footprintBounds, MAX_ITEMS, pieceCount, petBed, roomDesign, rugStack, rugTouches, groundAt, standHeight, FLOOR_Y, RUG_STEP, FLAT_RUG } from './layout.js';
@@ -1051,7 +1052,31 @@ export function createRoom(container, options = {}) {
     const item = layout.items.find(entry => entry.id === itemId);
     if ((kind === 'lamp' || kind === 'record') && item?.off) useItem(itemId);
     else if (kind === 'water' && item && !reducedMotion) { reactions.set(itemId, { kind: 'rustle', start: performance.now() }); requestRender(); }
+    else if ((kind === 'tea' || kind === 'read') && item && !reducedMotion) { useItem(itemId); }
     else if (kind === 'pet' && !petRoutine.pose.held) pet({ by: 'companion' });
+  }
+  function interactionFeedback(result) {
+    if (!result.ok && INTERACTION_NOTICES[result.reason]) options.onNotice?.(INTERACTION_NOTICES[result.reason]);
+    if (result.ok) { options.onItemInteraction?.(result); requestRender(); }
+    return result;
+  }
+  function interactWithItem(itemId) { return interactionFeedback(companionRoutine.requestInteraction(itemId)); }
+  function interactWithKind(kind) {
+    const candidates = layout.items.filter(item => interactionFor(item.type)?.kind === kind);
+    // Prefer reading in a chair, and try another placed piece if a corner is
+    // blocked. Only the final result speaks, never every rejected route.
+    candidates.sort((a, b) => Number(b.type === 'lounge-chair') - Number(a.type === 'lounge-chair'));
+    let result = { ok: false, reason: 'blocked' };
+    for (const item of candidates) {
+      result = companionRoutine.requestInteraction(item.id);
+      if (result.ok || result.reason !== 'blocked') break;
+    }
+    return interactionFeedback(result);
+  }
+  function tapItem(itemId) {
+    const item = layout.items.find(entry => entry.id === itemId);
+    if (interactionFor(item?.type)) return interactWithItem(itemId);
+    useItem(itemId);
   }
   function castPointer(event) {
     const rect = canvas.getBoundingClientRect();
@@ -1229,7 +1254,7 @@ export function createRoom(container, options = {}) {
     pendingPointer.clientX = event.clientX; pendingPointer.clientY = event.clientY; pendingPointer.pointerType = event.pointerType; hasPendingPointer = true;
     requestRender(); if (avatarRotation || !clicked) return;
     const ray = castPointer(event);
-    if (!editing) { const target = playTarget(ray); if (target?.house) options.onHouseNavigate?.(target.house); else if (target?.cat) pet(); else if (target?.avatar) options.onCompanionTap?.({ state: companionRoutine.pose.state, activity: companionRoutine.pose.activity }); else if (target?.id) useItem(target.id); else if (target?.lights) options.onToggleLights?.(); return; }
+    if (!editing) { const target = playTarget(ray); if (target?.house) options.onHouseNavigate?.(target.house); else if (target?.cat) pet(); else if (target?.avatar) options.onCompanionTap?.({ state: companionRoutine.pose.state, activity: companionRoutine.pose.activity }); else if (target?.id) tapItem(target.id); else if (target?.lights) options.onToggleLights?.(); return; }
     if (placement) {
       const point = isWallPiece(placement) ? wallPosition(ray) : floorPosition(ray);
       if (!point) { options.onNotice?.(placement.reason || (isWallPiece(placement) ? 'Choose a clear spot on a wall.' : 'Choose a clear spot inside the room.')); return; }
@@ -1603,7 +1628,7 @@ export function createRoom(container, options = {}) {
     setSuspended(value) { suspended = Boolean(value); if (suspended) { cancelDrag(); cancelAnimationFrame(frame); frame = 0; clearTimeout(petWake); } else { resize(); resumeFrames(); } wakeForClock(); },
     setTheme, setLayout, setEditMode, setAvatarEditing, setAvatarAppearance, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setSurface, setQuality,
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
-    setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet,
+    setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet, interactWithItem, interactWithKind,
     setPet(species) { const next = species === 'dog' ? 'dog' : 'cat'; if (next === petSpecies) return; if (petRoutine.pose.held) releasePet(); petSpecies = next; buildPet(); requestRender(); },
     anchor,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
