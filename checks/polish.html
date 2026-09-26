@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Little Hours · wardrobe & doorway check</title></head>
+<body><div id="app"></div><script type="module">
+// Development-only browser fixture. It uses its own session save, never the
+// player's localStorage. Clock controls exercise real completion/purchase UI.
+if (!import.meta.env.DEV) throw new Error('Development check only');
+const originalNow = Date.now;
+const nativeMatchMedia = window.matchMedia.bind(window), testMotion = new EventTarget();
+testMotion.matches = false;
+window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? testMotion : nativeMatchMedia(query);
+let offset = Number(sessionStorage.getItem('polish-check-clock')) || 0;
+Date.now = () => originalNow() + offset;
+window.__littleHoursTest = { storage: {
+  getItem: () => sessionStorage.getItem('polish-check-save'),
+  setItem: (_, value) => sessionStorage.setItem('polish-check-save', value),
+} };
+await import('../src/main.js');
+const controls = document.createElement('nav');
+controls.setAttribute('aria-label', 'Isolated test controls');
+controls.style.cssText = 'position:fixed;top:1px;left:50%;transform:translateX(-50%);opacity:.8;max-width:calc(100% - 12px);z-index:1000;display:flex;flex-wrap:wrap;gap:5px;padding:6px;background:#eee;color:#222;border:1px solid #333;border-radius:5px;font:11px sans-serif';
+controls.innerHTML = '<span>TEST SAVE</span><button id="advance">Advance 25 minutes</button><button id="reset-check">Reset test save</button><button id="reduce-motion" aria-pressed="false">Reduce motion</button><button id="inspect">Inspect runtime</button><button id="measure">Measure overview</button><output id="measurement"></output>';
+document.body.append(controls);
+const report = document.createElement('pre'); report.id = 'runtime-report'; report.hidden = true; document.body.append(report);
+document.querySelector('#inspect').onclick = () => {
+  const app = window.__littleHours, d = app.room.diagnostics(), scene = d.scene, pose = d.companion;
+  const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { x:r.x, y:r.y, width:r.width, height:r.height }; };
+  const head = d.companionModel.head.getAbsolutePosition(), viewport = d.camera.viewport.toGlobal(d.engine.getRenderWidth(), d.engine.getRenderHeight());
+  report.textContent = JSON.stringify({
+    avatar: app.state.avatar, activeRoom: app.state.house.activeId, coins: app.state.house.coins,
+    running: app.state.session.running, remaining: app.state.session.remaining,
+    avatarEditing: d.avatarEditing, cameraMask: d.camera.layerMask,
+    lights: scene.lights.map(l => ({ name:l.name, enabled:l.isEnabled(), intensity:l.intensity })),
+    pose: { state:pose.state, x:pose.x, z:pose.z, atDesk:pose.atDesk, sit:pose.sit, walkHeight:pose.walkHeight },
+    meshes: scene.meshes.length, materials: scene.materials.length, frame:scene.getFrameId(),
+    panel: rect('#room-panel'), canvas: rect('#room-canvas'), overflow: document.documentElement.scrollWidth > innerWidth,
+    doors: d.passages.links.map(l => ({ id:l.id, built:l.built, angle:scene.getTransformNodeByName(`door-hinge-${l.id}`)?.rotation.y })),
+    head: { x:head.x, y:head.y, z:head.z }, viewport,
+  });
+};
+document.querySelector('#advance').onclick = () => { offset += 25 * 60_000; sessionStorage.setItem('polish-check-clock', offset); document.dispatchEvent(new Event('visibilitychange')); };
+document.querySelector('#reset-check').onclick = () => { sessionStorage.removeItem('polish-check-save'); sessionStorage.removeItem('polish-check-clock'); location.reload(); };
+document.querySelector('#reduce-motion').onclick = event => { testMotion.matches = !testMotion.matches; testMotion.dispatchEvent(new Event('change')); event.target.setAttribute('aria-pressed', String(testMotion.matches)); };
+document.querySelector('#measure').onclick = async () => {
+  const app = window.__littleHours, overview = app.connected || app.house, start = overview.diagnostics(), roomFrame = app.room.diagnostics().scene.getFrameId();
+  if (!start) { document.querySelector('#measurement').textContent = 'Open the house first'; return; }
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  const end = overview.diagnostics();
+  document.querySelector('#measurement').textContent = end ? `${end.drawCalls} draw calls · ${Math.round(end.triangles)} triangles · ${end.renderCount - start.renderCount} overview frames · ${app.room.diagnostics().scene.getFrameId() - roomFrame} background room frames in 2s` : 'House closed';
+};
+</script></body></html>

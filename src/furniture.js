@@ -9,6 +9,7 @@ import { CreateTube } from '@babylonjs/core/Meshes/Builders/tubeBuilder.js';
 import { CreatePlane } from '@babylonjs/core/Meshes/Builders/planeBuilder.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { Vector3, Vector4, Quaternion, Matrix } from '@babylonjs/core/Maths/math.vector.js';
+import { Curve3 } from '@babylonjs/core/Maths/math.path.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
@@ -124,7 +125,7 @@ function rod(parent, a, b, radius, color, extra = {}) {
 // A limb that narrows from `a` to `b`.
 function taper(parent, a, b, radiusA, radiusB, color) {
   const start = new Vector3(...a), end = new Vector3(...b), delta = end.subtract(start);
-  const result = mesh(parent, CreateCylinder('limb', { diameterTop: radiusB * 2, diameterBottom: radiusA * 2, height: delta.length(), tessellation: 12 }, parent.getScene()), color, start.add(end).scale(0.5).asArray());
+  const result = mesh(parent, CreateCylinder('limb', { diameterTop: radiusB * 2, diameterBottom: radiusA * 2, height: delta.length(), tessellation: 20 }, parent.getScene()), color, start.add(end).scale(0.5).asArray());
   result.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), delta.normalize(), new Quaternion());
   return result;
 }
@@ -159,7 +160,7 @@ function group(parent, position = [0, 0, 0]) {
 
 // Bake transforms and colors into shared geometry. Every matte painted or wooden
 // part uses the same material, so a colorful shelf still costs one draw call.
-function batch(source) {
+function batch(source, correctNormals = false) {
   const scene = source.getScene(), cache = cacheFor(scene), buckets = new Map();
   for (const part of source.getChildMeshes()) {
     const mat = part.material, key = mat.metadata.batchKey;
@@ -174,7 +175,17 @@ function batch(source) {
     }
     part.computeWorldMatrix(true);
     const data = VertexData.ExtractFromMesh(part, true, true);
+    const originalNormals = correctNormals && data.normals ? Array.from(data.normals) : null;
     data.transform(part.getWorldMatrix());
+    if (originalNormals) {
+      // An ellipsoid's lighting must use inverse scale. The plain vertex-data
+      // transform scales normals like positions, which left dark joint seams.
+      const normalMatrix = Matrix.Transpose(Matrix.Invert(part.getWorldMatrix())), n = new Vector3();
+      for (let i = 0; i < originalNormals.length; i += 3) {
+        Vector3.TransformNormalFromFloatsToRef(originalNormals[i], originalNormals[i + 1], originalNormals[i + 2], normalMatrix, n);
+        n.normalize(); data.normals[i] = n.x; data.normals[i + 1] = n.y; data.normals[i + 2] = n.z;
+      }
+    }
     data.uvs = undefined; data.uvs2 = undefined;
     const color = mat.diffuseColor;
     data.colors = [];
@@ -685,6 +696,10 @@ const TEA_CART_SPOUT = [-0.05, 1.0, 0];
 // shelves, rainbow, neon sign and records keep their original shapes.
 function tube(parent, points, radius, color, extra) {
   return mesh(parent, CreateTube('soft-curve', { path: points.map(point => new Vector3(...point)), radius, tessellation: 6, cap: Mesh.CAP_ALL }, parent.getScene()), color, [0, 0, 0], extra);
+}
+function hairLock(parent, points, radius, color) {
+  const path = Curve3.CreateCatmullRomSpline(points.map(point => new Vector3(...point)), 6, false).getPoints();
+  return mesh(parent, CreateTube('soft-hair-lock', { path, radius, tessellation: 10, cap: Mesh.CAP_ALL }, parent.getScene()), color, [0, 0, 0]);
 }
 const pictureSizes = { 'tall-frame': [0.88, 1.23], 'small-frame': [0.60, 0.86], 'wide-frame': [1.32, 0.86], easel: [0.87, 1.11] };
 // Each view covers its opening (the frame less OPENING_INSET) with a margin.
@@ -1234,7 +1249,7 @@ function pleatedSkirt(parent, color, trim) {
   }
 }
 function hips(parent, trousers = TROUSERS, bottomStyle = 'trousers', trim = '#a4ac94') {
-  sphere(parent, [.225, .105, .19], [0, .785, -.08], trousers, 10);
+  sphere(parent, [.21, .085, .16], [0, .79, -.08], trousers, 16);
   if (bottomStyle === 'skirt') pleatedSkirt(parent, trousers, trim);
 }
 function shoe(parent, x) { return [sphere(parent, [.1, .072, .175], [x, .102, -.77], C.cream, 8), sphere(parent, [.106, .028, .182], [x, .048, -.768], '#b39c80', 6)]; }
@@ -1242,9 +1257,9 @@ function sweater(parent, appearance = AVATAR_DEFAULT) {
   const knit = avatarPaint(appearance, 'top'), outfit = appearance.outfit || 'cardigan';
   // Elliptical rings give the knit a soft waist and sloping shoulders, rather
   // than reusing the sharp furniture-box silhouette for a person.
-  const profile = [[0.83, 0.19, 0.15], [0.88, 0.225, 0.175], [0.98, 0.245, 0.19],
+  const profile = [[0.77, 0.215, 0.165], [0.86, 0.24, 0.185], [0.98, 0.245, 0.19],
     [1.22, 0.255, 0.19], [1.39, 0.235, 0.17], [1.49, 0.18, 0.14], [1.51, 0.12, 0.11]];
-  const positions = [], indices = [], normals = [], sides = 16;
+  const positions = [], indices = [], normals = [], sides = 24;
   for (const [y, width, depth] of profile) for (let side = 0; side < sides; side++) {
     const angle = side / sides * Math.PI * 2;
     positions.push(Math.cos(angle) * width, y, -0.085 + Math.sin(angle) * depth);
@@ -1264,24 +1279,33 @@ function sweater(parent, appearance = AVATAR_DEFAULT) {
   const data = new VertexData(); Object.assign(data, { positions, indices, normals });
   const shape = new Mesh('soft-knit-sweater', parent.getScene()); data.applyToMesh(shape);
   mesh(parent, shape, knit.color, [0, 0, 0]);
-  const hem = cylinder(parent, 0.238, 0.218, 0.045, [0, 0.859, -0.085], knit.shade); hem.scaling.z = 0.77;
+  const hem = cylinder(parent, 0.24, 0.216, 0.055, [0, 0.804, -0.085], knit.shade, { segments: 32 }); hem.scaling.z = 0.77;
   const collar = torus(parent, 0.107, 0.025, [0, 1.515, -0.14], knit.trim); collar.rotation.x = Math.PI / 2;
   if (outfit === 'cardigan') {
-    rod(parent, [0, 0.96, -0.321], [0, 1.43, -0.313], 0.009, knit.trim);
-    for (const y of [1.04, 1.18, 1.32]) sphere(parent, [0.014, 0.014, 0.009], [0.026, y, -0.328], knit.trim, 8);
+    rod(parent, [0, 0.86, -0.276], [0, 1.39, -0.258], 0.009, knit.trim);
+    for (const y of [0.96, 1.10, 1.24]) sphere(parent, [0.014, 0.014, 0.009], [0.026, y, -0.282], knit.trim, 8);
+    for (const side of [-1, 1]) {
+      const pocket = box(parent, [.105, .09, .014], [side * .135, .98, -.243], knit.shade, .018);
+      pocket.rotation.y = side * .32;
+    }
   } else if (outfit === 'hoodie') {
     sphere(parent, [.24, .19, .075], [0, 1.39, .15], knit.shade, 12);
-    box(parent, [.20, .105, .014], [0, 1.075, -.319], knit.shade, .025);
-    rod(parent, [-.084, 1.115, -.328], [.084, 1.115, -.328], .005, knit.trim);
-    for (const side of [-1, 1]) rod(parent, [side * .045, 1.45, -.258], [side * .05, 1.22, -.321], .009, knit.trim);
+    box(parent, [.20, .105, .014], [0, 1.075, -.279], knit.shade, .025);
+    rod(parent, [-.084, 1.115, -.291], [.084, 1.115, -.291], .005, knit.trim);
+    for (const side of [-1, 1]) rod(parent, [side * .045, 1.45, -.258], [side * .05, 1.22, -.282], .009, knit.trim);
   } else if (outfit === 'overalls') {
     // A flat, softly beveled bib sits against the sweater; a sphere here used
     // to protrude like a pouch and swallowed the overall straps and pocket.
-    box(parent, [.31, .29, .026], [0, 1.28, -.292], knit.shade, .045);
-    for (const side of [-1, 1]) rod(parent, [side * .12, 1.45, -.25], [side * .12, 1.355, -.318], .02, knit.trim);
-    box(parent, [.115, .078, .012], [0, 1.205, -.314], knit.color, .018);
-    rod(parent, [-.045, 1.224, -.324], [.045, 1.224, -.324], .004, knit.trim);
-    for (const x of [-.12, .12]) sphere(parent, [.012, .012, .008], [x, 1.414, -.317], knit.trim, 8);
+    const denim = avatarPaint(appearance, 'bottom');
+    box(parent, [.34, .52, .035], [0, 1.06, -.279], denim.color, .035);
+    const waistband = cylinder(parent, .242, .222, .06, [0, .808, -.085], denim.color, { segments: 32 }); waistband.scaling.z = .77;
+    for (const side of [-1, 1]) {
+      tube(parent, [[side * .12, 1.28, -.30], [side * .14, 1.46, -.21], [side * .14, 1.5, -.08], [side * .14, 1.4, .085], [side * .13, .85, .09]], .017, denim.color);
+    }
+
+    box(parent, [.115, .078, .012], [0, 1.105, -.307], denim.trim, .018);
+    rod(parent, [-.045, 1.125, -.318], [.045, 1.125, -.318], .004, knit.trim);
+    for (const x of [-.12, .12]) sphere(parent, [.012, .012, .008], [x, 1.295, -.31], knit.trim, 8);
   } else if (outfit === 'sailor') {
     for (const side of [-1, 1]) {
       const flap = box(parent, [.15, .052, .016], [side * .078, 1.444, -.294], knit.trim, .022);
@@ -1338,7 +1362,7 @@ function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
     const range = { start: vertexOffset, end: vertexOffset + part.getTotalVertices(), ...part.metadata };
     ranges.push(range); vertexOffset += part.getTotalVertices();
   }
-  const upper = batch(upperSource), upperPositions = upper.getChildMeshes()[0].getVerticesData('position');
+  const upper = batch(upperSource, true), upperPositions = upper.getChildMeshes()[0].getVerticesData('position');
   for (const range of ranges) if (range.arm) {
     const dx = range.b[0] - range.a[0], dy = range.b[1] - range.a[1], dz = range.b[2] - range.a[2], lengthSquared = dx * dx + dy * dy + dz * dz;
     range.length = Math.sqrt(lengthSquared); range.direction = new Vector3(dx, dy, dz).scaleInPlace(1 / range.length);
@@ -1368,7 +1392,7 @@ function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
     for (let row = 0; row <= rows; row++) for (let column = 0; column <= columns; column++) {
       const phi = column / columns * Math.PI * 2;
       const front = Math.max(0, -Math.sin(phi));
-      const theta = (row / rows) * (1.08 + backCoverage * (1 - front));
+      const theta = (row / rows) * ((appearance.style === 'crop' ? 1.22 : 1.08) + backCoverage * (1 - front));
       const lift = 1.014;
       positions.push(
         .214 * Math.sin(theta) * Math.cos(phi) * lift,
@@ -1387,19 +1411,19 @@ function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
   }
   if (appearance.style === 'bob') {
     sphere(head, [.205, .17, .115], [0, -.075, .09], hair, 16);
-    for (const side of [-1, 1]) tube(head, [
+    for (const side of [-1, 1]) hairLock(head, [
       [side * .166, .09, -.095], [side * .19, .035, -.114], [side * .188, -.045, -.126],
       [side * .17, -.13, -.124], [side * .145, -.225, -.105],
-    ], .034, hair);
+    ], .042, hair);
   } else if (appearance.style === 'waves') {
-    sphere(head, [.205, .19, .112], [0, -.085, .085], hair, 16);
-    for (const side of [-1, 1]) tube(head, [
+    sphere(head, [.217, .285, .115], [0, -.11, .093], hair, 20);
+    for (const side of [-1, 1]) hairLock(head, [
       [side * .164, .11, -.078], [side * .186, .045, -.092], [side * .17, -.035, -.108],
       [side * .194, -.12, -.11], [side * .172, -.21, -.101], [side * .19, -.30, -.086],
       [side * .167, -.39, -.075],
-    ], .026, hair);
+    ], .041, hair);
   } else if (appearance.style === 'crop') {
-    tube(head, [[-.15, .052, -.128], [-.09, .025, -.16], [-.025, .026, -.179], [.055, .038, -.174], [.14, .06, -.137]], .017, hair);
+    hairLock(head, [[-.16, .115, -.145], [-.08, .095, -.183], [.01, .078, -.198], [.09, .088, -.18], [.16, .12, -.13]], .028, hair);
     for (const x of [-.199, .199]) sphere(head, [.029, .056, .03], [x, .012, -.052], hair, 12);
   } else {
     for (const side of [-1, 1]) tube(head, [
@@ -1425,8 +1449,8 @@ function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
     sphere(head, [.012, .012, .009], [x, y, z - .009], '#d6ad69', 8);
   } else if (appearance.accessory === 'moon-clips') {
     for (const [x, tone] of [[-.16, '#e2c58f'], [.16, '#b4a6c4']]) {
-      rod(head, [x - .018, .047, -.154], [x + .018, .083, -.154], .009, tone);
-      rod(head, [x - .018, .083, -.154], [x + .018, .047, -.154], .009, tone);
+      const moon = torus(head, .025, .009, [x, .072, -.171], tone, Math.PI * 1.45);
+      moon.rotation.z = -.8;
     }
   }
   // Small uncovered ears keep the side silhouette human without oversized
@@ -1437,7 +1461,8 @@ function avatarTemplate(scene, choice = AVATAR_DEFAULT) {
   sphere(writingHand, [0.074, 0.044, 0.10], [0, 0, 0], skin);
   rod(writingHand, [0.015, -0.048, -0.045], [0.075, 0.15, 0.025], 0.009, '#bb9b61');
   rod(writingHand, [0.011, -0.058, -0.049], [0.015, -0.048, -0.045], 0.005, '#514e3b');
-  const value = { body: batch(body), upper, head: batch(head), hand: batch(hand), writingHand: batch(writingHand) };
+  const value = { body: batch(body, true), upper, head: batch(head, true), hand: batch(hand, true), writingHand: batch(writingHand, true) };
+  value.head.scaling.setAll(1.24);
   Object.values(value).forEach(part => part.setEnabled(false));
   templates.set(key, value); return value;
 }
@@ -1465,18 +1490,20 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
     for (const [name, a, b, radius, end, tint] of [['upperArm', 'shoulder', 'elbow', .092, .082, avatarPaint(appearance, 'top').color], ['forearm', 'elbow', 'wrist', .08, .068, avatarPaint(appearance, 'top').color], ...legSegments]) {
       const bone = name + key, part = taper(source, anchors[a], anchors[b], radius, end, tint);
       part.metadata = { bone }; bones[bone] = { a: a + key, b: b + key, start: new Vector3(...anchors[a]), end: new Vector3(...anchors[b]) };
-      const joint = sphere(source, [radius, radius, radius], anchors[a], tint); joint.metadata = { joint: a + key };
+      const joint = sphere(source, [radius * .99, radius * .99, radius * .99], anchors[a], tint, 16); joint.metadata = { joint: a + key };
     }
+    const sleeveCuff = cuffBand(source, anchors.elbow, anchors.wrist, .92, .072, .055, avatarPaint(appearance, 'top').trim);
+    sleeveCuff.metadata = { bone: 'forearm' + key };
     if (bottomStyle === 'shorts') {
       const cuff = cuffBand(source, anchors.hip, anchors.shortsHem, .91, .108, .024, bottomPaint.trim);
       cuff.metadata = { bone: 'thigh' + key };
     }
-      const hand = sphere(source, [.074, .082, .066], anchors.wrist, skin, 8); hand.metadata = { joint: 'wrist' + key };
+      const hand = sphere(source, [.064, .079, .06], [anchors.wrist[0], anchors.wrist[1] - .035, anchors.wrist[2]], skin, 16); hand.metadata = { joint: 'wrist' + key };
     for (const part of shoe(source, side * .15)) part.metadata = { joint: 'ankle' + key, pitch: key };
   }
   const ranges = []; let vertex = 0;
   for (const part of source.getChildMeshes()) { ranges.push({ start: vertex, end: vertex + part.getTotalVertices(), ...part.metadata }); vertex += part.getTotalVertices(); }
-  const bodyGroup = batch(source); bodyGroup.parent = root;
+  const bodyGroup = batch(source, true); bodyGroup.parent = root;
   const body = bodyGroup.getChildMeshes()[0]; body.name = 'companion-articulated-body';
   for (const kind of ['position', 'normal']) body.markVerticesDataAsUpdatable(kind, true);
   const neutral = Float32Array.from(body.getVerticesData('position')), positions = new Float32Array(neutral);
@@ -1564,7 +1591,7 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
       // body rolls a little toward that foot.
       const g = gait * (1 - sit), cycle = pose.step / 8 / STRIDE, mid = cycle - Math.floor(cycle) - STANCE / 2;
       const breath = reducedMotion ? 0 : Math.sin(seconds * (pose.doze > 0 ? 1.05 : 1.4)) * .007;
-      let hip = 1.10 * (1 - sit) + pose.seatHeight * sit + Math.cos(mid * Math.PI * 4) * .018 * g;
+      let hip = .98 * (1 - sit) + pose.seatHeight * sit + Math.cos(mid * Math.PI * 4) * .018 * g;
       let lean = sit * (.08 + pose.doze * .11) - .05 * g;
       const roll = Math.cos(mid * Math.PI * 2) * .03 * g;
       if (w) { hip += ((HIP[kind] ?? hip) - hip) * w; lean += (LEAN[kind] ?? 0) * w; }
