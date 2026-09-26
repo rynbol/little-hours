@@ -57,6 +57,8 @@ See [engine and performance notes](docs/engine-and-performance.md) for the basel
 
 ## Product research
 
+See the [September 25 implementation and resource research](research/2026-09-25/README.md) for an extensive assessment of the timer, interface, accessibility, room, audio, assets, persistence, social features, native options and verification tooling, with selective recommendations and linked primary sources.
+
 Start with [the competitor map](research/competitor-map.md), then [web and social](research/web-and-social.md) and [desktop and notch](research/desktop-and-notch.md). Research was checked September 21, 2026. Official feature claims are not equivalent to hands-on verification.
 
 The chosen direction is browser first, with a whole cutaway room visible like Rooms.xyz, then friends joining rooms and clearly visible study presence. The notch is an optional companion to that experience. See [product direction](docs/product-vision.md). Virtual Cottage 2 is the main product benchmark under that framing; Rooms is the visual reference. The competitive opportunity remains a hypothesis to validate through actual sessions.
