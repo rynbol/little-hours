@@ -53,7 +53,7 @@ All furniture and design changes remain free; earned coins buy the two house ext
 
 ### Whole-house view
 
-Choose **Whole house** above the room to see your furnished home together. **Open floors** brings the upstairs room out beside the ground floor on desktop, or lifts it clear on a phone; **Dollhouse** folds it back. Drag to turn, use the view buttons, or choose a room’s name to step inside. The larger room framing keeps the whole cutaway visible. See [whole-house notes](docs/whole-house.md).
+Choose **Whole house** above the room to see your furnished home together. **Open floors** brings the upstairs room out beside the ground floor on desktop, or lifts it clear on a phone; **Dollhouse** folds it back. Drag to turn, use the view buttons, or choose a room’s name to step inside. The larger room framing keeps the whole cutaway visible.
 
 ## Engine and art
 
@@ -67,7 +67,7 @@ See the [September 25 implementation and resource research](research/2026-09-25/
 
 Start with [the competitor map](research/competitor-map.md), then [web and social](research/web-and-social.md) and [desktop and notch](research/desktop-and-notch.md). Research was checked September 21, 2026. Official feature claims are not equivalent to hands-on verification.
 
-The chosen direction is browser first, with a whole cutaway room visible like Rooms.xyz, then friends joining rooms and clearly visible study presence. The notch is an optional companion to that experience. See [product direction](docs/product-vision.md). Virtual Cottage 2 is the main product benchmark under that framing; Rooms is the visual reference. The competitive opportunity remains a hypothesis to validate through actual sessions.
+The chosen direction is browser first, with a whole cutaway room visible like Rooms.xyz, then friends joining rooms and clearly visible study presence. The notch is an optional companion to that experience. See the [roadmap](docs/roadmap.md). Virtual Cottage 2 is the main product benchmark under that framing; Rooms is the visual reference. The competitive opportunity remains a hypothesis to validate through actual sessions.
 
 ## Verification
 
@@ -82,7 +82,7 @@ npm run test:e2e   # first time: npx playwright install chromium
 
 The development-only `/checks/house.html` page runs the real app with a separate session save and clock controls. Use it to check earning and spending coins without changing your own room or waiting through a session. It also measures idle overview frames and background room frames. It is not included in the production bundle.
 
-See [growing house notes](docs/growing-house.md) for save behavior, rendering limits and the browser verification results.
+See the [roadmap](docs/roadmap.md) for what comes next.
 
 `npm run test:e2e` drives the real app in Chromium with Playwright: a focus session through pause, reload and exactly-once completion (using a fake clock), downloading and restoring a home backup, the remembered chime choice, and automated axe accessibility scans of the focus card and saves panel. The room renders with software WebGL there, so these tests check behavior, not appearance or frame rate.
 
