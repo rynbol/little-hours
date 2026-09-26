@@ -30,4 +30,4 @@ Drive the real app in Chrome with real mouse and keyboard input, collect evidenc
 ## Other tools
 
 - `.mcp.json` adds chrome-devtools-mcp for poking at a page by hand (console, network, performance insights, memory). Use `lh` for anything that should be repeatable.
-- The Playwright suite (`npx playwright test`) covers accessibility, backup and timer completion.
+- The Playwright suite (`npm run test:e2e`) covers accessibility, backup and timer completion.

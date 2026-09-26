@@ -8,7 +8,7 @@ The user wants a visibly animated room while preserving FPS. Reuse transforms an
 
 Use Babylon.js as the game engine. The visual direction is an expansive, fantastical and exceptionally cozy study retreat, with layered warm lighting and deliberately detailed furniture. The long-term vision is friends joining rooms to study and an expandable native notch companion showing friends' study presence. Keep that as product direction; current work prioritizes graphics and the solo decorating game.
 
-The room and shared study presence are the core product. Make online availability, active focus and breaks visibly distinct. The notch is an optional extension of that same room/presence system, not a requirement for the website or friends feature. Current local timer status must not imply a live friends connection. See `docs/roadmap.md`.
+The room and shared study presence are the core product. Make online availability, active focus and breaks visibly distinct. The notch is an optional extension of that same room/presence system, not a requirement for the website or friends feature. Current local timer status must not imply a live friends connection. See `docs/roadmap.md` for the plan and decisions.
 
 ## Development checkpoints
 
@@ -24,3 +24,12 @@ Verify browser behaviour with the `lh` CLI (`npm run lh -- help`) and follow `.c
 - No new code comments. Name things so the code explains itself; put reasons in the commit message.
 
 Preserve the distinction between the in-page mini view and future native desktop/notch integration. Use original assets and implementation.
+
+## Gotchas
+
+- Load `house.css` after `ui.css`, and `wardrobe.css` after the general UI styles.
+- Keep the portrait branch of `fitRoom` when changing the room framing; the wardrobe uses it.
+- A house rebuild keeps each room that did not change (`createHouseModel`'s `previous` argument). Batch new house parts the same way.
+- The pages in `checks/` use their own test saves and are not in the production build.
+
+Read the code and tests for how things work; there are no per-feature docs.

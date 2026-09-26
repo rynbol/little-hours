@@ -6,14 +6,6 @@ Agreed on September 26, 2026. This replaces the old product-direction note and t
 
 Make a game good enough to spread on the App Store, on San Francisco tech Twitter (through a trailer), and among girls, couples and friends who study together. Every change must fit the cozy Little Hours look and feel.
 
-## What is true now (main, `cc08d9e`)
-
-- One furnished studio to start. A completed focus session earns 1 coin per minute (25, 50 or 90). The garden wing costs 25 coins and the upstairs hideaway costs 75.
-- Each room keeps its own furniture, colors and name. A *design* is a decorating style, not a room you own.
-- The house page shows the rooms as open boxes side by side on a flat plot. The only roof is a small strip at the back.
-- Porch doors and stairs link the rooms. The avatar walks to a door before it goes through. A door to an unbuilt room opens a little and then shows the house page for that room.
-- All saves are local. There are no accounts, no sync and no real-money purchases.
-
 ## Decisions
 
 | Question | Decision |
@@ -30,7 +22,7 @@ Make a game good enough to spread on the App Store, on San Francisco tech Twitte
 
 Each chunk is one large piece of work. Each one ends with a preview for approval before it goes to main.
 
-### Chunk 1: The dollhouse (the house page)
+### Chunk 1: The dollhouse (the house page), done
 
 - The closed cottage: a pitched roof, a chimney with smoke, windows that glow at night, and a garden plot with a path and a fence.
 - Tap a room: the roof lifts and the front swings open, then the camera moves in. Step back and the house closes.
@@ -84,11 +76,3 @@ Each chunk is one large piece of work. Each one ends with a preview for approval
 
 - Which server for sync and accounts. Decide before chunk 3.
 - Group size for study sessions with friends.
-
-## Rules to keep while building
-
-- **Checks:** run `npm test`, `npm run verify:room` and `npm run build`. Drive the real app in Chrome and Firefox with real input. Measure speed against main, and add no new work per frame.
-- **Test pages:** `checks/house.html`, `checks/whole-house.html`, `checks/motion.html` and `checks/polish.html` use their own test saves and never touch a player's save. They are not in the production build.
-- **CSS order:** load `house.css` after `ui.css`, and load `wardrobe.css` after the general UI styles.
-- **Wardrobe:** keep the portrait branch of `fitRoom` when changing the room framing.
-- **House rebuilds:** a house rebuild keeps each room that did not change (see `createHouseModel`'s `previous` argument). New house parts must be batched the same way.
