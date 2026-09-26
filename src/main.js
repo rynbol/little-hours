@@ -1,4 +1,7 @@
 import './style.css';
+import './ui.css';
+import { createUIFeedback } from './ui-feedback.js';
+import { blossomArt, coinArt, sproutArt } from './ui-art.js';
 import { createRoom } from './room.js';
 import { createSession, remainingAt, formatTime, sessionPhase, displayedRemaining } from './session.js';
 import { createStateStore, localDate, storageKey } from './state.js';
@@ -24,6 +27,8 @@ const icons = {
   leaf: '<path d="M20 3S4 2 4 12a7 7 0 0 0 7 7c10 0 9-16 9-16Z"/><path d="M3 21 15 9"/>',
   cat: '<path d="m4 11 1-8 5 5h4l5-5 1 8v5c0 7-16 7-16 0z"/><path d="M8 13h.1M16 13h.1M11 17h2"/>',
   mini: '<rect x="3" y="4" width="18" height="16" rx="3"/><rect x="12" y="12" width="7" height="6" rx="1"/>',
+  pause: '<path d="M8 5v14M16 5v14"/>',
+  heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',
   arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
   reset: '<path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/>',
   sound: '<path d="m11 4-6 5H2v6h3l6 5zM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
@@ -74,14 +79,15 @@ let companionActivity = 'idle';
 const listeners = new AbortController();
 
 document.querySelector('#app').innerHTML = `
+  <a class="skip-link" href="#start-button">Skip to focus timer</a>
   <div class="app-shell">
     <header class="app-header">
       <a class="brand" href="/" aria-label="Little Hours home"><span class="brand-mark">${icon('home')}</span><span>little hours<span class="brand-dot">.</span></span></a>
-      <div class="header-right"><button class="coin-wallet" id="coin-wallet" aria-label="Your house and coins">${icon('sun')}<span id="coin-balance">0</span><span>coins</span></button><button class="time-toggle" id="time-toggle" aria-label="Switch to daylight" title="Switch to daylight">${icon('moon')}<span>Night</span></button><button class="focus-toggle" id="focus-toggle" aria-expanded="true" aria-controls="focus-card" aria-label="Hide focus panel">${icon('clock')}<span>Focus</span><span id="dock-timer">25:00</span></button></div>
+      <span class="brand-tagline">a little time, a little magic</span><div class="header-right"><button class="coin-wallet" id="coin-wallet" aria-label="Your house and coins">${coinArt()}<span id="coin-balance">0</span><span>coins</span></button><button class="time-toggle" id="time-toggle" aria-label="Switch to daylight" title="Switch to daylight">${icon('moon')}<span>Night</span></button><button class="focus-toggle" id="focus-toggle" aria-expanded="true" aria-controls="focus-card" aria-label="Hide focus panel">${icon('clock')}<span>Focus</span><span id="dock-timer">25:00</span></button></div>
     </header>
     <main class="workspace">
       <section id="room-section" class="room-section" aria-labelledby="room-title">
-        <div class="room-heading"><div><p class="eyebrow">YOUR QUIET LITTLE WORLD</p><h1 id="room-title">The twilight retreat</h1><p class="room-subtitle" id="room-subtitle">The fire is warm. The night is yours.</p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Visit your house" aria-controls="house-page">${icon('home')}<span>House</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
+        <div class="room-heading"><div><p class="eyebrow">MAKE YOURSELF AT HOME</p><h1 id="room-title">The twilight retreat</h1><p class="room-subtitle" id="room-subtitle">The fire is warm. The night is yours.</p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Visit your house" aria-controls="house-page">${icon('home')}<span>My house</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
         <nav id="home-connections" class="home-connections" aria-label="Move around your house"></nav>
         <div class="stage" id="stage">
           <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a pet. Drag to turn the room."></div>
@@ -96,11 +102,11 @@ document.querySelector('#app').innerHTML = `
         <div class="room-bottom">
           <div class="room-company">${icon('cat')}<span id="pet-company">You & Miso</span></div>
           <nav class="room-tools" aria-label="Room controls">
-            <button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Atmosphere</span></button>
-            <button class="tool" data-panel="performance" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Performance</span></button>
+            <button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Ambience</span></button>
             <button class="tool" id="pet-button" data-panel="pet" aria-expanded="false" aria-controls="room-panel">${icon('cat')}<span id="pet-button-label">Miso</span></button>
             <button class="tool" id="avatar-button" data-panel="avatar" aria-expanded="false" aria-controls="room-panel">${icon('avatar')}<span>Avatar</span></button>
             <button class="tool" id="mini-button" aria-pressed="false">${icon('mini')}<span>Mini view</span></button>
+            <button class="tool" data-panel="performance" aria-label="Performance and quality" title="Performance and quality" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Quality</span></button>
           </nav>
         </div>
         <div class="room-panel" id="room-panel" hidden></div>
@@ -113,26 +119,38 @@ document.querySelector('#app').innerHTML = `
         </section>
       </section>
       <section id="house-page" class="house-page" aria-label="Your growing house" hidden></section>
-      <aside class="focus-card" id="focus-card" aria-labelledby="focus-title">
-        <div class="card-top"><span class="eyebrow">YOUR QUIET CHAPTER</span><span class="tiny-flower" aria-hidden="true">✳</span></div>
-        <h2 id="focus-title">Stay a <em>while.</em></h2>
-        <label class="field-label" for="task">What are you working on?</label>
-        <input id="task" maxlength="180" placeholder="One thing, for now…" autocomplete="off" />
-        <div class="timer-area"><span id="session-label" class="session-label">SETTLE IN</span><div id="timer" class="timer" role="timer" aria-label="25 minutes remaining">25:00</div><div class="durations" aria-label="Focus duration"><button data-minutes="25" aria-pressed="true">25 min</button><button data-minutes="50" aria-pressed="false">50 min</button><button data-minutes="90" aria-pressed="false">90 min</button></div></div>
+      <aside class="focus-card" id="focus-card" tabindex="-1" aria-labelledby="focus-title">
+        <div class="card-top"><span class="eyebrow">A MOMENT FOR YOU</span><span class="tiny-flower" aria-hidden="true">${blossomArt()}</span></div>
+        <h2 id="focus-title">Little by <em>little.</em></h2><p class="focus-intro">Make space for one good thing.</p>
+        <label class="field-label" for="task">Your little intention</label>
+        <input id="task" maxlength="180" placeholder="Read a chapter, dream something up…" autocomplete="off" />
+        <div class="timer-area">
+          <div class="timer-dial" id="timer-dial">
+            <svg class="timer-ring" viewBox="0 0 200 200" aria-hidden="true"><circle class="timer-track" cx="100" cy="100" r="91"/><circle class="timer-progress" id="timer-progress" cx="100" cy="100" r="91" pathLength="100"/><circle class="timer-seed" cx="100" cy="9" r="5"/></svg>
+            <div class="timer-center"><span id="session-label" class="session-label">SETTLE IN</span><div id="timer" class="timer" role="timer" aria-label="25 minutes remaining">25:00</div><span class="timer-caption" id="timer-caption">a small beginning</span></div>
+          </div>
+          <div class="durations" role="group" aria-label="Focus duration"><button data-minutes="25" aria-pressed="true">25 <span>min</span></button><button data-minutes="50" aria-pressed="false">50 <span>min</span></button><button data-minutes="90" aria-pressed="false">90 <span>min</span></button></div>
+        </div>
         <button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
-        <button class="reset-session" id="reset-session" hidden>Reset session</button>
-        <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="30" aria-label="Rain volume" /></div>
+        <button class="reset-session" id="reset-session" hidden>Start over</button>
+        <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="30" aria-label="Rain volume" disabled /></div>
         <div id="focus-reward" class="focus-reward"></div>
+        <details class="session-journal"><summary><span>Today’s little wins</span><span id="today-total">0 min</span></summary><div id="today-sessions"></div></details>
         <div class="daily-note" id="daily-note">Good things begin with a little time.</div>
       </aside>
     </main>
-    <footer class="app-footer"><span>A softer place to spend your hours.</span><span>Your room is saved as you go <span aria-hidden="true">✧</span></span></footer>
+    <footer class="app-footer"><span>A softer place to spend your hours.</span><span>Saved on this device <span aria-hidden="true">✧</span></span></footer>
   </div>
+  <dialog id="session-celebration" class="session-celebration" aria-labelledby="celebration-title" aria-describedby="celebration-copy">
+    <form method="dialog"><button class="celebration-close" aria-label="Close session celebration">${icon('close')}</button><div class="celebration-flower" aria-hidden="true"><img src="/ui/little-bloom.png" width="160" height="160" alt="" /></div><p class="eyebrow">LOOK AT YOU GROW</p><h2 id="celebration-title">A little time.<br><em>A lovely little win.</em></h2><p id="celebration-copy"></p><div class="celebration-coins">${coinArt()}<strong id="celebration-earned"></strong><span>for your home</span></div><button class="start-button" autofocus>Enjoy a little break ${icon('heart')}</button><p class="celebration-note">Your room will be right here.</p></form>
+  </dialog>
   <div id="drag-return-preview" class="drag-return-preview" aria-hidden="true" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>`;
 
 const $ = (selector) => document.querySelector(selector);
 $('#task').value = state.task;
+const feedback = createUIFeedback(document, { signal: listeners.signal });
+let journalSignature = '';
 function toast(message, warning = false) {
   $('#toast').textContent = message;
   $('#toast').classList.toggle('is-warning', warning);
@@ -223,7 +241,7 @@ function acceptUpdate(result) {
   applyState(result.state);
   if (result.completed) {
     room?.pet(); avatarSay('finish', { force: true });
-    toast(`+${result.earned} coins for your house. A little progress, made.`);
+    showSessionCelebration(result.earned);
   }
   if (!result.persisted && !storageWarningShown) {
     storageWarningShown = true;
@@ -354,7 +372,7 @@ function renderConnections(updateModel = true) {
     button.textContent = state.house.coins >= next.price ? `＋ Build ${next.short}` : `＋ ${next.short} · ${state.house.coins}/${next.price}`;
     button.addEventListener('click', () => visitRoom(next.id)); nav.append(button);
   }
-  const wide = document.createElement('button'); wide.className = 'home-wide'; wide.textContent = connectedView ? 'Back to my room' : 'See connected house'; wide.setAttribute('aria-pressed', String(Boolean(connectedView)));
+  const wide = document.createElement('button'); wide.className = 'home-wide'; wide.textContent = connectedView ? 'Back to my room' : 'Whole house'; wide.setAttribute('aria-pressed', String(Boolean(connectedView)));
   wide.addEventListener('click', () => setConnectedView(!connectedView)); nav.append(wide);
   if (connectedView && updateModel) connectedView.update(state.house, state.house.activeId, state.theme);
 }
@@ -428,7 +446,7 @@ function renderFocusReward() {
   const reward = focusCoins(state.session.duration / 60_000), next = nextExpansion(state.house);
   const name = next?.id === 'garden' ? 'garden wing' : 'upstairs hideaway';
   const progress = !next ? 'A little more saved for your home' : state.house.coins >= next.price ? `Your ${name} is ready to build` : `${next.price - state.house.coins} coins to your ${name}`;
-  $('#focus-reward').innerHTML = `${icon('sun')}<span><strong>+${reward} coins when you finish</strong>${progress}</span>`;
+  $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>Your time grows your home</strong><span>+${reward} coins when you finish</span><small>${progress}</small></span>`;
 }
 
 
@@ -443,6 +461,43 @@ function renderCompanionNote() {
   const minutes = state.history.filter(h => h.date === localDate()).reduce((sum, h) => sum + h.minutes, 0);
   const notes = { idle: 'Start focusing to work alongside your companion.', working: 'Your companion is working alongside you.', walking: 'A little stretch. Your companion is finding a cozy spot.', returning: 'Your companion is on the way back to the desk.', resting: 'A soft seat and a little breather. Take your time.', sleeping: 'Your companion has drifted off. Resume whenever you’re ready.', 'resting-at-desk': 'Your companion is taking a quiet break at the desk.', busy: 'Your companion is tending to the room.', 'at-door': 'Your companion is ready at the doorway.' };
   $('#daily-note').textContent = minutes ? `${minutes} quiet minutes made today. Look at you go.` : notes[companionActivity];
+}
+function renderJournal() {
+  const entries = state.history.filter(entry => entry.date === localDate());
+  const signature = JSON.stringify(entries);
+  if (signature === journalSignature) return;
+  journalSignature = signature;
+  const total = entries.reduce((sum, entry) => sum + entry.minutes, 0);
+  $('#today-total').textContent = `${total} min`;
+  const list = $('#today-sessions');
+  list.replaceChildren();
+  if (!entries.length) {
+    const note = document.createElement('p');
+    note.textContent = 'A fresh page. Your first little win is waiting.';
+    const mark = document.createElement('span');
+    mark.className = 'journal-sprout';
+    mark.innerHTML = sproutArt();
+    list.append(mark, note);
+  } else {
+    const note = document.createElement('p');
+    note.textContent = `${entries.length} ${entries.length === 1 ? 'session' : 'sessions'} completed. Every little bit counts.`;
+    list.append(note);
+    const chips = document.createElement('div');
+    chips.className = 'journal-sessions';
+    for (const entry of entries.slice(-12)) {
+      const chip = document.createElement('span');
+      chip.textContent = `✓ ${entry.minutes} min`;
+      chips.append(chip);
+    }
+    list.append(chips);
+  }
+}
+function showSessionCelebration(earned) {
+  const modal = $('#session-celebration');
+  $('#celebration-copy').textContent = `${earned} quiet minutes, just for you. Small beginnings add up to something good.`;
+  $('#celebration-earned').textContent = `+${earned} coins`;
+  if (!modal.open) modal.showModal();
+  feedback.celebrate($('.celebration-flower'));
 }
 function renderSession() {
   const ms = displayedRemaining(state.session);
@@ -461,7 +516,16 @@ function renderSession() {
   $('#dock-timer').textContent = formatted;
   $('#timer').setAttribute('aria-label', `${formatted} remaining`);
   document.title = state.session.running ? `${formatted} · Little Hours` : 'Little Hours — a little place to focus';
-  $('#session-label').textContent = state.session.running ? 'ONE LITTLE THING AT A TIME' : ms < state.session.duration && ms > 0 ? 'TAKE YOUR TIME' : ms === 0 ? 'A LITTLE PROGRESS, MADE' : 'SETTLE IN';
+  $('#session-label').textContent = state.session.running ? 'IN YOUR OWN TIME' : ms < state.session.duration && ms > 0 ? 'A LITTLE BREATHER' : ms === 0 ? 'YOU DID THAT' : 'SETTLE IN';
+  $('#timer-caption').textContent = state.session.running ? 'one thing at a time' : ms === 0 ? 'a little progress, made' : ms < state.session.duration ? 'ready when you are' : 'a small beginning';
+  $('#timer-progress').style.strokeDashoffset = String(100 * (1 - ms / state.session.duration));
+  $('#timer-dial').dataset.phase = state.session.running ? 'focusing' : ms === 0 ? 'complete' : presence;
+  const actionIcon = state.session.running ? 'pause' : 'arrow';
+  if ($('#start-button').dataset.icon !== actionIcon) {
+    $('#start-button svg').outerHTML = icon(actionIcon);
+    $('#start-button').dataset.icon = actionIcon;
+  }
+  renderJournal();
   const label = state.session.running ? 'Pause a moment' : ms === 0 ? 'Begin another session' : ms < state.session.duration ? 'Keep going' : 'Start focusing';
   $('#start-button span').textContent = label;
   $('#start-button').disabled = travelling || avatarPanelActive;
@@ -515,6 +579,14 @@ $('#time-toggle').addEventListener('click', () => {
 });
 $('#reset-view').addEventListener('click', () => room?.resetView());
 $('#focus-toggle').addEventListener('click', () => {
+  if (currentPanel) closePanel();
+  // On a phone the timer lives below the room. A tap should take you there,
+  // not hide an already off-screen card and require a second tap.
+  if (!$('#focus-card').hidden && window.matchMedia('(max-width: 999px)').matches) {
+    revealFocusDock();
+    $('#focus-card').focus({ preventScroll: true });
+    return;
+  }
   if (houseOpen || connectedView) {
     if (houseOpen) setHouseOpen(false);
     if (connectedView) setConnectedView(false);
@@ -523,6 +595,15 @@ $('#focus-toggle').addEventListener('click', () => {
   if (editMode) { focusCollapsed = false; setEditMode(false); }
   else { focusCollapsed = !focusCollapsed; syncFocusDock(); }
   if (!focusCollapsed) revealFocusDock();
+});
+$('.skip-link').addEventListener('click', event => {
+  event.preventDefault();
+  if (houseOpen) setHouseOpen(false);
+  if (connectedView) setConnectedView(false);
+  if (editMode) setEditMode(false);
+  if (currentPanel) closePanel();
+  focusCollapsed = false; syncFocusDock(); revealFocusDock();
+  $('#start-button').focus();
 });
 $('#rooms-button').addEventListener('click', () => setHouseOpen(true));
 $('#coin-wallet').addEventListener('click', () => setHouseOpen(!houseOpen));
@@ -569,8 +650,10 @@ function syncFocusDock() {
   $('#focus-card').hidden = !visible;
   document.body.classList.toggle('focus-collapsed', focusCollapsed);
   $('#focus-toggle').setAttribute('aria-expanded', String(visible));
-  $('#focus-toggle').setAttribute('aria-label', visible ? 'Hide focus panel' : 'Show focus panel');
+  $('#focus-toggle').setAttribute('aria-label', window.matchMedia('(max-width: 999px)').matches ? 'Go to focus timer' : visible ? 'Hide focus panel' : 'Show focus panel');
 }
+
+window.addEventListener('resize', syncFocusDock, { signal: listeners.signal });
 
 function revealFocusDock() {
   if (window.matchMedia('(min-width: 1000px)').matches) return;
@@ -959,6 +1042,7 @@ function renderPanel() {
     renderPerformance();
   }
   $('#close-panel').addEventListener('click', closePanel);
+  if (currentPanel !== 'avatar') $('#close-panel').focus({ preventScroll: true });
 }
 function closePanel() {
   const previous = currentPanel; currentPanel = null; renderPanel();
@@ -1007,12 +1091,14 @@ async function toggleSound() {
     if (!soundEnabled) setTimeout(() => { if (!soundEnabled) audioContext.suspend().catch(() => {}); }, 800);
     $('#sound-button').setAttribute('aria-pressed', soundEnabled);
     $('#sound-state').textContent = soundEnabled ? 'Rain is falling' : 'Sound off';
+    $('#volume').disabled = !soundEnabled;
   } catch { toast('Audio isn’t available in this browser. Your quiet room is still here.'); }
 }
 $('#sound-button').addEventListener('click', toggleSound);
 $('#volume').addEventListener('input', event => {
   if (soundEnabled && gainNode) gainNode.gain.setTargetAtTime(Number(event.target.value) / 130, audioContext.currentTime, 0.1);
 });
+syncFocusDock();
 syncCompanionIntent();
 tick();
 const tickInterval = setInterval(tick, 500);
@@ -1045,6 +1131,8 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking');
   clearInterval(tickInterval);
   clearTimeout(toastTimeout);
+  feedback.dispose();
+  $('#session-celebration')?.close();
   clearTimeout(travelTimer); clearTimeout(arrivalTimer); connectedView?.dispose();
   houseUI?.dispose();
   room?.dispose?.();
