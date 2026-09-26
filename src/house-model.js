@@ -62,10 +62,23 @@ export function createHouseModel(scene, house, selectedId, theme = 'day') {
     if (result.live) live.push(result.live);
   }
   // A landscaped plinth, porch and stepping stones make even one room a home.
-  box(0, -.52, 0, 11.8, .48, 6.4, '#4e6250'); box(0, -.25, 0, 11.6, .15, 6.2, '#839475');
+  box(0, -.52, 0, 11.8, .48, 6.4, '#63765e'); box(0, -.25, 0, 11.6, .15, 6.2, '#a2af8a');
   box(-2.55, -.12, 2.12, 4.9, .18, .65, wood);
   for (let i = 0; i < 3; i++) box(-2.5, -.13, 2.5 + i * .28, .75, .12, .22, '#cdb995');
-  for (const [x, z, s] of [[-5.2, -2.3, 1.5], [5.2, -2.3, 1.8], [5.15, 2.25, 1.1], [-5.15, 1.4, .9]]) plant(x, -.2, z, s);
+  for (const [x, z, s] of [[-5.2, -2.3, 1.5], [5.2, -2.3, 1.8], [5.15, 2.25, 1.1], [-5.15, 1.4, .9]]) plant(x, -.2, z, s, x > 0);
+  // A hand-planted border: each flower stays in the static grounds batch.
+  for (let i = 0; i < 32; i++) {
+    const x = -4.85 + i * .31, z = 2.67 + Math.sin(i * 2.3) * .18;
+    if (x > -3.1 && x < -1.9) continue;
+    const y = -.1 + (i % 3) * .035;
+    box(x, y, z, .025, .2, .025, '#6e855e');
+    ball(x, y + .13, z, .16, .09, .16, ['#eac0b9', '#f5e4bd', '#c8b7d7'][i % 3]);
+    ball(x + .065, y + .02, z, .14, .05, .075, '#839d6f');
+  }
+  // A low garden bench and two terracotta pots by the front path.
+  box(1.2, .13, 2.66, 1.1, .08, .35, '#d1ae86');
+  for (const x of [.8, 1.6]) box(x, -.03, 2.66, .08, .26, .27, '#8d6d53');
+  plant(-3.32, -.17, 2.55, .52, true); plant(-1.63, -.17, 2.55, .46);
   for (let i = 0; i < 13; i++) {
     const x = -5.2 + i * .86;
     box(x, .04, -2.86, .1, .58, .1, '#c6b99b');
