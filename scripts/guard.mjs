@@ -81,10 +81,11 @@ export function commentLines(file, code) {
 const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
 function addedLines(base) {
-  const added = new Map();
+  const added = new Map(), removed = new Set();
   let file = null;
   for (const line of git(['diff', '--unified=0', '--no-color', '--no-ext-diff', base, '--']).split('\n')) {
     if (line.startsWith('+++ ')) { file = line.startsWith('+++ b/') ? line.slice(6) : null; continue; }
+    if (line.startsWith('-') && !line.startsWith('--- ')) { removed.add(line.slice(1).trim()); continue; }
     const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
     if (hunk && file) {
       const start = Number(hunk[1]), count = hunk[2] === undefined ? 1 : Number(hunk[2]);
@@ -94,7 +95,7 @@ function addedLines(base) {
     }
   }
   for (const untracked of git(['ls-files', '--others', '--exclude-standard']).split('\n').filter(Boolean)) added.set(untracked, 'all');
-  return added;
+  return { added, removed };
 }
 
 function defaultBase() {
@@ -110,10 +111,11 @@ function main() {
   let base = null;
   if (baseArg) { try { base = git(['rev-parse', '--verify', `${baseArg}^{commit}`]); } catch {} }
   if (base) {
-    for (const [file, lines] of addedLines(base)) {
+    const { added, removed } = addedLines(base);
+    for (const [file, lines] of added) {
       if (!CHECKED.test(file) || !existsSync(join(root, file))) continue;
-      const code = readFileSync(join(root, file), 'utf8');
-      for (const line of commentLines(file, code)) if (lines === 'all' || lines.has(line)) problems.push({ file, line, rule: 'no-new-comments', message: 'new code comments are not allowed; say it in the code, the commit message, or the docs' });
+      const code = readFileSync(join(root, file), 'utf8'), text = code.split('\n');
+      for (const line of commentLines(file, code)) if ((lines === 'all' || lines.has(line)) && !removed.has(text[line - 1].trim())) problems.push({ file, line, rule: 'no-new-comments', message: 'new code comments are not allowed; say it in the code, the commit message, or the docs' });
     }
   }
   for (const problem of problems) console.log(`${problem.file}:${problem.line}  ${problem.rule}  ${problem.message}`);
