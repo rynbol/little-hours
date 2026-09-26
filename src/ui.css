@@ -99,7 +99,7 @@ body:not(.is-avatar-editing) .room-hint { color: #b5a3b1; font-size: 10px; botto
 .focus-mode-button > svg:last-child { width: 15px; height: 15px; margin-left: auto; color: #9a8490; }
 .focus-mode-button > span { display: grid; gap: 2px; }
 .focus-mode-button strong { color: #674f58; font-size: 11px; font-weight: 600; }
-.focus-mode-button small { color: #887780; font-size: 9px; }
+.focus-mode-button small { color: #6f5b63; font-size: 9px; }
 .focus-mode-button:hover:not(:disabled) { background: #f8ece8; border-color: #cdaeb5; }
 .focus-mode-button:disabled { opacity: .48; }
 .reset-session { color: #80696f; min-height: 32px; margin: 7px auto -7px; font-size: 10px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #80696f50; }

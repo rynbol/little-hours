@@ -19,6 +19,7 @@ export const cycles = {
   decorate: { about: 'open Decorate, then leave it', async run(app) { await steps.openDecorate(app); await steps.closeDecorate(app); } },
   avatar: { about: 'open the avatar editor, then press Done', async run(app) { await steps.openAvatar(app); await steps.closeAvatar(app); } },
   'house-toggle': { about: 'on the house page, close the house and open it again', async setup(app) { await steps.openHouse(app); }, async run(app) { await steps.toggleHouse(app); await steps.toggleHouse(app); } },
+  focus: { about: 'enter Focus mode and return to the room', async run(app) { if (!await app.js(`Boolean(document.querySelector('#focus-mode-enter'))`)) return; await steps.openFocusMode(app); await app.key('Escape'); await app.waitFor(`!document.body.classList.contains('is-focus-mode')`, { what: 'leaving Focus mode' }); } },
 };
 
 export const views = {

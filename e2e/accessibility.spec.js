@@ -12,6 +12,15 @@ test('the focus card has no serious automated accessibility issues', async ({ pa
   expect(serious(await scan(page))).toEqual([]);
 });
 
+test('Focus mode has no serious automated accessibility issues', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#focus-mode-enter').click();
+  await expect(page.locator('body')).toHaveClass(/is-focus-mode/);
+  await expect(page.locator('#focus-mode-timer')).toBeVisible();
+  await expect(page.locator('#focus-mode-exit')).toHaveAccessibleName('Leave focus mode');
+  expect(serious(await scan(page))).toEqual([]);
+});
+
 test('the saves panel has no serious automated accessibility issues', async ({ page }) => {
   await page.goto('/');
   await page.locator('#save-status').click();

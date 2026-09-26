@@ -52,6 +52,15 @@ test('a running session keeps counting while the page is closed', async ({ page 
   await expect(coins(page)).toHaveText('25');
 });
 
+test('Focus mode returns to the room when the session completes', async ({ page }) => {
+  await page.locator('#focus-mode-enter').click();
+  await expect(page.locator('body')).toHaveClass(/is-focus-mode/);
+  await page.clock.fastForward('25:00');
+  await expect(page.locator('#session-celebration')).toBeVisible();
+  await expect(page.locator('body')).not.toHaveClass(/is-focus-mode/);
+  await expect(page.locator('#stage-presence')).toHaveAttribute('data-presence', 'break');
+});
+
 test('the chime preference is remembered', async ({ page }) => {
   const chime = page.locator('#chime-toggle');
   await expect(chime).toBeChecked();
