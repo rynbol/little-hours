@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@1.10.1", "--isolated", "--headless", "--memoryDebugging", "--no-usage-statistics", "--no-performance-crux", "--viewport=1440x1000", "--chromeArg=--use-angle=metal", "--chromeArg=--hide-scrollbars"]
+    }
+  }
+}

@@ -35,6 +35,7 @@ import { ARTWORKS, SLEEVES } from './art.js';
 import { tintPaint } from './tints.js';
 import { surfacePaint } from './surfaces.js';
 import { createRoomPassages } from './room-passages.js';
+import { clockNow, clockRandom } from './test-pins.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -547,7 +548,7 @@ export function createRoom(container, options = {}) {
   function wakeForClock() {
     clearTimeout(clockWake); clockWake = 0;
     if (disposed || suspended || !reducedMotion || !visible || !layout?.items.some(item => getFurniture(item.type)?.clock)) return;
-    clockWake = setTimeout(() => { clockWake = 0; requestRender(); wakeForClock(); }, 60000 - Date.now() % 60000 + 20);
+    clockWake = setTimeout(() => { clockWake = 0; requestRender(); wakeForClock(); }, 60000 - clockNow() % 60000 + 20);
   }
   function refreshShadows() {
     shadow.getShadowMap().renderList = scene.meshes.filter(mesh => !(drag?.active && mesh === petModel?.body && drag.id === petBed(layout)?.id) && mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && (!drag?.active || itemAncestor(mesh)?.metadata.itemId !== drag.id) && mesh !== rain && mesh !== marker && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
@@ -892,7 +893,7 @@ export function createRoom(container, options = {}) {
     cancelDrag(); hoverItem(null); cancelPlacement(); selectItem(null); setEditMode(true);
     ghost = createFurniture(type, scene); ghost.getChildMeshes().forEach(mesh => { mesh.material = ghostMaterial; mesh.isPickable = false; mesh.receiveShadows = false; });
     ghost.metadata.avatar?.setEnabled(false);
-    const wall = getFurniture(type).mount === 'wall', id = `piece-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const wall = getFurniture(type).mount === 'wall', id = `piece-${clockNow().toString(36)}-${clockRandom().toString(36).slice(2, 7)}`;
     placement = wall ? { id, type, wall: 'back', u: 0, v: 3 } : { id, type, x: 0, z: 0, rotation: 0 };
     updateOutline();
     const free = findFreePosition(layout.items, type, 0, architectureStyle); updatePlacement(free || (wall ? { wall: 'back', u: 0, v: 3 } : { x: 0, z: 0 })); return true;
@@ -1754,7 +1755,7 @@ export function createRoom(container, options = {}) {
     anchor,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { if (avatarCameraEditing) return; camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    diagnostics() { return { scene, engine, camera, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
     dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); petModel?.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

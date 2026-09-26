@@ -2,6 +2,7 @@ import { createSession, remainingAt, startSession, pauseSession } from './sessio
 import { createLayout, normalizeLayout, PRESETS } from './layout.js';
 import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCoins, cleanName } from './house.js';
 import { AVATAR_DEFAULT, normalizeAvatarAppearance } from './avatar.js';
+import { clockNow } from './test-pins.js';
 
 export const storageKey = 'little-hours-v1';
 // The save as it was just before a backup replaced it.
@@ -13,7 +14,7 @@ export function freshState() {
   return { theme: 'dusk', pet: 'cat', avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [] };
 }
 
-export function localDate(timestamp = Date.now()) {
+export function localDate(timestamp = clockNow()) {
   const date = new Date(timestamp);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -72,7 +73,7 @@ function completeDueSession(state, now) {
   return true;
 }
 
-export function createStateStore(storage, now = () => Date.now()) {
+export function createStateStore(storage, now = clockNow) {
   let state = freshState();
   let lastPersisted = null;
 

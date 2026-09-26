@@ -15,6 +15,7 @@ import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import { getFurniture } from './catalog.js';
 import { AVATAR_DEFAULT, avatarAppearanceKey, avatarPaint, normalizeAvatarAppearance } from './avatar.js';
+import { clockNow, clockRandom } from './test-pins.js';
 
 // Hand-built forms, real joinery, small deliberate details. No downloaded models,
 // generated pictures or texture files: even the notebook and screen are geometry.
@@ -1565,7 +1566,7 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
   };
   // Break activities blend in and out. A negative lean bends forward, and a
   // negative head pitch looks down.
-  const act = { kind: null, weight: 0 }; let lastSeconds = null, nextBlink = 1 + Math.random() * 2;
+  const act = { kind: null, weight: 0 }; let lastSeconds = null, nextBlink = 1 + clockRandom() * 2;
   // The walk: each foot stays planted for most of a stride (`STANCE`) and
   // swings forward in a low arc, the knee bending over the swing. A stride
   // is `STRIDE` long; `gait` eases it in and out, so a stop never snaps.
@@ -1628,7 +1629,7 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
         if (u > 0 && u < .5) dip = Math.sin(u * Math.PI * 2) * .035;
         hip -= dip;
         // A blink every few seconds.
-        nextBlink -= dt; if (nextBlink < -.13) nextBlink = 2.4 + Math.random() * 2.4;
+        nextBlink -= dt; if (nextBlink < -.13) nextBlink = 2.4 + clockRandom() * 2.4;
       }
       const blink = pw > 0 && nextBlink < 0;
       if (lids.isEnabled() !== blink) lids.setEnabled(blink);
@@ -1888,7 +1889,7 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
     const bob = cylinder(pendulum, 0.13, 0.13, 0.052, [0, -0.69, 0], C.brass, { metalness: 0.45, segments: 20 }); bob.rotation.x = Math.PI / 2; bob.metadata = { dynamic: true };
     // Rest angles, clockwise from twelve, of the hands as they are modeled.
     const rest = { hour: Math.atan2(0.13, 0.18), minute: Math.atan2(-0.25, 0.045), second: 0 };
-    const localOffset = -new Date().getTimezoneOffset() * 60 + Date.now() / 1000 - performance.now() / 1000;
+    const localOffset = -new Date(clockNow()).getTimezoneOffset() * 60 + clockNow() / 1000 - performance.now() / 1000;
     animations.push((seconds, focused, reducedMotion) => {
       const time = (seconds + localOffset) % 43200, turn = Math.PI * 2;
       hour.rotation.z = -(time / 43200 * turn - rest.hour); minute.rotation.z = -(time % 3600 / 3600 * turn - rest.minute);
@@ -1911,7 +1912,7 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
     const second = hand('wall-clock-second-hand', 0.24, 0.06, 0.006, 0.096, '#c8674f');
     let shown = -1;
     animations.push((seconds, focused, reducedMotion) => {
-      const now = Date.now(), turn = Math.PI * 2;
+      const now = clockNow(), turn = Math.PI * 2;
       if (Math.floor(now / 60000) !== shown) {
         shown = Math.floor(now / 60000); const date = new Date(now);
         hour.rotation.z = -((date.getHours() % 12 * 60 + date.getMinutes()) / 720 * turn); minute.rotation.z = -(date.getMinutes() / 60 * turn);

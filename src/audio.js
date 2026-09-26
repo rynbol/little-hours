@@ -2,6 +2,7 @@
 // of a focus session. The context is created on a user gesture, suspended
 // whenever nothing is playing so the audio device can sleep, and only the
 // listener's choices are remembered, never a playing sound.
+import { clockRandom } from './test-pins.js';
 export const soundKey = 'little-hours-sound';
 const DEFAULTS = { volume: 30, chime: true };
 
@@ -32,7 +33,7 @@ export function createAudio(storage) {
     const buffer = context.createBuffer(1, context.sampleRate * 3, context.sampleRate);
     const data = buffer.getChannelData(0);
     let previous = 0;
-    for (let i = 0; i < data.length; i++) { previous = (previous + 0.025 * (Math.random() * 2 - 1)) / 1.025; data[i] = previous * 6; }
+    for (let i = 0; i < data.length; i++) { previous = (previous + 0.025 * (clockRandom() * 2 - 1)) / 1.025; data[i] = previous * 6; }
     rainSource = context.createBufferSource(); rainSource.buffer = buffer; rainSource.loop = true;
     const filter = context.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1400;
     rainGain = context.createGain(); rainGain.gain.value = 0;

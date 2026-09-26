@@ -2,6 +2,7 @@ import { getFurniture } from './catalog.js';
 import { ROOM_BOUNDS, FLOOR_Y, rugStack, standHeight, groundAt, footprintBounds, petBed } from './layout.js';
 import { sessionPhase } from './session.js';
 import { interactionFor } from './item-interactions.js';
+import { clockNow, clockRandom } from './test-pins.js';
 
 export const COMPANION_RADIUS = 0.24;
 // Half the room a sitting pet takes up, for walks around it.
@@ -23,7 +24,7 @@ const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const ease = t => t * t * (3 - 2 * t);
 // The companion faces -z at yaw 0.
 const facing = (from, to) => Math.atan2(-(to.x - from.x), -(to.z - from.z));
-export function companionIntent(session, now = Date.now()) {
+export function companionIntent(session, now = clockNow()) {
   // The companion is only at the desk during a real, running focus session.
   // A paused or completed timer means it heads to the sofa to rest.
   return sessionPhase(session, now) === 'focusing' ? 'working' : 'rest';
@@ -319,7 +320,7 @@ export function activitySpots(layout, { night = false, windowX = -2.7, pet = nul
   return spots;
 }
 
-export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, random = Math.random } = {}) {
+export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, random = clockRandom } = {}) {
   const pose = { state: 'idle', atDesk: true, x: 0, z: 0, yaw: 0, sit: 1, seatHeight: .80, walkHeight: 0, doze: 0, step: 0, moving: false, activity: null, activityTime: 0, reach: null, useAt: null, goal: null, seated: false, portal: null, to: null, seatId: null };
   let layout, intent = 'idle', editing = false, avatarEditing = false, anchor = null, trip = null, legs = [], legIndex = 0, elapsed = 0, doorElapsed = 0, doorPlanElapsed = 0, doorActionStarted = false, restTime = 0, doorArrival = null, doorOpening = null;
   // One activity per break; `reduced` is the last reduced-motion setting,

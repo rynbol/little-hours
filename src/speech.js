@@ -1,6 +1,7 @@
 // Little speech bubbles that float above the pet and the companion. The room
 // reports where each head is on screen; this module owns the words, the
 // timing and the DOM. One bubble per speaker, never a stack of them.
+import { clockRandom } from './test-pins.js';
 export const PET_LINES = {
   cat: {
     pet: ['prrrr… ♡', 'Mrrp!', 'Miso leans into your hand.', '*slow blink* ♡', 'Miso purrs like a tiny engine.', 'Mrow ♡', 'Miso nuzzles your fingers.'],
@@ -52,7 +53,7 @@ export const AVATAR_LINES = {
 };
 
 // A line from the list, never the same one twice in a row.
-export function pickLine(lines, last, random = Math.random) {
+export function pickLine(lines, last, random = clockRandom) {
   const choices = lines.length > 1 ? lines.filter(line => line !== last) : lines;
   return choices[Math.floor(random() * choices.length) % choices.length];
 }

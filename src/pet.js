@@ -1,6 +1,7 @@
 import { getFurniture } from './catalog.js';
 import { petBed, ROOM_BOUNDS } from './layout.js';
 import { navigationObstacles, walkable, clearSegment, findWalkingPath, localPoint, seatsFor, reachableFloor, reaches, cellPoint } from './companion.js';
+import { clockRandom } from './test-pins.js';
 
 // The pet's own day: it naps in its bed, wakes with a stretch, strolls to a
 // favorite spot (the fire, the window, a rug, beside you), sits a while and
@@ -78,7 +79,7 @@ export function petSpots(layout, { windowX = -2.7, companion = null } = {}) {
   return spots;
 }
 
-export function createPetRoutine({ random = Math.random, onChange = () => {} } = {}) {
+export function createPetRoutine({ random = clockRandom, onChange = () => {} } = {}) {
   // `to` is where a walk ends, so the companion keeps out of the way.
   const pose = { state: 'sleeping', action: 'sleep', x: 0, z: 0, yaw: 0, onBed: true, moving: false, walked: 0, petAge: Infinity, held: false, species: 'cat', to: null };
   let layout = null, editing = false, windowX = -2.7, companion = null, speed = PETS.cat.speed;

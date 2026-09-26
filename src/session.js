@@ -1,34 +1,35 @@
+import { clockNow } from './test-pins.js';
 export function createSession(minutes = 25) {
   return { duration: minutes * 60_000, remaining: minutes * 60_000, endsAt: null, running: false };
 }
 
 // Capped at the duration, so a clock moved backwards cannot add time.
-export function remainingAt(session, now = Date.now()) {
+export function remainingAt(session, now = clockNow()) {
   return Math.min(session.duration, Math.max(0, session.running ? session.endsAt - now : session.remaining));
 }
 
 // A finished session reads as a short break, then as a fresh session, so
 // yesterday's 00:00 and "On a break" never linger.
 export const BREAK_AFTER_FINISH = 15 * 60_000;
-export function sessionPhase(session, now = Date.now()) {
+export function sessionPhase(session, now = clockNow()) {
   if (session.running) return 'focusing';
   const remaining = remainingAt(session, now);
   if (remaining > 0) return remaining < session.duration ? 'break' : 'idle';
   return Number.isFinite(session.completedAt) && now - session.completedAt < BREAK_AFTER_FINISH ? 'break' : 'idle';
 }
 // What the timer shows: a finished session past its break reads as fresh.
-export function displayedRemaining(session, now = Date.now()) {
+export function displayedRemaining(session, now = clockNow()) {
   const remaining = remainingAt(session, now);
   return !session.running && remaining === 0 && sessionPhase(session, now) === 'idle' ? session.duration : remaining;
 }
 
-export function startSession(session, now = Date.now()) {
+export function startSession(session, now = clockNow()) {
   if (session.running) return session;
   const remaining = session.remaining > 0 ? session.remaining : session.duration;
   return { duration: session.duration, remaining, endsAt: now + remaining, running: true };
 }
 
-export function pauseSession(session, now = Date.now()) {
+export function pauseSession(session, now = clockNow()) {
   return { ...session, remaining: remainingAt(session, now), endsAt: null, running: false };
 }
 

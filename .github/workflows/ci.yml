@@ -13,11 +13,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm run guard
+        env:
+          GUARD_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
       - run: npm test
       - run: npm run verify:room
       - run: npm run build

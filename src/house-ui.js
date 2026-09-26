@@ -2,6 +2,7 @@ import './house.css';
 import { createHouseView } from './house-view.js';
 import { HOUSE_SLOTS, nextExpansion } from './house.js';
 import { PRESETS, roomDesign, createLayout } from './layout.js';
+import { clockRandom } from './test-pins.js';
 
 const escape = text => String(text).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const moods = {
@@ -111,7 +112,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
       <form id="build-room-form"><label class="house-choice-label" for="new-room-name"><b>02</b> Give it a little name <small>optional</small></label><input class="house-new-name" id="new-room-name" maxlength="40" placeholder="${slot.id === 'garden' ? 'e.g. Our Sunday corner' : 'e.g. Head in the clouds'}" value="${escape(plan.name)}" autocomplete="off">
       <div class="house-build-budget"><div class="house-cost"><span>${icon('sun')} ${slot.price} <small>coins to grow</small></span><small>${house.coins} in your pocket</small></div><div class="house-progress" role="progressbar" aria-label="Coins saved for ${slot.label}" aria-valuemin="0" aria-valuemax="${slot.price}" aria-valuenow="${Math.min(house.coins, slot.price)}"><span style="width:${Math.min(100, house.coins / slot.price * 100)}%"></span></div><p class="house-progress-copy">${enough ? 'All saved up. Your next chapter is ready.' : `${missing} more coins to go. ${missing <= 25 ? 'One 25-minute focus session will do it.' : 'A little focus brings it closer.'}`}</p></div><button class="start-button" id="build-house-room" type="submit" ${enough ? '' : 'disabled'}>Make room · ${slot.price} coins ${icon('plus')}</button></form>${!enough ? '<button class="house-secondary" id="focus-for-house">A little focus, a little closer →</button>' : ''}<p class="house-fine-print">Fully furnished, all yours. Redecorate whenever you like.</p>` : `<div class="house-future-art" aria-hidden="true">${art(PRESETS.find(p => p.id === 'cloud-loft'))}<span>one day, up here…</span></div><p class="house-progress-copy">Your upstairs chapter opens after the garden wing. One lovely thing at a time.</p><button class="house-secondary" id="show-garden">Dream up your garden wing ${icon('arrow')}</button>`}`;
       root.querySelectorAll('[data-house-design]').forEach(button => button.addEventListener('click', () => { plan.design = button.dataset.houseDesign; preview = true; render(); }));
-      $('#house-surprise')?.addEventListener('click', () => { const options = PRESETS.filter(p => p.id !== plan.design); plan.design = options[Math.floor(Math.random() * options.length)].id; preview = true; render(); });
+      $('#house-surprise')?.addEventListener('click', () => { const options = PRESETS.filter(p => p.id !== plan.design); plan.design = options[Math.floor(clockRandom() * options.length)].id; preview = true; render(); });
       $('#see-house-preview')?.addEventListener('click', () => $('#house-canvas').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' }));
       $('#new-room-name')?.addEventListener('input', event => { plan.name = event.target.value; });
       $('#build-room-form')?.addEventListener('submit', event => {

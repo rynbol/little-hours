@@ -2,15 +2,16 @@
 // careful way to bring one back.
 import { restoreState } from './state.js';
 import { remainingAt } from './session.js';
+import { clockNow } from './test-pins.js';
 
 export const BACKUP_FORMAT = 1;
 export const MAX_BACKUP_BYTES = 2_000_000;
 
-export function createBackup(state, now = Date.now()) {
+export function createBackup(state, now = clockNow()) {
   return JSON.stringify({ app: 'little-hours', format: BACKUP_FORMAT, exportedAt: new Date(now).toISOString(), save: state }, null, 2);
 }
 
-export function backupFilename(now = Date.now()) {
+export function backupFilename(now = clockNow()) {
   const date = new Date(now);
   return `little-hours-home-${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}.json`;
 }

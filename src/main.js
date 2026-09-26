@@ -23,6 +23,8 @@ import { createHouseView } from './house-view.js';
 import { AVATAR_DEFAULT, AVATAR_LOOKS } from './avatar.js';
 import { avatarEditorContent } from './avatar-ui.js';
 import './wardrobe.css';
+import { clockNow, pinnedStorage } from './test-pins.js';
+import { installTestHook } from './test-hook.js';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -48,7 +50,7 @@ const icons = {
   avatar: '<circle cx="12" cy="8" r="3.5"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/><path d="M8.5 14.5c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2"/>',
 };
 const icon = (name) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || icons.home}</svg>`;
-const deviceStorage = (import.meta.env.DEV && window.__littleHoursTest?.storage) || {
+const deviceStorage = pinnedStorage || {
   getItem: key => localStorage.getItem(key),
   setItem: (key, value) => localStorage.setItem(key, value),
 };
@@ -245,8 +247,8 @@ function applyState(next, force = false) {
 // twelve seconds on its own. An activity line may follow the pause line
 // sooner (`gap`), since it marks a new thing to see.
 function avatarSay(kind, { force = false, gap = 12_000 } = {}) {
-  if (!speech || editMode || compact || (!force && Date.now() - lastAvatarLine < gap)) return;
-  if (speech.say('avatar', Array.isArray(kind) ? kind : AVATAR_LINES[kind])) lastAvatarLine = Date.now();
+  if (!speech || editMode || compact || (!force && clockNow() - lastAvatarLine < gap)) return;
+  if (speech.say('avatar', Array.isArray(kind) ? kind : AVATAR_LINES[kind])) lastAvatarLine = clockNow();
 }
 function acceptUpdate(result) {
   applyState(result.state);
@@ -254,7 +256,7 @@ function acceptUpdate(result) {
     room?.pet(); avatarSay('finish', { force: true });
     showSessionCelebration(result.earned);
     // Ring for a session that just ended, not one found finished long ago.
-    if (Date.now() - state.session.completedAt < 90_000) audio.chime();
+    if (clockNow() - state.session.completedAt < 90_000) audio.chime();
   }
   setSaveStatus(result.persisted);
   if (!result.persisted && !storageWarningShown) {
@@ -294,7 +296,7 @@ try {
       $('#loading-note').hidden = true;
       setDecorEntry(true);
       // Back after half an hour or more: a small hello.
-      if (state.seenAt && Date.now() - state.seenAt > 30 * 60_000) setTimeout(welcome, 1200);
+      if (state.seenAt && clockNow() - state.seenAt > 30 * 60_000) setTimeout(welcome, 1200);
     },
     onItemInteraction({ kind }) {
       speech?.hide('avatar');
@@ -303,7 +305,7 @@ try {
     },
     onCompanionTap({ state: activity, activity: doing }) {
       const lines = (activity === 'busy' || (activity === 'resting' && doing === 'read')) ? AVATAR_LINES.activity[doing] : AVATAR_LINES.tap[activity];
-      if (speech && speech.say('avatar', lines || AVATAR_LINES.tap.idle)) lastAvatarLine = Date.now();
+      if (speech && speech.say('avatar', lines || AVATAR_LINES.tap.idle)) lastAvatarLine = clockNow();
     },
     pet: state.pet,
     onPet: petFeedback,
@@ -1183,17 +1185,16 @@ window.addEventListener('storage', event => {
 }, { signal: listeners.signal });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshState(); }, { signal: listeners.signal });
 // Remember the last visit, for a hello after a long time away.
-function markSeen() { store.update(draft => { draft.seenAt = Date.now(); }); }
+function markSeen() { store.update(draft => { draft.seenAt = clockNow(); }); }
 // A hello after a long time away, but never in the middle of focus.
 function welcome() { if (!state.session.running) avatarSay('welcome', { force: true }); }
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { hiddenSince = Date.now(); markSeen(); }
-  else if (hiddenSince && Date.now() - hiddenSince > 10 * 60_000) { hiddenSince = 0; setTimeout(welcome, 600); }
+  if (document.hidden) { hiddenSince = clockNow(); markSeen(); }
+  else if (hiddenSince && clockNow() - hiddenSince > 10 * 60_000) { hiddenSince = 0; setTimeout(welcome, 600); }
 }, { signal: listeners.signal });
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
-// Development builds expose the room to end-to-end checks; production strips it.
-if (import.meta.env.DEV) window.__littleHours = { get room() { return room; }, get state() { return state; }, get speech() { return speech; }, get house() { return houseUI; }, get connected() { return connectedView; } };
+if (import.meta.env.DEV) installTestHook({ get room() { return room; }, get state() { return state; }, get speech() { return speech; }, get house() { return houseUI; }, get connected() { return connectedView; } });
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');

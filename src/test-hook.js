@@ -1,0 +1,146 @@
+import { EngineStore } from '@babylonjs/core/Engines/engineStore.js';
+import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function until(test, timeout, what) {
+  const end = performance.now() + timeout;
+  while (!test()) {
+    if (performance.now() > end) throw new Error(`Timed out after ${timeout} ms waiting for ${what}`);
+    await wait(16);
+  }
+}
+
+function runningAnimations() {
+  return document.getAnimations().filter(animation => animation.playState === 'running' && Number.isFinite(animation.effect?.getComputedTiming().endTime)).length;
+}
+
+function itemId(mesh) {
+  for (let node = mesh; node; node = node.parent) if (node.metadata?.itemId) return node.metadata.itemId;
+  return null;
+}
+
+function matcher(target) {
+  if (target.houseRoom) return { view: 'house', match: mesh => mesh.metadata?.houseSlot === target.houseRoom };
+  if (target.item) return { view: 'room', match: mesh => itemId(mesh) === target.item };
+  if (target.door) return { view: 'room', match: mesh => mesh.metadata?.houseLink === target.door };
+  if (target.lights) return { view: 'room', match: mesh => Boolean(mesh.metadata?.lightSwitch) };
+  throw new Error(`Unknown screenPoint target ${JSON.stringify(target)}`);
+}
+
+export function installTestHook(app) {
+  const views = {
+    room: () => app.room?.diagnostics(),
+    house: () => app.house?.view?.diagnostics(),
+  };
+  const view = name => {
+    const found = views[name]?.();
+    if (!found) throw new Error(`The ${name} view is not built`);
+    return found;
+  };
+
+  function busy() {
+    const reasons = [];
+    const body = document.body.classList;
+    if (body.contains('is-travelling')) reasons.push('travelling');
+    if (body.contains('is-door-walking')) reasons.push('door walk');
+    const room = views.room();
+    if (room?.dragging) reasons.push('dragging');
+    if (room?.moving) reasons.push('avatar camera');
+    const house = document.body.classList.contains('is-house') ? views.house() : null;
+    if (house && house.open !== (house.closed ? 0 : 1)) reasons.push('house opening');
+    if (house?.activeRoomMotions) reasons.push('house room motion');
+    if (runningAnimations()) reasons.push('css animation');
+    return reasons;
+  }
+
+  function project(scene, points) {
+    const engine = scene.getEngine(), canvas = engine.getRenderingCanvas(), rect = canvas.getBoundingClientRect();
+    const width = engine.getRenderWidth(), height = engine.getRenderHeight();
+    const viewport = scene.activeCamera.viewport.toGlobal(width, height), transform = scene.getTransformMatrix();
+    return points.map(point => {
+      const screen = Vector3.Project(point, Matrix.IdentityReadOnly, transform, viewport);
+      return { x: screen.x / width * rect.width, y: screen.y / height * rect.height };
+    });
+  }
+
+  function screenPoint(target) {
+    if (target === 'pet' || target?.pet) {
+      const room = view('room'), pet = room.petModel;
+      if (!pet?.root.isEnabled()) return null;
+      const { min, max } = pet.root.getHierarchyBoundingVectors(true);
+      return scan(room.scene, min, max, (x, y) => pet.hitTest(room.scene.createPickingRay(x, y, null, room.camera)) !== null);
+    }
+    const { view: name, match } = matcher(target);
+    const scene = view(name).scene;
+    const meshes = scene.meshes.filter(mesh => mesh.isEnabled() && mesh.isVisible && match(mesh));
+    if (!meshes.length) return null;
+    const min = new Vector3(Infinity, Infinity, Infinity), max = new Vector3(-Infinity, -Infinity, -Infinity);
+    for (const mesh of meshes) {
+      mesh.computeWorldMatrix(true);
+      const box = mesh.getBoundingInfo().boundingBox;
+      min.minimizeInPlace(box.minimumWorld); max.maximizeInPlace(box.maximumWorld);
+    }
+    return scan(scene, min, max, (x, y) => { const picked = scene.pick(x, y)?.pickedMesh; return Boolean(picked && match(picked)); });
+  }
+
+  function scan(scene, min, max, isHit) {
+    const rect = scene.getEngine().getRenderingCanvas().getBoundingClientRect();
+    const corners = [];
+    for (const x of [min.x, max.x]) for (const y of [min.y, max.y]) for (const z of [min.z, max.z]) corners.push(new Vector3(x, y, z));
+    const flat = project(scene, corners);
+    const left = Math.max(0, Math.min(...flat.map(p => p.x))), right = Math.min(rect.width, Math.max(...flat.map(p => p.x)));
+    const top = Math.max(0, Math.min(...flat.map(p => p.y))), bottom = Math.min(rect.height, Math.max(...flat.map(p => p.y)));
+    const miss = { x: rect.left + (left + right) / 2, y: rect.top + (top + bottom) / 2, visible: false, hits: 0 };
+    if (right <= left || bottom <= top) return miss;
+    const step = Math.max(3, Math.min(right - left, bottom - top) / 14), hits = [];
+    for (let y = top + step / 2; y < bottom; y += step) for (let x = left + step / 2; x < right; x += step) if (isHit(x, y)) hits.push({ x, y });
+    if (!hits.length) return miss;
+    const mean = hits.reduce((sum, hit) => ({ x: sum.x + hit.x / hits.length, y: sum.y + hit.y / hits.length }), { x: 0, y: 0 });
+    const best = hits.reduce((a, b) => Math.hypot(a.x - mean.x, a.y - mean.y) <= Math.hypot(b.x - mean.x, b.y - mean.y) ? a : b);
+    return { x: rect.left + best.x, y: rect.top + best.y, visible: true, hits: hits.length };
+  }
+
+  function gpuFrame(name = 'room', samples = 30) {
+    const { engine, scene } = view(name), gl = engine._gl, pixel = new Uint8Array(4);
+    const once = () => {
+      const start = performance.now();
+      engine.beginFrame(); scene.render(); engine.endFrame();
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+      return performance.now() - start;
+    };
+    for (let i = 0; i < 5; i++) once();
+    const times = Array.from({ length: samples }, once).sort((a, b) => a - b);
+    return { ms: times[samples >> 1], width: engine.getRenderWidth(), height: engine.getRenderHeight(), triangles: Math.round(scene.getActiveIndices() / 3) };
+  }
+
+  function counts() {
+    const scene = diagnostics => diagnostics && { meshes: diagnostics.scene.meshes.length, materials: diagnostics.scene.materials.length, textures: diagnostics.scene.textures.length, geometries: diagnostics.scene.geometries.length };
+    return { engines: EngineStore.Instances.length, canvases: document.querySelectorAll('canvas').length, room: scene(views.room()), house: scene(views.house()) };
+  }
+
+  function stats(name = 'room') {
+    const found = view(name);
+    return { drawCalls: found.drawCalls, triangles: Math.round(found.scene.getActiveIndices() / 3), renderCount: found.renderCount ?? null, pixelRatio: found.pixelRatio ?? null, quality: found.quality ?? null };
+  }
+
+  window.__littleHours = {
+    version: 1,
+    get room() { return app.room; },
+    get state() { return app.state; },
+    get speech() { return app.speech; },
+    get house() { return app.house; },
+    get connected() { return app.connected; },
+    ready: (timeout = 30000) => until(() => app.room && document.getElementById('loading-note')?.hidden, timeout, 'the room to be ready').then(() => true),
+    busy,
+    async settled(timeout = 10000) {
+      await until(() => !busy().length, timeout, `the page to settle (${busy().join(', ')})`);
+      await wait(50);
+      return true;
+    },
+    screenPoint,
+    gpuFrame,
+    counts,
+    stats,
+  };
+}
