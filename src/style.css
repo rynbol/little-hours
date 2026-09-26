@@ -30,6 +30,7 @@ body[data-theme='day'] .time-toggle { background: #e8cc96; color: #58462d; borde
 .focus-collapsed:not(.is-decorating) .workspace { grid-template-columns: minmax(0, 1fr); }
 .room-section { min-width: 0; position: relative; display: flex; flex-direction: column; }
 .room-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 63px; padding: 0 6px; z-index: 1; }
+.room-heading > div:first-child { min-width: 0; }
 .eyebrow { color: #bd9a6b; font-size: 11px; line-height: 1.4; letter-spacing: 1.8px; font-weight: 550; margin: 0 0 4px; }
 h1 { font-family: Georgia, 'Times New Roman', serif; margin: 0; font-size: clamp(25px, 2.3vw, 34px); line-height: 1.15; font-weight: 400; letter-spacing: -.6px; color: #f0e0c4; }
 .room-subtitle { margin: 5px 0 0; font-size: 12px; line-height: 1.4; color: #b9a998; }
@@ -578,92 +579,3 @@ button.furniture-card[aria-pressed='true'] { animation-timing-function: var(--so
 .room-arrival .room-canvas { animation: home-arrival .6s cubic-bezier(.2,.7,.2,1); }
 @media (max-width: 720px) { .home-address { width: 100%; } .home-connections .home-wide { margin-left: 0; } }
 @media (prefers-reduced-motion: reduce) { .room-arrival .room-canvas, #room-canvas { animation: none; transition: none; } }
-.house-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 22px; }
-.house-heading > div, .room-heading > div:first-child { min-width: 0; }
-.house-heading > button, .house-title-row .icon-button { flex: none; }
-.house-heading h1, #room-title, .house-detail h2 { min-width: 0; overflow-wrap: anywhere; }
-.house-title-row { display: flex; align-items: center; gap: 12px; }
-.house-title-row .icon-button { width: 25px; height: 25px; border-color: transparent; }
-.house-title-row .icon-button svg { width: 13px; }
-.house-heading > button svg { rotate: 180deg; }
-.house-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
-.house-world { position: relative; min-width: 0; border: 1px solid #594b424f; border-radius: 22px; background: radial-gradient(ellipse at 48% 52%, #7f946a26, #25222b00 65%), linear-gradient(150deg, #302b33, #24212b); overflow: hidden; }
-.house-world-caption { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 20px 22px 0; color: #b8a890; font-size: 10px; }
-.house-address { letter-spacing: 1.8px; font-size: 9px; color: #b99f76; }
-.house-canvas { height: clamp(330px, calc(100svh - 335px), 660px); min-height: 330px; width: 100%; display: grid; place-items: center; color: #d0b998; text-align: center; }
-.house-canvas canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; }
-.house-map-hint { text-align: center; color: #b8a890; font-size: 11px; padding: 4px 12px 18px; }
-.house-rooms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 14px 14px; }
-.house-room-link { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 12px 9px; border: 1px solid #5d5041; border-radius: 11px; color: #dbc8ad; background: #302b31; text-align: left; }
-.house-room-link[aria-pressed='true'] { border-color: #c4a16b; background: #4d413a; color: #f3deb9; }
-.house-room-number { display: grid; place-items: center; width: 25px; height: 25px; flex: none; border: 1px solid #8b775351; border-radius: 50%; font-family: Georgia, serif; font-size: 13px; color: #d9b377; }
-.house-room-link strong { display: block; font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; }
-.house-room-link small { display: block; font-size: 9px; color: #baa98e; line-height: 1.5; margin-top: 3px; }
-.house-detail { background: #efe4cd; border: 1px solid #bca17a; border-radius: 18px; color: #594734; padding: 21px; box-shadow: 0 12px 38px #110c152b; }
-.house-detail .eyebrow { color: #967243; font-size: 9px; letter-spacing: 1.4px; }
-.house-detail h2 { color: #574532; font-family: Georgia, serif; font-size: 29px; font-weight: 400; margin: 8px 0 12px; line-height: 1.1; }
-.house-detail h2:focus { outline: none; }
-.house-description { font-size: 12px; line-height: 1.7; color: #7c654c; margin: 0 0 17px; }
-.house-design-art { height: 150px; background: radial-gradient(ellipse, #ded0b7, transparent 70%); margin: 4px 0 12px; }
-.house-design-art svg { display: block; width: 100%; height: 100%; }
-.house-detail .start-button { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; min-height: 42px; font-size: 12px; }
-.house-secondary { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; border: 1px solid #cbb592; border-radius: 9px; background: transparent; color: #795e3b; font-size: 11px; min-height: 38px; margin-top: 9px; padding: 8px; }
-.house-secondary svg { width: 14px; }
-.house-secondary:hover { background: #e3d1ae; }
-.room-name-form { border-top: 1px solid #d5c3a6; padding-top: 17px; margin-top: 20px; }
-.room-name-form label { display: block; font-size: 10px; color: #856d4f; margin-bottom: 7px; }
-.room-name-form > div { display: flex; gap: 5px; }
-.room-name-form input { width: 100%; min-width: 0; border: 1px solid #d0bb97; border-radius: 6px; padding: 7px; color: #664f34; background: #f6edda; font-size: 11px; }
-.house-next-note { display: flex; gap: 9px; padding-top: 17px; margin-top: 18px; border-top: 1px solid #d5c3a6; color: #7e7254; font-size: 10px; line-height: 1.7; }
-.house-next-note > svg { flex: none; width: 18px; margin-top: 2px; }
-.house-next-note p { margin: 0; }
-.house-next-note strong { display: block; color: #726249; font-weight: 600; font-size: 11px; }
-.text-link { display: flex; align-items: center; gap: 6px; padding: 6px 0 0; border: 0; background: transparent; color: #826034; font-size: 10px; }
-.text-link svg { width: 13px; }
-.house-reward-note { display: flex; gap: 10px; align-items: center; color: #b6a58d; font-size: 11px; line-height: 1.7; margin: 19px 4px 12px; }
-.house-reward-note > svg { width: 21px; height: 21px; flex: none; color: #a9b28b; }
-.house-reward-note strong { color: #cfbba0; font-weight: 500; }
-.house-cost { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 9px; }
-.house-cost > span { display: flex; align-items: center; gap: 6px; font-size: 20px; font-family: Georgia, serif; color: #795e35; }
-.house-cost svg { width: 17px; }
-.house-cost small { font-size: 11px; color: #8c765a; }
-.house-progress { height: 5px; background: #d9c9ac; border-radius: 4px; overflow: hidden; }
-.house-progress > span { display: block; height: 100%; background: #8b9b70; border-radius: inherit; }
-.house-progress-copy { font-size: 10px; line-height: 1.65; color: #8b7455; margin: 9px 0 20px; }
-.house-choice-label { color: #987749; font-size: 9px; letter-spacing: 1.3px; }
-.house-designs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-.house-designs button { border: 1px solid #d4bf9c; background: #e9d9bb; color: #795e3f; border-radius: 9px; padding: 4px 5px 9px; text-align: left; }
-.house-designs button[aria-pressed='true'] { background: #dee0c7; border-color: #829569; box-shadow: inset 0 0 0 1px #829569; }
-.house-designs button > span { display: block; height: 65px; }
-.house-designs svg { width: 100%; height: 100%; }
-.house-designs strong { display: block; text-align: center; font-size: 9px; font-weight: 600; }
-.house-design-copy { font-size: 10px; color: #8b7251; line-height: 1.6; min-height: 32px; margin: 10px 0 0; }
-.house-fine-print { font-size: 9px; color: #917d60; text-align: center; line-height: 1.6; margin: 10px 0 0; }
-.house-name-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 20px; padding: 14px; background: #393039; border-radius: 10px; font-size: 12px; }
-.house-name-form input { min-width: 0; max-width: 100%; border: 1px solid #8c7350; border-radius: 6px; padding: 8px 10px; background: #29252d; color: #e6d0b0; }
-@media (max-width: 1000px) {
-  .house-layout { grid-template-columns: minmax(0, 1fr) 260px; gap: 14px; }
-  .house-detail { padding: 16px; }
-  .house-room-number { display: none; }
-  .house-rooms { gap: 6px; padding: 0 10px 10px; }
-}
-@media (max-width: 720px) {
-  .house-page { padding: 10px 0 0; }
-  .house-heading { align-items: start; gap: 10px; margin-bottom: 15px; }
-  .house-heading .eyebrow { font-size: 8px; letter-spacing: 1px; }
-  .house-heading h1 { font-size: 26px; }
-  .house-heading > button { font-size: 10px; padding: 8px; }
-  .house-heading > button svg { display: none; }
-  .house-layout { grid-template-columns: minmax(0, 1fr); }
-  .house-world-caption { padding: 14px 14px 0; }
-  .house-address { font-size: 8px; letter-spacing: 1px; }
-  .house-canvas { height: 330px; }
-  .house-detail { padding: 20px; }
-  .house-design-art { height: 110px; }
-  .house-designs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .house-reward-note { font-size: 10px; }
-}
-@media (prefers-reduced-motion: reduce) { .house-page *, .coin-wallet { animation: none !important; transition: none !important; } }
-@media (min-width: 721px) {
-  .house-detail { max-height: max(410px, calc(100svh - 185px)); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #b8a080 transparent; }
-}

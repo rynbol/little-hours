@@ -387,8 +387,10 @@ function visitRoom(id, decorate = editMode, fromDoor = false) {
   const arrive = () => {
     room?.cancelPlacement(); room?.selectItem(null); selectedItem = null; undoLayout = null; $('#undo-layout').disabled = true;
     acceptUpdate(store.enterHouseRoom(id));
+    $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking'); travelling = false;
+    // Arrival must release the travel lock before opening the room editor.
     if (decorate) { collectionTab = 'collection'; setEditMode(true); }
-    $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking'); travelling = false; renderSession();
+    renderSession();
     $('#stage').classList.remove('room-arrival'); void $('#stage').offsetWidth; $('#stage').classList.add('room-arrival');
     clearTimeout(arrivalTimer); arrivalTimer = setTimeout(() => $('#stage').classList.remove('room-arrival'), 650);
   };

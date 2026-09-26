@@ -132,14 +132,14 @@ export function createStateStore(storage, now = () => Date.now()) {
         draft.layout = structuredClone(destination.layout);
       });
     },
-    buildRoom(slotId, presetId) {
+    buildRoom(slotId, presetId, name) {
       let verdict;
       const result = update(draft => {
         verdict = expansionVerdict(draft.house, slotId, presetId);
         if (!verdict.ok) return;
         draft.house.coins -= verdict.slot.price;
         // Start from the chosen furnished design, leaving archived arrangements intact.
-        draft.house.rooms.push({ id: slotId, name: verdict.slot.label, layout: createLayout(presetId) });
+        draft.house.rooms.push({ id: slotId, name: cleanName(name, verdict.slot.label), layout: createLayout(presetId) });
       });
       return { ...result, built: verdict.ok, reason: verdict.reason };
     },

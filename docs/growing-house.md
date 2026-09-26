@@ -18,3 +18,18 @@ The first home is the player's existing furnished room. A completed focus sessio
 - The connected house and navigation fit at 390 CSS pixels with no horizontal overflow; the browser check logged no errors. The preceding checkpoint also verified long names and 2×-density model picking. Physical-device touch gestures remain untested.
 
 The development-only `/checks/house.html` fixture uses its own sessionStorage save and clock controls. It never advances the player's real save. Vite's production entry excludes this page and strips the development hook. The build retains the existing large-chunk advisory.
+
+## House builder refresh — September 25, 2026
+
+The house page now has its own `house.css`, a landscape with daylight/rain/night palettes, and a paper room builder. Six interior buttons preview the real room in place; before/after and surprise controls make comparing them reversible. Optional names and designs stay in per-slot drafts while the page is open or the player visits focus (drafts are not persisted on reload). A room purchase saves its cleaned name, furnished layout and coin deduction together. Existing save schema and prices are unchanged.
+
+A successful build adds a short welcome note and 36 instanced petals in one draw call. Reduced motion suppresses the burst and camera easing. The turn buttons stay within the cutaway angles and refit the complete model. The planted border, blossom pots and bench share the existing static grounds batch. `house-postcard.js` creates a local 1600 × 1200 PNG, shown in a keyboard-dismissible dialog with a download link; preview rooms have a daydream caption. Blob URLs are released when replaced or disposed.
+
+The house's “Make it yours” action also fixes an existing arrival ordering issue: the travel lock is released before entering the editor, so a different room can actually open in Decorate.
+
+Validation on this branch:
+
+- All 115 unit tests passed, including optional name persistence, repeated purchases, blank/long names and a focus session expiring at purchase. Runtime verification and production build are recorded with the commit; the build keeps the existing large-chunk advisory.
+- Browser fixture earned 25 coins for a named Sakura garden, then 75 for a named Cloud upstairs. Both names, layouts and the spent balance survived reload. All six previews, before/after, surprise, locked upstairs guidance, draft names across design/site switches, room entry and the editor handoff were checked.
+- Desktop at 1280 × 900 and phone at 390 × 844 were inspected; the phone document measured 390px wide with no horizontal overflow. Day/night house views and the completed-house postcard were inspected. The generated postcard image measured 1600 × 1200; its download link and Escape dismissal worked.
+- The three-room welcome animation measured 18 draw calls, 236,334 triangles and 61 overview frames over two seconds, with zero background room frames. After reduced-motion camera changes settled, it drew zero overview and zero background room frames over two seconds. No browser warning/error logs were recorded. These are local measurements; physical-device touch remains untested.
