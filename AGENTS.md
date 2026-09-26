@@ -19,8 +19,8 @@ Use Node 24. Verification commands are `npm test`, `npm run verify:room`, and `n
 Verify browser behaviour with the `lh` CLI (`npm run lh -- help`) and follow `.claude/skills/verify-little-hours/SKILL.md`: `lh doctor`, then `lh run <flow>`, then `lh perf` / `lh shot` / `lh heap` with `--against main`, then `lh cleanup`. Add missing steps or flows under `scripts/lh/` instead of writing one-off driver scripts. Use `--headed` when the user wants to watch.
 
 `npm run guard` runs in CI and enforces these rules:
-- Game code gets time from `clockNow()` and randomness from `clockRandom()` in `src/test-pins.js`, never `Date.now()`, `Math.random()` or `new Date()` directly, so test runs repeat.
-- Only `src/test-hook.js` and `src/test-pins.js` touch the test globals; only `src/main.js` imports the hook, and it is left out of production builds.
+- Game code gets time from `clockNow()` and randomness from `clockRandom()` in `src/core/test-pins.js`, never `Date.now()`, `Math.random()` or `new Date()` directly, so test runs repeat.
+- Only `src/dev/test-hook.js` and `src/core/test-pins.js` touch the test globals; only `src/main.js` imports the hook, and it is left out of production builds.
 - No new code comments. Name things so the code explains itself; put reasons in the commit message.
 
 Preserve the distinction between the in-page mini view and future native desktop/notch integration. Use original assets and implementation.

@@ -24,7 +24,7 @@ function lineAt(code, offset) {
 }
 
 function layerOf(file) {
-  if (file === 'src/main.js') return { layer: 'app' };
+  if (file === 'src/main.js' || file.startsWith('src/app/')) return { layer: 'app' };
   const feature = file.match(/^src\/features\/([^/]+)\//);
   if (feature) return { layer: 'feature', feature: feature[1] };
   const top = file.match(/^src\/([^/]+)\//)?.[1];
@@ -33,14 +33,14 @@ function layerOf(file) {
 
 function layerProblem(file, target) {
   const from = layerOf(file), to = layerOf(target);
-  if (!from.layer) return `put ${file} in src/core, src/models, src/ui, src/dev or src/features/<name>`;
+  if (!from.layer) return `put ${file} in src/core, src/models, src/ui, src/dev, src/app or src/features/<name>`;
   if (!to.layer) return `${target} is outside the layers`;
   if (to.layer === 'feature') {
     if (from.layer === 'feature' && from.feature === to.feature) return null;
     if (from.layer !== 'feature' && from.layer !== 'app') return `${from.layer} code must not import features (${target})`;
     return target === `src/features/${to.feature}/index.js` ? null : `import the ${to.feature} feature through src/features/${to.feature}/index.js, not ${target}`;
   }
-  if (to.layer === 'app') return 'nothing imports src/main.js';
+  if (to.layer === 'app') return target === 'src/main.js' ? 'nothing imports src/main.js' : from.layer === 'app' ? null : `${from.layer} code must not import the app shell (${target})`;
   return LAYERS[from.layer].includes(to.layer) ? null : `${from.layer} code must not import ${to.layer} (${target})`;
 }
 

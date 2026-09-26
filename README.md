@@ -21,7 +21,10 @@ npm run dev
 - `src/models/`: Babylon.js furniture and room architecture.
 - `src/features/<name>/`: one folder per feature. Other code uses a feature only through its `index.js`.
 - `src/ui/`: shared page styles and helpers.
-- `src/main.js`: starts the app.
+- `src/dev/`: the dev-only test hook.
+- `src/main.js` and `src/app/`: start-up, the page shell and the panel switcher. `main.js` builds one `app` object and hands it to each feature's `create…(app)`; features call each other through it (`app.decorate.setEditMode(false)`), never by importing each other's UI.
+
+Layers point one way: core ← models ← features ← app. `ui` may use core; `dev` stands alone.
 
 `npm run guard` checks these boundaries in CI.
 

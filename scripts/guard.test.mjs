@@ -35,6 +35,9 @@ test('features meet only through their index, and layers point one way', () => {
   assert.deepEqual(rules('src/core/state.js', "import { build } from '../models/furniture.js';"), ['layers']);
   assert.deepEqual(rules('src/models/furniture.js', "import { AVATAR_DEFAULT } from '../core/avatar.js';"), []);
   assert.deepEqual(rules('src/features/pet/pet.js', "import { x } from '../../main.js';"), ['layers']);
+  assert.deepEqual(rules('src/features/pet/pet-ui.js', "import { icon } from '../../app/panels.js';"), ['layers']);
+  assert.deepEqual(rules('src/main.js', "import { createPanels } from './app/panels.js';"), []);
+  assert.deepEqual(rules('src/app/panels.js', "import { createRoom } from '../features/room/index.js'; import { x } from '../features/room/room.js';"), ['layers']);
   assert.deepEqual(rules('src/stray.js', "import { FURNITURE } from './core/catalog.js';"), ['layers']);
   assert.deepEqual(rules('src/features/pet/pet.test.js', "import { walkable } from '../companion/companion.js';"), []);
 });

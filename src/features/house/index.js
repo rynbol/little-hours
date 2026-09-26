@@ -1,2 +1,2 @@
 export { createHouseUI } from './house-ui.js';
-export { createHouseView } from './house-view.js';
+export { createHouseNavigation } from './house-navigation.js';

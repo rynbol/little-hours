@@ -22,7 +22,7 @@ Drive the real app in Chrome with real mouse and keyboard input, collect evidenc
 ## Rules
 
 - Input is real: clicks, drags and keys go through Chrome's input pipeline. The `window.__littleHours` hook is for setup and reading state (`ready`, `settled`, `screenPoint`, `stats`), never for triggering the behaviour under test.
-- Time and randomness are pinned (`src/test-pins.js`), so runs repeat. New game code gets time from `clockNow()` and randomness from `clockRandom()`; `npm run guard` enforces it.
+- Time and randomness are pinned (`src/core/test-pins.js`), so runs repeat. New game code gets time from `clockNow()` and randomness from `clockRandom()`; `npm run guard` enforces it.
 - Never kill processes by port. Never touch browsers lh did not start.
 - An art change needs a before/after shot shown to the user and their yes.
 - Report the numbers you measured, including failures.

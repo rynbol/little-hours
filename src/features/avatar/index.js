@@ -1,1 +1,1 @@
-export { avatarEditorContent } from './avatar-ui.js';
+export { createAvatarPanel } from './avatar-panel.js';
