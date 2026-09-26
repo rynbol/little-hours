@@ -1206,6 +1206,26 @@ try {
     assert.ok(Math.abs(rotated - diagnostics().companionModel.root.rotation.y) > 1, 'turn and face-me controls rotate the character');
     room.setTheme('day'); room.setAvatarAppearance({ skin: 'deep', outfit: 'hoodie' }); advance(3);
     assert.equal(scene.getLightByName('window-lamplight').isEnabled(), false, 'a theme change also preserves portrait lighting');
+    const portraitPoint = new Vector3(diagnostics().companion.x, 1.5, diagnostics().companion.z);
+    const screenPoint = () => Vector3.Project(portraitPoint, Matrix.Identity(), camera.getViewMatrix(true).multiply(camera.getProjectionMatrix(true)), camera.viewport.toGlobal(container.clientWidth, container.clientHeight));
+    const beforeExit = screenPoint();
+    room.setAvatarEditing(false);
+    assert.equal(canvas.getAttribute('data-portrait'), 'leaving');
+    container.clientWidth = canvas.clientWidth = 1100; container.clientHeight = canvas.clientHeight = 720;
+    observer.callback();
+    const resizedExit = screenPoint();
+    assert.ok(Vector3.Distance(beforeExit, resizedExit) < .01, 'closing the drawer preserves the avatar screen position across the canvas resize');
+    const frames = [];
+    for (let i = 0; i < 65; i++) {
+      advance(1); frames.push([camera.orthoLeft, camera.orthoRight, camera.orthoTop, camera.orthoBottom]);
+    }
+    const lastMoving = frames.findLastIndex((frame, i) => i > 0 && frame.some((value, j) => Math.abs(value - frames[i - 1][j]) > 1e-8));
+    const finalStep = Math.max(...frames[lastMoving].map((value, j) => Math.abs(value - frames[lastMoving - 1][j])));
+    assert.ok(finalStep < .035, `the return eases into the room framing without a final snap (${finalStep})`);
+    assert.equal(canvas.getAttribute('data-portrait'), 'room');
+    assert.equal(scene.getMeshByName('wardrobe-plinth').isEnabled(), false);
+    container.clientWidth = canvas.clientWidth = 800; container.clientHeight = canvas.clientHeight = 600; observer.callback();
+    room.setAvatarEditing(true); advance(100);
     room.setAvatarEditing(false); advance(8); room.setAvatarEditing(true); advance(100);
     room.setAvatarEditing(false); advance(70);
     assert.equal(diagnostics().camera.layerMask, homeMask);

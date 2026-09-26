@@ -854,6 +854,7 @@ $('#avatar-face-front').addEventListener('click', () => room?.turnAvatar(0, true
 
 function renderPanel() {
   const panel = $('#room-panel');
+  const leavingAvatar = currentPanel !== 'avatar' && avatarPanelActive;
   if (currentPanel === 'avatar' && !avatarPanelActive) {
     avatarPanelActive = true; avatarSection = 'looks'; room?.setAvatarEditing?.(true);
     avatarEditorResumeTimer = state.session.running;
@@ -877,6 +878,9 @@ function renderPanel() {
   else if (!editMode) $('#room-hint').innerHTML = `Drag to look around<span>·</span>Tap a lamp, the fire or ${PETS[state.pet]?.name || PETS.cat.name}`;
   panel.hidden = !currentPanel;
   document.querySelectorAll('[data-panel]').forEach(button => button.setAttribute('aria-expanded', button.dataset.panel === currentPanel));
+  // Reconcile the new canvas bounds before the next frame, not one frame
+  // later when ResizeObserver runs after the portrait layout disappears.
+  if (leavingAvatar) room?.resize?.();
   if (!currentPanel) return;
   panel.innerHTML = `<div class="panel-heading"><span>${({ atmosphere: 'Find your kind of quiet', pet: 'Your little companion', avatar: 'Meet your avatar' })[currentPanel] || 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
   if (currentPanel === 'atmosphere') {

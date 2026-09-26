@@ -21,6 +21,23 @@ controls.style.cssText = 'position:fixed;top:1px;left:50%;transform:translateX(-
 controls.innerHTML = '<span>TEST SAVE</span><button id="advance">Advance 25 minutes</button><button id="reset-check">Reset test save</button><button id="reduce-motion" aria-pressed="false">Reduce motion</button><button id="inspect">Inspect runtime</button><button id="measure">Measure overview</button><output id="measurement"></output>';
 document.body.append(controls);
 const report = document.createElement('pre'); report.id = 'runtime-report'; report.hidden = true; document.body.append(report);
+const exitReport = document.createElement('pre'); exitReport.id = 'exit-report'; exitReport.hidden = true; document.body.append(exitReport);
+document.addEventListener('click', event => {
+  if (!event.target.closest('#avatar-done, #close-panel') || !document.body.classList.contains('is-avatar-editing')) return;
+  const frames = [], started = performance.now();
+  const sample = () => {
+    const d = window.__littleHours.room.diagnostics(), camera = d.camera, rect = document.querySelector('#room-canvas').getBoundingClientRect();
+    frames.push({ ms: performance.now() - started, phase: document.querySelector('canvas').dataset.portrait,
+      height: camera.orthoTop - camera.orthoBottom, cx: (camera.orthoLeft + camera.orthoRight) / 2, cy: (camera.orthoTop + camera.orthoBottom) / 2,
+      alpha: camera.alpha, beta: camera.beta, width: rect.width, canvasHeight: rect.height,
+      avatarX: d.companionModel.root.position.x, avatarZ: d.companionModel.root.position.z,
+      scenery: d.scene.meshes.find(mesh => mesh.name === 'floor')?.visibility,
+    });
+    if (performance.now() - started < 1400) requestAnimationFrame(sample);
+    else exitReport.textContent = JSON.stringify(frames);
+  };
+  exitReport.textContent = ''; sample();
+}, true);
 document.querySelector('#inspect').onclick = () => {
   const app = window.__littleHours, d = app.room.diagnostics(), scene = d.scene, pose = d.companion;
   const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { x:r.x, y:r.y, width:r.width, height:r.height }; };
