@@ -513,7 +513,7 @@ export function createRoom(container, options = {}) {
   const outlinedMeshes = [];
   const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782'), playOutline = color('#d9b98a');
   const ghostMaterial = new StandardMaterial('placement-preview', scene); ghostMaterial.diffuseColor = color('#85ac80'); ghostMaterial.emissiveColor = color('#42653f'); ghostMaterial.alpha = 0.43; ghostMaterial.disableLighting = true;
-  let theme = 'dusk', focused = false, petStart = -Infinity, disposed = false, readyReported = false;
+  let theme = 'dusk', focused = false, focusMode = false, focusCameraApplied = false, focusScenery = null, savedFocusCamera = null, petStart = -Infinity, disposed = false, readyReported = false;
   let passages = null, houseKey = '', houseHover = null, lockedDoor = null, openingDoor = null;
   function setHouse(house) {
     const key = JSON.stringify([house.activeId, house.coins, house.rooms.map(entry => [entry.id, entry.name])]);
@@ -616,6 +616,7 @@ export function createRoom(container, options = {}) {
     const atDesk = companionRoutine?.pose.atDesk ?? true;
     for (const [id, object] of placedObjects) object.metadata.avatar?.setEnabled(atDesk && id === layout.activeDeskId);
     mobileCompanion?.root.setEnabled(!atDesk); mobileCompanion?.contact.setEnabled(!atDesk);
+    if (focusMode && atDesk) applyFocusFrame();
   }
   // A wall piece's back sits on its wall face; the side wall turns it to face the room.
   function placeOnWall(node, piece) {
@@ -1051,6 +1052,31 @@ export function createRoom(container, options = {}) {
     }
     syncCompanionVisibility(); refreshShadows(); requestRender();
   }
+  function setFocusMode(value) {
+    const next = Boolean(value);
+    if (next === focusMode || (next && (avatarCameraEditing || editing))) return;
+    if (next) {
+      focusMode = true;
+      savedFocusCamera = cameraFrame();
+      camera.detachControl();
+      resize();
+      if (companionRoutine.pose.atDesk) applyFocusFrame();
+    } else {
+      focusMode = false;
+      for (const [mesh, enabled] of focusScenery || []) if (!mesh.isDisposed()) mesh.setEnabled(enabled);
+      focusScenery = null; focusCameraApplied = false;
+      if (savedFocusCamera) {
+        camera.alpha = savedFocusCamera.alpha; camera.beta = savedFocusCamera.beta; camera.radius = savedFocusCamera.radius;
+        camera.target.copyFrom(savedFocusCamera.target);
+      }
+      savedFocusCamera = null;
+      camera.attachControl(canvas, false);
+      canvas.setAttribute('aria-label', 'Your cozy miniature study room. Drag to look around. Tap a lamp, the fire or the record player to switch it; tap your pet to pet it, or drag your pet somewhere new.');
+      refreshShadows();
+      resize();
+    }
+    requestRender();
+  }
   function applyBulbs() {
     const glow = color('#ffd392').scale(theme === 'day' ? 0.50 : theme === 'dusk' ? 1.25 : 0.80);
     bulb.emissiveColor = decorVisible.lights ? glow : Color3.Black(); candleFlame.emissiveColor = glow; moteGlow.emissiveColor = glow.clone();
@@ -1392,6 +1418,7 @@ export function createRoom(container, options = {}) {
   const projectedCorner = new Vector3(); let canvasAspect = 1, fitAlpha = NaN, fitBeta = NaN;
   let avatarCameraEditing = false, avatarCameraTransition = null, savedAvatarCamera = null, savedAvatarEffects = null, avatarPoseTransition = null, avatarPreviewRotation = 0, avatarPreviewTarget = 0;
   const avatarFrameHeight = 3.45;
+  const focusFrameHeight = 3.85;
   let activeAvatarFrameHeight = avatarFrameHeight, avatarScenery = null, avatarCanvasAnimation = null;
   // Idle life for the editor close-up; `weight` eases in once the companion
   // has turned to the camera.
@@ -1407,6 +1434,22 @@ export function createRoom(container, options = {}) {
     return { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone(),
       height: camera.orthoTop - camera.orthoBottom, centerX: (camera.orthoLeft + camera.orthoRight) / 2,
       centerY: (camera.orthoTop + camera.orthoBottom) / 2, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } };
+  }
+  function applyFocusFrame() {
+    if (!focusMode || focusCameraApplied || !companionRoutine?.pose.atDesk) return;
+    const desk = placedObjects.get(layout.activeDeskId);
+    if (!desk) return;
+    focusCameraApplied = true;
+    focusScenery = scene.meshes.filter(mesh => mesh !== desk && !mesh.isDescendantOf(desk)).map(mesh => [mesh, mesh.isEnabled()]);
+    for (const [mesh] of focusScenery) mesh.setEnabled(false);
+    const pose = companionRoutine.pose, floor = groundAt(rugSurfaces, pose.x, pose.z) - FLOOR_Y;
+    camera.alpha = alphaHome; camera.beta = 1.12; camera.radius = 19;
+    camera.target.set(pose.x, 1.35 + floor, pose.z);
+    setCameraHeight(focusFrameHeight);
+    fitAlpha = camera.alpha; fitBeta = camera.beta;
+    canvas.setAttribute('aria-label', 'Focus view of your companion working beside you at the active desk.');
+    refreshShadows();
+    requestRender();
   }
   function restoreAvatarScenery() {
     for (const [mesh, visibility] of avatarScenery || []) if (!mesh.isDisposed()) mesh.visibility = visibility;
@@ -1458,6 +1501,10 @@ export function createRoom(container, options = {}) {
   }
   let avatarCameraControl = false;
   function fitRoom() {
+    if (focusMode && focusCameraApplied) {
+      setCameraHeight(focusFrameHeight);
+      fitAlpha = camera.alpha; fitBeta = camera.beta; return;
+    }
     if (avatarCameraControl) {
       if (avatarCameraEditing) activeAvatarFrameHeight = Math.max(avatarFrameHeight, 1.65 / canvasAspect);
       if (!avatarCameraTransition) setCameraHeight(avatarCameraEditing ? activeAvatarFrameHeight : camera.orthoTop - camera.orthoBottom);
@@ -1635,7 +1682,7 @@ export function createRoom(container, options = {}) {
       starMatrices[offset + 13] = seed.y + (reducedMotion ? 0 : Math.cos(seconds * 0.19 + i * 2.3) * 0.055);
     }
     skyStars.thinInstanceBufferUpdated('matrix');
-    moths.setEnabled(!reducedMotion && architectureStyle !== 'metro');
+    moths.setEnabled(!focusCameraApplied && !reducedMotion && architectureStyle !== 'metro');
     for (let i = 0; i < mothSeeds.length; i++) {
       const seed = mothSeeds[i], phase = seconds * 0.52 + i * 2.1;
       const x = seed.x + (reducedMotion ? 0 : Math.sin(phase) * 0.24), y = seed.y + (reducedMotion ? 0 : Math.cos(phase * 1.27) * 0.20), z = seed.z + (reducedMotion ? 0 : Math.sin(phase * 0.83) * 0.13);
@@ -1668,13 +1715,13 @@ export function createRoom(container, options = {}) {
     if (carriedBed) petModel.root.position.set(carriedBed.position.x, bedTop, carriedBed.position.z), petModel.root.rotation.y = carriedBed.rotation.y - Math.PI / 2 - 0.35;
     else petModel.root.position.set(pose.x, petY, pose.z), petModel.root.rotation.y = pose.yaw;
     petModel.contact.position.set(petModel.root.position.x, (bed && (onBed || carriedBed) ? bedTop + 0.002 : surfaceBelow(pointArea)), petModel.root.position.z); petModel.contact.rotation.y = petModel.root.rotation.y;
-    petModel.animate(pose, companionDelta, seconds, reducedMotion);
+    if (!focusCameraApplied) petModel.animate(pose, companionDelta, seconds, reducedMotion);
     for (const [id, reaction] of reactions) {
       const object = placedObjects.get(id), t = (now - reaction.start) / 1000 / reactionSeconds[reaction.kind];
       if (object) react(object, reaction.kind, reducedMotion ? 1 : t);
       if (!object || reducedMotion || t >= 1) reactions.delete(id);
     }
-    for (let i = 0; i < animatedObjects.length; i++) { const object = animatedObjects[i]; object.metadata.animate(seconds, focused && object.metadata.itemId === layout.activeDeskId, reducedMotion); }
+    for (let i = 0; i < animatedObjects.length; i++) { const object = animatedObjects[i]; if (focusCameraApplied && object.metadata.itemId !== layout.activeDeskId) continue; object.metadata.animate(seconds, focused && object.metadata.itemId === layout.activeDeskId, reducedMotion); }
     let settled = false;
     for (const [id, entry] of settlingPieces) {
       const progress = Math.min(1, Math.max(0, (now - entry.start) / 420));
@@ -1747,7 +1794,7 @@ export function createRoom(container, options = {}) {
     },
     cancelDoorWalk(options) { const cancelled = companionRoutine.cancelDoorWalk(options); if (cancelled) requestRender(); return cancelled; },
     setSuspended(value) { suspended = Boolean(value); if (suspended) { cancelDrag(); cancelAnimationFrame(frame); frame = 0; clearTimeout(petWake); } else { resize(); resumeFrames(); } wakeForClock(); },
-    resize, setTheme, setLayout, setEditMode, setAvatarEditing, setAvatarAppearance, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setSurface, setQuality,
+    resize, setTheme, setLayout, setEditMode, setAvatarEditing, setFocusMode, setAvatarAppearance, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setSurface, setQuality,
     turnAvatar(angle, reset = false) { if (!avatarCameraEditing || avatarPoseTransition) return; avatarPreviewTarget = reset ? 0 : avatarPreviewTarget + angle; requestRender(); },
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet, interactWithItem, interactWithKind,
@@ -1755,7 +1802,7 @@ export function createRoom(container, options = {}) {
     anchor,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { if (avatarCameraEditing) return; camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    diagnostics() { return { scene, engine, camera, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, focusMode, focusCameraApplied, focusHiddenMeshes: focusScenery?.length ?? 0, focusVisibleMeshes: focusScenery?.filter(([mesh]) => !mesh.isDisposed() && mesh.isEnabled()).length ?? scene.meshes.length, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
     dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); petModel?.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

@@ -6,6 +6,12 @@ export const steps = {
   async closeDecorate(app) { await app.clickSel('#decorate-button'); await app.waitFor(`!document.body.classList.contains('is-decorating')`, { what: 'leaving Decorate' }); await app.settle(); },
   async openAvatar(app) { await app.clickSel('#avatar-button'); await app.waitFor(`document.body.classList.contains('is-avatar-editing')`, { what: 'the avatar editor' }); await app.settle(); },
   async closeAvatar(app) { await app.clickSel('#avatar-done'); await app.waitFor(`!document.body.classList.contains('is-avatar-editing')`, { what: 'leaving the avatar editor' }); await app.settle(); },
+  async openFocusMode(app) {
+    if (!await app.js(`Boolean(document.querySelector('#focus-mode-enter'))`)) return;
+    await app.clickSel('#focus-mode-enter');
+    await app.waitFor(`document.body.classList.contains('is-focus-mode')`, { what: 'Focus mode' });
+    await app.waitFor(`window.__littleHours.room.diagnostics().focusCameraApplied`, { what: 'the companion to reach the active desk', timeout: 20000 });
+  },
 };
 
 export const cycles = {
@@ -21,4 +27,5 @@ export const views = {
   'house-closed': { about: 'the house page, closed', async go(app) { await steps.openHouse(app); await steps.toggleHouse(app); } },
   decorate: { about: 'Decorate mode', async go(app) { await steps.openDecorate(app); } },
   avatar: { about: 'the avatar editor', async go(app) { await steps.openAvatar(app); } },
+  focus: { about: 'Focus mode with the avatar at the active desk and its quiet timer', async go(app) { await steps.openFocusMode(app); } },
 };

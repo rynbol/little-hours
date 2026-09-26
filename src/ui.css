@@ -94,6 +94,14 @@ body:not(.is-avatar-editing) .room-hint { color: #b5a3b1; font-size: 10px; botto
 .focus-card .start-button, .session-celebration .start-button { background: var(--ui-rose); border: 1px solid #944756; border-radius: 13px; min-height: 47px; color: #fff8f0; font-size: 12px; font-weight: 600; padding: 12px 15px; box-shadow: 0 3px 0 #743a4c25; }
 .focus-card .start-button:hover:hover, .session-celebration .start-button:hover { background: #944a59; }
 .is-focusing .focus-card .start-button { background: var(--ui-sage); border-color: #52654b; }
+.focus-mode-button { width: 100%; min-height: 53px; display: flex; align-items: center; gap: 10px; margin-top: 9px; padding: 8px 11px; border: 1px solid #dfd1c5; border-radius: 12px; background: #fffaf5a8; color: #806871; text-align: left; }
+.focus-mode-button > svg:first-child { width: 18px; height: 18px; color: #a16e7b; }
+.focus-mode-button > svg:last-child { width: 15px; height: 15px; margin-left: auto; color: #9a8490; }
+.focus-mode-button > span { display: grid; gap: 2px; }
+.focus-mode-button strong { color: #674f58; font-size: 11px; font-weight: 600; }
+.focus-mode-button small { color: #887780; font-size: 9px; }
+.focus-mode-button:hover:not(:disabled) { background: #f8ece8; border-color: #cdaeb5; }
+.focus-mode-button:disabled { opacity: .48; }
 .reset-session { color: #80696f; min-height: 32px; margin: 7px auto -7px; font-size: 10px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #80696f50; }
 .sound-row { border-color: #e3d7cb; margin-top: 18px; padding-top: 14px; }
 .sound-button { min-height: 34px; color: #634e56; font-size: 11px; }
@@ -193,6 +201,36 @@ body:not(.is-avatar-editing) .room-panel .quiet-button { min-height: 40px; backg
 .skip-link { position: fixed; top: 8px; left: 12px; z-index: 30; padding: 12px; background: var(--ui-paper); color: var(--ui-ink); border-radius: 8px; transform: translateY(-150%); }
 .skip-link:focus { transform: none; }
 button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid #c484a0; outline-offset: 4px; }
+body.is-focus-mode { overflow: hidden; }
+body.is-focus-mode .app-shell { width: 100%; max-width: none; min-height: 100svh; padding: 0; }
+body.is-focus-mode .app-header,
+body.is-focus-mode .room-section > :not(#stage),
+body.is-focus-mode #house-page,
+body.is-focus-mode .focus-card,
+body.is-focus-mode .app-footer,
+body.is-focus-mode .skip-link { display: none !important; }
+body.is-focus-mode .workspace { display: block; min-height: 0; padding: 0; }
+body.is-focus-mode #stage { position: fixed; inset: 0; z-index: 40; width: 100vw; height: 100vh; height: 100svh; background: radial-gradient(ellipse at 50% 45%, #b18d9b1a, transparent 52%), linear-gradient(155deg, #211d29, #29232f 58%, #201e2b); }
+body.is-focus-mode #stage::before { display: none; }
+body.is-focus-mode #room-canvas { inset: 0; }
+body.is-focus-mode #room-canvas canvas { touch-action: none; }
+body.is-focus-mode #stage-presence,
+body.is-focus-mode .companion-status,
+body.is-focus-mode .room-hint,
+body.is-focus-mode .speech-layer,
+body.is-focus-mode .loading-note,
+body.is-focus-mode .room-travel { display: none; }
+body.is-focus-mode .little-moments { display: none; }
+.focus-mode-hud { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.focus-mode-timer { position: absolute; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 7px 15px 8px; border: 1px solid #f4e9e31d; border-radius: 999px; background: #201d2860; color: #f3eae1b8; opacity: .82; box-shadow: 0 6px 28px #0c091342; backdrop-filter: blur(12px); font-family: 'Manrope', sans-serif; font-size: 17px; font-weight: 450; letter-spacing: .3px; line-height: 1.3; font-variant-numeric: tabular-nums; pointer-events: none; }
+.focus-mode-exit { position: absolute; top: max(22px, env(safe-area-inset-top)); right: max(22px, env(safe-area-inset-right)); width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid #f4e9e31d; border-radius: 50%; background: #201d2855; color: #f3eae1a8; opacity: .66; backdrop-filter: blur(12px); pointer-events: auto; transition: opacity .2s ease, background .2s ease; }
+.focus-mode-exit svg { width: 17px; height: 17px; }
+.focus-mode-exit:hover, .focus-mode-exit:focus-visible { opacity: 1; background: #403643a8; }
+@media (max-width: 999px) {
+  .focus-mode-button { grid-column: 1 / -1; }
+  .focus-mode-timer { bottom: max(18px, env(safe-area-inset-bottom)); font-size: 16px; }
+  .focus-mode-exit { top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); }
+}
 @media (hover: hover) {
   .tiny-flower:hover { rotate: 35deg; transition: rotate .5s var(--press-spring); }
 }

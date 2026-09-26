@@ -58,6 +58,7 @@ const store = createStateStore(deviceStorage);
 const audio = createAudio(deviceStorage);
 let state = store.state;
 let room;
+let roomReady = false;
 let houseUI;
 let momentsUI;
 let houseOpen = false;
@@ -81,6 +82,7 @@ let roomLayoutSignature = '';
 let quality = 'auto';
 let performanceStats = null;
 let focusCollapsed = false;
+let focusMode = false, focusModeReturnFocus = null;
 let lastSessionRender = '';
 let lastCompanionIntent = null;
 let draggedItemId = null;
@@ -111,6 +113,10 @@ document.querySelector('#app').innerHTML = `
           <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
           <div class="mini-caption" id="mini-caption" hidden>Mini view preview · inside this page</div>
           <div class="room-hint" id="room-hint">Drag to look around<span>·</span>Tap a plant, bookcase or tea table</div>
+          <div class="focus-mode-hud" id="focus-mode-hud" hidden>
+            <time class="focus-mode-timer" id="focus-mode-timer" role="timer" aria-label="25 minutes remaining">25:00</time>
+            <button class="focus-mode-exit" id="focus-mode-exit" aria-label="Leave focus mode" title="Leave focus mode">${icon('close')}</button>
+          </div>
         </div>
         <div class="room-bottom">
           <div class="room-company">${icon('cat')}<span id="pet-company">You & Miso</span></div>
@@ -145,6 +151,7 @@ document.querySelector('#app').innerHTML = `
           <div class="durations" role="group" aria-label="Focus duration"><button data-minutes="25" aria-pressed="true">25 <span>min</span></button><button data-minutes="50" aria-pressed="false">50 <span>min</span></button><button data-minutes="90" aria-pressed="false">90 <span>min</span></button></div>
         </div>
         <button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
+        <button class="focus-mode-button" id="focus-mode-enter" disabled>${icon('avatar')}<span><strong>Focus mode</strong><small>Just you and your companion</small></span>${icon('arrow')}</button>
         <button class="reset-session" id="reset-session" hidden>Start over</button>
         <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="${audio.prefs.volume}" aria-label="Rain volume" disabled /><label class="chime-toggle"><span>Chime when a session ends</span><input type="checkbox" id="chime-toggle" ${audio.prefs.chime ? 'checked' : ''} /></label></div>
         <div id="focus-reward" class="focus-reward"></div>
@@ -197,6 +204,8 @@ function renderRoomHeading() {
 function applyState(next, force = false) {
   const previous = state;
   state = next;
+  const focusRoomChanged = previous.theme !== state.theme || previous.pet !== state.pet || JSON.stringify(previous.avatar) !== JSON.stringify(state.avatar) || JSON.stringify(previous.decor) !== JSON.stringify(state.decor) || JSON.stringify(previous.layout) !== JSON.stringify(state.layout);
+  if (focusMode && (!state.session.running || focusRoomChanged)) leaveFocusMode();
   if (doorWalking) {
     if (state.session.running) cancelDoorTravel('Focusing started in another tab, so the walk to the door stopped.');
     else if (previous.house.activeId !== state.house.activeId || JSON.stringify(previous.layout) !== JSON.stringify(state.layout)) cancelDoorTravel('Your room changed. Tap the door again when you’re ready.');
@@ -294,7 +303,9 @@ try {
   room = createRoom($('#room-canvas'), {
     onReady() {
       $('#loading-note').hidden = true;
+      roomReady = true;
       setDecorEntry(true);
+      renderSession();
       // Back after half an hour or more: a small hello.
       if (state.seenAt && clockNow() - state.seenAt > 30 * 60_000) setTimeout(welcome, 1200);
     },
@@ -550,6 +561,7 @@ function renderSession() {
   // The clock polls for deadlines twice a second, but idle rooms and unchanged
   // displayed seconds do not need another set of DOM mutations.
   $('#start-button').disabled = travelling || avatarPanelActive;
+  $('#focus-mode-enter').disabled = !roomReady || travelling || avatarPanelActive || editMode || houseOpen || Boolean(connectedView);
   $('#avatar-button').disabled = travelling;
   $('#decorate-button').disabled = travelling || !room;
   $('#rooms-button').disabled = travelling || !room;
@@ -559,8 +571,10 @@ function renderSession() {
   if (renderKey === lastSessionRender) return;
   lastSessionRender = renderKey;
   $('#timer').textContent = formatted;
+  $('#focus-mode-timer').textContent = formatted;
   $('#dock-timer').textContent = formatted;
   $('#timer').setAttribute('aria-label', `${spokenTime(ms)} remaining`);
+  $('#focus-mode-timer').setAttribute('aria-label', `${spokenTime(ms)} remaining`);
   document.title = state.session.running ? `${formatted} · Little Hours` : 'Little Hours — a little place to focus';
   $('#session-label').textContent = state.session.running ? 'IN YOUR OWN TIME' : ms < state.session.duration && ms > 0 ? 'A LITTLE BREATHER' : ms === 0 ? 'YOU DID THAT' : 'SETTLE IN';
   $('#timer-caption').textContent = state.session.running ? 'one thing at a time' : ms === 0 ? 'a little progress, made' : ms < state.session.duration ? 'ready when you are' : 'a small beginning';
@@ -606,6 +620,32 @@ $('#start-button').addEventListener('click', () => {
   if (state.session.running) avatarSay(resuming ? 'resume' : 'start', { force: true });
   else if (remainingAt(state.session) > 0) avatarSay('pause', { force: true });
 });
+function enterFocusMode() {
+  if (focusMode || !roomReady || travelling || avatarPanelActive || editMode || houseOpen || connectedView) return;
+  const resuming = !state.session.running && remainingAt(state.session) > 0 && remainingAt(state.session) < state.session.duration;
+  if (!state.session.running) {
+    audio.unlock();
+    acceptUpdate(store.setRunning(true));
+    avatarSay(resuming ? 'resume' : 'start', { force: true });
+  }
+  focusModeReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : $('#focus-mode-enter');
+  focusMode = true;
+  document.body.classList.add('is-focus-mode');
+  $('#focus-mode-hud').hidden = false;
+  room?.setFocusMode?.(true);
+  $('#focus-mode-exit').focus({ preventScroll: true });
+}
+function leaveFocusMode({ restoreFocus = true } = {}) {
+  if (!focusMode) return;
+  focusMode = false;
+  document.body.classList.remove('is-focus-mode');
+  $('#focus-mode-hud').hidden = true;
+  room?.setFocusMode?.(false);
+  if (restoreFocus) (focusModeReturnFocus?.isConnected ? focusModeReturnFocus : $('#focus-mode-enter')).focus({ preventScroll: true });
+  focusModeReturnFocus = null;
+}
+$('#focus-mode-enter').addEventListener('click', enterFocusMode);
+$('#focus-mode-exit').addEventListener('click', () => leaveFocusMode());
 $('#reset-session').addEventListener('click', () => {
   acceptUpdate(store.update(draft => { draft.session = createSession(draft.session.duration / 60000); }));
   // Reset hides itself; keep keyboard and screen-reader focus on the timer.
@@ -1141,6 +1181,7 @@ document.querySelectorAll('[data-panel]').forEach(button => button.addEventListe
   renderPanel();
 }));
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && focusMode) { event.preventDefault(); leaveFocusMode(); return; }
   if (event.key === 'Escape' && houseOpen && !event.target.closest('input')) { setHouseOpen(false); return; }
   if (event.key === 'Escape' && room?.cancelDrag?.()) { event.preventDefault(); return; }
   // Escape while typing (or composing) belongs to the text field, not the panel.
@@ -1197,7 +1238,7 @@ window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 if (import.meta.env.DEV) installTestHook({ get room() { return room; }, get state() { return state; }, get speech() { return speech; }, get house() { return houseUI; }, get connected() { return connectedView; } });
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
-  document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');
+  document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating', 'is-focus-mode');
   clearInterval(tickInterval);
   clearTimeout(toastTimeout);
   feedback.dispose();
