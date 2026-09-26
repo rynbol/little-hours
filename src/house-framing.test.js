@@ -7,7 +7,8 @@ import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { houseFrame } from './house-framing.js';
-import { createHouseModel } from './house-model.js';
+import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
+import { createHouseMotion } from './house-motion.js';
 import { createHouse } from './house.js';
 import { createLayout } from './layout.js';
 import { AVATAR_DEFAULT } from './avatar.js';
@@ -58,6 +59,32 @@ test('opened floors keep all authored geometry framed, picking follows the room,
     assert.equal(hit.pickedMesh?.metadata.houseSlot, 'loft', 'picking follows the unfolded upper floor');
     model.setOpenFloors(0);
     assert.equal(loft.getWorldMatrix().getTranslation().length(), 0, 'dollhouse restores the original home');
+    const motion = createHouseMotion(HOUSE_POSITIONS); motion.bind(model);
+    for (const aspect of [.45, 1.5, 2.5]) for (const opened of [0, 1]) for (const alpha of [.65, 1.45]) {
+      motion.stop(); model.setOpenFloors(opened, aspect < 1.15); camera.alpha = alpha;
+      const frame = houseFrame(model.framing, camera.getViewMatrix(true), aspect, .92);
+      camera.orthoLeft = frame.x - frame.height * aspect / 2; camera.orthoRight = frame.x + frame.height * aspect / 2;
+      camera.orthoBottom = frame.y - frame.height / 2; camera.orthoTop = frame.y + frame.height / 2;
+      camera.getProjectionMatrix(true); const matrix = camera.getTransformationMatrix();
+      for (const kind of ['select', 'design', 'build']) for (const time of [0, 220, 340, 580]) {
+        motion.stop();
+        for (const id of Object.keys(HOUSE_POSITIONS)) motion.trigger(id, kind, 0);
+        motion.update(time);
+        for (const mesh of model.meshes) {
+          const vertices = mesh.getVerticesData('position'), world = mesh.computeWorldMatrix(true);
+          const point = new Vector3(), projected = new Vector3(); let maximum = 0;
+          for (let i = 0; i < vertices.length; i += 3) {
+            point.set(vertices[i], vertices[i + 1], vertices[i + 2]); Vector3.TransformCoordinatesToRef(point, world, projected);
+            Vector3.TransformCoordinatesToRef(projected, matrix, point);
+            maximum = Math.max(maximum, Math.abs(point.x), Math.abs(point.y));
+          }
+          assert.ok(maximum <= 1, `${mesh.name} remains visible during ${kind} at ${aspect}/${opened}/${alpha}/${time}: ${maximum}`);
+        }
+      }
+    }
+    motion.stop(); model.setOpenFloors(1, false); motion.trigger('loft', 'select', 0); motion.update(340);
+    assert.equal(scene.pickWithRay(new Ray(new Vector3(-8, 9, 0), new Vector3(0, -1, 0)), mesh => mesh === loft).pickedMesh, loft, 'picking follows a bouncing room');
+    motion.dispose();
     assert.equal(JSON.stringify(house), saved);
   } finally { model.dispose(); scene.dispose(); engine.dispose(); globalThis.document = oldDocument; }
 });
