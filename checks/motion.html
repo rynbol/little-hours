@@ -6,7 +6,7 @@ if (!import.meta.env.DEV) throw new Error('Development check only');
 const nativeMatchMedia = window.matchMedia.bind(window), motion = new EventTarget();
 motion.matches = false;
 window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? motion : nativeMatchMedia(query);
-const { freshState } = await import('../src/state.js');
+const { freshState } = await import('../src/core/state.js');
 const state = freshState(); state.house.coins = 300; state.theme = 'day';
 let raw = JSON.stringify(state);
 window.__littleHoursTest = { storage: { getItem: () => raw, setItem: (_, value) => { raw = value; } } };

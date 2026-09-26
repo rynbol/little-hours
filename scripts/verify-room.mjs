@@ -4,9 +4,9 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Ray } from '@babylonjs/core/Culling/ray.js';
-import { createLayout, footprintBounds, pieceCount, LAYOUT_VERSION, rugStack, rugTouches, groundAt, standHeight } from '../src/layout.js';
-import { createHouse } from '../src/house.js';
-import { SURFACES } from '../src/surfaces.js';
+import { createLayout, footprintBounds, pieceCount, LAYOUT_VERSION, rugStack, rugTouches, groundAt, standHeight } from '../src/core/layout.js';
+import { createHouse } from '../src/core/house.js';
+import { SURFACES } from '../src/core/surfaces.js';
 
 class Surface {
   listeners = new Map();
@@ -53,7 +53,7 @@ globalThis.IntersectionObserver = class {
   constructor(callback) { this.callback = callback; intersection = this; }
   observe() {} disconnect() { this.disconnected = true; }
 };
-const { createRoom } = await import('../src/room.js');
+const { createRoom } = await import('../src/features/room/index.js');
 let engine;
 const container = { clientWidth: 800, clientHeight: 600, appendChild(canvas) { this.canvas = canvas; } };
 const changes = [], notices = [], stats = [], dragStates = [], lightTaps = [], companionTaps = [], houseTrips = [];

@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { parseSync } from 'rolldown/experimental';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const HOOK_FILES = ['src/test-hook.js', 'src/test-pins.js'];
-const CLOCK_FILE = 'src/test-pins.js';
+const HOOK_FILES = ['src/dev/test-hook.js', 'src/core/test-pins.js'];
+const CLOCK_FILE = 'src/core/test-pins.js';
+const LAYERS = { core: ['core'], models: ['core', 'models'], ui: ['core', 'ui'], feature: ['core', 'models', 'ui'], dev: ['dev'], app: ['core', 'models', 'ui', 'dev'] };
 const CHECKED = /^(src|scripts|e2e|checks)\/.*\.(js|mjs)$/;
 
 function walk(node, visit) {
@@ -22,6 +23,27 @@ function lineAt(code, offset) {
   return line;
 }
 
+function layerOf(file) {
+  if (file === 'src/main.js') return { layer: 'app' };
+  const feature = file.match(/^src\/features\/([^/]+)\//);
+  if (feature) return { layer: 'feature', feature: feature[1] };
+  const top = file.match(/^src\/([^/]+)\//)?.[1];
+  return { layer: ['core', 'models', 'ui', 'dev'].includes(top) ? top : null };
+}
+
+function layerProblem(file, target) {
+  const from = layerOf(file), to = layerOf(target);
+  if (!from.layer) return `put ${file} in src/core, src/models, src/ui, src/dev or src/features/<name>`;
+  if (!to.layer) return `${target} is outside the layers`;
+  if (to.layer === 'feature') {
+    if (from.layer === 'feature' && from.feature === to.feature) return null;
+    if (from.layer !== 'feature' && from.layer !== 'app') return `${from.layer} code must not import features (${target})`;
+    return target === `src/features/${to.feature}/index.js` ? null : `import the ${to.feature} feature through src/features/${to.feature}/index.js, not ${target}`;
+  }
+  if (to.layer === 'app') return 'nothing imports src/main.js';
+  return LAYERS[from.layer].includes(to.layer) ? null : `${from.layer} code must not import ${to.layer} (${target})`;
+}
+
 const propertyName = node => node.computed ? node.property?.value : node.property?.name;
 
 export function checkSource(file, code) {
@@ -31,7 +53,7 @@ export function checkSource(file, code) {
   const game = file.startsWith('src/') && !file.endsWith('.test.js');
   walk(program, node => {
     if (game && file !== CLOCK_FILE) {
-      if (node.type === 'MemberExpression' && node.object?.type === 'Identifier' && ((node.object.name === 'Date' && propertyName(node) === 'now') || (node.object.name === 'Math' && propertyName(node) === 'random'))) add(node, 'clock', `use clockNow/clockRandom from ./test-pins.js instead of ${node.object.name}.${propertyName(node)}`);
+      if (node.type === 'MemberExpression' && node.object?.type === 'Identifier' && ((node.object.name === 'Date' && propertyName(node) === 'now') || (node.object.name === 'Math' && propertyName(node) === 'random'))) add(node, 'clock', `use clockNow/clockRandom from src/core/test-pins.js instead of ${node.object.name}.${propertyName(node)}`);
       if (node.type === 'NewExpression' && node.callee?.name === 'Date' && !node.arguments.length) add(node, 'clock', 'use new Date(clockNow()) so tests can pin the clock');
     }
     if (game && !HOOK_FILES.includes(file)) {
@@ -42,7 +64,8 @@ export function checkSource(file, code) {
     if (typeof source !== 'string' || !source.startsWith('.')) return;
     const target = relative(root, resolve(root, dirname(file), source));
     if (game && !target.startsWith('src/')) add(node, 'imports', `game code must not import ${target}`);
-    if (game && target === 'src/test-hook.js' && file !== 'src/main.js') add(node, 'imports', 'only src/main.js may install the test hook');
+    if (game && target === 'src/dev/test-hook.js' && file !== 'src/main.js') add(node, 'imports', 'only src/main.js may install the test hook');
+    if (game && target.startsWith('src/') && !target.endsWith('.css')) { const problem = layerProblem(file, target); if (problem) add(node, 'layers', problem); }
     if (file.startsWith('scripts/lh') && target.startsWith('src/')) add(node, 'imports', `lh drives the app through the browser; it must not import ${target}`);
   });
   return found;

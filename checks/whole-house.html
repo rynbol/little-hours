@@ -4,8 +4,8 @@
 if (!import.meta.env.DEV) throw new Error('Development check only');
 const nativeMatchMedia = window.matchMedia.bind(window), motion = new EventTarget();
 motion.matches = false; window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? motion : nativeMatchMedia(query);
-const {freshState} = await import('../src/state.js');
-const {createLayout} = await import('../src/layout.js');
+const {freshState} = await import('../src/core/state.js');
+const {createLayout} = await import('../src/core/layout.js');
 const state = freshState();
 state.theme = 'day'; state.house.name = 'Our little Sunday';
 state.house.rooms[0].name = 'The reading room';
