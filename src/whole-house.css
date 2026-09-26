@@ -40,3 +40,6 @@ body.is-connected:not(.is-avatar-editing):not(.is-decorating) .stage { height: c
 .house-canvas .house-room-tag { background: #f5eddfef; color: #514c41; border-color: #fff8e2a0; }
 .house-canvas .house-room-tag small { color: #69765c; }
 .house-canvas .house-room-tag[aria-current='location'] { border-color: #65745c; }
+@media (max-width: 640px) {
+  body.is-connected:not(.is-avatar-editing) .stage-presence { top: auto; bottom: 7px; left: 7px; }
+}
