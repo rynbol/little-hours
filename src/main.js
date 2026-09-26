@@ -18,7 +18,9 @@ import { designPaint } from './architecture.js';
 import { createHouseUI } from './house-ui.js';
 import { activeHouseRoom, nextExpansion, focusCoins } from './house.js';
 import { createHouseView } from './house-view.js';
-import { AVATAR_DEFAULT, AVATAR_OPTIONS } from './avatar.js';
+import { AVATAR_DEFAULT, AVATAR_LOOKS } from './avatar.js';
+import { avatarEditorContent } from './avatar-ui.js';
+import './wardrobe.css';
 
 const icons = {
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-8h6v8"/>',
@@ -54,7 +56,7 @@ let houseUI;
 let momentsUI;
 let houseOpen = false;
 let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
-let currentPanel = null, avatarPanelActive = false, avatarEditorResumeTimer = false, avatarSection = 'face';
+let currentPanel = null, avatarPanelActive = false, avatarEditorResumeTimer = false, avatarSection = 'looks';
 let compact = false;
 let audioContext, noiseNode, gainNode;
 let soundEnabled = false;
@@ -91,10 +93,13 @@ document.querySelector('#app').innerHTML = `
       <section id="room-section" class="room-section" aria-labelledby="room-title">
         <div class="room-heading"><div><p class="eyebrow">MAKE YOURSELF AT HOME</p><h1 id="room-title">The twilight retreat</h1><p class="room-subtitle" id="room-subtitle">The fire is warm. The night is yours.</p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Visit your house" aria-controls="house-page">${icon('home')}<span>My house</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
         <nav id="home-connections" class="home-connections" aria-label="Move around your house"></nav>
+        <div class="avatar-stage-heading"><span class="eyebrow">YOUR EVERYDAY KIND OF MAGIC</span><span class="avatar-pause-note" id="avatar-pause-note"></span></div>
         <div class="stage" id="stage">
+          <div class="portrait-backdrop" aria-hidden="true"><span>✧</span><span>✦</span><span>✧</span></div>
+          <div class="avatar-preview-controls" aria-label="Turn your avatar"><button id="avatar-turn-left" aria-label="Turn avatar left">${icon('rotate')}</button><span>Drag to turn</span><button id="avatar-turn-right" aria-label="Turn avatar right">${icon('rotate')}</button><button id="avatar-face-front">Face me</button></div>
           <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a pet. Drag to turn the room."></div>
           <div id="house-in-room" class="house-in-room" hidden></div>
-          <div id="room-travel" class="room-travel" role="status" hidden><span>✧</span><strong id="travel-label"></strong><small>A different corner of home.</small></div>
+          <div id="room-travel" class="room-travel" role="status" hidden><span>${icon('leaf')}</span><div><strong id="travel-label"></strong><small>A different corner of home.</small></div><div class="journey-progress" aria-hidden="true"><i id="journey-progress-fill"></i></div></div>
           <div class="loading-note" id="loading-note">Making room for you…</div>
           <div class="stage-presence" id="stage-presence" data-presence="idle" role="status" aria-live="polite" aria-atomic="true" aria-label="Your local focus status: In your room" title="Your focus status in this browser."><span id="presence-icon" aria-hidden="true">${icon('home')}</span><span id="room-status">In your room</span></div>
           <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
@@ -297,6 +302,7 @@ try {
     onPet: petFeedback,
     onPetCarry({ species, held }) { if (held) speech?.say('pet', (PET_LINES[species] || PET_LINES.cat).carry); },
     onFrame() { speech?.update(); },
+    onDoorProgress(progress) { if (doorWalking) $('#journey-progress-fill').style.transform = `scaleX(${progress})`; },
     onCompanionState({ state: activity, activity: doing }) {
       companionActivity = activity;
       const labels = { idle: 'Ready at the desk', working: 'Working alongside you', walking: 'Finding a cozy spot', returning: 'Back to the desk', resting: 'Taking a breather', sleeping: 'Dozing off', customizing: 'Choosing a look', 'resting-at-desk': 'Resting at the desk', busy: 'Taking a little break', 'at-door': 'At the doorway' };
@@ -372,7 +378,10 @@ function renderConnections(updateModel = true) {
   for (const entry of state.house.rooms) {
     const button = document.createElement('button'); button.dataset.houseGo = entry.id;
     button.textContent = entry.name; button.setAttribute('aria-current', entry.id === state.house.activeId && !connectedView ? 'location' : 'false');
-    button.addEventListener('click', () => visitRoom(entry.id)); nav.append(button);
+    button.addEventListener('click', () => {
+      if (entry.id === state.house.activeId || connectedView || editMode) visitRoom(entry.id);
+      else visitDoor(entry.id);
+    }); nav.append(button);
   }
   const next = nextExpansion(state.house);
   if (next) {
@@ -426,11 +435,14 @@ function visitRoom(id, decorate = editMode, fromDoor = false) {
 }
 function visitDoor(id) {
   if (travelling) return;
+  if (currentPanel === 'avatar') closePanel();
   acceptUpdate(store.update());
   if (state.session.running) { toast('Pause your focus session before walking to another room.', true); return; }
   const entry = state.house.rooms.find(room => room.id === id);
   if (!entry) { setHouseOpen(true, id); return; }
   doorWalking = true; travelling = true;
+  clearTimeout(toastTimeout); $('#toast').hidden = true;
+  $('#journey-progress-fill').style.transform = 'scaleX(0)';
   $('#travel-label').textContent = `Walking to ${entry.name}`;
   $('#room-travel small').textContent = 'A little walk through your home.';
   $('#room-travel').hidden = false; document.body.classList.add('is-travelling', 'is-door-walking'); renderSession();
@@ -444,7 +456,10 @@ function visitDoor(id) {
     $('#travel-label').textContent = `On to ${entry.name}`;
     $('#room-travel small').textContent = 'A different corner of home.';
     visitRoom(id, false, true);
-  }, () => room?.setDoorOpen?.(id));
+  }, () => {
+    room?.setDoorOpen?.(id);
+    $('#room-travel small').textContent = 'Opening the door. Make yourself at home.';
+  });
   if (!started) {
     cancelDoorTravel();
     toast('There isn’t a clear path to that door. Move a little furniture and try again.', true);
@@ -519,6 +534,12 @@ function renderSession() {
   // The clock polls for deadlines twice a second, but idle rooms and unchanged
   // displayed seconds do not need another set of DOM mutations.
   $('#start-button').disabled = travelling || avatarPanelActive;
+  $('#avatar-button').disabled = travelling;
+  $('#decorate-button').disabled = travelling || !room;
+  $('#rooms-button').disabled = travelling || !room;
+  $('#coin-wallet').disabled = travelling;
+  $('#mini-button').disabled = travelling;
+  document.querySelectorAll('[data-house-go], .home-wide').forEach(button => { button.disabled = travelling; });
   if (renderKey === lastSessionRender) return;
   lastSessionRender = renderKey;
   $('#timer').textContent = formatted;
@@ -919,10 +940,15 @@ function renderPerformance() {
   metrics.innerHTML = `<div><dt>Rendered frames</dt><dd>${value('fps')} <small>fps</small></dd></div><div><dt>95th % frame interval</dt><dd>${value('p95', 1)} <small>ms</small></dd></div><div><dt>${Number.isFinite(stats.cpuRenderMsP95) ? '95th % CPU render' : 'CPU submission'}</dt><dd>${value('cpu', 1)} <small>ms</small></dd></div><div><dt>Draw calls</dt><dd>${value('drawCalls')}</dd></div><div><dt>Triangles</dt><dd>${Number.isFinite(stats.triangles) ? Math.round(stats.triangles).toLocaleString() : '—'}</dd></div><div><dt>Pixel ratio</dt><dd>${value('pixelRatio', 2)}<small>×</small></dd></div>`;
 }
 
+$('#avatar-turn-left').addEventListener('click', () => room?.turnAvatar(-Math.PI / 4));
+$('#avatar-turn-right').addEventListener('click', () => room?.turnAvatar(Math.PI / 4));
+$('#avatar-face-front').addEventListener('click', () => room?.turnAvatar(0, true));
+
 function renderPanel() {
   const panel = $('#room-panel');
+  const leavingAvatar = currentPanel !== 'avatar' && avatarPanelActive;
   if (currentPanel === 'avatar' && !avatarPanelActive) {
-    avatarPanelActive = true; avatarSection = 'face'; room?.setAvatarEditing?.(true);
+    avatarPanelActive = true; avatarSection = 'looks'; room?.setAvatarEditing?.(true);
     avatarEditorResumeTimer = state.session.running;
     if (avatarEditorResumeTimer) {
       const result = store.setRunning(false);
@@ -939,10 +965,14 @@ function renderPanel() {
   }
   document.body.classList.toggle('is-avatar-editing', currentPanel === 'avatar');
   renderRoomLabel();
-  if (avatarPanelActive) $('#room-hint').textContent = 'Drag left or right over your avatar to turn them';
+  $('#avatar-pause-note').textContent = avatarEditorResumeTimer ? 'Focus paused · resumes when you’re done' : 'Make yourself at home';
+  if (avatarPanelActive) $('#room-hint').textContent = 'A small version of you. A whole world to make your own.';
   else if (!editMode) $('#room-hint').innerHTML = `Drag to look around<span>·</span>Tap a plant, bookcase or tea table`;
   panel.hidden = !currentPanel;
   document.querySelectorAll('[data-panel]').forEach(button => button.setAttribute('aria-expanded', button.dataset.panel === currentPanel));
+  // Reconcile the new canvas bounds before the next frame, not one frame
+  // later when ResizeObserver runs after the portrait layout disappears.
+  if (leavingAvatar) room?.resize?.();
   if (!currentPanel) return;
   panel.innerHTML = `<div class="panel-heading"><span>${({ atmosphere: 'Find your kind of quiet', pet: 'Your little companion', avatar: 'Meet your avatar' })[currentPanel] || 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
   if (currentPanel === 'atmosphere') {
@@ -964,81 +994,32 @@ function renderPanel() {
     }));
     $('#pet-now').addEventListener('click', () => { if (room) room.pet(); else petFeedback(); });
   } else if (currentPanel === 'avatar') {
-    const partNames = {
-      skin: 'Skin tone', hair: 'Hair color', style: 'Hair style',
-      outfit: 'Outfit design', top: 'Sweater color', bottomStyle: 'Bottom design', bottom: 'Trouser color',
-      accessory: 'Personal detail',
+    panel.innerHTML = `<div class="panel-heading"><div><p class="eyebrow">THE LITTLE WARDROBE</p><h2>A little more <em>you.</em></h2></div><button class="icon-button" id="close-panel" aria-label="Close wardrobe">${icon('close')}</button></div>
+      <div class="avatar-editor-tabs" role="group" aria-label="Customize your avatar">${[['looks', 'Looks'], ['face', 'Face & hair'], ['outfit', 'Outfits'], ['details', 'Extras']].map(([id, name]) => `<button data-avatar-section="${id}" aria-pressed="${avatarSection === id}">${name}</button>`).join('')}</div>
+      <div class="avatar-customizer">${avatarEditorContent(state.avatar, avatarSection)}</div>
+      <div class="avatar-editor-footer"><button class="avatar-reset" id="avatar-reset">Reset look</button><span class="avatar-save-note">${storageWarningShown ? 'This visit only' : 'Saved as you go'}</span><button class="avatar-done" id="avatar-done">${icon('check')} Done</button></div>`;
+    const rerenderChoices = selector => {
+      const scroll = panel.querySelector('.avatar-customizer').scrollTop;
+      renderPanel();
+      panel.querySelector('.avatar-customizer').scrollTop = scroll;
+      panel.querySelector(selector)?.focus({ preventScroll: true });
     };
-    const parts = avatarSection === 'face' ? ['skin', 'hair', 'style'] : avatarSection === 'outfit' ? ['outfit', 'top', 'bottomStyle', 'bottom'] : ['accessory'];
-    const hairShapes = {
-      bun: 'M8 19v-5a8 8 0 0 1 16 0v5c-2-2-5-3-8-3s-6 1-8 3Zm11-11a3 3 0 1 1 6 0 3 3 0 0 1-6 0Z',
-      bob: 'M7 18V14a9 9 0 0 1 18 0v12h-4v-9H11v9H7V18Z',
-      waves: 'M7 18V14a9 9 0 0 1 18 0v5c-2-2-2-3-4-2s-2 4-4 3-2-4-4-3-2 3-4 2H7Z',
-      crop: 'M8 16v-3a8 8 0 0 1 16 0v3c-2-2-4-2-6-1s-4 1-6 0-2-1-4 1Z',
-    };
-    const designShapes = {
-      outfit: {
-        cardigan: '<path class="design-fill" d="m11 5-6 4 4 6v16h18V15l4-6-6-4-4 7h-6z"/><path class="design-accent" d="M16 12v18m3-12h.1m-.1 5h.1m-.1 5h.1"/>',
-        hoodie: '<path class="design-fill" d="M11 8a5 5 0 0 1 10 0l6 3 3 5-4 2v13H8V18l-4-2 3-5z"/><path class="design-accent" d="M13 20h6l2 5h-10zm1-10 2 3 2-3"/>',
-        overalls: '<path class="design-fill" d="m9 7 4 2h6l4-2 5 4-3 5v15H7V16l-3-5z"/><path class="design-accent" d="M11 8v8h10V8m-10 8 1 6h8l1-6m-5-6v12"/>',
-        sailor: '<path class="design-fill" d="m11 5-6 4 4 6v16h18V15l4-6-6-4-4 7h-6z"/><path class="design-accent" d="m10 11 6 5 6-5m-6 5v14m-4-9h.1"/>',
-      },
-      bottomStyle: {
-        trousers: '<path class="design-fill" d="M9 5h14l2 26h-7l-2-14-2 14H7z"/><path class="design-accent" d="M16 7v9"/>',
-        skirt: '<path class="design-fill" d="M10 5h12l5 26H5z"/><path class="design-accent" d="m12 9-2 18m6-18v18m4-18 2 18"/>',
-        shorts: '<path class="design-fill" d="M9 5h14l3 16h-8l-2-5-2 5H6z"/><path class="design-accent" d="M16 7v9m-8 5h7m2 0h8"/>',
-      },
-      accessory: {
-        none: '<path class="design-face" d="M8 18a8 8 0 1 1 16 0v4a8 8 0 0 1-16 0z"/><path class="design-accent" d="M25 8h.1"/>',
-        glasses: '<path class="design-face" d="M8 18a8 8 0 1 1 16 0v4a8 8 0 0 1-16 0z"/><circle class="design-accent" cx="12" cy="19" r="3.4"/><circle class="design-accent" cx="20" cy="19" r="3.4"/><path class="design-accent" d="M15.4 19h1.2"/>',
-        blossom: '<path class="design-face" d="M8 18a8 8 0 1 1 16 0v4a8 8 0 0 1-16 0z"/><path class="design-flower" d="M9 10c-2-3 2-5 4-2 1-4 5-3 5 0 4-2 6 2 3 4 3 2 1 6-3 5-1 4-5 3-5 0-4 2-6-2-3-4-3-1-3-4-1-3Z"/>',
-        'moon-clips': '<path class="design-face" d="M8 18a8 8 0 1 1 16 0v4a8 8 0 0 1-16 0z"/><path class="design-star" d="m9 11 1.3 2.3 2.5.4-1.8 1.8.4 2.5-2.4-1.2-2.3 1.2.4-2.5-1.8-1.8 2.5-.4zm14 0 1.3 2.3 2.5.4-1.8 1.8.4 2.5-2.4-1.2-2.3 1.2.4-2.5-1.8-1.8 2.5-.4z"/>',
-      },
-    };
-    const choices = parts.map(part => {
-      const options = AVATAR_OPTIONS[part], activeHair = AVATAR_OPTIONS.hair.find(option => option.id === state.avatar.hair)?.color;
-      const activeSkin = AVATAR_OPTIONS.skin.find(option => option.id === state.avatar.skin)?.color;
-      const activeTop = AVATAR_OPTIONS.top.find(option => option.id === state.avatar.top);
-      const activeBottom = AVATAR_OPTIONS.bottom.find(option => option.id === state.avatar.bottom);
-      const preview = option => {
-        if (part === 'style') return `<svg class="avatar-hair-preview" viewBox="0 0 32 32" aria-hidden="true" style="--hair-tone:${activeHair};--skin-tone:${activeSkin}"><ellipse cx="16" cy="19" rx="8" ry="10"/><path d="${hairShapes[option.id]}"/></svg>`;
-        if (designShapes[part]) {
-          const colors = part === 'outfit'
-            ? `--design-tone:${activeTop.color};--design-accent:${activeTop.trim}`
-            : part === 'bottomStyle' ? `--design-tone:${activeBottom.color};--design-accent:${activeBottom.color}`
-              : `--hair-tone:${activeHair};--skin-tone:${activeSkin}`;
-          return `<svg class="avatar-design-preview avatar-design-${part}" viewBox="0 0 36 36" aria-hidden="true" style="${colors}">${designShapes[part][option.id]}</svg>`;
-        }
-        return `<span class="avatar-color" style="--avatar-color:${option.color}"></span>`;
-      };
-      const design = part === 'style' || Boolean(designShapes[part]);
-      return `<fieldset class="avatar-choice"><legend>${partNames[part]}</legend><div class="avatar-swatches ${design ? 'avatar-styles avatar-designs' : ''}" style="--avatar-count:${options.length}" role="group" aria-label="${partNames[part]}">${options.map(option => `<button class="avatar-swatch ${design ? 'avatar-style avatar-design-choice' : ''}" data-avatar-part="${part}" data-avatar-value="${option.id}" aria-pressed="${state.avatar[part] === option.id}" aria-label="${option.name}" title="${option.name}">${preview(option)}<span>${option.name}</span></button>`).join('')}</div></fieldset>`;
-    }).join('');
-    panel.insertAdjacentHTML('beforeend', `<div class="avatar-editor-lead"><span class="avatar-editor-mark" aria-hidden="true">✧</span><span><strong>Make it your own.</strong><small>Pick a shape, then give it your colors. Drag the avatar to turn them.</small></span></div><div class="avatar-editor-tabs" role="group" aria-label="Customize your avatar"><button data-avatar-section="face" aria-pressed="${avatarSection === 'face'}">Face &amp; hair</button><button data-avatar-section="outfit" aria-pressed="${avatarSection === 'outfit'}">Outfits</button><button data-avatar-section="details" aria-pressed="${avatarSection === 'details'}">Extras</button></div><div class="avatar-customizer">${choices}</div><div class="avatar-editor-footer"><button class="avatar-reset" id="avatar-reset">Start over</button><button class="quiet-button avatar-done" id="avatar-done">${icon('check')} Done</button></div>`);
     panel.querySelectorAll('[data-avatar-section]').forEach(button => button.addEventListener('click', () => {
-      avatarSection = button.dataset.avatarSection; renderPanel(); panel.querySelector(`[data-avatar-section="${avatarSection}"]`)?.focus();
+      avatarSection = button.dataset.avatarSection; renderPanel(); panel.querySelector(`[data-avatar-section="${avatarSection}"]`)?.focus({ preventScroll: true });
     }));
     panel.querySelectorAll('[data-avatar-part]').forEach(button => button.addEventListener('click', () => {
       const part = button.dataset.avatarPart, value = button.dataset.avatarValue;
       acceptUpdate(store.update(draft => { draft.avatar[part] = value; }));
-      panel.querySelectorAll(`[data-avatar-part="${part}"]`).forEach(option => option.setAttribute('aria-pressed', String(option.dataset.avatarValue === value)));
-      const hairTone = AVATAR_OPTIONS.hair.find(option => option.id === state.avatar.hair).color;
-      const skinTone = AVATAR_OPTIONS.skin.find(option => option.id === state.avatar.skin).color;
-      panel.querySelectorAll('.avatar-hair-preview, .avatar-design-preview').forEach(preview => {
-        preview.style.setProperty('--hair-tone', hairTone); preview.style.setProperty('--skin-tone', skinTone);
-        if (part === 'top') {
-          const top = AVATAR_OPTIONS.top.find(option => option.id === state.avatar.top);
-          preview.style.setProperty('--design-tone', top.color); preview.style.setProperty('--design-accent', top.trim);
-        }
-        if (part === 'bottom') {
-          const bottom = AVATAR_OPTIONS.bottom.find(option => option.id === state.avatar.bottom);
-          preview.style.setProperty('--design-tone', bottom.color); preview.style.setProperty('--design-accent', bottom.color);
-        }
-      });
+      rerenderChoices(`[data-avatar-part="${part}"][data-avatar-value="${value}"]`);
+    }));
+    panel.querySelectorAll('[data-avatar-look]').forEach(button => button.addEventListener('click', () => {
+      const look = AVATAR_LOOKS.find(x => x.id === button.dataset.avatarLook);
+      acceptUpdate(store.update(draft => { Object.assign(draft.avatar, look.appearance); }));
+      rerenderChoices(`[data-avatar-look="${look.id}"]`);
     }));
     $('#avatar-reset').addEventListener('click', () => {
       acceptUpdate(store.update(draft => { draft.avatar = { ...AVATAR_DEFAULT }; }));
-      avatarSection = 'face'; renderPanel(); $('#avatar-reset')?.focus();
+      renderPanel(); $('#avatar-reset')?.focus({ preventScroll: true });
     });
     $('#avatar-done').addEventListener('click', closePanel);
   } else {
@@ -1060,6 +1041,14 @@ function closePanel() {
 document.querySelectorAll('[data-panel]').forEach(button => button.addEventListener('click', () => {
   // Like Decorate, the avatar editor waits until a walk or a room change ends.
   if (travelling && button.dataset.panel === 'avatar' && currentPanel !== 'avatar') return;
+  if (button.dataset.panel === 'avatar' && currentPanel !== 'avatar') {
+    if (editMode) setEditMode(false);
+    if (connectedView) setConnectedView(false);
+    if (compact) {
+      compact = false; $('#stage').classList.remove('is-mini'); $('#mini-caption').hidden = true;
+      $('#mini-button').setAttribute('aria-pressed', 'false'); $('#mini-button span').textContent = 'Mini view';
+    }
+  }
   currentPanel = currentPanel === button.dataset.panel ? null : button.dataset.panel;
   renderPanel();
 }));
@@ -1137,7 +1126,7 @@ window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 if (import.meta.env.DEV) window.__littleHours = { get room() { return room; }, get state() { return state; }, get speech() { return speech; }, get house() { return houseUI; }, get connected() { return connectedView; } };
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
-  document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking');
+  document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');
   clearInterval(tickInterval);
   clearTimeout(toastTimeout);
   feedback.dispose();

@@ -105,3 +105,37 @@ test('every avatar option builds finite geometry inside the character bounds', (
     }
   } finally { scene.dispose(); engine.dispose(); }
 });
+
+test('curated outfits preserve identity and round-trip through the saved state', async () => {
+  const { AVATAR_LOOKS } = await import('./avatar.js');
+  const { createStateStore } = await import('./state.js');
+  let saved = null;
+  const storage = { getItem: () => saved, setItem: (_, value) => { saved = value; } };
+  const store = createStateStore(storage);
+  store.update(draft => { Object.assign(draft.avatar, { skin: 'deep', hair: 'silver', style: 'waves' }); });
+  for (const look of AVATAR_LOOKS) {
+    store.update(draft => { Object.assign(draft.avatar, look.appearance); });
+    const restored = createStateStore(storage).state.avatar;
+    assert.deepEqual(restored, normalizeAvatarAppearance(restored));
+    assert.deepEqual([restored.skin, restored.hair, restored.style], ['deep', 'silver', 'waves']);
+    for (const [part, value] of Object.entries(look.appearance)) assert.equal(restored[part], value);
+  }
+});
+
+test('avatar ellipsoids and animated joints keep unit normals for consistent skin and cloth lighting', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  const avatar = createMobileCompanion(scene, { ...AVATAR_DEFAULT, outfit: 'overalls', bottomStyle: 'shorts' });
+  try {
+    for (const sit of [0, .5, 1]) {
+      avatar.animate({ atDesk: false, x: 0, z: 0, yaw: .8, sit, seatHeight: .8, doze: 0, step: 4, moving: !sit, activity: null }, 1 + sit, false);
+      for (const mesh of avatar.root.getChildMeshes()) {
+        const normals = mesh.getVerticesData('normal');
+        if (!normals) continue;
+        for (let i = 0; i < normals.length; i += 3) {
+          const length = Math.hypot(normals[i], normals[i + 1], normals[i + 2]);
+          assert.ok(Math.abs(length - 1) < .001 || length < 1e-6, `${mesh.name} has normalized surface lighting (${length})`);
+        }
+      }
+    }
+  } finally { avatar.dispose(); scene.dispose(); engine.dispose(); }
+});

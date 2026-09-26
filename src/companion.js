@@ -503,6 +503,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
   }
   return {
     pose,
+    get doorProgress() { return doorArrival ? Math.min(1, doorElapsed / DOOR_TRIP_SECONDS) : null; },
     setLayout(next) {
       if (doorArrival) { const cancel = doorArrival; this.cancelDoorWalk({ returnToDesk: true }); cancel({ cancelled: true }); }
       layout = next; deskFloor = null;
