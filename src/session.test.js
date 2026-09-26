@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSession, remainingAt, startSession, pauseSession, formatTime, sessionPhase, displayedRemaining, BREAK_AFTER_FINISH } from './session.js';
+import { createSession, remainingAt, startSession, pauseSession, formatTime, spokenTime, sessionPhase, displayedRemaining, BREAK_AFTER_FINISH } from './session.js';
 import { createStateStore, freshState, localDate, restoreState, storageKey } from './state.js';
 import { createLayout } from './layout.js';
 
@@ -222,4 +222,12 @@ test('a clock moved backwards never shows more than the session duration', () =>
   const running = startSession(createSession(25), 5_000_000);
   assert.equal(remainingAt(running, 5_000_000 - 600_000), 1_500_000);
   assert.equal(pauseSession(running, 5_000_000 - 600_000).remaining, 1_500_000);
+});
+
+test('the timer reads as words for screen readers', () => {
+  assert.equal(spokenTime(25 * 60_000), '25 minutes');
+  assert.equal(spokenTime(24 * 60_000 + 59_000), '24 minutes, 59 seconds');
+  assert.equal(spokenTime(61_000), '1 minute, 1 second');
+  assert.equal(spokenTime(1), '1 second');
+  assert.equal(spokenTime(0), '0 seconds');
 });
