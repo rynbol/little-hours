@@ -1524,6 +1524,9 @@ export function createRoom(container, options = {}) {
       transition.from = before; transition.duration = Math.max(0, transition.duration - transition.elapsed); transition.elapsed = 0;
       setCameraHeight(before.height, before.centerX, before.centerY);
     } else fitRoom();
+    // A new size clears the canvas. Draw at once, before this frame paints,
+    // so a layout change never shows one empty frame.
+    if (visible && onScreen && !suspended && readyReported) { engine.beginFrame(); scene.render(); engine.endFrame(); }
     requestRender();
   }
   function applyPixelRatio(value) { pixelRatio = value; engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; steadySamples = 0; resize(); }
@@ -1736,7 +1739,7 @@ export function createRoom(container, options = {}) {
     setDoorOpen(id) { openingDoor = id || null; requestRender(); },
     walkToDoor(id, onArrive, onOpen) {
       const link = passages?.links.find(entry => entry.id === id);
-      if (!link?.built) return false;
+      if (!link) return false;
       const started = companionRoutine.walkToDoor(link, onArrive, onOpen);
       if (started) requestRender();
       return started;

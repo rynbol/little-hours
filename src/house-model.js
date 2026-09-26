@@ -14,13 +14,25 @@ import { houseFurniture, houseArchitecture } from './house-furniture.js';
 // Reuse authored room geometry, batched per room. Only the occupied desk
 // keeps its animated rig; window views retain their illustrated materials.
 export const HOUSE_POSITIONS = { studio: [-2.55, 0, 0], garden: [2.55, 0, 0], loft: [-2.55, 2.95, -0.45] };
-export function createHouseModel(scene, house, selectedId, theme = 'day', avatar) {
-  const meshes = [], buckets = new Map(), live = [], shells = [], framing = [];
-  const levels = Object.fromEntries(Object.keys(HOUSE_POSITIONS).map(id => [id, new TransformNode(`house-level-${id}`, scene)])); let furnitureFloor = .16, rugs = [];
-  const material = new StandardMaterial('house-paint', scene);
+// Pass the previous model to rebuild only the batches whose inputs changed.
+// Unchanged batches move to the new model, and the previous dispose() skips them.
+export function createHouseModel(scene, house, selectedId, theme = 'day', avatar, previous = null) {
+  const meshes = [], buckets = new Map(), live = [], shells = [], framing = [], pieces = new Map(), model = {};
+  const shared = previous?.shared || {
+    levels: Object.fromEntries(Object.keys(HOUSE_POSITIONS).map(id => [id, new TransformNode(`house-level-${id}`, scene)])),
+    material: new StandardMaterial('house-paint', scene),
+  };
+  shared.owner = model;
+  const { levels, material } = shared; let furnitureFloor = .16, rugs = [];
   material.diffuseColor = Color3.White(); material.specularColor.setAll(0); material.emissiveColor.setAll(0.08);
-  let bucket = 'grounds';
+  let bucket = 'grounds', piece = null;
   let origin = [0, 0, 0];
+  function batch(id, key, build, slot = id) {
+    const old = previous?.pieces.get(id);
+    if (old?.key === key) { old.owner = model; pieces.set(id, old); return; }
+    bucket = id; origin = [0, 0, 0]; piece = { key, slot, owner: model, live: [], shells: [] }; pieces.set(id, piece);
+    build();
+  }
   function paint(mesh, hex) {
     const data = VertexData.ExtractFromMesh(mesh);
     mesh.computeWorldMatrix(true); data.transform(mesh.getWorldMatrix()); mesh.dispose();
@@ -62,8 +74,9 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     });
     if (!buckets.has(bucket)) buckets.set(bucket, []);
     buckets.get(bucket).push(...result.parts);
-    if (result.live) { result.live.parent = levels[bucket]; live.push(result.live); }
+    if (result.live) { result.live.parent = levels[bucket]; piece.live.push(result.live); }
   }
+  batch('grounds', String(house.rooms.length === 3), () => {
   // A landscaped plinth, porch and stepping stones make even one room a home.
   box(0, -.52, 0, 11.8, .48, 6.4, '#63765e'); box(0, -.25, 0, 11.6, .15, 6.2, '#a2af8a');
   box(-2.55, -.12, 2.12, 4.9, .18, .65, wood);
@@ -87,15 +100,24 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     box(x, .04, -2.86, .1, .58, .1, '#c6b99b');
   }
   box(0, .07, -2.86, 10.7, .07, .08, '#c6b99b'); box(0, .3, -2.86, 10.7, .07, .08, '#c6b99b');
-  for (const entry of house.rooms) {
-    bucket = entry.id; origin = HOUSE_POSITIONS[entry.id];
+  if (house.rooms.length === 3) {
+    // A little exterior stair connects the upper hideaway without taking
+    // away any editable floor space inside the player's rooms.
+    for (let i = 0; i < 12; i++) {
+      const height = (i + 1) * .247;
+      box(-5.32, height / 2, 1.85 - i * .25, .64, height, .26, i % 2 ? '#b58a5e' : '#a97c52');
+    }
+  }
+  });
+  for (const entry of house.rooms) batch(entry.id, JSON.stringify([entry.layout, theme, entry.id === house.activeId && avatar, house.rooms.length === 1]), () => {
+    origin = HOUSE_POSITIONS[entry.id];
     const style = roomDesign(entry.layout).style || 'retreat';
     const walls = surfaceChoices(style, 'walls').find(s => s.id === (entry.layout.walls || ''))?.swatch || ['#80917d', '#c9bba2'];
     const floor = surfaceChoices(style, 'floor').find(s => s.id === (entry.layout.floor || ''))?.swatch || ['#92654a', '#a27352'];
     furnitureFloor = .16;
     if (style !== 'retreat') {
       const shell = houseArchitecture(scene, entry.layout, style, origin, theme, entry.id);
-      shell.root.parent = levels[bucket]; shells.push(shell); furnitureFloor = shell.floor;
+      shell.root.parent = levels[bucket]; piece.shells.push(shell); furnitureFloor = shell.floor;
       if (!buckets.has(bucket)) buckets.set(bucket, []);
       buckets.get(bucket).push(...shell.parts);
     } else {
@@ -128,20 +150,16 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
       box(0, roofY, -2.1, 5.15, .17, .5, '#526b65', -.02);
       box(1.55, roofY + .27, -2, .45, .58, .45, '#ae8b70'); box(1.55, roofY + .6, -2, .56, .12, .56, cream);
     }
-    if (entry.id === selectedId) box(0, -.04, 2.08, 4.96, .075, .07, '#f0cf91');
-  }
-  if (house.rooms.length === 3) {
-    bucket = 'grounds'; origin = [0, 0, 0];
-    // A little exterior stair connects the upper hideaway without taking
-    // away any editable floor space inside the player's rooms.
-    for (let i = 0; i < 12; i++) {
-      const height = (i + 1) * .247;
-      box(-5.32, height / 2, 1.85 - i * .25, .64, height, .26, i % 2 ? '#b58a5e' : '#a97c52');
-    }
-  }
+  });
+  // The selected room's front edge is its own small batch, so choosing a room
+  // never rebuilds the rooms themselves.
+  if (house.rooms.some(entry => entry.id === selectedId)) batch('selection', selectedId, () => {
+    origin = HOUSE_POSITIONS[selectedId];
+    box(0, -.04, 2.08, 4.96, .075, .07, '#f0cf91');
+  }, selectedId);
   // Only the next extension is a building site. Future space is garden.
-  if (house.rooms.length < 3) {
-    bucket = house.rooms.length === 1 ? 'garden' : 'loft'; origin = HOUSE_POSITIONS[bucket];
+  if (house.rooms.length < 3) batch(house.rooms.length === 1 ? 'garden' : 'loft', 'site', () => {
+    origin = HOUSE_POSITIONS[bucket];
     if (bucket === 'garden') {
       box(0, -.02, 0, 4.6, .12, 3.65, '#97a18b');
       for (let i = 0; i < 10; i++) for (const z of [-1.82, 1.82]) box(-2.15 + i * .48, .06, z, .26, .035, .04, '#e2d3af');
@@ -154,15 +172,17 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
       box(0, .42, 0, .07, .84, .07, wood); box(0, .93, 0, .7, .48, .08, '#e2cfab');
       for (let i = 0; i < 3; i++) box(-.22 + i * .2, .84 + i * .05, .055, .13, .12 + i * .1, .035, '#8d9e83');
     }
-  }
+  });
   for (const [id, parts] of buckets) {
-    framing.push({ points: boundsPoints(parts), offset: levels[id]?.position });
+    const target = pieces.get(id), slot = target.slot;
+    target.framing = { points: boundsPoints(parts), offset: levels[slot]?.position };
     const data = parts.shift(); if (parts.length) data.merge(parts, true);
     const mesh = new Mesh(`house-${id}`, scene); data.applyToMesh(mesh); mesh.material = material;
-    mesh.parent = levels[id] || null; mesh.useVertexColors = true; mesh.metadata = { houseSlot: id === 'grounds' ? null : id }; mesh.isPickable = id !== 'grounds';
-    mesh.freezeWorldMatrix(); meshes.push(mesh);
+    mesh.parent = levels[slot] || null; mesh.useVertexColors = true; mesh.metadata = { houseSlot: slot === 'grounds' ? null : slot }; mesh.isPickable = slot !== 'grounds';
+    mesh.freezeWorldMatrix(); target.mesh = mesh;
   }
-  return { meshes, live, shells, framing, levels,
+  for (const entry of pieces.values()) { meshes.push(entry.mesh); framing.push(entry.framing); live.push(...entry.live); shells.push(...entry.shells); }
+  return Object.assign(model, { meshes, live, shells, framing, levels, shared, pieces,
     setOpenFloors(open, portrait = false) {
       // The upper floor opens like a dollhouse: beside the home on wide screens,
       // above it on a phone. Room layouts and saved positions never change.
@@ -170,5 +190,9 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
       levels.loft.computeWorldMatrix(true);
       for (const mesh of meshes) { mesh.unfreezeWorldMatrix(); mesh.computeWorldMatrix(true); mesh.freezeWorldMatrix(); }
     },
-    animate(seconds, focused, reducedMotion) { for (const root of live) root.metadata.animate?.(seconds, focused, reducedMotion); }, dispose() { shells.forEach(shell => shell.dispose()); live.forEach(root => root.dispose(false, false)); [...meshes].forEach(m => m.dispose()); Object.values(levels).forEach(root => root.dispose()); material.dispose(); } };
+    animate(seconds, focused, reducedMotion) { for (const root of live) root.metadata.animate?.(seconds, focused, reducedMotion); },
+    dispose() {
+      for (const entry of pieces.values()) if (entry.owner === model) { entry.shells.forEach(shell => shell.dispose()); entry.live.forEach(root => root.dispose(false, false)); entry.mesh.dispose(); }
+      if (shared.owner === model) { Object.values(levels).forEach(root => root.dispose()); material.dispose(); }
+    } });
 }

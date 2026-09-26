@@ -24,6 +24,17 @@
     opacity: 1;
   }
   .ui-motion-enabled:not(.is-avatar-editing) #app :is(#room-panel, #builder-panel, #house-name-form)[hidden] { opacity: 0; }
+  /* Decorate: the panel rises in and sinks away; the timer card and the room
+     rows come back softly when it closes. Only opacity and translate move. */
+  .ui-motion-enabled:not(.is-avatar-editing) #app #builder-panel { transition: opacity .3s var(--soft-ease), translate .45s cubic-bezier(.2, .9, .3, 1.12), display .2s allow-discrete; translate: 0 0; }
+  .ui-motion-enabled:not(.is-avatar-editing) #app #builder-panel[hidden] { translate: 0 14px; transition-duration: .18s, .2s, .2s; transition-timing-function: ease-in; }
+  .ui-motion-enabled:not(.is-avatar-editing) #app #focus-card { transition: opacity .35s var(--soft-ease), translate .45s var(--soft-ease); }
+  .ui-motion-enabled:not(.is-avatar-editing) #app :is(.home-connections, .room-bottom, .room-heading .eyebrow, .room-subtitle) { transition: opacity .35s var(--soft-ease); }
+  @starting-style {
+    .ui-motion-enabled:not(.is-avatar-editing) #app #builder-panel:not([hidden]) { opacity: 0; translate: 0 28px; }
+    .ui-motion-enabled:not(.is-avatar-editing) #app #focus-card:not([hidden]) { opacity: 0; translate: 0 10px; }
+    .ui-motion-enabled:not(.is-avatar-editing) #app :is(.home-connections, .room-bottom, .room-heading .eyebrow, .room-subtitle) { opacity: 0; }
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .ui-motion-enabled:not(.is-avatar-editing) #app *, .ui-motion-enabled:not(.is-avatar-editing) #app *::before, .ui-motion-enabled:not(.is-avatar-editing) #app *::after { animation: none !important; transition: none !important; }

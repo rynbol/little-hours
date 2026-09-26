@@ -515,6 +515,8 @@ button.furniture-card[aria-pressed='true'] { animation-timing-function: var(--so
 .is-door-walking .room-travel strong { font-size: 16px; }
 @keyframes home-arrival { from { opacity: .3; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
 .room-arrival .room-canvas { animation: home-arrival .6s cubic-bezier(.2,.7,.2,1); }
+@keyframes room-reframe { from { opacity: .55; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: none; } }
+.room-reframe:not(.room-arrival) .room-canvas { animation: room-reframe .5s cubic-bezier(.2,.7,.2,1); }
 @media (max-width: 720px) { .home-address { width: 100%; } .home-connections .home-wide { margin-left: 0; } }
 @media (prefers-reduced-motion: reduce) { .room-arrival .room-canvas, #room-canvas { animation: none; transition: none; } }
 /* A journey keeps the room visible, with a small, legible destination card. */

@@ -16,6 +16,7 @@
 .house-canvas, .house-in-room { position: relative; }
 .house-in-room { position: absolute; }
 .house-canvas canvas, .house-in-room canvas { touch-action: pan-y; }
+.house-canvas canvas:focus, .house-in-room canvas:focus { outline: none; }
 .is-connected .stage-presence { top: 15px; }
 @media (max-width: 640px) {
   .house-camera-controls { top: 7px; right: 7px; max-width: calc(100% - 14px); gap: 4px; }

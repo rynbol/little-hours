@@ -101,7 +101,8 @@ export function createRoomPassages(scene, house) {
       for (const door of doors) {
         const avatarOpened = openingDoor === door.link.id;
         const pointerOpened = lockedDoor !== door.link.id && hovered === door.link.id;
-        const target = door.link.built ? (avatarOpened ? -1.38 : pointerOpened ? -.62 : -.18) : 0;
+        // A door to a room not built yet only opens ajar, for a peek.
+        const target = door.link.built ? (avatarOpened ? -1.38 : pointerOpened ? -.62 : -.18) : avatarOpened ? -.62 : 0;
         door.angle = reducedMotion ? target : door.angle + (target - door.angle) * Math.min(1, dt * 9);
         door.hinge.rotation.y = door.angle;
       }

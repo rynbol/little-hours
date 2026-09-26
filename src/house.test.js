@@ -136,7 +136,7 @@ test('house uses real furniture and architecture, batches static paint and relea
   try {
     for (let count = 1; count <= 3; count++) {
       const model = createHouseModel(scene, f.store.state.house, 'studio');
-      assert.ok(model.meshes.length <= 4);
+      assert.ok(model.meshes.length <= 5, 'grounds, up to three rooms and the selection edge');
       const vertices = model.meshes.reduce((total, mesh) => total + mesh.getTotalVertices(), 0);
       assert.ok(vertices > 10_000 && vertices < 1_000_000);
       for (const mesh of model.meshes) assert.ok(mesh.getVerticesData('position').every(Number.isFinite));
@@ -152,6 +152,41 @@ test('house uses real furniture and architecture, batches static paint and relea
       assert.ok(model.live.every(root => root.isDisposed()));
       if (count < 3) { finish(f, 90); f.store.buildRoom(nextExpansion(f.store.state.house).id, count === 1 ? 'moonlit-greenhouse' : 'cloud-loft'); }
     }
+  } finally { scene.dispose(); engine.dispose(); globalThis.document = previousDocument; }
+});
+
+test('a house rebuild keeps unchanged rooms and matches a fresh build', () => {
+  const previousDocument = globalThis.document;
+  const context = new Proxy({}, { get: (_, key) => String(key).includes('Gradient') ? () => ({ addColorStop() {} }) : key === 'measureText' ? () => ({ width: 20 }) : () => {} });
+  globalThis.document = { addEventListener() {}, removeEventListener() {}, createElement: () => ({ width: 256, height: 256, getContext: () => context }) };
+  const engine = new NullEngine(), scene = new Scene(engine), f = fixture();
+  const counts = model => Object.fromEntries(model.meshes.map(mesh => [mesh.name, mesh.getTotalVertices()]));
+  try {
+    finish(f, 90); f.store.buildRoom('garden', 'sakura-studio');
+    const house = f.store.state.house, preview = design => ({ ...house, rooms: [...house.rooms, { id: 'loft', name: 'Loft', layout: createLayout(design) }] });
+    const first = createHouseModel(scene, preview('cloud-loft'), 'loft');
+    const byName = model => Object.fromEntries(model.meshes.map(mesh => [mesh.name, mesh]));
+    // A new design for the preview room: only that room is rebuilt.
+    const second = createHouseModel(scene, preview('moonlit-greenhouse'), 'loft', 'day', undefined, first);
+    first.dispose();
+    const [a, b] = [byName(first), byName(second)];
+    assert.equal(b['house-studio'], a['house-studio']); assert.equal(b['house-garden'], a['house-garden']); assert.equal(b['house-grounds'], a['house-grounds']);
+    assert.notEqual(b['house-loft'], a['house-loft']); assert.ok(a['house-loft'].isDisposed());
+    assert.ok(second.meshes.every(mesh => !mesh.isDisposed()) && second.live.every(root => !root.isDisposed()));
+    assert.ok(second.levels.loft && !second.levels.loft.isDisposed(), 'the room levels move to the new model');
+    // A new selection rebuilds only the small selection edge.
+    const third = createHouseModel(scene, preview('moonlit-greenhouse'), 'garden', 'day', undefined, second);
+    second.dispose();
+    const c = byName(third);
+    for (const id of ['grounds', 'studio', 'garden', 'loft']) assert.equal(c[`house-${id}`], b[`house-${id}`]);
+    assert.notEqual(c['house-selection'], b['house-selection']); assert.ok(b['house-selection'].isDisposed());
+    assert.equal(c['house-selection'].parent, third.levels.garden); assert.equal(c['house-selection'].metadata.houseSlot, 'garden');
+    const fresh = createHouseModel(scene, preview('moonlit-greenhouse'), 'garden');
+    assert.deepEqual(counts(third), counts(fresh), 'a reused house has the same geometry as a fresh one');
+    assert.deepEqual(third.meshes.map(mesh => mesh.name), fresh.meshes.map(mesh => mesh.name));
+    fresh.dispose();
+    const kept = [...third.meshes, ...third.live]; third.dispose();
+    assert.ok(kept.every(node => node.isDisposed()));
   } finally { scene.dispose(); engine.dispose(); globalThis.document = previousDocument; }
 });
 

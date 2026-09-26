@@ -1287,7 +1287,9 @@ try {
     assert.equal(passage.root.isEnabled(), false, 'the porch stays outside furniture editing');
     assert.deepEqual(diagnostics().layout, layoutBefore, 'navigation geometry never changes furniture');
     room.setEditMode(false); room.setActivity('idle');
-    assert.equal(room.walkToDoor('loft', () => {}), false, 'an unbuilt door cannot start a walk');
+    assert.equal(room.walkToDoor('attic', () => {}), false, 'a door that is not in the room cannot start a walk');
+    assert.equal(room.walkToDoor('loft', () => {}), true, 'an unbuilt door starts a walk, for a peek');
+    assert.equal(room.cancelDoorWalk({ returnToDesk: true }), true); advance(240);
     let arrivedGarden = false, openedGarden = false;
     assert.equal(room.walkToDoor('garden', () => { arrivedGarden = true; }, () => { openedGarden = true; room.setDoorOpen('garden'); }), true, 'the built door starts an avatar trip');
     assert.equal(diagnostics().companion.goal, 'door'); assert.equal(diagnostics().companion.moving, true);

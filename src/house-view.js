@@ -156,10 +156,12 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   function update(next, selected, atmosphere = theme, appearance = avatar) {
     const previousSelection = selectedId, hadModel = Boolean(model);
     roomMotion.stop();
-    house = next; selectedId = selected; theme = atmosphere; avatar = appearance; model?.dispose();
+    house = next; selectedId = selected; theme = atmosphere; avatar = appearance;
     sky.intensity = theme === 'dusk' ? .56 : .62; sun.intensity = theme === 'dusk' ? .8 : .95;
     sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9');
-    model = createHouseModel(scene, house, selectedId, theme, avatar);
+    const previous = model;
+    model = createHouseModel(scene, house, selectedId, theme, avatar, previous);
+    previous?.dispose();
     roomMotion.bind(model);
     if (!motion.matches) {
       house.rooms.forEach((entry, index) => {

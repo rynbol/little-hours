@@ -9,7 +9,7 @@ import { createAudio } from './audio.js';
 import { createBackup, readBackup, backupFilename } from './backup.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { PRESETS, normalizeLayout, MAX_ITEMS, pieceCount, roomDesign } from './layout.js';
-import { companionIntent } from './companion.js';
+import { companionIntent, DOOR_OPEN_SECONDS } from './companion.js';
 import { createMomentsUI } from './moments-ui.js';
 import { PETS } from './pet.js';
 import { createSpeech, PET_LINES, AVATAR_LINES } from './speech.js';
@@ -18,7 +18,7 @@ import { tintsFor } from './tints.js';
 import { surfaceChoices } from './surfaces.js';
 import { designPaint } from './architecture.js';
 import { createHouseUI } from './house-ui.js';
-import { activeHouseRoom, nextExpansion, focusCoins } from './house.js';
+import { activeHouseRoom, nextExpansion, focusCoins, houseConnections } from './house.js';
 import { createHouseView } from './house-view.js';
 import { AVATAR_DEFAULT, AVATAR_LOOKS } from './avatar.js';
 import { avatarEditorContent } from './avatar-ui.js';
@@ -59,7 +59,7 @@ let room;
 let houseUI;
 let momentsUI;
 let houseOpen = false;
-let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
+let connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, reframeTimer = 0, travelling = false, doorWalking = false;
 let currentPanel = null, avatarPanelActive = false, avatarEditorResumeTimer = false, avatarSection = 'looks';
 let compact = false;
 let storageWarningShown = false;
@@ -276,7 +276,7 @@ function renderRoomLabel() {
     ? 'Avatar preview. Drag left or right over the character to turn them. Your focus timer is paused while editing.'
     : editMode
     ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
-    : `Interactive 3D cutaway study room. Drag to turn the room. Tap a plant to water it, a bookcase to read, a tea table for tea, or a seat to get comfortable. Little moments offers the same actions with buttons. Tap a lamp, the fire or the record player to switch it, tap your companion or ${pet}, or tap a built doorway to walk to another room while your focus timer is paused.`;
+    : `Interactive 3D cutaway study room. Drag to turn the room. Tap a plant to water it, a bookcase to read, a tea table for tea, or a seat to get comfortable. Little moments offers the same actions with buttons. Tap a lamp, the fire or the record player to switch it, tap your companion or ${pet}, or tap a doorway to walk to another room, or to plan a new one, while your focus timer is paused.`;
   $('#room-canvas').setAttribute('aria-label', label);
   $('#room-canvas canvas')?.setAttribute('aria-label', label);
 }
@@ -446,17 +446,21 @@ function visitDoor(id) {
   acceptUpdate(store.update());
   if (state.session.running) { toast('Pause your focus session before walking to another room.', true); return; }
   const entry = state.house.rooms.find(room => room.id === id);
-  if (!entry) { setHouseOpen(true, id); return; }
+  // A door to a room not built yet: walk over, peek through, then plan it.
+  const link = entry || houseConnections(state.house).find(slot => slot.id === id);
+  if (!entry && (!link || window.matchMedia('(prefers-reduced-motion: reduce)').matches)) { setHouseOpen(true, id); return; }
+  const planRoom = () => { cancelDoorTravel(); setHouseOpen(true, id); };
   doorWalking = true; travelling = true;
   clearTimeout(toastTimeout); $('#toast').hidden = true;
   $('#journey-progress-fill').style.transform = 'scaleX(0)';
-  $('#travel-label').textContent = `Walking to ${entry.name}`;
+  $('#travel-label').textContent = `Walking to ${link.name}`;
   $('#room-travel small').textContent = 'A little walk through your home.';
   $('#room-travel').hidden = false; document.body.classList.add('is-travelling', 'is-door-walking'); renderSession();
   room?.setDoorActive?.(id);
   const started = room?.walkToDoor?.(id, result => {
     if (result?.cancelled) { cancelDoorTravel('Your room changed. Tap the door again when you’re ready.'); return; }
     if (!doorWalking) return;
+    if (!entry) { planRoom(); return; }
     doorWalking = false;
     room?.setDoorActive?.(null);
     document.body.classList.remove('is-door-walking');
@@ -465,11 +469,14 @@ function visitDoor(id) {
     visitRoom(id, false, true);
   }, () => {
     room?.setDoorOpen?.(id);
-    $('#room-travel small').textContent = 'Opening the door. Make yourself at home.';
+    if (entry) { $('#room-travel small').textContent = 'Opening the door. Make yourself at home.'; return; }
+    $('#room-travel small').textContent = 'A little peek at what could be.';
+    travelTimer = setTimeout(() => { if (doorWalking) { $('#journey-progress-fill').style.transform = 'scaleX(1)'; planRoom(); } }, DOOR_OPEN_SECONDS * 1000);
   });
   if (!started) {
     cancelDoorTravel();
-    toast('There isn’t a clear path to that door. Move a little furniture and try again.', true);
+    if (!entry) setHouseOpen(true, id);
+    else toast('There isn’t a clear path to that door. Move a little furniture and try again.', true);
   }
 }
 function renderFocusReward() {
@@ -671,6 +678,7 @@ function setEditMode(enabled) {
   }
   document.body.classList.toggle('is-decorating', enabled);
   $('#builder-panel').hidden = !enabled;
+  reframeRoom();
   syncFocusDock();
   $('#decorate-button').setAttribute('aria-pressed', enabled);
   $('#decorate-button').setAttribute('aria-label', enabled ? 'Done decorating' : 'Decorate');
@@ -682,6 +690,13 @@ function setEditMode(enabled) {
   if (!enabled) { placement = null; selectedItem = null; }
   renderInspector();
   if (enabled) { renderCollection(); revealRoomForPlacement(); }
+}
+
+// The room settles into its new frame when the layout around it changes.
+function reframeRoom() {
+  const stage = $('#stage');
+  stage.classList.remove('room-reframe'); void stage.offsetWidth; stage.classList.add('room-reframe');
+  clearTimeout(reframeTimer); reframeTimer = setTimeout(() => stage.classList.remove('room-reframe'), 550);
 }
 
 function syncFocusDock() {
@@ -1186,7 +1201,7 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   clearTimeout(toastTimeout);
   feedback.dispose();
   $('#session-celebration')?.close();
-  clearTimeout(travelTimer); clearTimeout(arrivalTimer); connectedView?.dispose();
+  clearTimeout(travelTimer); clearTimeout(arrivalTimer); clearTimeout(reframeTimer); connectedView?.dispose();
   houseUI?.dispose();
   momentsUI?.dispose();
   room?.dispose?.();
