@@ -154,3 +154,25 @@ test('house uses real furniture and architecture, batches static paint and relea
     }
   } finally { scene.dispose(); engine.dispose(); globalThis.document = previousDocument; }
 });
+
+test('building saves an optional bounded room name in the same purchase and preserves it after reload', () => {
+  const f = fixture(); finish(f);
+  const result = f.store.buildRoom('garden', 'sakura-studio', '  Our Sunday corner  ');
+  assert.equal(result.built, true);
+  assert.equal(result.state.house.coins, 0);
+  assert.equal(f.reopen().state.house.rooms[1].name, 'Our Sunday corner');
+  assert.equal(f.reopen().state.house.rooms[1].layout.presetId, 'sakura-studio');
+  // A repeated submission cannot charge twice or overwrite the chosen name.
+  assert.equal(f.store.buildRoom('garden', 'cloud-loft', 'Changed').built, false);
+  assert.equal(f.reopen().state.house.rooms[1].name, 'Our Sunday corner');
+  finish(f, 90);
+  f.store.buildRoom('loft', 'cloud-loft', 'x'.repeat(80));
+  assert.equal(f.reopen().state.house.rooms[2].name.length, 40);
+});
+
+test('blank names at purchase use the room name, including a session expiring during purchase', () => {
+  const f = fixture(); f.store.setRunning(true); f.advance(25 * 60_000);
+  const result = f.store.buildRoom('garden', 'cloud-loft', '   ');
+  assert.equal(result.built, true); assert.equal(result.completed, true);
+  assert.equal(f.reopen().state.house.rooms[1].name, 'Garden wing');
+});
