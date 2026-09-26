@@ -592,6 +592,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
     beginAvatarEditing() {
       if (avatarEditing) return null;
       requestedItemId = null;
+      const source = doorSource();
       let exit = null;
       if (trip) {
         // If the avatar was between destinations, keep the visible floor
@@ -608,6 +609,17 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       } else if (anchor?.seat) {
         exit = anchor.side || anchor.portal || null;
       }
+      // The portrait's cosmetic step must finish on navigable floor. A side
+      // point can still be inside a desk's collision footprint, leaving all
+      // later moments blocked when the wardrobe closes.
+      if (!exit || !canReach(exit)) {
+        const candidates = [
+          ...routeStarts(layout, source).map(start => start.portal),
+          { x: pose.x, z: pose.z },
+          ...seatsFor(layout.items.find(item => item.id === layout.activeDeskId)).filter(seat => usableSeat(layout, seat)).map(seat => seat.portal),
+        ];
+        exit = candidates.filter(point => point && canReach(point)).sort((a, b) => distance(a, pose) - distance(b, pose))[0] || null;
+      }
       const entry = { fromX: pose.x, fromZ: pose.z, fromSit: pose.sit, fromYaw: pose.yaw, toX: exit?.x ?? pose.x, toZ: exit?.z ?? pose.z };
       avatarEditing = true;
       Object.assign(pose, { atDesk: false, moving: false, activity: null, goal: null, to: null, doze: 0 });
@@ -619,6 +631,7 @@ export function createCompanionRoutine(onChange = () => {}, { onUse = () => {}, 
       avatarEditing = false;
       Object.assign(pose, { atDesk: false, sit: 0, seatHeight: .8, moving: false, activity: null, goal: null, to: null, doze: 0, seated: false, seatId: null });
       anchor = { x: pose.x, z: pose.z };
+      if (!canReach(anchor)) deskPose();
       reconcile();
     },
     // Night, the window and the pet decide which activities there are.

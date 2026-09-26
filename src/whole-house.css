@@ -1,0 +1,45 @@
+/* Renderer-owned controls, shared by the home overview and the builder. */
+.house-camera-controls { position: absolute; z-index: 3; top: 12px; right: 14px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: calc(100% - 28px); }
+.house-camera-group { display: flex; align-items: center; gap: 3px; padding: 4px; border: 1px solid #ad93804a; border-radius: 24px; background: #302b35ed; box-shadow: 0 5px 20px #19131e24; }
+.house-camera-controls button { min-height: 34px; padding: 6px 13px; border: 0; border-radius: 20px; color: #d9c9b8; background: transparent; font-size: 11px; line-height: 1.3; white-space: nowrap; transition: background .18s, transform .18s; }
+.house-camera-controls button:hover { background: #e8d4bc18; }
+.house-camera-controls button:active { transform: scale(.96); }
+.house-camera-controls button[aria-pressed='true'] { background: #d5e0c8; color: #3e5042; box-shadow: 0 2px 5px #17101c1a; }
+.house-camera-controls button:focus-visible, .house-room-tag:focus-visible { outline: 2px solid #f1d2a4; outline-offset: 3px; }
+.house-camera-controls .house-camera-turn { width: 34px; padding: 6px; font-size: 17px; }
+.house-room-tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.house-room-tag { position: absolute; left: 0; top: 0; pointer-events: auto; transform: translate(-50%, 0); border: 1px solid #bead9247; border-radius: 11px; background: #302a34ed; padding: 7px 12px; color: #e8dac8; text-align: center; max-width: 180px; box-shadow: 0 5px 18px #16101c2e; }
+.house-room-tag strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 500; }
+.house-room-tag small { display: block; margin-bottom: 2px; font-size: 8px; letter-spacing: 1.2px; color: #b9c8a7; text-transform: uppercase; }
+.house-room-tag[aria-current='location'] { border-color: #c7d5b7a3; }
+.house-camera-note { position: absolute; bottom: 9px; left: 50%; translate: -50% 0; width: max-content; max-width: calc(100% - 24px); color: #c6b8aa; text-align: center; font-size: 10px; pointer-events: none; }
+.house-canvas, .house-in-room { position: relative; }
+.house-in-room { position: absolute; }
+.house-canvas canvas, .house-in-room canvas { touch-action: pan-y; }
+.is-connected .stage-presence { top: 15px; }
+@media (max-width: 640px) {
+  .house-camera-controls { top: 7px; right: 7px; max-width: calc(100% - 14px); gap: 4px; }
+  .house-camera-controls button { padding: 6px 10px; font-size: 10px; min-height: 36px; }
+  .house-room-tag { padding: 4px 7px; border-radius: 8px; max-width: 125px; }
+  .house-room-tag strong { font-size: 9px; }
+  .house-room-tag small { font-size: 7px; }
+  .house-camera-note { font-size: 9px; }
+  .is-connected .stage-presence { top: auto; bottom: 7px; left: 7px; font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .house-camera-controls button { transition: none; } }
+.is-connected .loading-note { display: none; }
+@media (max-width: 640px) { .is-connected .house-camera-note { display: none; } }
+/* A home is the main canvas. Give its furniture enough room to read. */
+body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(450px, calc(100svh - 240px), 980px); }
+body.is-connected:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(480px, calc(100svh - 240px), 980px); }
+@media (max-width: 640px) {
+  body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(375px, 53svh, 580px); }
+  body.is-connected:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(440px, 57svh, 640px); }
+}
+.house-canvas .house-camera-note { display: none; }
+.house-canvas .house-room-tag { background: #f5eddfef; color: #514c41; border-color: #fff8e2a0; }
+.house-canvas .house-room-tag small { color: #69765c; }
+.house-canvas .house-room-tag[aria-current='location'] { border-color: #65745c; }
+@media (max-width: 640px) {
+  body.is-connected:not(.is-avatar-editing) .stage-presence { top: auto; bottom: 7px; left: 7px; }
+}

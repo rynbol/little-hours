@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Little Hours · motion check</title></head>
+<body><div id="app"></div><script type="module">
+// Isolated save and motion switch. This fixture never touches player storage.
+if (!import.meta.env.DEV) throw new Error('Development check only');
+const nativeMatchMedia = window.matchMedia.bind(window), motion = new EventTarget();
+motion.matches = false;
+window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? motion : nativeMatchMedia(query);
+const { freshState } = await import('../src/state.js');
+const state = freshState(); state.house.coins = 300; state.theme = 'day';
+let raw = JSON.stringify(state);
+window.__littleHoursTest = { storage: { getItem: () => raw, setItem: (_, value) => { raw = value; } } };
+await import('../src/main.js');
+const controls = document.createElement('nav'); controls.setAttribute('aria-label', 'Motion test controls');
+controls.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:1000;display:flex;flex-wrap:wrap;gap:8px;padding:6px;background:#eee;color:#222;font:11px sans-serif';
+controls.innerHTML = '<button id="test-motion" aria-pressed="false">Reduce motion</button><button id="test-held">Check held press</button><button id="test-frames">Measure house</button><output id="motion-result">Choose a control to measure its animation</output>';
+document.body.append(controls);
+controls.querySelector('#test-held').onclick = async () => {
+  ++run;
+  const button = document.querySelector('#house-turn-left');
+  if (!button || button.closest('[hidden]')) { controls.querySelector('output').textContent = 'Open My house first'; return; }
+  button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+  await new Promise(resolve => setTimeout(resolve, 250));
+  const held = getComputedStyle(button).scale;
+  button.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0 }));
+  await new Promise(resolve => setTimeout(resolve, 700));
+  controls.querySelector('output').textContent = `Held scale ${held} → released ${getComputedStyle(button).scale} · ${button.getAnimations().length} remaining animations`;
+};
+controls.querySelector('#test-frames').onclick = async () => {
+  ++run;
+  const app = window.__littleHours, overview = app.connected || app.house;
+  const start = overview.diagnostics(), roomFrame = app.room.diagnostics().scene.getFrameId();
+  if (!start) return;
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  const end = overview.diagnostics();
+  controls.querySelector('output').textContent = end ? `${end.drawCalls} draw calls · ${Math.round(end.triangles)} triangles · ${end.renderCount - start.renderCount} overview frames · ${app.room.diagnostics().scene.getFrameId() - roomFrame} background room frames in 2s` : 'House closed';
+};
+controls.querySelector('#test-motion').onclick = event => {
+  ++run;
+  motion.matches = !motion.matches; motion.dispatchEvent(new Event('change'));
+  event.target.setAttribute('aria-pressed', String(motion.matches));
+  requestAnimationFrame(() => {
+    const app = window.__littleHours;
+    controls.querySelector('output').textContent = `${document.getAnimations().filter(a => a.playState === 'running').length} running UI animations · ${(app.connected || app.house).diagnostics()?.activeRoomMotions || 0} room reactions`;
+  });
+};
+let run = 0;
+document.addEventListener('click', event => {
+  const button = event.target.closest('button');
+  if (!button?.closest('#app')) return;
+  const id = ++run, start = performance.now(), label = button.getAttribute('aria-label') || button.textContent.trim();
+  let uiPeak = 0, roomPeak = 0, startFrames;
+  function measure(now) {
+    if (id !== run) return;
+    const app = window.__littleHours, overview = (app.connected || app.house).diagnostics();
+    const running = document.getAnimations().filter(a => a.playState === 'running').length;
+    startFrames ??= overview?.renderCount;
+    uiPeak = Math.max(uiPeak, running); roomPeak = Math.max(roomPeak, overview?.activeRoomMotions || 0);
+    controls.querySelector('output').textContent = `${label}: ${uiPeak} UI / ${roomPeak} room peak · ${running} UI / ${overview?.activeRoomMotions || 0} room now · ${overview ? overview.renderCount - (startFrames || 0) : 0} house frames · ${now - start < 1500 ? 'measuring' : 'settled'}`;
+    if (now - start < 1500) requestAnimationFrame(measure);
+  }
+  requestAnimationFrame(measure);
+}, true);
+</script></body></html>

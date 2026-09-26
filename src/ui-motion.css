@@ -1,0 +1,33 @@
+/* Controls feel like small physical objects. Javascript owns press/release
+   springs; transforms are independent of positioned room tags and camera math. */
+.ui-motion-enabled:not(.is-avatar-editing) #app button:not(:disabled),
+.ui-motion-enabled #app summary, .ui-motion-enabled #app a[download] {
+  transition: background-color .22s, border-color .22s, color .22s, box-shadow .22s, transform .3s cubic-bezier(.2,.85,.3,1.4);
+}
+.ui-motion-enabled:not(.is-avatar-editing) #app button:active { transform: none; }
+.ui-motion-enabled:not(.is-avatar-editing) #app .house-room-tag:active { transform: translate(-50%, 0); }
+.ui-motion-enabled:not(.is-avatar-editing) #app :is(.room-panel, .builder-panel, .house-detail, .focus-card, .house-celebration) { animation: none; }
+.ui-motion-enabled:not(.is-avatar-editing) :is(.house-design-thumb, .furniture-art, .preset-art, .house-room-number) { transform-origin: 50% 80%; }
+.ui-motion-enabled .motion-spark { font-size: 20px; text-shadow: 0 2px 6px #fff3db65; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .ui-motion-enabled:not(.is-avatar-editing) #app :is(.house-designs button, .furniture-card, .preset-card):hover { transform: translateY(-4px); box-shadow: 0 7px 15px #6a415427; }
+  .ui-motion-enabled:not(.is-avatar-editing) #app :is(.house-designs button, .furniture-card):hover :is(.house-design-thumb, .furniture-art) { animation: little-wiggle .6s ease-in-out; }
+  .ui-motion-enabled:not(.is-avatar-editing) #app :is(.mode-button, .house-secondary, .quiet-button, .tool):hover svg { animation: little-nod .5s ease-out; }
+}
+@keyframes little-wiggle { 0%, 100% { rotate: 0deg; translate: 0 0; } 30% { rotate: -5deg; translate: 0 -4px; } 65% { rotate: 3deg; translate: 0 -2px; } }
+@keyframes little-nod { 0%, 100% { rotate: 0deg; } 40% { rotate: -12deg; } 70% { rotate: 7deg; } }
+/* Native discrete display transitions keep the actual controls accessible until
+   they're closed, with no duplicate canvases, stale screenshots or click locks. */
+@supports (transition-behavior: allow-discrete) {
+  .ui-motion-enabled:not(.is-avatar-editing) #app :is(#room-panel, #builder-panel, #house-name-form) {
+    transition: opacity .18s ease, display .18s allow-discrete;
+    opacity: 1;
+  }
+  .ui-motion-enabled:not(.is-avatar-editing) #app :is(#room-panel, #builder-panel, #house-name-form)[hidden] { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-motion-enabled:not(.is-avatar-editing) #app *, .ui-motion-enabled:not(.is-avatar-editing) #app *::before, .ui-motion-enabled:not(.is-avatar-editing) #app *::after { animation: none !important; transition: none !important; }
+}
+.ui-motion-enabled.ui-reduced-motion:not(.is-avatar-editing) #app *,
+.ui-motion-enabled.ui-reduced-motion:not(.is-avatar-editing) #app *::before,
+.ui-motion-enabled.ui-reduced-motion:not(.is-avatar-editing) #app *::after { animation: none !important; transition: none !important; }

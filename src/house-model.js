@@ -1,6 +1,8 @@
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
+import { boundsPoints } from './house-framing.js';
 import { Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
@@ -12,8 +14,9 @@ import { houseFurniture, houseArchitecture } from './house-furniture.js';
 // Reuse authored room geometry, batched per room. Only the occupied desk
 // keeps its animated rig; window views retain their illustrated materials.
 export const HOUSE_POSITIONS = { studio: [-2.55, 0, 0], garden: [2.55, 0, 0], loft: [-2.55, 2.95, -0.45] };
-export function createHouseModel(scene, house, selectedId, theme = 'day') {
-  const meshes = [], buckets = new Map(), live = [], shells = []; let furnitureFloor = .16, rugs = [];
+export function createHouseModel(scene, house, selectedId, theme = 'day', avatar) {
+  const meshes = [], buckets = new Map(), live = [], shells = [], framing = [];
+  const levels = Object.fromEntries(Object.keys(HOUSE_POSITIONS).map(id => [id, new TransformNode(`house-level-${id}`, scene)])); let furnitureFloor = .16, rugs = [];
   const material = new StandardMaterial('house-paint', scene);
   material.diffuseColor = Color3.White(); material.specularColor.setAll(0); material.emissiveColor.setAll(0.08);
   let bucket = 'grounds';
@@ -55,11 +58,11 @@ export function createHouseModel(scene, house, selectedId, theme = 'day') {
     const itemFloor = furnitureFloor + ((rug?.y ?? standHeight(item, rugs)) - FLOOR_Y) * .43;
     const result = houseFurniture(scene, item, {
       style: roomDesign(entry.layout).style || 'retreat', origin, floor: itemFloor, rugScale: rug?.scale || 1,
-      occupied: house.activeId === bucket && item.id === entry.layout.activeDeskId,
+      avatar, occupied: house.activeId === bucket && item.id === entry.layout.activeDeskId,
     });
     if (!buckets.has(bucket)) buckets.set(bucket, []);
     buckets.get(bucket).push(...result.parts);
-    if (result.live) live.push(result.live);
+    if (result.live) { result.live.parent = levels[bucket]; live.push(result.live); }
   }
   // A landscaped plinth, porch and stepping stones make even one room a home.
   box(0, -.52, 0, 11.8, .48, 6.4, '#63765e'); box(0, -.25, 0, 11.6, .15, 6.2, '#a2af8a');
@@ -92,7 +95,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day') {
     furnitureFloor = .16;
     if (style !== 'retreat') {
       const shell = houseArchitecture(scene, entry.layout, style, origin, theme, entry.id);
-      shells.push(shell); furnitureFloor = shell.floor;
+      shell.root.parent = levels[bucket]; shells.push(shell); furnitureFloor = shell.floor;
       if (!buckets.has(bucket)) buckets.set(bucket, []);
       buckets.get(bucket).push(...shell.parts);
     } else {
@@ -128,7 +131,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day') {
     if (entry.id === selectedId) box(0, -.04, 2.08, 4.96, .075, .07, '#f0cf91');
   }
   if (house.rooms.length === 3) {
-    bucket = 'loft'; origin = [0, 0, 0];
+    bucket = 'grounds'; origin = [0, 0, 0];
     // A little exterior stair connects the upper hideaway without taking
     // away any editable floor space inside the player's rooms.
     for (let i = 0; i < 12; i++) {
@@ -153,10 +156,19 @@ export function createHouseModel(scene, house, selectedId, theme = 'day') {
     }
   }
   for (const [id, parts] of buckets) {
+    framing.push({ points: boundsPoints(parts), offset: levels[id]?.position });
     const data = parts.shift(); if (parts.length) data.merge(parts, true);
     const mesh = new Mesh(`house-${id}`, scene); data.applyToMesh(mesh); mesh.material = material;
-    mesh.useVertexColors = true; mesh.metadata = { houseSlot: id === 'grounds' ? null : id }; mesh.isPickable = id !== 'grounds';
+    mesh.parent = levels[id] || null; mesh.useVertexColors = true; mesh.metadata = { houseSlot: id === 'grounds' ? null : id }; mesh.isPickable = id !== 'grounds';
     mesh.freezeWorldMatrix(); meshes.push(mesh);
   }
-  return { meshes, live, shells, animate(seconds, focused, reducedMotion) { for (const root of live) root.metadata.animate?.(seconds, focused, reducedMotion); }, dispose() { shells.forEach(shell => shell.dispose()); live.forEach(root => root.dispose(false, false)); [...meshes].forEach(m => m.dispose()); material.dispose(); } };
+  return { meshes, live, shells, framing, levels,
+    setOpenFloors(open, portrait = false) {
+      // The upper floor opens like a dollhouse: beside the home on wide screens,
+      // above it on a phone. Room layouts and saved positions never change.
+      levels.loft.position.set(open * (portrait ? 0 : -5.45), open * (portrait ? 2.7 : -1.95), open * (portrait ? 0 : .45));
+      levels.loft.computeWorldMatrix(true);
+      for (const mesh of meshes) { mesh.unfreezeWorldMatrix(); mesh.computeWorldMatrix(true); mesh.freezeWorldMatrix(); }
+    },
+    animate(seconds, focused, reducedMotion) { for (const root of live) root.metadata.animate?.(seconds, focused, reducedMotion); }, dispose() { shells.forEach(shell => shell.dispose()); live.forEach(root => root.dispose(false, false)); [...meshes].forEach(m => m.dispose()); Object.values(levels).forEach(root => root.dispose()); material.dispose(); } };
 }

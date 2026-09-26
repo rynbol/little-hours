@@ -15,8 +15,11 @@ import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import '@babylonjs/core/Culling/ray.js';
 import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
 import { createHousePostcard } from './house-postcard.js';
+import { houseFrame } from './house-framing.js';
+import { createHouseMotion } from './house-motion.js';
+import './whole-house.css';
 
-export function createHouseView(container, { house, selectedId, theme, onSelect, focused = false }) {
+export function createHouseView(container, { house, selectedId, theme, avatar, onSelect, focused = false }) {
   const canvas = document.createElement('canvas');
   canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', 'Your miniature cottage. Choose a room or building site. Use the room navigation to choose with a keyboard.');
   container.appendChild(canvas);
@@ -27,8 +30,9 @@ export function createHouseView(container, { house, selectedId, theme, onSelect,
   scene.imageProcessingConfiguration.toneMappingType = 1;
   scene.imageProcessingConfiguration.exposure = 1.12;
   scene.skipPointerMovePicking = true; scene.skipPointerDownPicking = true; scene.skipPointerUpPicking = true;
-  const camera = new ArcRotateCamera('cottage-camera', Math.PI / 2.8, 1.08, 24, new Vector3(0, 1.3, 0), scene);
-  camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
+  const camera = new ArcRotateCamera('cottage-camera', Math.PI / 2.8, 1.02, 32, new Vector3(0, 1.3, 0), scene);
+  camera.mode = Camera.ORTHOGRAPHIC_CAMERA; camera.minZ = .1; camera.maxZ = 100;
+  scene.doNotHandleCursors = true;
   const sky = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene);
   const sun = new DirectionalLight('afternoon', new Vector3(-1, -2, -1), scene);
   sun.position.set(0, 12, 6);
@@ -36,6 +40,8 @@ export function createHouseView(container, { house, selectedId, theme, onSelect,
   shadows.getShadowMap().refreshRate = 0;
   const instrumentation = new SceneInstrumentation(scene);
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const roomMotion = createHouseMotion(HOUSE_POSITIONS);
+  let layoutKeys = new Map();
   const motes = MeshBuilder.CreateSphere('cottage-fireflies', { diameter: .045, segments: 3 }, scene);
   const motePaint = new StandardMaterial('cottage-firefly-light', scene); motePaint.disableLighting = true; motePaint.emissiveColor = Color3.FromHexString('#efd6a5'); motes.material = motePaint; motes.isPickable = false;
   const moteMatrices = new Float32Array(24 * 16);
@@ -48,6 +54,13 @@ export function createHouseView(container, { house, selectedId, theme, onSelect,
   const petals = new Float32Array(36 * 16);
   for (let i = 0; i < 36; i++) petals[i * 16 + 15] = 1;
   sparkles.thinInstanceSetBuffer('matrix', petals, 16, false); sparkles.setEnabled(false);
+  const controls = document.createElement('div'); controls.className = 'house-camera-controls';
+  controls.innerHTML = `<div class="house-camera-group" role="group" aria-label="House view"><button type="button" data-house-view="together" aria-pressed="false">Dollhouse</button><button type="button" data-house-view="open" aria-pressed="true">Open floors</button></div>${container.id === 'house-in-room' ? '<div class="house-camera-group" role="group" aria-label="House angle"><button type="button" class="house-camera-turn" data-turn="-1" aria-label="Turn house left">↶</button><button type="button" data-turn="0" aria-label="Reset house view">Recenter</button><button type="button" class="house-camera-turn" data-turn="1" aria-label="Turn house right">↷</button></div>' : ''}`;
+  container.appendChild(controls);
+  const tags = document.createElement('div'); tags.className = 'house-room-tags'; container.appendChild(tags);
+  const note = document.createElement('span'); note.className = 'house-camera-note'; container.appendChild(note);
+  const tagPoint = new Vector3(), tagProjection = new Vector3();
+  let openFloors = true, floorAmount = 1, floorTarget = 1, portrait = false, dragging = null;
   const homeAngle = Math.PI / 2.8;
   let targetAngle = homeAngle, lastPick = 0, hovering = null, burst = null;
   let model, frame = 0, disposed = false, renderCount = 0, lastDraw = 0;
@@ -57,9 +70,19 @@ export function createHouseView(container, { house, selectedId, theme, onSelect,
     if (!motion.matches && now - lastDraw < 1000 / 30 - 1) { requestRender(); return; }
     lastDraw = now;
     const seconds = motion.matches ? 0 : now / 1000;
+    const wasReacting = roomMotion.activeCount > 0;
+    roomMotion.restore();
     model.animate(seconds, focused, motion.matches);
+    const opening = Math.abs(floorAmount - floorTarget) > .001;
+    if (opening) {
+      floorAmount = motion.matches ? floorTarget : floorAmount + (floorTarget - floorAmount) * .22;
+      if (Math.abs(floorAmount - floorTarget) < .001) floorAmount = floorTarget;
+      model.setOpenFloors(floorAmount, portrait); shadows.getShadowMap().resetRefreshCounter(); fitCamera();
+    }
     const turning = Math.abs(targetAngle - camera.alpha) > .001;
     if (turning) { camera.alpha = motion.matches ? targetAngle : camera.alpha + (targetAngle - camera.alpha) * .18; fitCamera(); }
+    const reacting = roomMotion.update(now, motion.matches);
+    if (reacting || wasReacting) { shadows.getShadowMap().resetRefreshCounter(); positionTags(); }
     const age = burst ? (now - burst.start) / 1000 : 5;
     sparkles.setEnabled(Boolean(burst) && age < 2.8 && !motion.matches);
     if (sparkles.isEnabled()) {
@@ -83,31 +106,76 @@ export function createHouseView(container, { house, selectedId, theme, onSelect,
     const readyBeforeDraw = scene.isReady();
     engine.beginFrame(); scene.render(); engine.endFrame(); renderCount++;
     // A shader may finish after its mesh was skipped during this draw.
-    if (!motion.matches || turning || !readyBeforeDraw || !scene.isReady()) requestRender();
+    if (!motion.matches || turning || opening || reacting || !readyBeforeDraw || !scene.isReady()) requestRender();
   }
   function requestRender() { if (!disposed && !document.hidden && !frame) frame = requestAnimationFrame(render); }
   function resize() {
     if (disposed) return;
     engine.resize();
-    fitCamera(); requestRender();
+    if (model) { roomMotion.restore(); presentFloors(); }
   }
   function fitCamera() {
-    // Fit all corners rather than cropping the garden on portrait screens.
-    const view = camera.getViewMatrix(true), points = [];
-    for (const x of [-6.1, 6.1]) for (const y of [-.8, house.rooms.length === 3 ? 6.4 : 3.7]) for (const z of [-3.3, 3.3]) points.push(Vector3.TransformCoordinates(new Vector3(x, y, z), view));
-    const minX = Math.min(...points.map(p => p.x)), maxX = Math.max(...points.map(p => p.x));
-    const minY = Math.min(...points.map(p => p.y)), maxY = Math.max(...points.map(p => p.y));
-    const aspect = Math.max(.1, container.clientWidth / Math.max(1, container.clientHeight));
-    const height = Math.max(maxY - minY, (maxX - minX) / aspect) * 1.06;
-    const cx = (maxX + minX) / 2, cy = (maxY + minY) / 2;
-    camera.orthoLeft = cx - height * aspect / 2; camera.orthoRight = cx + height * aspect / 2;
-    camera.orthoTop = cy + height / 2; camera.orthoBottom = cy - height / 2;
+    if (!model) return;
+    const width = Math.max(1, container.clientWidth), height = Math.max(1, container.clientHeight);
+    const frame = houseFrame(model.framing, camera.getViewMatrix(true), width / height, .92);
+    const halfWidth = frame.height * width / height / 2;
+    camera.orthoLeft = frame.x - halfWidth; camera.orthoRight = frame.x + halfWidth;
+    camera.orthoTop = frame.y + frame.height / 2; camera.orthoBottom = frame.y - frame.height / 2;
+    camera.getProjectionMatrix(true); positionTags();
   }
-  function update(next, selected, atmosphere = theme) {
-    house = next; selectedId = selected; theme = atmosphere; model?.dispose();
+  function positionTags() {
+    const width = container.clientWidth, height = container.clientHeight, matrix = camera.getTransformationMatrix();
+    for (const button of tags.children) {
+      const id = button.dataset.room, base = HOUSE_POSITIONS[id], offset = model.levels[id].position;
+      tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15, base[2] + offset.z + 2.08);
+      Vector3.TransformCoordinatesToRef(tagPoint, matrix, tagProjection);
+      const half = Math.min(90, width / 4);
+      button.style.left = `${Math.max(half, Math.min(width - half, (tagProjection.x + 1) * width / 2))}px`;
+      button.style.top = `${Math.max(52, Math.min(height - 57, (1 - tagProjection.y) * height / 2 + 5))}px`;
+    }
+  }
+  function presentFloors() {
+    roomMotion.restore();
+    const hasLoft = house.rooms.some(room => room.id === 'loft');
+    portrait = container.clientWidth / Math.max(1, container.clientHeight) < 1.15;
+    floorTarget = openFloors && hasLoft ? 1 : 0;
+    if (!hasLoft || motion.matches) floorAmount = floorTarget;
+    model.setOpenFloors(floorAmount, portrait);
+    controls.querySelector('[aria-label="House view"]').hidden = !hasLoft;
+    controls.querySelectorAll('[data-house-view]').forEach(button => button.setAttribute('aria-pressed', String((button.dataset.houseView === 'open') === openFloors)));
+    note.textContent = openFloors && hasLoft ? 'Floors opened out · every little corner, together' : 'Drag to turn · choose a room to step inside';
+    shadows.getShadowMap().resetRefreshCounter(); fitCamera(); requestRender();
+  }
+  function turn(direction) { targetAngle = direction === 0 ? homeAngle : Math.max(.65, Math.min(1.45, targetAngle + direction * .22)); requestRender(); }
+  controls.addEventListener('click', event => {
+    const button = event.target.closest('button'); if (!button) return;
+    if (button.dataset.houseView) { openFloors = button.dataset.houseView === 'open'; presentFloors(); }
+    if (button.dataset.turn !== undefined) turn(Number(button.dataset.turn));
+  });
+  tags.addEventListener('click', event => { const button = event.target.closest('button'); if (button) onSelect(button.dataset.room); });
+  function update(next, selected, atmosphere = theme, appearance = avatar) {
+    const previousSelection = selectedId, hadModel = Boolean(model);
+    roomMotion.stop();
+    house = next; selectedId = selected; theme = atmosphere; avatar = appearance; model?.dispose();
     sky.intensity = theme === 'dusk' ? .56 : .62; sun.intensity = theme === 'dusk' ? .8 : .95;
     sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9');
-    model = createHouseModel(scene, house, selectedId, theme);
+    model = createHouseModel(scene, house, selectedId, theme, avatar);
+    roomMotion.bind(model);
+    if (!motion.matches) {
+      house.rooms.forEach((entry, index) => {
+        const key = JSON.stringify(entry.layout);
+        const kind = !hadModel ? 'arrive' : layoutKeys.get(entry.id) !== key ? 'design' : selectedId !== previousSelection && entry.id === selectedId ? 'select' : null;
+        if (kind) roomMotion.trigger(entry.id, kind, performance.now(), hadModel ? 0 : index * 110);
+      });
+    }
+    layoutKeys = new Map(house.rooms.map(entry => [entry.id, JSON.stringify(entry.layout)]));
+    tags.replaceChildren();
+    for (const entry of house.rooms) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'house-room-tag'; button.dataset.room = entry.id;
+      button.setAttribute('aria-label', `Visit ${entry.name}`); button.setAttribute('aria-current', entry.id === house.activeId ? 'location' : 'false');
+      const level = document.createElement('small'); level.textContent = entry.id === 'loft' ? 'Upstairs' : entry.id === house.activeId ? 'You’re here' : 'Ground floor';
+      const name = document.createElement('strong'); name.textContent = entry.name; button.append(level, name); tags.appendChild(button);
+    }
     for (const mesh of model.meshes) mesh.receiveShadows = true;
     // Babylon removes disposed casters from this list. Keep it separate from
     // model.meshes so disposal cannot skip every other room batch.
@@ -119,24 +187,40 @@ export function createHouseView(container, { house, selectedId, theme, onSelect,
     // Babylon converts CSS pixels to render pixels using hardware scaling.
     return scene.pick(event.clientX - rect.left, event.clientY - rect.top)?.pickedMesh?.metadata?.houseSlot;
   }
-  const onClick = event => { const id = pick(event); if (id) onSelect(id); };
+  const onDown = event => { if (event.button !== 0 || dragging) return; dragging = { id: event.pointerId, x: event.clientX, y: event.clientY, angle: targetAngle, moved: false }; };
+  const onUp = event => {
+    const gesture = dragging; if (!gesture || gesture.id !== event.pointerId) return; dragging = null;
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    canvas.style.cursor = 'grab';
+    if (!gesture.moved) { const id = pick(event); if (id) onSelect(id); }
+  };
+  const onCancel = () => { dragging = null; canvas.style.cursor = 'grab'; };
+  const onLeave = () => { if (!dragging?.moved) onCancel(); };
   const onMove = event => {
+    if (dragging && dragging.id === event.pointerId) {
+      const dx = event.clientX - dragging.x, dy = event.clientY - dragging.y;
+      if (!dragging.moved && Math.hypot(dx, dy) < 6) return;
+      if (!dragging.moved && event.pointerType === 'touch' && Math.abs(dy) > Math.abs(dx)) { onCancel(); return; }
+      dragging.moved = true; canvas.setPointerCapture(event.pointerId); canvas.style.cursor = 'grabbing';
+      targetAngle = Math.max(.65, Math.min(1.45, dragging.angle - dx * .004)); requestRender(); return;
+    }
     if (performance.now() - lastPick < 55) return;
     lastPick = performance.now(); const id = pick(event);
     if (id === hovering) return;
-    hovering = id; canvas.style.cursor = id ? 'pointer' : 'default';
+    hovering = id; canvas.style.cursor = id ? 'pointer' : 'grab';
     canvas.title = id ? house.rooms.find(room => room.id === id)?.name || 'A little room to grow' : '';
   };
-  const onVisibility = () => { if (document.hidden) { cancelAnimationFrame(frame); frame = 0; } else requestRender(); };
-  canvas.addEventListener('click', onClick); canvas.addEventListener('pointermove', onMove);
+  const onVisibility = () => { if (document.hidden) { onCancel(); roomMotion.stop(); shadows.getShadowMap().resetRefreshCounter(); cancelAnimationFrame(frame); frame = 0; } else requestRender(); };
+  window.addEventListener('blur', onCancel); canvas.addEventListener('lostpointercapture', onCancel); canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointerup', onUp); canvas.addEventListener('pointercancel', onCancel); canvas.addEventListener('pointerleave', onLeave); canvas.addEventListener('pointermove', onMove);
   document.addEventListener('visibilitychange', onVisibility);
-  motion.addEventListener('change', requestRender);
+  const onMotionChange = () => { roomMotion.stop(); shadows.getShadowMap().resetRefreshCounter(); requestRender(); };
+  motion.addEventListener('change', onMotionChange);
   const observer = new ResizeObserver(resize); observer.observe(container);
   update(house, selectedId);
   return {
     update,
-    turn(direction) { targetAngle = direction === 0 ? homeAngle : Math.max(.65, Math.min(1.85, targetAngle + direction * .22)); requestRender(); },
-    celebrate(id) { burst = { start: performance.now(), origin: HOUSE_POSITIONS[id] || [0, 0, 0] }; requestRender(); },
+    turn,
+    celebrate(id) { if (!motion.matches) roomMotion.trigger(id, 'build', performance.now()); burst = { start: performance.now(), origin: (HOUSE_POSITIONS[id] || [0, 0, 0]).map((v, i) => v + (model.levels[id]?.position.asArray()[i] || 0)) }; requestRender(); },
     async createPostcard(name, caption) {
       // Copy immediately after rendering: WebGL's default buffer need not be
       // preserved between frames (which would cost memory on every visit).
@@ -144,7 +228,7 @@ export function createHouseView(container, { house, selectedId, theme, onSelect,
       return createHousePostcard(canvas, name, caption, theme);
     },
     setFocused(value) { if (focused === Boolean(value)) return; focused = Boolean(value); requestRender(); },
-    diagnostics: () => ({ renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
-    dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', requestRender); document.removeEventListener('visibilitychange', onVisibility); canvas.removeEventListener('click', onClick); canvas.removeEventListener('pointermove', onMove); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); },
+    diagnostics: () => ({ activeRoomMotions: roomMotion.activeCount, openFloors, portrait, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
+    dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); controls.remove(); tags.remove(); note.remove(); },
   };
 }
