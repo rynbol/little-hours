@@ -43,9 +43,9 @@ export function houseArchitecture(scene, layout, style, origin, theme, roomId) {
 
 // The house uses the SAME authored furniture as the room. Static geometry is
 // baked into the house batches; only the occupied desk keeps its live rig.
-export function houseFurniture(scene, item, { style, origin, occupied, floor = .16, rugScale = 1 }) {
+export function houseFurniture(scene, item, { style, origin, occupied, avatar, floor = .16, rugScale = 1 }) {
   const definition = getFurniture(item.type);
-  const root = createFurniture(item.type, scene);
+  const root = createFurniture(item.type, scene, avatar);
   styleFurniture(root, style, tintPaint(item.type, item.tint));
   root.metadata.avatar?.setEnabled(Boolean(occupied));
   root.metadata.off = Boolean(item.off);

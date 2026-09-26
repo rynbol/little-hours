@@ -10,6 +10,8 @@ import { houseFrame } from './house-framing.js';
 import { createHouseModel } from './house-model.js';
 import { createHouse } from './house.js';
 import { createLayout } from './layout.js';
+import { AVATAR_DEFAULT } from './avatar.js';
+import { createFurniture } from './furniture.js';
 
 test('opened floors keep all authored geometry framed, picking follows the room, saves stay intact', () => {
   const oldDocument = globalThis.document;
@@ -20,8 +22,13 @@ test('opened floors keep all authored geometry framed, picking follows the room,
   const house = createHouse(createLayout());
   house.rooms.push({id:'garden',name:'Tea',layout:createLayout('sakura-studio')}, {id:'loft',name:'Clouds',layout:createLayout('cloud-loft')});
   const saved = JSON.stringify(house);
-  const model = createHouseModel(scene, house, 'studio');
+  const appearance = { ...AVATAR_DEFAULT, skin: 'deep', hair: 'silver', style: 'waves', top: 'rose', accessory: 'glasses' };
+  const model = createHouseModel(scene, house, 'studio', 'day', appearance);
   try {
+    const reference = createFurniture('study-desk', scene, appearance);
+    const colors = root => Array.from(root.metadata.avatarHead.getChildMeshes()[0].getVerticesData('color'));
+    assert.deepEqual(colors(model.live[0]), colors(reference), 'the overview wears the same saved avatar appearance as the room');
+    reference.dispose(false, false);
     const loft = model.meshes.find(m => m.metadata.houseSlot === 'loft');
     const studio = model.meshes.find(m => m.metadata.houseSlot === 'studio');
     const meshCount = scene.meshes.length;

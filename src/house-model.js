@@ -14,7 +14,7 @@ import { houseFurniture, houseArchitecture } from './house-furniture.js';
 // Reuse authored room geometry, batched per room. Only the occupied desk
 // keeps its animated rig; window views retain their illustrated materials.
 export const HOUSE_POSITIONS = { studio: [-2.55, 0, 0], garden: [2.55, 0, 0], loft: [-2.55, 2.95, -0.45] };
-export function createHouseModel(scene, house, selectedId, theme = 'day') {
+export function createHouseModel(scene, house, selectedId, theme = 'day', avatar) {
   const meshes = [], buckets = new Map(), live = [], shells = [], framing = [];
   const levels = Object.fromEntries(Object.keys(HOUSE_POSITIONS).map(id => [id, new TransformNode(`house-level-${id}`, scene)])); let furnitureFloor = .16, rugs = [];
   const material = new StandardMaterial('house-paint', scene);
@@ -58,7 +58,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day') {
     const itemFloor = furnitureFloor + ((rug?.y ?? standHeight(item, rugs)) - FLOOR_Y) * .43;
     const result = houseFurniture(scene, item, {
       style: roomDesign(entry.layout).style || 'retreat', origin, floor: itemFloor, rugScale: rug?.scale || 1,
-      occupied: house.activeId === bucket && item.id === entry.layout.activeDeskId,
+      avatar, occupied: house.activeId === bucket && item.id === entry.layout.activeDeskId,
     });
     if (!buckets.has(bucket)) buckets.set(bucket, []);
     buckets.get(bucket).push(...result.parts);

@@ -82,7 +82,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     if (!shown) return;
     view?.setFocused(store.state.session.running);
     const house = store.state.house, next = nextExpansion(house), plan = planFor(selectedId);
-    const key = JSON.stringify([house, selectedId, plan.design, preview, celebration, store.state.theme]);
+    const key = JSON.stringify([house, selectedId, plan.design, preview, celebration, store.state.theme, store.state.avatar]);
     if (key === signature) return;
     signature = key;
     const activeControl = root.contains(document.activeElement) ? document.activeElement : null;
@@ -135,12 +135,12 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     $('#house-preview-toggle').hidden = !canPreview;
     $('#house-preview-toggle').textContent = preview ? 'Show before' : 'Show my dream';
     $('#house-preview-toggle').setAttribute('aria-pressed', String(preview));
-    const nextModel = JSON.stringify([modelHouse.rooms, house.activeId, selectedId, store.state.theme]);
+    const nextModel = JSON.stringify([modelHouse.rooms, house.activeId, selectedId, store.state.theme, store.state.avatar]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
       try {
-        if (view) view.update(modelHouse, selectedId, store.state.theme);
-        else view = createHouseView($('#house-canvas'), { house: modelHouse, selectedId, theme: store.state.theme, focused: store.state.session.running, onSelect: select });
+        if (view) view.update(modelHouse, selectedId, store.state.theme, store.state.avatar);
+        else view = createHouseView($('#house-canvas'), { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: select });
       } catch (error) {
         console.error('Could not show the cottage:', error);
         $('#house-canvas').textContent = 'Your rooms are safe. Use the room buttons below to enter or expand your house.';

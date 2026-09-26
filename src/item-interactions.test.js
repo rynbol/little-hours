@@ -130,3 +130,18 @@ test('a tea sip reuses a single cup mesh, stays attached to the hand, and rests 
     pose.activity = null; avatar.animate(pose, 12, true); assert.equal(avatar.cup.isEnabled(), false);
   } finally { scene.dispose(); engine.dispose(); }
 });
+
+test('wardrobe exits keep tea and other moments reachable from the desk, a seat, and mid-walk', () => {
+  for (const preset of PRESETS) for (const start of ['desk', 'seat', 'walking']) {
+    const layout = createLayout(preset.id), routine = createCompanionRoutine(); routine.setLayout(layout);
+    if (start !== 'desk') { routine.setIntent('rest'); if (start === 'seat') until(routine, () => routine.pose.state === 'resting'); else routine.update(.1, false); }
+    const entry = routine.beginAvatarEditing();
+    Object.assign(routine.pose, {x:entry.toX, z:entry.toZ, sit:0});
+    routine.endAvatarEditing(); routine.setIntent('rest');
+    until(routine, () => routine.pose.state === 'resting');
+    const tea = layout.items.filter(item => interactionFor(item.type)?.kind === 'tea');
+    assert.ok(tea.some(item => routine.requestInteraction(item.id).ok), `${preset.id} after wardrobe from ${start}`);
+    until(routine, () => routine.pose.state === 'busy');
+    assert.equal(routine.pose.activity, 'tea');
+  }
+});

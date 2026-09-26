@@ -18,7 +18,7 @@ import { createHousePostcard } from './house-postcard.js';
 import { houseFrame } from './house-framing.js';
 import './whole-house.css';
 
-export function createHouseView(container, { house, selectedId, theme, onSelect, focused = false }) {
+export function createHouseView(container, { house, selectedId, theme, avatar, onSelect, focused = false }) {
   const canvas = document.createElement('canvas');
   canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', 'Your miniature cottage. Choose a room or building site. Use the room navigation to choose with a keyboard.');
   container.appendChild(canvas);
@@ -145,11 +145,11 @@ export function createHouseView(container, { house, selectedId, theme, onSelect,
     if (button.dataset.turn !== undefined) turn(Number(button.dataset.turn));
   });
   tags.addEventListener('click', event => { const button = event.target.closest('button'); if (button) onSelect(button.dataset.room); });
-  function update(next, selected, atmosphere = theme) {
-    house = next; selectedId = selected; theme = atmosphere; model?.dispose();
+  function update(next, selected, atmosphere = theme, appearance = avatar) {
+    house = next; selectedId = selected; theme = atmosphere; avatar = appearance; model?.dispose();
     sky.intensity = theme === 'dusk' ? .56 : .62; sun.intensity = theme === 'dusk' ? .8 : .95;
     sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9');
-    model = createHouseModel(scene, house, selectedId, theme);
+    model = createHouseModel(scene, house, selectedId, theme, avatar);
     tags.replaceChildren();
     for (const entry of house.rooms) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'house-room-tag'; button.dataset.room = entry.id;

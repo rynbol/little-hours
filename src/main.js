@@ -370,7 +370,7 @@ function setHouseOpen(open, selectedId) {
 }
 function renderConnections(updateModel = true) {
   connectedView?.setFocused(state.session.running);
-  const key = JSON.stringify([state.house, state.theme, Boolean(connectedView)]);
+  const key = JSON.stringify([state.house, state.theme, state.avatar, Boolean(connectedView)]);
   if (connectionsKey === key) return;
   connectionsKey = key;
   const nav = $('#home-connections'); nav.replaceChildren();
@@ -391,7 +391,7 @@ function renderConnections(updateModel = true) {
   }
   const wide = document.createElement('button'); wide.className = 'home-wide'; wide.textContent = connectedView ? 'Back to my room' : 'Whole house'; wide.setAttribute('aria-pressed', String(Boolean(connectedView)));
   wide.addEventListener('click', () => setConnectedView(!connectedView)); nav.append(wide);
-  if (connectedView && updateModel) connectedView.update(state.house, state.house.activeId, state.theme);
+  if (connectedView && updateModel) connectedView.update(state.house, state.house.activeId, state.theme, state.avatar);
 }
 function setConnectedView(open) {
   if (travelling || open === Boolean(connectedView)) return;
@@ -399,7 +399,7 @@ function setConnectedView(open) {
   if (open && editMode) setEditMode(false);
   if (open) {
     $('#house-in-room').hidden = false;
-    connectedView = createHouseView($('#house-in-room'), { house: state.house, selectedId: state.house.activeId, theme: state.theme, focused: state.session.running, onSelect: visitRoom });
+    connectedView = createHouseView($('#house-in-room'), { house: state.house, selectedId: state.house.activeId, theme: state.theme, avatar: state.avatar, focused: state.session.running, onSelect: visitRoom });
   } else { connectedView.dispose(); connectedView = null; $('#house-in-room').hidden = true; }
   $('#room-canvas').hidden = open;
   document.body.classList.toggle('is-connected', open); renderRoomHeading();
