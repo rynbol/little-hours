@@ -361,7 +361,7 @@ test('walking and seated poses reuse two body/head meshes with grounded feet and
   try {
     const avatar = createMobileCompanion(scene), body = scene.getMeshByName('companion-articulated-body');
     const meshes = scene.meshes.length, materials = scene.materials.length, geometry = body.geometry;
-    assert.equal(avatar.root.getChildMeshes().length, 6, 'body, head, sleep letters, book, watering can and teacup');
+    assert.equal(avatar.root.getChildMeshes().length, 7, 'body, head, eyelids, sleep letters, book, watering can and teacup');
     const pose = { atDesk: false, x: 0, z: 0, yaw: 0, sit: 0, seatHeight: .80, doze: 0, step: 0, moving: true };
     for (let i = 0; i < 150; i++) {
       pose.step = i * .1; pose.sit = i < 70 ? 0 : Math.min(1, (i - 70) / 30); pose.doze = i > 100 ? 1 : 0;
@@ -374,6 +374,22 @@ test('walking and seated poses reuse two body/head meshes with grounded feet and
     assert.ok(avatar.root.getChildMeshes().every(mesh => !mesh.isPickable && !mesh.receiveShadows && mesh.metadata.castShadow === false));
     avatar.animate(pose, 5, true); const still = Array.from(body.getVerticesData('position'));
     avatar.animate(pose, 25, true); assert.deepEqual(Array.from(body.getVerticesData('position')), still);
+    // The editor preview: grounded and finite through a reaction, the lids
+    // blink only in the preview, and no new meshes.
+    Object.assign(pose, { moving: false, sit: 0, activity: null, reach: null });
+    const lids = scene.getTransformNodeByName('companion-lids'); let blinked = false;
+    for (const part of ['outfit', 'face']) {
+      pose.preview = { weight: 1, reactAt: 10, part };
+      for (let i = 0; i < 300; i++) {
+        avatar.animate(pose, 10 + i / 60, false); blinked ||= lids.isEnabled();
+        const positions = body.getVerticesData('position');
+        for (let j = 0; j < positions.length; j++) assert.ok(Number.isFinite(positions[j]));
+        for (let j = 1; j < positions.length; j += 3) assert.ok(positions[j] >= -.0001, 'feet remain above the floor');
+      }
+    }
+    assert.ok(blinked, 'the preview blinks');
+    pose.preview = null; avatar.animate(pose, 20, false); assert.equal(lids.isEnabled(), false);
+    assert.equal(scene.meshes.length, meshes);
     // Every break activity: grounded, finite, the right prop only, hands
     // where they reach, and no new meshes.
     // The spots put each target about 0.55 in front of the companion.

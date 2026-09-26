@@ -970,6 +970,12 @@ export function createRoom(container, options = {}) {
   function setAvatarAppearance(value) {
     const next = normalizeAvatarAppearance(value), nextKey = avatarAppearanceKey(next);
     if (nextKey === avatarKey) return;
+    // In the editor the companion reacts to a new choice: clothes get a look
+    // down, a face or hair change gets clasped hands.
+    if (avatarCameraEditing) {
+      avatarPreview.reactAt = performance.now() / 1000;
+      avatarPreview.part = ['top', 'bottom', 'outfit', 'bottomStyle'].some(key => next[key] !== avatarAppearance[key]) ? 'outfit' : 'face';
+    }
     avatarAppearance = next; avatarKey = nextKey;
     // Release every old avatar clone before replacing the compact cached
     // geometry, so edits never accumulate hidden heads or body templates.
@@ -1386,6 +1392,9 @@ export function createRoom(container, options = {}) {
   let avatarCameraEditing = false, avatarCameraTransition = null, savedAvatarCamera = null, savedAvatarEffects = null, avatarPoseTransition = null, avatarPreviewRotation = 0, avatarPreviewTarget = 0;
   const avatarFrameHeight = 3.45;
   let activeAvatarFrameHeight = avatarFrameHeight, avatarScenery = null, avatarCanvasAnimation = null;
+  // Idle life for the editor close-up; `weight` eases in once the companion
+  // has turned to the camera.
+  const avatarPreview = { weight: 0, reactAt: -Infinity, part: null };
   const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
   const smoothStep = t => t * t * (3 - 2 * t);
   function restoreAvatarEffects() {
@@ -1585,6 +1594,10 @@ export function createRoom(container, options = {}) {
       }
       if (t === 1) avatarPoseTransition = null;
     }
+    const previewGoal = avatarCameraEditing && !avatarPoseTransition && !reducedMotion ? 1 : 0;
+    avatarPreview.weight = reducedMotion ? 0 : avatarPreview.weight + (previewGoal - avatarPreview.weight) * Math.min(1, companionDelta * 3);
+    if (avatarPreview.weight < .001) avatarPreview.weight = 0;
+    companionPose.preview = avatarPreview.weight ? avatarPreview : null;
     // The companion stands on the rug under it and sits as high as its seat
     // stands. Its height eases, so a step onto a rug reads.
     if (!companionPose.atDesk) {

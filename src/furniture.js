@@ -1518,6 +1518,24 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
   body.metadata = { dynamic: true, castShadow: false, companion: true, rig: { joints } };
   body.setBoundingInfo(new BoundingInfo(new Vector3(-.6, 0, -.95), new Vector3(.6, 2.1, .65)));
   const head = avatarTemplate(scene, appearance).head.clone('companion-head', root); head.setEnabled(true);
+  // Skin-coloured lids with a closed-eye line cover the eyes for a blink in
+  // the avatar editor.
+  const lidSource = new TransformNode('companion-lid-source', scene);
+  for (const x of [-.08, .08]) {
+    sphere(lidSource, [.031, .037, .014], [x, -.026, -.183], skin, 10);
+    tube(lidSource, [[x - .022, -.028, -.195], [x, -.033, -.1985], [x + .022, -.028, -.195]], .0045, '#352924');
+  }
+  const lids = batch(lidSource, true); lids.name = 'companion-lids'; lids.parent = head; lids.setEnabled(false);
+  // The lids take the normals of the face under them, so they shade like the
+  // skin around them with no rim.
+  for (const lid of lids.getChildMeshes()) {
+    const at = lid.getVerticesData('position'), facing = new Float32Array(at.length);
+    for (let i = 0; i < at.length; i += 3) {
+      const x = at[i] / .214 ** 2, y = at[i + 1] / .232 ** 2, z = at[i + 2] / .19 ** 2, length = Math.hypot(x, y, z);
+      facing[i] = x / length; facing[i + 1] = y / length; facing[i + 2] = z / length;
+    }
+    lid.setVerticesData('normal', facing);
+  }
   const sleepLetters = CreateLineSystem('companion-sleep-letters', { lines: [0, 1].map(i => {
     const x = i * .19, y = i * .22, size = i ? .10 : .14;
     return [new Vector3(x, y + size, 0), new Vector3(x + size, y + size, 0), new Vector3(x, y, 0), new Vector3(x + size, y, 0)];
@@ -1547,7 +1565,7 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
   };
   // Break activities blend in and out. A negative lean bends forward, and a
   // negative head pitch looks down.
-  const act = { kind: null, weight: 0 }; let lastSeconds = null;
+  const act = { kind: null, weight: 0 }; let lastSeconds = null, nextBlink = 1 + Math.random() * 2;
   // The walk: each foot stays planted for most of a stride (`STANCE`) and
   // swings forward in a low arc, the knee bending over the swing. A stride
   // is `STRIDE` long; `gait` eases it in and out, so a stop never snaps.
@@ -1594,10 +1612,26 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
       // The hips bob twice a stride, highest over a planted foot, and the
       // body rolls a little toward that foot.
       const g = gait * (1 - sit), cycle = pose.step / 8 / STRIDE, mid = cycle - Math.floor(cycle) - STANCE / 2;
-      const breath = reducedMotion ? 0 : Math.sin(seconds * (pose.doze > 0 ? 1.05 : 1.4)) * .007;
+      const preview = pose.preview, pw = preview ? preview.weight : 0;
+      const breath = reducedMotion ? 0 : Math.sin(seconds * (pose.doze > 0 ? 1.05 : 1.4)) * .007 * (1 + pw * .7);
       let hip = .98 * (1 - sit) + pose.seatHeight * sit + Math.cos(mid * Math.PI * 4) * .018 * g;
       let lean = sit * (.08 + pose.doze * .11) - .05 * g;
-      const roll = Math.cos(mid * Math.PI * 2) * .03 * g;
+      let roll = Math.cos(mid * Math.PI * 2) * .03 * g;
+      // In the avatar editor (`pose.preview`, never under reduced motion) the
+      // companion shifts its weight, breathes deeper and reacts to each new
+      // choice: a small dip, then a look down at new clothes or hands clasped in delight.
+      let react = 0, lookDown = 0, openHands = 0, dip = 0;
+      if (pw) {
+        const u = (seconds - preview.reactAt) / .8;
+        if (u > 0 && u < 1) { react = Math.sin(u * Math.PI); if (preview.part === 'outfit') lookDown = react; else openHands = react; }
+        roll += Math.sin(seconds * .9) * .022 * pw;
+        if (u > 0 && u < .5) dip = Math.sin(u * Math.PI * 2) * .035;
+        hip -= dip;
+        // A blink every few seconds.
+        nextBlink -= dt; if (nextBlink < -.13) nextBlink = 2.4 + Math.random() * 2.4;
+      }
+      const blink = pw > 0 && nextBlink < 0;
+      if (lids.isEnabled() !== blink) lids.setEnabled(blink);
       if (w) { hip += ((HIP[kind] ?? hip) - hip) * w; lean += (LEAN[kind] ?? 0) * w; }
       // A piece on lower ground than the companion, such as bare floor beside
       // the rug that it stands on: the knees bend by the difference, so the
@@ -1621,9 +1655,14 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
         // Standing, the knee sits between hip and ankle, a little forward; it
         // bends further as the foot swings through.
         const ankleY = .15 + lift * g, ankleZ = foot * g;
-        joints['knee' + key].set(side * .15, (hip - .02 + ankleY) / 2 * (1 - sit) + (pose.seatHeight - .13) * sit, ((-.08 + ankleZ) / 2 - .035 - bend * g - drop * 1.5) * (1 - sit) - .63 * sit);
+        joints['knee' + key].set(side * .15, (hip - .02 + ankleY) / 2 * (1 - sit) + (pose.seatHeight - .13) * sit, ((-.08 + ankleZ) / 2 - .035 - bend * g - (drop + dip) * 1.5) * (1 - sit) - .63 * sit);
         if (bottomStyle === 'shorts') Vector3.LerpToRef(joints['hip' + key], joints['knee' + key], SHORTS_HEM_FRACTION, joints['shortsHem' + key]);
         joints['ankle' + key].set(side * .15, ankleY * (1 - sit) + .17 * sit, ankleZ * (1 - sit) - .67 * sit);
+        if (pw) {
+          const hand = joints['wrist' + key];
+          if (openHands) { reachArm(joints['shoulder' + key], target.set(side * .07, hip + .45, -.34), side, -.8, .3); blendArm(key, openHands); }
+          hand.y += Math.sin(seconds * .9 + side) * .01 * pw;
+        }
         if (!w) continue;
         const shoulder = joints['shoulder' + key], H = hip;
         // The right hand does the work; the left one helps or rests.
@@ -1693,6 +1732,8 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
       // The head stays steadier than the body under it.
       head.rotation.set(lean * (1 - g * .6) - pose.doze * .36 * (kind === 'read' ? .5 : 1) + look, (reducedMotion ? 0 : Math.sin(seconds * .45) * .055 * sit) + glance, roll * .4 + pose.doze * .09);
       if (kind === 'tea') head.rotation.x -= (.12 - sip * .10) * w;
+      // In the editor the head looks around a little and tilts at each choice.
+      if (pw) head.rotation.addInPlaceFromFloats(Math.sin(seconds * .37) * .035 * pw - lookDown * .38, (Math.sin(seconds * .53) * .1 + Math.sin(seconds * .21 + 2) * .06) * pw * (1 - react), Math.sin(seconds * .61 + 1) * .04 * pw + react * .12);
       // The book sits between the hands; the can hangs from the right hand
       // and tips to pour in the middle of the watering.
       book.setEnabled(kind === 'read' && w > .02); can.setEnabled(kind === 'water' && w > .02);
