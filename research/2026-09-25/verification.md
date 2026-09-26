@@ -27,3 +27,7 @@ The NullEngine run emitted Babylon warnings about pet skeleton matrices exceedin
 - No claim is made that the moving development branches still have every gap recorded in this fixed snapshot.
 
 The individual deep dives describe their researchers' source-review scope. The tests and narrow browser check listed here were performed during final integration of those reports.
+
+## Follow-up check
+
+The later `follow-up-shortlist.md` compares the original baseline with local combined development commit `511728a5a23563129b01df4bb875493b1a296eec`, while a fresh fetch still showed `origin/main` at `05e7426`. Inspected relevant source diffs and branch documentation; checked six exact package versions using npm registry metadata and revisited the primary integration guides. Relative Markdown links and whitespace passed. No application or dependency files changed, so the unchanged app suites were not repeated. Earlier test counts apply only to the original baseline, not as validation of the combined development branch.

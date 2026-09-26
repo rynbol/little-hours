@@ -6,6 +6,8 @@
 
 ## Read by area
 
+**Follow-up:** [New branch work and exact package shortlist](follow-up-shortlist.md) records which recommendations are already implemented on the combined development branch and verifies specific package versions. Read this before treating the original gap list as current implementation work.
+
 | Research | What it answers |
 | --- | --- |
 | [Timer, UI and accessibility](timer-ui-accessibility.md) | Timer internals and visible components, actual breaks, progress ring, duration settings, alerts, tasks, history, fonts, icons, motion, dialogs, popovers, keyboard and mobile use. |
