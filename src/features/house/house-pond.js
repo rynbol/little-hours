@@ -2,7 +2,7 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 
 export const POND = Object.freeze({ x: 10, z: .7, rx: 1.95, rz: 1.45 });
 export const DOCK = Object.freeze({ x: 9.55, from: 3, to: 1.35, width: .72 });
-export const POND_TAG = [10.2, .1, 1.5];
+export const POND_TAG = [10.45, .1, -.35];
 const GROUND = -.175, WATER = GROUND + .015;
 const hash = n => { const s = Math.sin(n * 91.7 + 17.3) * 43758.5453; return s - Math.floor(s); };
 const rgba = (hex, shade = 1) => { const c = Color3.FromHexString(hex); return [c.r * shade, c.g * shade, c.b * shade, 1]; };

@@ -60,7 +60,7 @@ export function createHouseNavigation(app) {
     wide.addEventListener('click', () => setConnectedView(!connectedView)); nav.append(wide);
     if (connectedView && updateModel) connectedView.update(withGarden(), app.state.house.activeId, app.state.theme, app.state.avatar);
   }
-  const withGarden = () => ({ ...app.state.house, garden: studyTrees(app.state.history) });
+  const withGarden = () => ({ ...app.state.house, pet: app.state.pet, garden: studyTrees(app.state.history) });
   function setConnectedView(open) {
     if (travelling || open === Boolean(connectedView)) return;
     if (open && app.panels.current === 'avatar') app.panels.close();

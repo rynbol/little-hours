@@ -16,6 +16,7 @@ import '@babylonjs/core/Culling/ray.js';
 import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
 import { GARDEN_TAG } from './house-garden.js';
 import { POND_TAG } from './house-pond.js';
+import { createStroll } from './house-stroll.js';
 import { createHousePostcard } from './house-postcard.js';
 import { houseFrame } from './house-framing.js';
 import { createHouseMotion } from './house-motion.js';
@@ -72,6 +73,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const homeAngle = Math.PI / 2.8;
   const turnTo = angle => Math.max(-.3, Math.min(2.45, angle)), tiltTo = beta => Math.max(.72, Math.min(1.3, beta));
   let targetAngle = homeAngle, targetTilt = 1.02, lastPick = 0, hovering = null, burst = null;
+  let stroll = null, strollKey = '';
   let model, frame = 0, disposed = false, suspended = false, renderCount = 0, builds = 0, lastDraw = 0;
   // The whole house opens like a dollhouse front. It arrives closed, unless motion is reduced.
   const arrival = () => motion.matches ? 0 : performance.now() + 650;
@@ -96,6 +98,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const wasReacting = roomMotion.activeCount > 0;
     roomMotion.restore();
     model.animate(seconds, focused, motion.matches);
+    for (const root of model.live) root.metadata.avatar?.setEnabled(focused);
+    stroll.setVisible(!focused);
+    if (!focused) stroll.animate(seconds, motion.matches);
     const turning = Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001;
     if (turning) {
       const ease = motion.matches || dragging?.moved ? 0 : Math.exp(-dt * 11);
@@ -193,6 +198,8 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     model = createHouseModel(scene, house, selectedId, theme, avatar, previous);
     previous?.dispose();
     roomMotion.bind(model);
+    const nextStroll = JSON.stringify([avatar, house.pet]);
+    if (nextStroll !== strollKey) { strollKey = nextStroll; stroll?.dispose(); stroll = createStroll(scene, avatar, house.pet || 'cat'); }
     if (!motion.matches) {
       house.rooms.forEach((entry, index) => {
         const key = JSON.stringify(entry.layout);
@@ -283,7 +290,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       resize();
     },
     setFocused(value) { if (focused === Boolean(value)) return; focused = Boolean(value); requestRender(); },
-    diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, turning: Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001, trees: model.trees, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
-    dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); controls.remove(); tags.remove(); note.remove(); },
+    diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, turning: Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001, trees: model.trees, stroll: focused ? null : stroll?.pose, strollPet: focused ? null : stroll?.pet, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
+    dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); stroll?.dispose(); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); controls.remove(); tags.remove(); note.remove(); },
   };
 }

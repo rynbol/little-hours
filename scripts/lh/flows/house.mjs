@@ -1,5 +1,5 @@
 export default {
-  about: 'the house page: the dollhouse arrives closed, opens, closes on the toggle, picks a room from the 3D view, comes back fast, grows a tree per study day and turns freely',
+  about: 'the house page: the dollhouse arrives closed, opens, closes on the toggle, picks a room from the 3D view, comes back fast, grows a tree per study day, lets you stroll the garden when you are not focusing, and turns freely',
   async run(t) {
     const { check, steps, sleep } = t;
     let app = await t.open({ seed: 'three-rooms' });
@@ -56,6 +56,16 @@ export default {
     const garden = await app.house();
     check('the garden has one tree per study day, full grown at an hour', garden.trees?.length === 14 && garden.trees[2] === 1 && Math.abs(garden.trees[0] - 10 / 60) < 1e-9, garden.trees);
     check('the garden is named on screen', await app.visible('.house-room-tag.is-garden') && await app.text('.house-room-tag.is-garden') === 'Garden');
+    const STROLL = `(() => { const d = window.__littleHours.house.diagnostics(); return { me: d.stroll && [d.stroll.x, d.stroll.z], pet: d.strollPet && [d.strollPet.x, d.strollPet.z], shown: d.scene.getTransformNodeByName('house-stroll')?.isEnabled() ?? null }; })()`;
+    const walk = [await app.js(STROLL)];
+    for (let i = 0; i < 8; i++) { await sleep(500 * t.slow); walk.push(await app.js(STROLL)); }
+    const farthest = key => Math.max(...walk.map(w => Math.hypot(w[key][0] - walk[0][key][0], w[key][1] - walk[0][key][1])));
+    check('when you are not focusing, you stroll the garden and your pet follows', walk[0].shown && farthest('me') > .5 && farthest('pet') > .5, { me: farthest('me'), pet: farthest('pet') });
+    await steps.backToRoom(app);
+    await app.clickSel('#start-button');
+    await steps.openHouse(app);
+    const focusing = await app.js(STROLL);
+    check('while focusing, the stroll stops and you are back at your desk', focusing.shown === false && focusing.me === null, focusing);
     const hinged = await app.js(`window.__littleHours.house.diagnostics().scene.transformNodes.filter(node => node.name.startsWith('house-hinge-')).map(node => node.name.slice(12))`);
     check('only fronts and roof lids open; side walls stay shut', hinged.length > 0 && hinged.every(name => /-(front|lid)$/.test(name)), hinged);
     const box = await app.box('#house-canvas canvas');
