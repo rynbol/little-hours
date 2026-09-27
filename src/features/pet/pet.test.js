@@ -4,7 +4,7 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { PRESETS, createLayout, petBed } from '../../core/layout.js';
 import { seatsFor, walkable, findWalkingPath } from '../companion/companion.js';
-import { createPetRoutine, petSpots, petObstacles, petHome, insideBed, PET_REACTION, PETS } from './pet.js';
+import { createPetRoutine, petSpots, petObstacles, petHome, insideBed, PET_REACTION, PET_HOLD, HEART_LIFE, MAX_HEARTS, PETS } from './pet.js';
 import { createPetModel } from './pets.js';
 import { disposeFurnitureAssets } from '../../models/furniture.js';
 
@@ -114,7 +114,7 @@ test('cat and dog models: one mesh, finite poses, paws on the floor, eyes that c
   try {
     for (const species of Object.keys(PETS)) {
       const model = createPetModel(scene, species), meshes = scene.meshes.length, geometry = model.body.geometry;
-      const pose = { action: 'sleep', moving: false, walked: 0, petAge: Infinity };
+      const pose = { action: 'sleep', moving: false, walked: 0, petAge: Infinity, hearts: [] };
       // The skeleton recomputes its matrices once per render; without a
       // render, force it, or every read sees the first pose.
       const positions = () => { model.body.skeleton.prepare(true); return model.body.getPositionData(true); };
@@ -134,9 +134,9 @@ test('cat and dog models: one mesh, finite poses, paws on the floor, eyes that c
       // Asleep, the pet shows closed eyes and floating letters; petting brings a heart.
       pose.action = 'sleep'; pose.moving = false; for (let i = 0; i < 60; i++) model.animate(pose, 1 / 30, 3 + i / 30, false);
       assert.equal(model.sleepLetters.isEnabled(), true); assert.equal(model.heart.isEnabled(), false);
-      pose.petAge = 0.5; model.animate(pose, 1 / 30, 6, false);
+      pose.petAge = 0.5; pose.hearts = [{ age: 0.5, size: 1, sway: 0 }]; model.animate(pose, 1 / 30, 6, false);
       assert.equal(model.heart.isEnabled(), true); assert.equal(model.sleepLetters.isEnabled(), false);
-      pose.petAge = Infinity;
+      pose.petAge = Infinity; pose.hearts = [];
       assert.equal(model.body.geometry, geometry); assert.equal(scene.meshes.length, meshes, 'animation allocates no meshes');
       assert.ok(!model.body.receiveShadows && model.body.skeleton.bones.length < 60, 'one small rig');
       // Reduced motion rests exactly: two frames far apart are identical.
@@ -153,4 +153,22 @@ test('the chosen pet is saved, and only known pets are restored', async () => {
   assert.equal(restoreState(JSON.stringify({ pet: 'dog' })).pet, 'dog');
   assert.equal(restoreState(JSON.stringify({ pet: 'dragon' })).pet, 'cat');
   assert.equal(restoreState('{').pet, 'cat');
+});
+
+test('petting again holds the lean and stacks hearts: two for the first pet, then one each', () => {
+  const routine = createPetRoutine({ random: seeded(5) });
+  routine.setLayout(createLayout('ember-library'));
+  const shown = () => routine.pose.hearts.filter(heart => heart.age >= 0).length;
+  routine.pet(); assert.equal(shown(), 1, 'the first heart shows at once');
+  advance(routine, 0.3); assert.equal(shown(), 2, 'and a second follows it');
+  advance(routine, 0.5); const age = routine.pose.petAge;
+  routine.pet(); assert.equal(routine.pose.petAge, Math.min(age, PET_HOLD), 'a second pet never starts the lean over');
+  assert.equal(shown(), 3, 'a second pet adds one heart');
+  for (let i = 0; i < 3; i++) { advance(routine, 0.1); routine.pet(); }
+  assert.equal(routine.pose.fuss, 5); assert.equal(routine.pose.hearts.at(-1).size, 1.6, 'the fifth pet in a row sends a big heart');
+  for (let i = 0; i < 10; i++) routine.pet();
+  assert.equal(routine.pose.hearts.length, MAX_HEARTS, 'hearts stack up to a limit');
+  advance(routine, HEART_LIFE + 0.1); assert.equal(routine.pose.hearts.length, 0, 'every heart floats away');
+  advance(routine, PET_REACTION); assert.equal(routine.pose.petAge, Infinity); assert.equal(routine.pose.fuss, 0, 'a new fuss starts from two hearts again');
+  routine.pet(); advance(routine, 0.3); assert.equal(shown(), 2);
 });

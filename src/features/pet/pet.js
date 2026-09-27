@@ -12,6 +12,8 @@ export const PETS = Object.freeze({
   dog: Object.freeze({ id: 'dog', name: 'Mochi', speed: 0.62 }),
 });
 export const PET_REACTION = 2.6;
+export const PET_HOLD = 0.6;
+export const HEART_LIFE = 1.7, MAX_HEARTS = 8, BIG_HEART_EVERY = 5;
 // Half the room the companion takes up where it stands, for walks around it.
 const COMPANION_CLEARANCE = 0.2;
 const STRETCH = 2.2, SETTLE = 1.6, AFTER_DROP = [3.5, 5];
@@ -81,7 +83,7 @@ export function petSpots(layout, { windowX = -2.7, companion = null } = {}) {
 
 export function createPetRoutine({ random = clockRandom, onChange = () => {} } = {}) {
   // `to` is where a walk ends, so the companion keeps out of the way.
-  const pose = { state: 'sleeping', action: 'sleep', x: 0, z: 0, yaw: 0, onBed: true, moving: false, walked: 0, petAge: Infinity, held: false, species: 'cat', to: null };
+  const pose = { state: 'sleeping', action: 'sleep', x: 0, z: 0, yaw: 0, onBed: true, moving: false, walked: 0, petAge: Infinity, fuss: 0, hearts: [], held: false, species: 'cat', to: null };
   let layout = null, editing = false, windowX = -2.7, companion = null, speed = PETS.cat.speed;
   // The floor that leads home, found once per layout.
   let homeFloor = null;
@@ -163,9 +165,14 @@ export function createPetRoutine({ random = clockRandom, onChange = () => {} } =
       if (trip) { if (!walkTo(trip.end, trip.kind)) goHomeNow(); }
     },
     setCompanion(value) { companion = value; },
-    setEditing(value) { if (editing === Boolean(value)) return; editing = Boolean(value); if (editing && layout) { pose.held = false; pose.petAge = Infinity; sleepAtHome(); } },
+    setEditing(value) { if (editing === Boolean(value)) return; editing = Boolean(value); if (editing && layout) { pose.held = false; pose.petAge = Infinity; pose.fuss = 0; pose.hearts = []; sleepAtHome(); } },
     pet() {
-      pose.petAge = 0;
+      const first = pose.petAge === Infinity;
+      pose.petAge = first ? 0 : Math.min(pose.petAge, PET_HOLD);
+      pose.fuss = first ? 1 : pose.fuss + 1;
+      const big = pose.fuss % BIG_HEART_EVERY === 0, size = big ? 1.6 : Math.min(1.35, 0.9 + pose.fuss * 0.05);
+      for (const delay of first ? [0, 0.22] : [0]) pose.hearts.push({ age: -delay, size: delay ? size * 0.8 : size, sway: ((pose.fuss * 0.618 + delay * 3) % 1 - 0.5) * 0.3 });
+      if (pose.hearts.length > MAX_HEARTS) pose.hearts.splice(0, pose.hearts.length - MAX_HEARTS);
       // A walking pet stops for the fuss, then carries on.
       if (trip && !pose.held) { pose.moving = false; stall = PET_REACTION; }
     },
@@ -194,7 +201,8 @@ export function createPetRoutine({ random = clockRandom, onChange = () => {} } =
       // Frames are steady in full motion; reduced motion may pass a long gap.
       if (!reducedMotion) dt = Math.min(dt, 0.1);
       // A pet given in Decorate still ends its heart.
-      if (pose.petAge < PET_REACTION) pose.petAge += dt; else pose.petAge = Infinity;
+      if (pose.petAge < PET_REACTION) pose.petAge += dt; else { pose.petAge = Infinity; pose.fuss = 0; }
+      if (pose.hearts.length) { for (const heart of pose.hearts) heart.age += dt; pose.hearts = pose.hearts.filter(heart => heart.age < HEART_LIFE); }
       if (editing || pose.held) return pose;
       if (reducedMotion) {
         // No strolls: the pet stays asleep at home, or snaps home after a drop.

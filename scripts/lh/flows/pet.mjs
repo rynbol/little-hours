@@ -8,25 +8,35 @@ async function tapPet(app, sleep, slow) {
     if (spot?.visible) {
       await app.click(spot.x, spot.y);
       const counts = [];
-      for (let k = 0; k < 42 * slow && !counts.includes(3); k++) { counts.push(await app.js(HEARTS)); await sleep(100 / slow); }
+      for (let k = 0; k < 42 * slow && !counts.includes(2); k++) { counts.push(await app.js(HEARTS)); await sleep(100 / slow); }
       if (counts.some(Boolean)) return { spot, counts, said: await app.js(BUBBLE) };
     }
     await sleep(300);
   }
   return { spot: await app.point('pet'), counts: [], said: null };
 }
-const oneByOne = counts => counts.indexOf(1) >= 0 && counts.indexOf(1) < counts.indexOf(2) && counts.indexOf(2) < counts.indexOf(3);
+const oneByOne = counts => counts.indexOf(1) >= 0 && counts.indexOf(1) < counts.indexOf(2);
+const PET_AGE = `window.__littleHours.room.diagnostics().pet.petAge`;
+
+async function petAgain(app, sleep, spot, times) {
+  const ages = [];
+  for (let i = 0; i < times; i++) { await app.click(spot.x, spot.y); await sleep(120); ages.push(await app.js(PET_AGE)); }
+  return { ages, hearts: await app.js(HEARTS) };
+}
 
 export default {
-  about: 'the pet: a tap gets hearts one after another and no words, the pet panel switches between the cat and the dog, and the choice survives a reload',
+  about: 'the pet: a tap gets two hearts one after another and no words, more taps stack a heart each without starting the lean over, the pet panel switches between the cat and the dog, and the choice survives a reload',
   async run(t) {
     const { check, sleep } = t;
     const app = await t.open({ seed: 'three-rooms' });
     await app.settle();
     check('the room starts with Miso the cat', await app.text('#pet-button-label') === 'Miso' && await app.js('window.__littleHours.room.diagnostics().petSpecies') === 'cat');
     let tap = await tapPet(app, sleep, t.slow);
-    check('tapping the cat floats three hearts up one after another', oneByOne(tap.counts), tap.counts);
+    check('tapping the cat floats two hearts up one after another', oneByOne(tap.counts), tap.counts);
     check('petting shows no words', tap.said === null, tap.said);
+    const again = await petAgain(app, sleep, tap.spot, 4);
+    check('four more taps stack a heart each', again.hearts >= 5, again);
+    check('more taps hold the lean instead of starting it over', again.ages.every(age => age >= .3 && age < 2.6), again.ages);
     await t.shot(app, 'cat-hearts');
     await app.clickSel('#pet-button');
     await app.waitFor(`document.querySelectorAll('[data-pet-choice]').length === 2`, { what: 'the pet panel' });

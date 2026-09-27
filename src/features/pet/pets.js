@@ -11,7 +11,7 @@ import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
 import { Skeleton } from '@babylonjs/core/Bones/skeleton.js';
 import { Bone } from '@babylonjs/core/Bones/bone.js';
 import { createContactShadow } from '../../models/furniture.js';
-import { PET_REACTION } from './pet.js';
+import { PET_REACTION, HEART_LIFE, MAX_HEARTS } from './pet.js';
 
 // Hand-built pets. Each pet is one vertex-colored mesh on a small rig of
 // rigid parts: a two-part spine, head, ears, two-part legs placed by
@@ -265,7 +265,7 @@ export function createPetModel(scene, species = 'cat') {
   const heart = new Mesh('pet-heart', scene); heartData().applyToMesh(heart);
   const heartMaterial = scene.getMaterialByName('pet-heart-glow') || Object.assign(new StandardMaterial('pet-heart-glow', scene), { disableLighting: true, diffuseColor: Color3.Black(), emissiveColor: Color3.White(), backFaceCulling: false });
   heart.material = heartMaterial; heart.useVertexColors = true; heart.billboardMode = Mesh.BILLBOARDMODE_ALL; heart.isPickable = false; heart.metadata = { castShadow: false, effect: 'pet-heart' }; heart.setEnabled(false);
-  const hearts = [heart, ...[1, 2].map(i => Object.assign(heart.clone(`pet-heart-${i}`), { metadata: heart.metadata }))];
+  const hearts = [heart, ...Array.from({ length: MAX_HEARTS - 1 }, (_, i) => i + 1).map(i => Object.assign(heart.clone(`pet-heart-${i}`), { metadata: heart.metadata }))];
   const contact = createContactShadow(`pet-${species}-contact-shadow`, 0.42 * spec.scale, 0.3 * spec.scale, scene, { soft: 0.24, strength: 0.3 });
   contact.metadata = { ...contact.metadata, pet: true };
   // Scratch space, reused every frame.
@@ -418,16 +418,16 @@ export function createPetModel(scene, species = 'cat') {
       }
       sleepLetters.updateVerticesData('position', letterPositions, false, false);
     }
-    const showHeart = pose.petAge < PET_REACTION;
-    if (showHeart) headPoint(w);
+    const live = pose.hearts.filter(each => each.age >= 0), shown = reducedMotion ? live.slice(-1) : live;
+    if (shown.length) headPoint(w);
     hearts.forEach((each, i) => {
-      const t = pose.petAge - (reducedMotion ? 0 : i * 0.42), life = 1.7, visible = showHeart && t >= 0 && t < life && (!reducedMotion || i === 0);
-      each.setEnabled(visible);
-      if (!visible) return;
-      const pop = reducedMotion ? 1 : smooth(t / 0.2) * (1 + Math.sin(Math.min(1, t / 0.45) * Math.PI) * 0.2), fade = 1 - smooth((t - life + 0.5) / 0.5), size = [1, 0.78, 0.9][i];
-      const sway = reducedMotion ? 0 : Math.sin(t * 3.2 + i * 2) * 0.05 + [0, -0.07, 0.07][i];
-      each.position.set(w.x + sway, w.y + 0.26 + (reducedMotion ? 0 : t * 0.24), w.z);
-      each.scaling.setAll(pop * size * (0.7 + fade * 0.3)); each.visibility = fade;
+      const spark = shown[i];
+      each.setEnabled(Boolean(spark));
+      if (!spark) return;
+      const t = spark.age, pop = reducedMotion ? 1 : smooth(t / 0.2) * (1 + Math.sin(Math.min(1, t / 0.45) * Math.PI) * 0.2), fade = 1 - smooth((t - HEART_LIFE + 0.5) / 0.5);
+      const sway = reducedMotion ? 0 : Math.sin(t * 3.2 + i * 2) * 0.05 + spark.sway;
+      each.position.set(w.x + sway, w.y + 0.26 + (reducedMotion ? 0 : t * (0.2 + spark.size * 0.06)), w.z);
+      each.scaling.setAll(pop * spark.size * (0.7 + fade * 0.3)); each.visibility = fade;
     });
   }
 }
