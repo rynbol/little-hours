@@ -15,6 +15,7 @@ import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import '@babylonjs/core/Culling/ray.js';
 import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
 import { GARDEN_TAG } from './house-garden.js';
+import { POND_TAG } from './house-pond.js';
 import { createHousePostcard } from './house-postcard.js';
 import { houseFrame } from './house-framing.js';
 import { createHouseMotion } from './house-motion.js';
@@ -157,7 +158,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const width = container.clientWidth, height = container.clientHeight, matrix = camera.getTransformationMatrix();
     for (const button of tags.children) {
       const id = button.dataset.room, base = HOUSE_POSITIONS[id], offset = model.levels[id]?.position;
-      if (!base) tagPoint.set(...GARDEN_TAG);
+      if (!base) tagPoint.set(...(id === 'pond' ? POND_TAG : GARDEN_TAG));
       else tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : id === 'loft' ? .7 : 0), base[2] + offset.z + 2.08);
       Vector3.TransformCoordinatesToRef(tagPoint, matrix, tagProjection);
       const half = Math.min(90, width / 4);
@@ -209,6 +210,8 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     }
     const garden = document.createElement('span'); garden.className = 'house-room-tag is-garden'; garden.dataset.room = 'orchard';
     const days = document.createElement('strong'); days.textContent = 'Garden'; garden.append(days); tags.appendChild(garden);
+    const pond = document.createElement('button'); pond.type = 'button'; pond.className = 'house-room-tag is-pond'; pond.dataset.room = 'pond'; pond.setAttribute('aria-label', 'Go fishing at Willow Pond');
+    const pondLevel = document.createElement('small'); pondLevel.textContent = 'Go fishing'; const pondName = document.createElement('strong'); pondName.textContent = 'Willow Pond'; pond.append(pondLevel, pondName); tags.appendChild(pond);
     // The blueprint's tag: what grows next and how close it is.
     const site = nextExpansion(house);
     if (site && container.id === 'house-canvas') {
@@ -250,7 +253,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     lastPick = performance.now(); const id = pick(event);
     if (id === hovering) return;
     hovering = id; canvas.style.cursor = id ? 'pointer' : 'grab';
-    canvas.title = id ? house.rooms.find(room => room.id === id)?.name || 'A little room to grow' : '';
+    canvas.title = id === 'pond' ? 'Willow Pond' : id ? house.rooms.find(room => room.id === id)?.name || 'A little room to grow' : '';
   };
   const onVisibility = () => { if (document.hidden) { onCancel(); roomMotion.stop(); shadows.getShadowMap().resetRefreshCounter(); cancelAnimationFrame(frame); frame = 0; } else requestRender(); };
   window.addEventListener('blur', onCancel); canvas.addEventListener('lostpointercapture', onCancel); canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointerup', onUp); canvas.addEventListener('pointercancel', onCancel); canvas.addEventListener('pointerleave', onLeave); canvas.addEventListener('pointermove', onMove);

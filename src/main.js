@@ -20,6 +20,7 @@ import { createAvatarPanel } from './features/avatar/index.js';
 import './features/avatar/wardrobe.css';
 import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
+import { createFishingUI } from './features/fishing/index.js';
 import { installTestHook } from './dev/test-hook.js';
 
 const deviceStorage = pinnedStorage || {
@@ -50,6 +51,7 @@ app.decorate = createDecorateUI(app);
 app.nav = createHouseNavigation(app);
 app.roomUI = createRoomUI(app);
 app.panels = createPanels(app);
+app.lake = createFishingUI(app);
 wireSoundControls(app);
 
 function applyState(next, force = false) {
@@ -63,6 +65,7 @@ function applyState(next, force = false) {
   $('#coin-wallet').setAttribute('aria-label', `${state.house.coins} coins · Visit your house`);
   app.timer.renderFocusReward();
   app.houseUI?.render();
+  app.lake.render();
   app.room?.setHouse(state.house);
   app.nav.renderConnections();
   app.roomUI.applyTheme(previous, force);
@@ -134,6 +137,7 @@ app.houseUI = createHouseUI($('#house-page'), {
   onClose: () => app.nav.setHouseOpen(false),
   onEnter: app.nav.visitRoom,
   onFocus: () => { app.nav.setHouseOpen(false); app.timer.expand(); $('#start-button').focus(); },
+  onPond: () => app.lake.open(),
 });
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && app.nav.houseOpen && !event.target.closest('input')) { app.nav.setHouseOpen(false); return; }
@@ -168,7 +172,7 @@ document.addEventListener('visibilitychange', () => {
 }, { signal: listeners.signal });
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
-if (import.meta.env.DEV) installTestHook({ get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get connected() { return app.nav.connected; } });
+if (import.meta.env.DEV) installTestHook({ get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get connected() { return app.nav.connected; } });
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');
@@ -178,6 +182,7 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   $('#session-celebration')?.close();
   app.nav.dispose(); app.decorate.dispose();
   app.houseUI?.dispose();
+  app.lake.dispose();
   app.moments?.dispose();
   app.room?.dispose?.();
   audio.dispose();

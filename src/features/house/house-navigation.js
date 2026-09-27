@@ -67,7 +67,7 @@ export function createHouseNavigation(app) {
     if (open && app.decorate.active) app.decorate.setEditMode(false);
     if (open) {
       $('#house-in-room').hidden = false;
-      connectedView = createHouseView($('#house-in-room'), { house: withGarden(), selectedId: app.state.house.activeId, theme: app.state.theme, avatar: app.state.avatar, focused: app.state.session.running, onSelect: visitRoom });
+      connectedView = createHouseView($('#house-in-room'), { house: withGarden(), selectedId: app.state.house.activeId, theme: app.state.theme, avatar: app.state.avatar, focused: app.state.session.running, onSelect: id => id === 'pond' ? app.lake?.open() : visitRoom(id) });
     } else { connectedView.dispose(); connectedView = null; $('#house-in-room').hidden = true; }
     $('#room-canvas').hidden = open;
     document.body.classList.toggle('is-connected', open); app.roomUI.renderHeading();

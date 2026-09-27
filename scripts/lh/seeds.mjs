@@ -25,6 +25,8 @@ export const SEEDS = {
   attic: { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft' } },
   ...Object.fromEntries(['bunny', 'fox', 'panda'].map(pet => [`pet-${pet}`, { ...house(1), pet, pets: ['cat', 'dog', pet] }])),
   'pet-shop': house(1, 120),
+  pond: { ...house(3), history: studyDays, pond: { bait: [{ minutes: 10, at: 1 }, { minutes: 20, at: 2 }, { minutes: 35, at: 3 }, { minutes: 35, at: 4 }, { minutes: 60, at: 5 }, { minutes: 95, at: 6 }], journal: { minnow: { count: 3, best: 7.4, first: 1 }, perch: { count: 1, best: 18.2, first: 2 }, koi: { count: 1, best: 41, first: 3 } }, log: [] } },
+  'pond-empty': { ...house(3), pond: { bait: [], journal: {}, log: [] } },
 };
 
 export function seedState(name, { theme } = {}) {

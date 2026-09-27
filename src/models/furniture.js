@@ -1620,8 +1620,8 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
   // swings forward in a low arc, the knee bending over the swing. A stride
   // is `STRIDE` long; `gait` eases it in and out, so a stop never snaps.
   const STRIDE = .9, STANCE = .6, REACH = STRIDE * STANCE / 2, pitch = { L: 0, R: 0 }; let gait = 0;
-  const LEAN = { record: -.68, water: -.12, pet: -.55, lamp: .04, warm: -.04 }, HIP = { pet: .36 };
-  const LOOK = { read: -.34, water: -.3, record: -.32, pet: -.22, lamp: .3, window: .1, warm: -.06 };
+  const LEAN = { record: -.68, water: -.12, pet: -.55, lamp: .04, warm: -.04, fish: -.05 }, HIP = { pet: .36 };
+  const LOOK = { read: -.34, water: -.3, record: -.32, pet: -.22, lamp: .3, window: .1, warm: -.06, fish: -.08 };
   // Two-bone arm IK: the hand goes to its target, or as close as the arm allows.
   const UPPER = .341, FORE = .218, aim = new Vector3(), bend = new Vector3(), target = new Vector3(), pole = new Vector3(), elbow = new Vector3(), wrist = new Vector3(), local = new Vector3();
   function reachArm(shoulder, goal, poleX, poleY, poleZ) {
@@ -1723,6 +1723,11 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
         else if (kind === 'tea') {
           // Cradle the cup, then bring its rim to the mouth for one slow sip.
           reachArm(shoulder, target.set(side > 0 ? .18 : -.10, H + (side > 0 ? .30 : .14) + sip * .48, -.42 + sip * .12), side, -.7, .3);
+          blendArm(key, w);
+        }
+        else if (kind === 'fish' && pose.grip) {
+          const grip = pose.grip;
+          reachArm(shoulder, side > 0 ? target.set(grip.x, grip.y, grip.z) : target.set(grip.x - .16, grip.y - .2, grip.z + .1), side, -.6, .3);
           blendArm(key, w);
         }
         else if (kind === 'door' && side > 0 && pose.reach) {

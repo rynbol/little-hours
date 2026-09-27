@@ -15,7 +15,7 @@ const moods = {
   'midnight-metro': ['After-hours magic', '#c5c3dd'],
 };
 
-export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onFocus, art, icon, notice }) {
+export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onFocus, onPond, art, icon, notice }) {
   let view, firstBuild = 0, shown = false, selectedId = store.state.house.activeId, signature = '', modelSignature = '';
   let preview = true, celebration = null, celebrationTimer, exporting = false, postcardUrl = null;
   const plans = new Map();
@@ -140,7 +140,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     const nextModel = JSON.stringify([modelHouse.rooms, modelHouse.garden, house.activeId, selectedId, store.state.theme, store.state.avatar]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
-      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: select };
+      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: id => id === 'pond' ? onPond?.() : select(id) };
       const build = () => {
         try {
           if (view) view.update(options.house, options.selectedId, options.theme, options.avatar);
