@@ -18,6 +18,7 @@ export default {
     check('Ambience switches the room to rain', await app.attr('[data-theme-choice="rain"]', 'aria-pressed') === 'true' && (await app.saved()).theme === 'rain');
     check('the header toggle follows the theme', /Rain/.test(await app.text('#time-toggle')));
     const lights = (await app.saved()).decor.lights;
+    await app.settle();
     await app.clickSel('.fairy-lights input');
     check('the lights switch saves', await app.waitFor(`JSON.parse(localStorage.getItem('little-hours-v1')).decor.lights === ${!lights}`, { what: 'the lights to save' }).catch(() => false));
     await app.key('Escape');

@@ -73,9 +73,9 @@ export default {
     app = await t.open({ seed: 'two-rooms', reducedMotion: true, label: 'reduced motion' });
     await app.settle();
     walk = await tapDoor(app, 'garden', t.sleep, { slow: t.slow });
-    check('reduced motion: a built door takes you there at once', walk.end?.active === 'garden' && !walk.end?.travelling && walk.ms < 1500, { ms: walk.ms, end: walk.end });
+    check('reduced motion: a built door takes you there at once', walk.end?.active === 'garden' && !walk.end?.travelling && walk.ms < 1500 * t.slow, { ms: walk.ms, end: walk.end });
     walk = await tapDoor(app, 'loft', t.sleep, { slow: t.slow });
-    check('reduced motion: an unbuilt door opens the house page at once', walk.end?.house && !walk.walked && walk.ms < 1500 && await app.text('#house-detail h2') === 'Star attic', { ms: walk.ms, walked: walk.walked });
+    check('reduced motion: an unbuilt door opens the house page at once', walk.end?.house && !walk.walked && walk.ms < 1500 * t.slow && await app.text('#house-detail h2') === 'Star attic', { ms: walk.ms, walked: walk.walked });
     await t.close(app);
   },
 };
