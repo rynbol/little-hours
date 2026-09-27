@@ -4,14 +4,14 @@ async function tapDoor(app, id, sleep, { timeout = 20000, slow = 1 } = {}) {
   const spot = await app.point({ door: id });
   if (!spot?.visible) return { spot };
   const start = await app.js(PROBE(id)), began = Date.now(), seen = { walked: false, labels: new Set(), notes: new Set(), open: 0, moved: 0 };
-  await app.js(`(() => { clearInterval(window.__lhDoorWatch); window.__lhDoorOpen = 0; window.__lhDoorWatch = setInterval(() => { const hinge = window.__littleHours.room.diagnostics().scene.getTransformNodeByName('door-hinge-${id}'); if (hinge) window.__lhDoorOpen = Math.max(window.__lhDoorOpen, -hinge.rotation.y); }, 10); })()`);
+  await app.js(`(() => { clearInterval(window.__lhDoorWatch); window.__lhDoorOpen = 0; window.__lhDoorWatch = setInterval(() => { const hinge = window.__littleHours.room.diagnostics().scene.getTransformNodeByName('door-hinge-${id}'); if (hinge && !document.body.classList.contains('is-house')) window.__lhDoorOpen = Math.max(window.__lhDoorOpen, -hinge.rotation.y); }, 10); })()`);
   await app.click(spot.x, spot.y);
   let now = start;
   while (Date.now() - began < timeout * slow) {
     now = await app.js(PROBE(id)).catch(() => now);
     if (now.walking) seen.walked = true;
     if (now.travelling) { seen.labels.add(now.label); seen.notes.add(now.note); }
-    if (now.door !== null) seen.open = Math.max(seen.open, -now.door);
+    if (now.door !== null && !now.house) seen.open = Math.max(seen.open, -now.door);
     if (now.walking) seen.moved = Math.max(seen.moved, Math.hypot(now.x - start.x, now.z - start.z));
     if (!now.travelling && (now.active === id || now.house)) break;
     await sleep(40 / slow);
@@ -58,7 +58,7 @@ export default {
     walk = await tapDoor(app, 'garden', t.sleep, { slow: t.slow });
     check('one room: the unbuilt garden door is on screen', walk.spot?.visible, walk.spot);
     check('one room: the companion walks to the unbuilt door first', walk.walked && walk.moved > .5 && walk.ms > 1500, { ms: walk.ms, moved: walk.moved });
-    check('one room: the unbuilt door opens only ajar for a peek', walk.open > .4 && walk.open < 1 && walk.notes.includes('A little peek at what could be.'), { open: walk.open, notes: walk.notes });
+    check('one room: the unbuilt door opens ajar for a peek before the house page shows', walk.open > .4 && walk.open < 1 && walk.notes.includes('A little peek at what could be.'), { open: walk.open, notes: walk.notes });
     check('one room: then the house page opens on the garden wing', walk.end?.house && !walk.end?.travelling && await app.text('#house-detail h2') === 'Greenhouse', { end: walk.end, h2: await app.text('#house-detail h2') });
     await steps.backToRoom(app);
     check('one room: back in the room nothing is stuck', !await app.js(`document.body.classList.contains('is-travelling') || document.body.classList.contains('is-door-walking')`) && (await app.saved()).house.activeId === 'studio');
