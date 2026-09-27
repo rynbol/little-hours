@@ -4,6 +4,7 @@ async function tapDoor(app, id, sleep, { timeout = 20000, slow = 1 } = {}) {
   const spot = await app.point({ door: id });
   if (!spot?.visible) return { spot };
   const start = await app.js(PROBE(id)), began = Date.now(), seen = { walked: false, labels: new Set(), notes: new Set(), open: 0, moved: 0 };
+  await app.js(`(() => { clearInterval(window.__lhDoorWatch); window.__lhDoorOpen = 0; window.__lhDoorWatch = setInterval(() => { const hinge = window.__littleHours.room.diagnostics().scene.getTransformNodeByName('door-hinge-${id}'); if (hinge) window.__lhDoorOpen = Math.max(window.__lhDoorOpen, -hinge.rotation.y); }, 10); })()`);
   await app.click(spot.x, spot.y);
   let now = start;
   while (Date.now() - began < timeout * slow) {
@@ -15,6 +16,7 @@ async function tapDoor(app, id, sleep, { timeout = 20000, slow = 1 } = {}) {
     if (!now.travelling && (now.active === id || now.house)) break;
     await sleep(40 / slow);
   }
+  seen.open = Math.max(seen.open, await app.js(`(() => { clearInterval(window.__lhDoorWatch); return window.__lhDoorOpen; })()`).catch(() => 0));
   return { spot, ms: Date.now() - began, ...seen, labels: [...seen.labels], notes: [...seen.notes], end: now };
 }
 
