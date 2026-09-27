@@ -203,15 +203,33 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
 
   bank();
   ball(0, -1.8, -46, 110, 4.4, 24, palette.meadow, 18);
-  for (let i = 0; i < 7; i++) ball(-60 + i * 20 + hash(i) * 8, 1, -70 - hash(i * 3) * 15, 30 + hash(i * 5) * 20, 10 + hash(i * 7) * 12, 14, palette.hill[i % 3], 10);
-  for (let i = 0; i < 5; i++) ball(-50 + i * 26, 4, -95, 40, 22 + hash(i) * 10, 10, palette.hill[(i + 1) % 3], 10, .92);
+  const haze = Color3.FromHexString(palette.low).scale(.7).add(Color3.FromHexString(palette.mid).scale(.3));
+  const ridge = (z, base, rise, crowns, hex, fade, seed, half = 170) => {
+    const tone = Color3.Lerp(Color3.FromHexString(hex), haze, fade), foot = tone.scale(.9), positions = [], colors = [], normals = [], indices = [];
+    const columns = Math.round(half * 2 / (crowns ? .6 : 2.5));
+    let crown = -half, radius = 0, puff = 0;
+    for (let i = 0; i <= columns; i++) {
+      const x = -half + i * half * 2 / columns;
+      if (crowns && x > crown + radius) { crown = x; radius = crowns * (.5 + hash(seed + i) * 1.1); puff = .3 + hash(seed * 3 + i) * .35; }
+      const bump = crowns ? Math.sqrt(Math.max(0, 1 - ((x - crown - radius / 2) / (radius / 2)) ** 2)) * radius * puff : 0;
+      const top = base + rise * (.55 + .3 * Math.sin(x * .031 + seed) + .15 * Math.sin(x * .087 + seed * 2)) + bump;
+      positions.push(x, top, z, x, base - 14, z + 6);
+      colors.push(tone.r, tone.g, tone.b, 1, foot.r, foot.g, foot.b, 1);
+      normals.push(0, .5, .87, 0, .5, .87);
+      if (i) indices.push(i * 2 - 2, i * 2, i * 2 - 1, i * 2 - 1, i * 2, i * 2 + 1);
+    }
+    baked.push(Object.assign(new VertexData(), { positions, colors, normals, indices }));
+  };
+  ridge(-140, 3, 9, 0, palette.hill[2], .75, 5, 260);
+  ridge(-105, 0, 7, 4, palette.leaf[0], .58, 9, 220);
+  ridge(-72, -1, 5, 3, palette.leaf[0], .3, 2, 190);
+  ridge(-44, -1.5, 3.2, 2.2, palette.leaf[0], .08, 7, 150);
   const windows = cottage(5.4, -15.8, -.45);
   willow(...rim(3.2, 1.16), 1.1);
   for (const [x, z, s, seed] of [[-7.6, -12.8, 1.1, 0], [-2.6, -14, .85, 4], [9.6, -19, 1.15, 1], [12.2, -8.6, .95, 7], [-12.6, -8, 1, 3]]) tree(x, z, s, seed);
   for (const [x, z, s] of [[-10.3, -11.2, 1.05], [13.4, -12.6, .9]]) asset('tree-pine', { x, z, yaw: x, scale: s * 1.7 });
   for (const [x, z, s, seed] of [[1.2, -16.4, .85, 0], [11.4, -3.6, .8, 1], [-11.4, 4.6, .85, 3]]) blossom(x, z, s, seed);
   asset('tree-fruit', { x: 10.2, z: -14.2, yaw: 1, scale: 1.45 });
-  for (let i = 0; i < 9; i++) asset('bush', { x: -44 + i * 11 + hash(i) * 4, y: -.6, z: -33 - hash(i * 3) * 6, yaw: i * 1.7, scale: 7 + hash(i * 5) * 4, tint: [.7, .78, .8] });
   for (const [x, z, s] of [[-18, -22, 1.1], [-12, -25, .95], [16, -23, 1.2], [21, -27, 1]]) tree(x, z, s, Math.round(x));
   picket(rim(-.9, 1.5), rim(-.25, 1.35), 10);
   const stones = [[-2.95, -2.3], [-1.75, -1.2], [-.95, -.35], [.3, 1.05], [2.15, 2.75]];
@@ -398,6 +416,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   const tip = new Vector3(), tipLocal = new Vector3(), base = new Vector3(), dir = new Vector3(), bend = new Vector3(), bobberAt = new Vector3(), castFrom = new Vector3(), castTo = new Vector3(), reelFrom = new Vector3(), hover = new Vector3(), world = new Matrix();
   let clock = 0, phase = 'idle', phaseAt = 0, progress = 0, tug = 0, lastTap = -9, leapDone = null, castDone = null, rise = 4, catchInfo = null, stowAt = -1;
   const setPhase = next => { phase = next; phaseAt = clock; };
+  const lively = { weight: 1, reactAt: -9, part: 'catch' };
   let last = performance.now(), disposed = false;
 
   function rodShape(t) {
@@ -420,6 +439,8 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     const shape = rodShape(clock);
     pose.grip.set(.2, 1.02 + shape.lift * .3, -.36 + shape.lift * .16);
     pose.activityTime += dt;
+    pose.doze += ((!reducedMotion && phase === 'idle' && clock - phaseAt > 20 ? 1 : 0) - pose.doze) * Math.min(1, dt * .7);
+    lively.weight = 1 - pose.doze; pose.preview = reducedMotion ? null : lively; petPose.action = pose.doze > .6 ? 'sleep' : 'sit';
     companion.animate(pose, clock, reducedMotion, DOCK_Y);
     if (petModel) { if (petPose.petAge !== Infinity) petPose.petAge += dt; if (petPose.petAge > 4) petPose.petAge = Infinity; petModel.animate(petPose, dt, clock, reducedMotion); }
     const wrist = joints.wristR;
@@ -482,7 +503,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
         const vy = Math.cos(k * Math.PI) * 1.5;
         fish.root.rotation.set(Math.sin(k * 10) * .15, -1.2 + k * 3.2, Math.atan2(vy, 1.8) + (1 - k) * .4);
         if (k < .08 && !fish.splashed) { fish.splashed = true; splash(reelFrom, 30, 1.25); ripple(reelFrom.x, reelFrom.z, 1.6, 0); burst(reelFrom, tierOf(fish.species.tier).color, 16); }
-        if (k >= 1) { setPhase('shown'); burst(hover, tierOf(fish.species.tier).color, 30); petPose.petAge = 0; leapDone?.(catchInfo); leapDone = null; }
+        if (k >= 1) { setPhase('shown'); lively.reactAt = clock; burst(hover, tierOf(fish.species.tier).color, 30); petPose.petAge = 0; leapDone?.(catchInfo); leapDone = null; }
       } else {
         const hoverT = clock - phaseAt, wiggle = reducedMotion ? 0 : 1;
         fish.root.position.set(hover.x, hover.y + Math.sin(hoverT * 2) * .05 * wiggle, hover.z);
@@ -562,7 +583,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
       return new Promise(resolve => { castDone = resolve; if (reducedMotion) { phaseAt = clock - 1.7; } });
     },
     nibble() { if (phase !== 'wait') return; ripple(castTo.x, castTo.z, .45, 1); bobberAt.y -= .03; bobber.position.y -= .04; },
-    bite() { if (phase !== 'wait') return; setPhase('bite'); ripple(castTo.x, castTo.z, 1.2, 1); splash(castTo, 10, .6); },
+    bite() { if (phase !== 'wait') return; setPhase('bite'); lively.reactAt = clock; petPose.petAge = 0; ripple(castTo.x, castTo.z, 1.2, 1); splash(castTo, 10, .6); },
     hook() { reelFrom.copyFrom(bobber.position); reelFrom.y = 0; progress = 0; setPhase('reel'); lastTap = clock; splash(reelFrom, 10, .7); },
     reel(next) { progress = Math.min(1, next); tug = 1; lastTap = clock; splash(bobber.position, 6, .55); ripple(bobber.position.x, bobber.position.z, .9); },
     leap(caught) {

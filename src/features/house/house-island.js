@@ -92,14 +92,12 @@ export function buildIsland(api) {
   });
   for (const { points } of waterfalls()) {
     const [fx, fy, fz] = points.at(-1);
-    for (let k = 0; k < 7; k++) api.ball(fx - .45 + hash(k * 4.1) * .9, fy + .2 + hash(k * 2.3) * .45, fz - .5 + hash(k * 6.7) * 1, .8 + hash(k) * .5, .5, .7, k % 2 ? '#f3e7ee' : '#e8dbe6');
+    asset('cloud-b', { x: fx, y: fy - .1, z: fz, yaw: .45 + hash(fx) * .6, scale: .6 });
   }
 
   buildPaths(api);
 
-  for (const [x, y, z, s] of [[-6.2, -2.5, 3.7, 1], [4.4, -4, 4.4, 1.15], [10.4, -3.1, 3.4, .8], [-8.9, -.5, -1.6, .6]]) {
-    for (const [dx, dy, dz, r] of [[0, .15, 0, 1.25], [-.8, 0, .15, .9], [.85, -.02, -.05, .95], [-1.45, -.12, .05, .6], [1.5, -.1, .1, .62], [.3, .45, -.2, .8]]) api.ball(x + dx * s, y + dy * s, z + dz * s, r * 1.3 * s, r * .75 * s, r * 1.05 * s, dy > .1 ? '#fffafb' : '#f6edf2');
-  }
+  for (const [x, y, z, s, i] of [[-6.2, -2.7, 3.7, 1.1, 0], [4.4, -4.2, 4.4, 1.25, 1], [10.4, -3.3, 3.4, .85, 0], [-8.9, -.7, -1.6, .65, 1]]) asset(i ? 'cloud-b' : 'cloud-a', { x, y, z, yaw: .45 + (hash(x) - .5) * .3, scale: s });
 }
 
 export function waterfalls(drop = 3.3) {

@@ -179,8 +179,8 @@ def gradient(low, high, bottom, top, jitter=.04, seed=0):
 
 
 LEAVES = {
-    'sage': ('#5f7d5c', '#a7bd86'), 'olive': ('#6c8456', '#b3c283'), 'deep': ('#4f6d55', '#8fae7c'),
-    'blossom': ('#c98f9f', '#f7e0dc'), 'pine': ('#4d6e58', '#9dbb8a'), 'willow': ('#6a8a5a', '#b4c98e'),
+    'sage': ('#4c6e5a', '#a3c27c'), 'olive': ('#557050', '#b2c877'), 'deep': ('#44634f', '#8fb474'),
+    'blossom': ('#b5798f', '#f8d7da'), 'pine': ('#4d6e58', '#9dbb8a'), 'willow': ('#6a8a5a', '#b4c98e'),
 }
 BARK = ('#5e4535', '#8a6a52')
 
@@ -196,39 +196,42 @@ def lobe(at, radius, seed, subdivisions=3):
     return obj
 
 
-def park_tree(seed, leaves, size=1.0, lobes=(3, 4), spread=(.45, .6), girth=.19):
+def park_tree(seed, leaves, size=1.0, lobes=8, wide=1.0, tall=1.0, girth=.17):
     rng = random.Random(seed)
-    height = 1.4 * size
-    lean = Vector((rng.uniform(-.12, .12), rng.uniform(-.12, .12), 0)) * size
+    height = .95 * size
+    lean = Vector((rng.uniform(-.1, .1), rng.uniform(-.1, .1), 0)) * size
     fork = lean + Vector((0, 0, height))
-    parts = [branch([Vector((0, 0, -.05)), lean * .35 + Vector((0, 0, height * .45)), fork], girth * size, tip=.5, resolution=5)]
+    centre = fork + Vector((0, 0, .75 * size * tall))
+    reach = Vector((.95 * wide, .95 * wide, .85 * tall)) * size
+    parts = [branch([Vector((0, 0, -.05)), lean * .4 + Vector((0, 0, height * .5)), fork], girth * size, tip=.55, resolution=5)]
     for k in range(3):
         d = Vector((math.cos(k / 3 * math.tau + seed), math.sin(k / 3 * math.tau + seed), 0))
-        parts.append(branch([d * .04 * size + Vector((0, 0, .22 * size)), d * .15 * size + Vector((0, 0, .04 * size)), d * .24 * size + Vector((0, 0, -.04))], .085 * size, tip=.35, resolution=3))
-    puffs, tips = [], []
-    count = rng.choice(lobes)
-    for k in range(count):
-        a = k / count * math.tau + rng.uniform(-.4, .4) + seed
+        parts.append(branch([d * .04 * size + Vector((0, 0, .2 * size)), d * .14 * size + Vector((0, 0, .03 * size)), d * .22 * size + Vector((0, 0, -.04))], .07 * size, tip=.35, resolution=3))
+        a = k / 3 * math.tau + seed + .5
         d = Vector((math.cos(a), math.sin(a), 0))
-        tip = fork + d * rng.uniform(*spread) * size + Vector((0, 0, rng.uniform(.4, .6) * size))
-        parts.append(branch([fork, fork + d * .2 * size + Vector((0, 0, .25 * size)), tip], .1 * size, tip=.45, resolution=4))
-        radius = rng.uniform(.5, .6) * size
-        puffs.append(lobe(tip, Vector((1, 1, .78)) * radius, seed + k))
-        tips.append((tip, radius))
-    puffs.append(lobe(fork + Vector((rng.uniform(-.1, .1), rng.uniform(-.1, .1), 1.0)) * size, Vector((1, 1, .8)) * .6 * size, seed + 9))
-    puffs.append(lobe(fork + Vector((0, 0, .62 * size)), Vector((1.05, 1.05, .7)) * .7 * size, seed + 11))
+        parts.append(branch([fork, fork + d * .25 * size + Vector((0, 0, .3 * size)), centre + d * .55 * size + Vector((0, 0, -.1 * size))], .07 * size, tip=.4, resolution=4))
+    puffs, tips = [lobe(centre, reach * .72, seed, 2)], []
+    for k in range(lobes):
+        z = 1 - (k + .5) / lobes * 1.7
+        a = k * 2.39996 + rng.uniform(-.3, .3)
+        ring = math.sqrt(max(0, 1 - z * z))
+        at = centre + Vector((math.cos(a) * ring * reach.x, math.sin(a) * ring * reach.y, z * reach.z)) * .62
+        radius = rng.uniform(.36, .48) * size * wide
+        puffs.append(lobe(at, Vector((1, 1, .85)) * radius, seed + k + 1, 2))
+        tips.append((at, radius))
     wood = join(parts, 'wood')
     paint(wood, gradient(*BARK, 0, height * 1.4))
     low, high = (hex_rgb(c) for c in LEAVES[leaves])
-    warm, middle = hex_rgb('#efe6b0'), fork.z + .6 * size
+    middle, top, sun = low.lerp(high, .55), high.lerp(hex_rgb('#f1f0b8'), .35), Vector((-.4, -.5, .77)).normalized()
     def colour(co, vertex):
-        t = max(0, min(1, (co.z - middle + .75 * size) / (1.6 * size) + .08 * noise.noise(co * 2.5)))
-        return low.lerp(high, t ** 1.2).lerp(warm, max(0, t - .8) * .8)
+        t = max(0, min(1, (co.z - centre.z + reach.z) / (2 * reach.z) + .06 * noise.noise(co * 3)))
+        base = low.lerp(middle, min(1, t * 1.6)) if t < .62 else middle.lerp(top, (t - .62) / .38)
+        return base.lerp(top, max(0, (co - centre).normalized().dot(sun)) * .25)
     for obj in puffs:
         paint(obj, colour)
     canopy = join(puffs, 'canopy')
-    radial_normals(canopy, Vector((fork.x, fork.y, middle - .2 * size)), .6)
-    return wood, canopy, tips, middle
+    canopy.data.polygons.foreach_set('use_smooth', [False] * len(canopy.data.polygons))
+    return wood, canopy, tips, centre.z
 
 
 def round_tree(seed, leaves, size=1.0, fruit=False):
@@ -249,7 +252,7 @@ def round_tree(seed, leaves, size=1.0, fruit=False):
 
 
 def blossom_tree(seed, size=1.0):
-    wood, canopy, _, _ = park_tree(seed, 'blossom', size, lobes=(4, 5), spread=(.5, .68), girth=.16)
+    wood, canopy, _, _ = park_tree(seed, 'blossom', size, lobes=10, wide=1.15, tall=.85, girth=.15)
     return [wood, canopy]
 
 
@@ -279,18 +282,37 @@ def pine_tree(seed, size=1.0):
 
 def willow_tree(seed, size=1.0):
     rng = random.Random(seed)
-    wood, canopy, tips, middle = park_tree(seed, 'willow', size, lobes=(4, 5), spread=(.55, .7), girth=.21)
+    wood, canopy, tips, middle = park_tree(seed, 'willow', size, lobes=9, wide=1.2, tall=.85, girth=.2)
     drapes = []
-    for k in range(16):
-        a = k / 16 * math.tau + rng.uniform(-.1, .1)
-        ring = rng.uniform(.85, 1.0) * size
-        drop = rng.uniform(.45, .7) * size
-        drapes.append(lobe(Vector((math.cos(a) * ring, math.sin(a) * ring, middle - drop * .75)), Vector((.26 * size, .26 * size, drop)), seed + 20 + k, 2))
+    for k in range(13):
+        a = k / 13 * math.tau + rng.uniform(-.1, .1)
+        ring = rng.uniform(.9, 1.05) * size
+        drop = rng.uniform(.38, .55) * size
+        drapes.append(lobe(Vector((math.cos(a) * ring, math.sin(a) * ring, middle - drop * .55)), Vector((.22 * size, .22 * size, drop)), seed + 20 + k, 2))
     for obj in drapes:
         paint(obj, gradient('#5f7f52', '#a9c286', middle - 1.4 * size, middle + .2 * size, jitter=.1, seed=seed))
     curtain = join(drapes, 'curtain')
-    radial_normals(curtain, Vector((0, 0, middle - .6 * size)), .5)
+    curtain.data.polygons.foreach_set('use_smooth', [False] * len(curtain.data.polygons))
     return [wood, canopy, curtain]
+
+
+def cloud(seed, puffs=5):
+    rng = random.Random(seed)
+    spots = [(0, 0, .3, .95), (rng.uniform(-.35, -.15), .1, .75, .55), (rng.uniform(.2, .4), -.1, .65, .5)]
+    for k in range(puffs):
+        side = -1 if k % 2 else 1
+        r = max(.3, .7 - k // 2 * .18) * rng.uniform(.9, 1.1)
+        spots.append((side * (.7 + k // 2 * .5 + rng.uniform(-.08, .08)), rng.uniform(-.2, .2), r * .35, r))
+    parts = [lobe(Vector((x, y, z)), Vector((r, r * .9, r * .9)), seed + i, 3) for i, (x, y, z, r) in enumerate(spots)]
+    body = join(parts, 'cloud')
+    for v in body.data.vertices:
+        if v.co.z < 0:
+            v.co.z *= .12
+    body.data.update()
+    top, under = hex_rgb('#fffdfb'), hex_rgb('#d6cbe2')
+    paint(body, lambda co, vertex: under.lerp(top, max(0, min(1, co.z / .9)) ** .6))
+    body.data.polygons.foreach_set('use_smooth', [True] * len(body.data.polygons))
+    return [body]
 
 
 def sapling(seed, size=1.0):
@@ -556,6 +578,8 @@ BUILDS = {
     'island-cliff': lambda: island_cliff(),
     'islet-a': lambda: islet(1),
     'islet-b': lambda: islet(6, .8),
+    'cloud-a': lambda: cloud(2),
+    'cloud-b': lambda: cloud(7, 3),
 }
 
 FLAT = {'island-cliff', 'rock-a', 'rock-b'}
@@ -567,7 +591,7 @@ if __name__ == '__main__':
     for name in names:
         reset()
         objects = BUILDS[name]()
-        bake_occlusion(objects)
+        bake_occlusion(objects, .45 if name.startswith('tree') else .2 if name.startswith('cloud') else .75)
         export(objects, name, flat=name in FLAT)
         if shot:
             preview(os.path.join(shot, name + '.png'), -.2 if 'cliff' in name else .42)

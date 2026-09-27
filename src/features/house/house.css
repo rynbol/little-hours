@@ -11,8 +11,8 @@
 .house-heading > button svg { rotate: 180deg; }
 .house-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 24px; align-items: start; }
 .house-left { min-width: 0; }
-.house-world { position: relative; min-width: 0; border: 1px solid #ae8d8b70; border-radius: 24px; background: radial-gradient(ellipse at 48% 46%, #dac0b464, transparent 66%), linear-gradient(165deg, #55475f 0%, #897080 54%, #baa095 100%); overflow: hidden; box-shadow: inset 0 1px #ffe5d321, 0 15px 50px #140c161a; }
-body[data-theme='day'] .house-world { background: radial-gradient(ellipse at 48% 38%, #fff7d180, transparent 65%), linear-gradient(155deg, #a2b8b2, #d6c9b6 62%, #b5b997); }
+.house-world { position: relative; min-width: 0; border: 1px solid #ae8d8b70; border-radius: 24px; background: radial-gradient(ellipse at 48% 46%, #dac0b440, transparent 66%), linear-gradient(165deg, #4f4260 0%, #86697f 54%, #c0a193 100%); overflow: hidden; box-shadow: inset 0 1px #ffe5d321, 0 15px 50px #140c161a; }
+body[data-theme='day'] .house-world { background: radial-gradient(ellipse at 48% 38%, #fff7d150, transparent 65%), linear-gradient(170deg, #93b8c2, #c8d6c8 58%, #d9cfae); }
 body[data-theme='rain'] .house-world { background: radial-gradient(ellipse at 50% 45%, #c1c5cc4d, transparent 65%), linear-gradient(155deg, #566676, #8b99a3 62%, #9aafa6); }
 .house-world-caption { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 22px 24px 0; color: #f4e5d7; font-size: 10px; position: relative; z-index: 1; }
 .house-address { display: flex; align-items: center; gap: 8px; letter-spacing: 1.6px; font-size: 8px; }
@@ -24,6 +24,9 @@ body[data-theme='rain'] .house-world { background: radial-gradient(ellipse at 50
 body[data-theme='day'] .house-world-caption { color: #4f6257; }
 .house-scene { position: relative; }
 .house-canvas { position: relative; height: clamp(330px, calc(100svh - 355px), 580px); min-height: 330px; width: 100%; display: grid; place-items: center; color: #f4e5d7; text-align: center; }
+.house-canvas::before { content: ''; position: absolute; left: 4%; top: 42%; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle closest-side, #ffe8c6 0 15%, #ffd1a3e6 17%, #f8b6904d 30%, #f2a68a1c 55%, transparent); pointer-events: none; }
+body[data-theme='day'] .house-canvas::before { left: 13%; top: 11%; border-radius: 50%; width: 150px; height: 150px; background: radial-gradient(circle, #fffbea 0 18%, #fff4c7cc 21%, #fff0c055 36%, transparent 68%), repeating-conic-gradient(from 8deg, #fff6d02e 0 5deg, transparent 5deg 22deg); -webkit-mask: radial-gradient(circle, #000 30%, transparent 70%); mask: radial-gradient(circle, #000 30%, transparent 70%); }
+body[data-theme='rain'] .house-canvas::before { left: 16%; top: 14%; width: 110px; height: 110px; background: radial-gradient(circle, #e9ecef66 0 22%, #dfe4e826 40%, transparent 70%); }
 .house-canvas canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: pan-y; }
 .house-sky-mark { position: absolute; top: 10%; right: 12%; font-size: 46px; color: #f6e3cfa8; pointer-events: none; }
 .house-sky-mark::before, .house-sky-mark::after { content: '✦'; position: absolute; font-size: 12px; left: -38px; top: -3px; }

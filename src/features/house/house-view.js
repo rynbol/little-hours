@@ -42,6 +42,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   scene.imageProcessingConfiguration.toneMappingEnabled = true;
   scene.imageProcessingConfiguration.toneMappingType = 1;
   scene.imageProcessingConfiguration.exposure = 1.12;
+  scene.imageProcessingConfiguration.contrast = 1.12;
   scene.skipPointerMovePicking = true; scene.skipPointerDownPicking = true; scene.skipPointerUpPicking = true;
   const camera = new ArcRotateCamera('cottage-camera', Math.PI / 2.8, 1.02, 32, new Vector3(0, 1.3, 0), scene);
   camera.mode = Camera.ORTHOGRAPHIC_CAMERA; camera.minZ = .1; camera.maxZ = 100;
@@ -49,7 +50,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const sky = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene);
   const sun = new DirectionalLight('afternoon', new Vector3(-1, -2, -1), scene);
   sun.position.set(0, 12, 6);
-  const shadows = new ShadowGenerator(1024, sun); shadows.usePercentageCloserFiltering = true; shadows.bias = .002; shadows.normalBias = .02; shadows.darkness = .22;
+  const shadows = new ShadowGenerator(2048, sun); shadows.usePercentageCloserFiltering = true; shadows.bias = .002; shadows.normalBias = .02; shadows.darkness = .3;
   shadows.getShadowMap().refreshRate = 0;
   const instrumentation = new SceneInstrumentation(scene);
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
