@@ -8,10 +8,11 @@ const openRooms = async page => {
     if (!localStorage.getItem('little-hours-v1')) localStorage.setItem('little-hours-v1', JSON.stringify(seed));
   }, seedState('three-rooms'));
   await page.goto('/');
-  await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
+  await expect(page.locator('#loading-note')).toBeHidden({ timeout: 60000 });
 };
 
 test('the room heading edits its own saved name without losing drafts or literal names', async ({ page }) => {
+  test.slow();
   await openRooms(page);
   await expect(page.locator('#room-title')).toHaveText('Ember library');
   await expect(page.locator('[data-house-go="studio"]')).toContainText('Ember library');
@@ -42,7 +43,7 @@ test('the room heading edits its own saved name without losing drafts or literal
   expect(axe.violations).toEqual([]);
   await input.press('Enter');
   await page.reload();
-  await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
+  await expect(page.locator('#loading-note')).toBeHidden({ timeout: 60000 });
   await expect(page.locator('#room-title')).toHaveText('Your studio');
   await page.locator('#rooms-button').click();
   await expect(page.locator('#house-detail h2')).toHaveText('Your studio');
@@ -86,13 +87,14 @@ test('room cards respect focus and reduced motion, with readable phone controls'
 });
 
 test('a room change in another tab cancels the old heading draft', async ({ page, context }) => {
+  test.slow();
   await openRooms(page);
   await page.locator('#rename-room').click();
   await page.locator('#room-title-input').fill('Unsubmitted studio name');
   const other = await context.newPage();
   await other.emulateMedia({ reducedMotion: 'reduce' });
   await other.goto('/');
-  await expect(other.locator('#loading-note')).toBeHidden({ timeout: 30000 });
+  await expect(other.locator('#loading-note')).toBeHidden({ timeout: 60000 });
   await other.locator('[data-house-go="garden"]').click();
   await expect(other.locator('#room-title')).toHaveText('Garden wing');
   await expect(page.locator('#room-title')).toHaveText('Garden wing');

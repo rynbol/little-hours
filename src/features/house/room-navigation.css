@@ -51,6 +51,7 @@ body.is-avatar-editing #home-connections { display: none; }
   .room-cards { flex-basis: 100%; gap: 7px; }
   body #home-connections .home-wide { flex-direction: row; gap: 5px; min-height: 44px; padding: 4px 1px; font-size: 10px; }
   body #home-connections .home-wide svg { width: 14px; height: 14px; }
+  body.is-decorating:not(.is-avatar-editing) #home-connections { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   body #home-connections *, .room-title-row *, .room-title-form * { transition: none; animation: none; }
