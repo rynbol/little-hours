@@ -1,6 +1,6 @@
 export const GARDEN_CENTER = [8.75, 0, 0];
 export const GARDEN_TAG = [8.75, -.15, 3.05];
-const GROUND = -.175, grass = ['#a9b98f', '#b2c197'], hedge = ['#6f8a62', '#7d9669', '#657f5b'], picket = '#efe4cc';
+const GROUND = -.175, hedge = ['#6f8a62', '#7d9669', '#657f5b'], picket = '#efe4cc';
 const stone = ['#cfc3ad', '#bfb29a'], bark = '#7a5a42', soil = '#8a6a4f';
 const bloom = ['#eac0b9', '#f5e4bd', '#c8b7d7', '#e6a3a0'];
 const lampGlow = theme => theme === 'dusk' ? ['#ffd88f', 2.1] : theme === 'rain' ? ['#e9d6a8', 1.35] : ['#f3e2bd', 1];
@@ -43,8 +43,6 @@ function flowers(api, x0, x1, z, count) {
 
 export function buildGarden(api, trees, theme) {
   const [cx] = GARDEN_CENTER, w = 5.3, d = 6.2, left = cx - w / 2, right = cx + w / 2, back = -d / 2, front = d / 2;
-  api.box(cx, -.52, 0, w + .2, .48, d + .2, '#63765e');
-  for (let i = 0; i < 6; i++) api.box(left + w * (i + .5) / 6, -.25, 0, w / 6, .15, d, grass[i % 2]);
 
   for (let i = 0; i < 14; i++) api.ball(left + .2 + i * (w - .4) / 13, GROUND + .22, back + .22, .56, .5, .42, hedge[i % 3]);
   for (let i = 1; i < 10; i++) api.ball(right - .2, GROUND + .22, back + .22 + i * (d - 1.6) / 9, .42, .5, .56, hedge[i % 3]);

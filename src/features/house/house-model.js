@@ -11,6 +11,7 @@ import { getFurniture } from '../../core/catalog.js';
 import { surfaceChoices } from '../../core/surfaces.js';
 import { houseFurniture, houseArchitecture } from './house-furniture.js';
 import { buildGarden } from './house-garden.js';
+import { buildIsland } from './house-island.js';
 import { buildExteriorPart, buildBlueprint, exteriorPlan, hingeOf, hingePose, CHIMNEY_TOP } from './house-exterior.js';
 
 // Reuse authored room geometry, batched per room. Only the occupied desk
@@ -70,7 +71,14 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     const m = MeshBuilder.CreateCylinder('part', { diameter, height: depth, tessellation: 18 }, scene);
     m.position.set(x, y, z); if (sideways) m.rotation.z = Math.PI / 2; else m.rotation.x = Math.PI / 2; paint(m, hex, strength);
   }
-  const outside = { box, ball, prism, disc };
+  function shape(positions, colors, normals) {
+    const data = new VertexData(); data.positions = positions; data.indices = Array.from({ length: positions.length / 3 }, (_, i) => i);
+    data.normals = normals; data.colors = colors;
+    data.transform(Matrix.Translation(...origin));
+    if (!buckets.has(bucket)) buckets.set(bucket, []);
+    buckets.get(bucket).push(data);
+  }
+  const outside = { box, ball, prism, disc, shape };
   function cylinder(x, y, z, top, bottom, h, hex) {
     const m = MeshBuilder.CreateCylinder('part', { diameterTop: top, diameterBottom: bottom, height: h, tessellation: 12 }, scene);
     m.position.set(x, y, z); paint(m, hex);
@@ -98,7 +106,6 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   }
   batch('grounds', String(house.rooms.length === 3), () => {
   // A landscaped plinth, porch and stepping stones make even one room a home.
-  box(0, -.52, 0, 11.8, .48, 6.4, '#63765e'); box(0, -.25, 0, 11.6, .15, 6.2, '#a2af8a');
   box(-2.55, -.12, 2.12, 4.9, .18, .65, wood);
   for (let i = 0; i < 3; i++) box(-2.5, -.13, 2.5 + i * .28, .75, .12, .22, '#cdb995');
   // With the loft, the stair hall fills the left end, so its plants step aside.
@@ -130,6 +137,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     }
   }
   });
+  batch('island', 'island', () => buildIsland({ ...outside, cylinder }), 'grounds');
   const trees = house.garden || [];
   batch('orchard', JSON.stringify([theme, trees.map(tree => [tree.date, Math.round(tree.growth * 20)])]), () => buildGarden({ ...outside, cylinder }, trees, theme));
   for (const entry of house.rooms) batch(entry.id, JSON.stringify([entry.layout, theme, entry.id === house.activeId && avatar, house.rooms.length === 1]), () => {
