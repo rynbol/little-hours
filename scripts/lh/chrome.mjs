@@ -109,10 +109,12 @@ export async function launch({ width = 1440, height = 1000, scale = 2, headed = 
       return js(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return null; el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); const b = el.getBoundingClientRect(); const style = getComputedStyle(el); return b.width && b.height && style.visibility !== 'hidden' ? { x: b.left + b.width / 2, y: b.top + b.height / 2, width: b.width, height: b.height, disabled: Boolean(el.disabled) } : null; })()`);
     },
     async clickSel(selector, { timeout = 5000 } = {}) {
-      const end = Date.now() + timeout;
-      let box;
-      while (!(box = await browser.box(selector)) || box.disabled) {
-        if (Date.now() > end) throw new Error(box?.disabled ? `Disabled: ${selector}` : `Not visible: ${selector}`);
+      const end = Date.now() + timeout * slow;
+      let box, before = null;
+      const still = () => before && Math.abs(box.x - before.x) < .5 && Math.abs(box.y - before.y) < .5;
+      while (!(box = await browser.box(selector)) || box.disabled || !still()) {
+        if (Date.now() > end) throw new Error(box?.disabled ? `Disabled: ${selector}` : box ? `Still moving: ${selector}` : `Not visible: ${selector}`);
+        before = box;
         await sleep(50);
       }
       await browser.click(box.x, box.y);
