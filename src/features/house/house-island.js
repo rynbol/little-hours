@@ -1,7 +1,7 @@
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 
 export const ISLAND = Object.freeze({ cx: 2.85, cz: .1, rx: 9.95, rz: 4.65, power: 4.2 });
-export const STREAM = Object.freeze([[10.9, 1.95], [11.5, 2.2], [12.1, 2.35], [12.95, 2.5]]);
+export const STREAM = Object.freeze([[11.75, 1.3], [12.1, 1.75], [12.5, 2.15], [12.95, 2.5]]);
 const TOP = -.175, SEGMENTS = 72, RINGS = 7;
 const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const lawn = ['#a6b68c', '#aebd92', '#9fb187', '#b4c296'];

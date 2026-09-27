@@ -3,7 +3,8 @@ import { createLayout, normalizeLayout, PRESETS } from './layout.js';
 import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCoins, cleanName, recordSession } from './house.js';
 import { fitRoomType } from './room-types.js';
 import { AVATAR_DEFAULT, normalizeAvatarAppearance } from './avatar.js';
-import { clockNow } from './test-pins.js';
+import { clockNow, clockRandom } from './test-pins.js';
+import { emptyPond, normalizePond, addBait, landCatch } from './fishing.js';
 import { normalizeOwnedPets, adoptionVerdict, FREE_PETS } from './pets.js';
 
 export const storageKey = 'little-hours-v1';
@@ -12,7 +13,7 @@ export const recoveryKey = 'little-hours-v1-before-restore';
 
 export function freshState() {
   const layout = createLayout();
-  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [] };
+  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [], pond: emptyPond() };
 }
 
 export function localDate(timestamp = clockNow()) {
@@ -29,6 +30,7 @@ export function restoreState(raw) {
   if (typeof saved.task === 'string') initial.task = saved.task.slice(0, 180);
   initial.avatar = normalizeAvatarAppearance(saved.avatar);
   initial.pets = normalizeOwnedPets(saved.pets);
+  initial.pond = normalizePond(saved.pond);
   if (initial.pets.includes(saved.pet)) initial.pet = saved.pet;
   if (Number.isSafeInteger(saved.seenAt) && saved.seenAt > 0) initial.seenAt = saved.seenAt;
   for (const key of Object.keys(initial.decor)) {
@@ -75,6 +77,7 @@ function completeDueSession(state, now) {
   state.history = state.history.slice(-365);
   state.house.coins = Math.min(1_000_000_000, state.house.coins + focusCoins(duration / 60_000));
   recordSession(state.house, { at: endsAt, minutes: duration / 60_000 });
+  addBait(state.pond, duration / 60_000, endsAt);
   return true;
 }
 
@@ -162,6 +165,11 @@ export function createStateStore(storage, now = clockNow) {
         draft.pet = id;
       });
       return { ...result, adopted: verdict.ok, reason: verdict.reason };
+    },
+    landFish(baitIndex) {
+      let caught = null;
+      const result = update((draft, { now: timestamp }) => { caught = landCatch(draft.pond, baitIndex, clockRandom, timestamp); });
+      return { ...result, caught };
     },
     renameHouse(name) { return update(draft => { draft.house.name = cleanName(name, draft.house.name); }); },
     renameRoom(id, name) { return update(draft => { const room = draft.house.rooms.find(entry => entry.id === id); if (room) room.name = cleanName(name, room.name); }); },

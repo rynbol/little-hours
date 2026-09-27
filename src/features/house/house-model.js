@@ -11,6 +11,7 @@ import { getFurniture } from '../../core/catalog.js';
 import { surfaceChoices } from '../../core/surfaces.js';
 import { houseFurniture, houseArchitecture } from './house-furniture.js';
 import { buildGarden } from './house-garden.js';
+import { buildPond } from './house-pond.js';
 import { buildIsland } from './house-island.js';
 import { buildExteriorPart, buildBlueprint, exteriorPlan, hingeOf, hingePose, CHIMNEY_TOP } from './house-exterior.js';
 
@@ -138,6 +139,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   }
   });
   batch('island', 'island', () => buildIsland({ ...outside, cylinder }), 'grounds');
+  batch('pond', 'pond', () => buildPond({ ...outside, cylinder }));
   const trees = house.garden || [];
   batch('orchard', JSON.stringify([theme, trees.map(tree => [tree.date, Math.round(tree.growth * 20)])]), () => buildGarden({ ...outside, cylinder }, trees, theme));
   for (const entry of house.rooms) batch(entry.id, JSON.stringify([entry.layout, theme, entry.id === house.activeId && avatar, house.rooms.length === 1]), () => {

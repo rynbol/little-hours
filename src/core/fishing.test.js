@@ -1,0 +1,76 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { rollCatch, baitRange, SPECIES, TIERS, BAIT_RANGES } from './fishing.js';
+import { createStateStore, restoreState, freshState } from './state.js';
+
+const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
+const tierOfCatch = c => SPECIES.find(s => s.id === c.species).tier;
+
+test('bait falls in a range by session length, and short sessions give none', () => {
+  assert.deepEqual([1, 4, 5, 14, 15, 29, 30, 49, 50, 89, 90, 120].map(m => baitRange(m)?.id ?? null),
+    [null, null, 'crumb', 'crumb', 'worm', 'worm', 'cricket', 'cricket', 'firefly', 'firefly', 'star', 'star']);
+});
+
+test('longer sessions reach rarer tiers, and a crumb never hooks a legend', () => {
+  assert.equal(tierOfCatch(rollCatch(10, seq(.999, 0, .5))), 'uncommon');
+  assert.equal(tierOfCatch(rollCatch(10, seq(.1, 0, .5))), 'common');
+  assert.equal(tierOfCatch(rollCatch(120, seq(.999, 0, .5))), 'legendary');
+  assert.equal(tierOfCatch(rollCatch(60, seq(.5, 0, .5))), 'rare');
+  let random = 1; const lcg = () => (random = (random * 16807) % 2147483647) / 2147483647;
+  const counts = minutes => { const c = Object.fromEntries(TIERS.map(t => [t.id, 0])); for (let i = 0; i < 4000; i++) c[tierOfCatch(rollCatch(minutes, lcg))]++; return c; };
+  const short = counts(10), long = counts(120);
+  assert.deepEqual([short.rare, short.epic, short.legendary], [0, 0, 0]);
+  assert.ok(long.legendary > 300 && long.legendary < 660, `about 12% legends from a 2 hour session, got ${long.legendary}`);
+  assert.ok(long.common < short.common / 5);
+});
+
+test('the same fish comes out bigger from a longer session', () => {
+  const small = rollCatch(15, seq(.1, 0, .5)), big = rollCatch(120, seq(.02, 0, .5));
+  assert.deepEqual([small.species, big.species], ['minnow', 'minnow']);
+  assert.equal(small.size, 6.9);
+  assert.equal(big.size, 8);
+});
+
+test('every range has a catchable species and weights that sum to 100', () => {
+  for (const range of BAIT_RANGES) assert.equal(range.weights.reduce((a, b) => a + b, 0), 100, range.id);
+  for (const tier of TIERS) assert.ok(SPECIES.some(s => s.tier === tier.id), tier.id);
+});
+
+function fixture(initial) {
+  let raw = initial ? JSON.stringify(initial) : null, clock = 1000;
+  const storage = { getItem: () => raw, setItem: (_, value) => { raw = value; } };
+  const now = () => clock;
+  return { store: createStateStore(storage, now), tick: ms => { clock += ms; }, reopen: () => createStateStore(storage, now) };
+}
+
+test('a finished focus session leaves bait at the pond, and a short one does not', () => {
+  const f = fixture();
+  assert.deepEqual(f.store.state.pond.bait, [{ minutes: 10, at: 0 }], 'a starter crumb for a new pond');
+  f.store.update(d => { d.session = { duration: 45 * 60_000, remaining: 45 * 60_000, running: false, endsAt: null }; });
+  f.store.setRunning(true); f.tick(45 * 60_000); f.store.update();
+  assert.deepEqual(f.store.state.pond.bait.map(b => b.minutes), [10, 45]);
+  f.store.update(d => { d.session = { duration: 3 * 60_000, remaining: 3 * 60_000, running: false, endsAt: null }; });
+  f.store.setRunning(true); f.tick(3 * 60_000); f.store.update();
+  assert.deepEqual(f.reopen().state.pond.bait.map(b => b.minutes), [10, 45]);
+});
+
+test('landing a fish spends the bait and fills the journal, repeats count up', () => {
+  const state = freshState(); state.pond.bait = [{ minutes: 20, at: 5 }, { minutes: 20, at: 6 }, { minutes: 20, at: 7 }];
+  const f = fixture(state);
+  const first = f.store.landFish(0).caught;
+  assert.equal(first.isNew, true);
+  assert.equal(f.store.state.pond.bait.length, 2);
+  const again = [f.store.landFish(0).caught, f.store.landFish(0).caught];
+  assert.equal(f.store.landFish(0).caught, null, 'no bait, no fish');
+  const all = [first, ...again], mine = f.reopen().state.pond;
+  const total = Object.values(mine.journal).reduce((sum, e) => sum + e.count, 0);
+  assert.equal(total, 3);
+  assert.equal(mine.log.length, 3);
+  for (const c of all) assert.equal(mine.journal[c.species].best, Math.max(...all.filter(o => o.species === c.species).map(o => o.size)));
+});
+
+test('a broken saved pond is cleaned up', () => {
+  const pond = restoreState(JSON.stringify({ pond: { bait: [{ minutes: 3, at: 1 }, { minutes: 30, at: 2 }, 'x'], journal: { koi: { count: 2, best: 44, first: 9 }, dragon: { count: 1, best: 1, first: 1 }, perch: { count: -1 } }, log: [{ species: 'nope' }] } })).pond;
+  assert.deepEqual(pond, { bait: [{ minutes: 30, at: 2 }], journal: { koi: { count: 2, best: 44, first: 9 } }, log: [] });
+  assert.deepEqual(restoreState('{}').pond.bait, [{ minutes: 10, at: 0 }]);
+});
