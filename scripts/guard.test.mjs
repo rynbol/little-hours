@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkSource, commentLines } from './guard.mjs';
+import { checkSource, commentLines, untestedChange } from './guard.mjs';
 
 const rules = (file, code) => checkSource(file, code).map(problem => problem.rule);
 
@@ -40,4 +40,13 @@ test('features meet only through their index, and layers point one way', () => {
   assert.deepEqual(rules('src/app/panels.js', "import { createRoom } from '../features/room/index.js'; import { x } from '../features/room/room.js';"), ['layers']);
   assert.deepEqual(rules('src/stray.js', "import { FURNITURE } from './core/catalog.js';"), ['layers']);
   assert.deepEqual(rules('src/features/pet/pet.test.js', "import { walkable } from '../companion/companion.js';"), []);
+});
+
+test('game code changes come with a test, or a No-test trailer says why', () => {
+  assert.equal(untestedChange(['src/features/house/house-garden.js'], 'Garden gets a pond')?.rule, 'tests-with-changes');
+  assert.equal(untestedChange(['src/features/house/house-garden.js', 'scripts/lh/flows/house.mjs'], ''), null);
+  assert.equal(untestedChange(['src/core/garden.js', 'src/core/garden.test.js'], ''), null);
+  assert.equal(untestedChange(['src/features/house/whole-house.css', 'README.md'], ''), null);
+  assert.equal(untestedChange(['src/features/room/room.js'], 'Tidy\n\nNo-test: rename only'), null);
+  assert.equal(untestedChange(['src/features/room/room.js'], 'No-test:')?.rule, 'tests-with-changes');
 });

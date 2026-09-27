@@ -98,6 +98,15 @@ function addedLines(base) {
   return { added, removed };
 }
 
+const TEST_FILE = /(\.test\.m?js$|^e2e\/|^scripts\/lh\/flows\/|^checks\/)/;
+const GAME_CODE = /^src\/.*\.js$/;
+
+export function untestedChange(files, messages) {
+  const code = files.filter(file => GAME_CODE.test(file) && !TEST_FILE.test(file));
+  if (!code.length || files.some(file => TEST_FILE.test(file)) || /^No-test: \S/m.test(messages)) return null;
+  return { file: code[0], line: 0, rule: 'tests-with-changes', message: `game code changed (${code.length} file(s)) with no unit test, e2e test, lh flow or check; add one, or say why in a "No-test: <reason>" commit trailer` };
+}
+
 function defaultBase() {
   try { return git(['merge-base', 'HEAD', 'origin/main']); } catch { return null; }
 }
@@ -117,6 +126,8 @@ function main() {
       const code = readFileSync(join(root, file), 'utf8'), text = code.split('\n');
       for (const line of commentLines(file, code)) if ((lines === 'all' || lines.has(line)) && !removed.has(text[line - 1].trim())) problems.push({ file, line, rule: 'no-new-comments', message: 'new code comments are not allowed; say it in the code, the commit message, or the docs' });
     }
+    const untested = untestedChange([...added.keys()], git(['log', '--format=%B', `${base}..HEAD`]));
+    if (untested) problems.push(untested);
   }
   for (const problem of problems) console.log(`${problem.file}:${problem.line}  ${problem.rule}  ${problem.message}`);
   console.log(`guard: ${files.length} files, ${problems.length} problem(s)${base ? `, new comments checked against ${base.slice(0, 7)}` : ', comment check skipped (no base commit)'}`);

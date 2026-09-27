@@ -18,6 +18,8 @@ Use Node 24. Verification commands are `npm test`, `npm run verify:room`, and `n
 
 Verify browser behaviour with the `lh` CLI (`npm run lh -- help`) and follow `.claude/skills/verify-little-hours/SKILL.md`: `lh doctor`, then `lh run <flow>`, then `lh perf` / `lh shot` / `lh heap` with `--against main`, then `lh cleanup`. Add missing steps or flows under `scripts/lh/` instead of writing one-off driver scripts. Use `--headed` when the user wants to watch.
 
+A feature is done when it has a test. Every change to game code (`src/**/*.js`) ships in the same push with a unit test, Playwright test, lh flow or check that would fail without it; `npm run guard` enforces this, and a change that truly needs none says why in a `No-test: <reason>` commit trailer. CI runs guard, unit tests, the room harness, the build, Playwright and every lh flow on each push. In Claude Code, a Stop hook (`.claude/hooks/check-before-stop.sh`) runs the unit tests and guard on uncommitted changes and will not let the agent finish while they fail.
+
 `npm run guard` runs in CI and enforces these rules:
 - Game code gets time from `clockNow()` and randomness from `clockRandom()` in `src/core/test-pins.js`, never `Date.now()`, `Math.random()` or `new Date()` directly, so test runs repeat.
 - Only `src/dev/test-hook.js` and `src/core/test-pins.js` touch the test globals; only `src/main.js` imports the hook, and it is left out of production builds.

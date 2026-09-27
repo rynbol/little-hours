@@ -39,3 +39,23 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+
+  flows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: echo "CHROME_PATH=$(node -e "import('@playwright/test').then(p => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
+      - run: npm run lh -- run all
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lh-evidence
+          path: .lh/out
+          retention-days: 7

@@ -27,7 +27,7 @@ export async function launch({ width = 1440, height = 1000, scale = 2, headed = 
     `--user-data-dir=${dir}`, '--remote-debugging-port=0', headed ? '' : '--headless=new',
     '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--mute-audio',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
-    `--use-angle=${gpuFlag}`, gpuFlag === 'swiftshader' ? '--enable-unsafe-swiftshader' : '',
+    `--use-angle=${gpuFlag}`, gpuFlag === 'swiftshader' ? '--enable-unsafe-swiftshader' : '', process.env.CI ? '--no-sandbox' : '',
     `--window-size=${width},${height}`, 'about:blank',
   ].filter(Boolean);
   const proc = spawn(chromePath, args, { stdio: 'ignore' });
