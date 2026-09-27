@@ -11,7 +11,7 @@ test('lines never repeat back to back, and every moment has something short to s
   assert.equal(pickLine(['only'], 'only'), 'only', 'a single line still speaks');
   // Every companion state has tap lines; every pet has pet, sleepy, carry and hello lines.
   for (const state of ['idle', 'working', 'walking', 'returning', 'resting', 'sleeping', 'resting-at-desk']) assert.ok(AVATAR_LINES.tap[state].length >= 2, state);
-  for (const species of Object.keys(PETS)) for (const kind of ['pet', 'sleepy', 'carry', 'hello', 'friend']) assert.ok(PET_LINES[species][kind].length >= 2, `${species} ${kind}`);
+  for (const species of Object.keys(PETS)) for (const kind of ['carry', 'hello', 'friend']) assert.ok(PET_LINES[species][kind].length >= 2, `${species} ${kind}`);
   // Every break activity, and reading in the armchair, has its own lines.
   for (const kind of [...Object.keys(ACTIVITIES), 'read']) assert.ok(AVATAR_LINES.activity[kind]?.length >= 2, kind);
   // Bubbles stay small: short lines, and each one stays long enough to read.

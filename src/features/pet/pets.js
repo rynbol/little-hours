@@ -265,6 +265,7 @@ export function createPetModel(scene, species = 'cat') {
   const heart = new Mesh('pet-heart', scene); heartData().applyToMesh(heart);
   const heartMaterial = scene.getMaterialByName('pet-heart-glow') || Object.assign(new StandardMaterial('pet-heart-glow', scene), { disableLighting: true, diffuseColor: Color3.Black(), emissiveColor: Color3.White(), backFaceCulling: false });
   heart.material = heartMaterial; heart.useVertexColors = true; heart.billboardMode = Mesh.BILLBOARDMODE_ALL; heart.isPickable = false; heart.metadata = { castShadow: false, effect: 'pet-heart' }; heart.setEnabled(false);
+  const hearts = [heart, ...[1, 2].map(i => Object.assign(heart.clone(`pet-heart-${i}`), { metadata: heart.metadata }))];
   const contact = createContactShadow(`pet-${species}-contact-shadow`, 0.42 * spec.scale, 0.3 * spec.scale, scene, { soft: 0.24, strength: 0.3 });
   contact.metadata = { ...contact.metadata, pet: true };
   // Scratch space, reused every frame.
@@ -320,7 +321,7 @@ export function createPetModel(scene, species = 'cat') {
     return nearest;
   }
   return {
-    root, body, contact, heart, sleepLetters, species, headPoint, hitTest,
+    root, body, contact, heart, hearts, sleepLetters, species, headPoint, hitTest,
     animate(pose, dt, seconds, reducedMotion) {
       const action = goals[pose.action] ? pose.action : 'sleep';
       // A settled nap only breathes, slowly: the rig updates at half rate
@@ -403,7 +404,7 @@ export function createPetModel(scene, species = 'cat') {
       skin[0].bone.markAsDirty();
       updateEffects(pose, seconds, reducedMotion);
     },
-    dispose() { for (const node of [root, sleepLetters, heart, contact]) node.dispose(false, false); skeleton.dispose(); },
+    dispose() { for (const node of [root, sleepLetters, ...hearts, contact]) node.dispose(false, false); skeleton.dispose(); },
   };
   // The nap letters and the heart float above the head.
   function updateEffects(pose, seconds, reducedMotion) {
@@ -418,11 +419,15 @@ export function createPetModel(scene, species = 'cat') {
       sleepLetters.updateVerticesData('position', letterPositions, false, false);
     }
     const showHeart = pose.petAge < PET_REACTION;
-    heart.setEnabled(showHeart);
-    if (showHeart) {
-      const t = pose.petAge, pop = reducedMotion ? 1 : smooth(t / 0.22) * (1 + Math.sin(Math.min(1, t / 0.5) * Math.PI) * 0.25);
-      headPoint(w); heart.position.set(w.x, w.y + 0.3 + (reducedMotion ? 0 : t * 0.16), w.z); heart.scaling.setAll(pop * (1 - smooth((t - 2.1) / 0.5) * 0.4));
-      heart.visibility = 1 - smooth((t - 2.1) / 0.5);
-    }
+    if (showHeart) headPoint(w);
+    hearts.forEach((each, i) => {
+      const t = pose.petAge - (reducedMotion ? 0 : i * 0.42), life = 1.7, visible = showHeart && t >= 0 && t < life && (!reducedMotion || i === 0);
+      each.setEnabled(visible);
+      if (!visible) return;
+      const pop = reducedMotion ? 1 : smooth(t / 0.2) * (1 + Math.sin(Math.min(1, t / 0.45) * Math.PI) * 0.2), fade = 1 - smooth((t - life + 0.5) / 0.5), size = [1, 0.78, 0.9][i];
+      const sway = reducedMotion ? 0 : Math.sin(t * 3.2 + i * 2) * 0.05 + [0, -0.07, 0.07][i];
+      each.position.set(w.x + sway, w.y + 0.26 + (reducedMotion ? 0 : t * 0.24), w.z);
+      each.scaling.setAll(pop * size * (0.7 + fade * 0.3)); each.visibility = fade;
+    });
   }
 }

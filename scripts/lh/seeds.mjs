@@ -18,6 +18,7 @@ export const SEEDS = {
   'three-rooms': house(3),
   greenhouse: { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'garden' } },
   ...Object.fromEntries(['seed', 'sprout', 'youngling', 'budding', 'bloom'].map((name, phase) => [`greenhouse-${name}`, { ...house(3), layout: undefined, session: growing(phase), house: { ...house(3).house, activeId: 'garden' } }])),
+  ...Object.fromEntries(['cloud-loft', 'ember-library'].map(presetId => [`greenhouse-${presetId}`, { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'garden', rooms: rooms.map(entry => entry.id === 'garden' ? room('garden', presetId, 'Garden wing') : entry) } }])),
   'attic-stars': { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft', sessions: starLog } },
   attic: { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft' } },
 };

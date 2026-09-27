@@ -7,11 +7,8 @@ import { icon } from '../../ui/icons.js';
 export function createPetUI(app) {
   const name = () => PETS[app.state.pet]?.name || PETS.cat.name;
 
-  // A pet gets a cute line in a bubble just above its head.
-  function feedback({ species = app.state.pet, state: mood, by = 'you' } = {}) {
-    const lines = PET_LINES[species] || PET_LINES.cat;
-    if (app.speech) app.speech.say('pet', by === 'companion' ? lines.friend : mood === 'sleeping' ? lines.sleepy : lines.pet);
-    else app.toast(`${PETS[species]?.name || 'Miso'} is happy you’re here.`);
+  function feedback({ species = app.state.pet, by = 'you' } = {}) {
+    if (by === 'companion') app.speech?.say('pet', (PET_LINES[species] || PET_LINES.cat).friend);
   }
 
   function renderName() {

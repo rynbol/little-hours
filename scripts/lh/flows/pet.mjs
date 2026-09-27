@@ -1,30 +1,33 @@
 const BUBBLE = `(() => { const b = document.querySelector('.speech-bubble[data-speaker="pet"]'); return b && !b.hidden ? b.textContent.trim() : null; })()`;
-const CAT = /prr|Mrr|Mrow|Miso|blink|purr/i, DOG = /Wag|snuffle|Mochi|Boop|Arf|tail|belly/i;
+const CAT = /prr|Mrr|Mew/i, DOG = /Arf|Wuff|Yip|Snff/i;
+const HEARTS = `window.__littleHours.room.diagnostics().petModel.hearts.filter(heart => heart.isEnabled()).length`;
 
 async function tapPet(app, sleep) {
   for (let i = 0; i < 4; i++) {
     const spot = await app.point('pet');
     if (spot?.visible) {
       await app.click(spot.x, spot.y);
-      const said = await app.waitFor(BUBBLE, { timeout: 1500 }).catch(() => null);
-      if (said) return { spot, said };
+      const counts = [];
+      for (let k = 0; k < 14; k++) { counts.push(await app.js(HEARTS)); await sleep(100); }
+      if (counts.some(Boolean)) return { spot, counts, said: await app.js(BUBBLE) };
     }
     await sleep(300);
   }
-  return { spot: await app.point('pet'), said: null };
+  return { spot: await app.point('pet'), counts: [], said: null };
 }
+const oneByOne = counts => counts.indexOf(1) >= 0 && counts.indexOf(1) < counts.indexOf(2) && counts.indexOf(2) < counts.indexOf(3);
 
 export default {
-  about: 'the pet: a tap gets a bubble, the pet panel switches between the cat and the dog, and the choice survives a reload',
+  about: 'the pet: a tap gets hearts one after another and no words, the pet panel switches between the cat and the dog, and the choice survives a reload',
   async run(t) {
     const { check, sleep } = t;
     const app = await t.open({ seed: 'three-rooms' });
     await app.settle();
     check('the room starts with Miso the cat', await app.text('#pet-button-label') === 'Miso' && await app.js('window.__littleHours.room.diagnostics().petSpecies') === 'cat');
     let tap = await tapPet(app, sleep);
-    check('tapping the cat shows a bubble above it', tap.said !== null, tap);
-    check('the bubble is a cat line', CAT.test(tap.said || ''), tap.said);
-    await t.shot(app, 'cat-bubble');
+    check('tapping the cat floats three hearts up one after another', oneByOne(tap.counts), tap.counts);
+    check('petting shows no words', tap.said === null, tap.said);
+    await t.shot(app, 'cat-hearts');
     await app.clickSel('#pet-button');
     await app.waitFor(`document.querySelectorAll('[data-pet-choice]').length === 2`, { what: 'the pet panel' });
     check('the pet panel offers the cat and the dog, with the cat chosen', await app.attr('[data-pet-choice="cat"]', 'aria-pressed') === 'true' && await app.attr('[data-pet-choice="dog"]', 'aria-pressed') === 'false');
@@ -41,8 +44,8 @@ export default {
     await app.settle();
     check('after a reload the dog is still your pet', await app.text('#pet-button-label') === 'Mochi' && await app.js('window.__littleHours.room.diagnostics().petSpecies') === 'dog');
     tap = await tapPet(app, sleep);
-    check('tapping the dog after the reload shows a dog line', DOG.test(tap.said || ''), tap);
-    await t.shot(app, 'dog-bubble');
+    check('tapping the dog after the reload gets hearts too, without words', oneByOne(tap.counts) && tap.said === null, tap);
+    await t.shot(app, 'dog-hearts');
     await app.clickSel('#pet-button');
     await app.waitFor(`document.getElementById('pet-now') !== null`, { what: 'the pet panel' });
     check('the panel button offers to pet Mochi', (await app.text('#pet-now'))?.includes('Give Mochi a pet'), await app.text('#pet-now'));
