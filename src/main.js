@@ -13,11 +13,12 @@ import { createRoom, createRoomUI } from './features/room/index.js';
 import { createAudio, wireSoundControls } from './features/audio/index.js';
 import { createSavesPanel } from './features/backup/index.js';
 import { createSpeech, createCompanionUI } from './features/companion/index.js';
-import { createMomentsUI } from './features/moments/index.js';
+import { createMomentsUI, createDelights } from './features/moments/index.js';
 import { createPetUI } from './features/pet/index.js';
 import { createHouseUI, createHouseNavigation } from './features/house/index.js';
 import { createAvatarPanel } from './features/avatar/index.js';
 import './features/avatar/wardrobe.css';
+import './features/pet/pet.css';
 import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
@@ -71,6 +72,7 @@ function applyState(next, force = false) {
   app.roomUI.applyTheme(previous, force);
   if ($('#task').value !== state.task) $('#task').value = state.task;
   if (force || previous.pet !== state.pet) { app.room?.setPet?.(state.pet); app.pet.renderName(); app.decorate.renderInspector(); }
+  app.pet.sync();
   app.room?.setAvatarAppearance?.(state.avatar);
   for (const [key, visible] of Object.entries(state.decor)) {
     if (key === 'lights' && (force || previous.decor[key] !== visible)) app.room?.setDecor(key, visible);
@@ -81,11 +83,11 @@ function applyState(next, force = false) {
 }
 function acceptUpdate(result) {
   applyState(result.state);
-  if (result.completed) {
-    app.room?.pet(); app.companion.say('finish', { force: true });
-    app.timer.showCelebration(result.earned);
+  if (result.completion) {
+    app.room?.celebrate(); app.room?.petRitual('play'); app.delights?.show('finish'); app.delights?.show('play', 'pet');
+    app.timer.showCelebration(result.completion);
     // Ring for a session that just ended, not one found finished long ago.
-    if (clockNow() - app.state.session.completedAt < 90_000) audio.chime();
+    if (clockNow() - result.completion.at < 90_000) audio.chime();
   }
   app.backup.setSaveStatus(result.persisted);
   if (!result.persisted && !app.storageWarningShown) {
@@ -110,7 +112,7 @@ try {
     pet: app.state.pet,
     onPet: app.pet.feedback,
     onPetCarry: app.pet.onPetCarry,
-    onFrame() { app.speech?.update(); },
+    onFrame() { app.speech?.update(); app.delights?.update(); },
     onDoorProgress: app.nav.onDoorProgress,
     onCompanionState: app.companion.onCompanionState,
     ...app.decorate.roomEvents,
@@ -125,6 +127,7 @@ try {
   const speechLayer = document.createElement('div'); speechLayer.className = 'speech-layer';
   $('#room-canvas').appendChild(speechLayer);
   app.speech = createSpeech(speechLayer, { anchor: who => app.room?.anchor(who), reducedMotion: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
+  app.delights = createDelights($('#room-canvas'), { room: app.room, signal: listeners.signal, unavailable: () => app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact });
   app.moments = createMomentsUI($('#stage'), { room: app.room, signal: listeners.signal, getState: () => ({ items: app.state.layout.items, focusing: app.state.session.running, unavailable: app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact }) });
 } catch (error) {
   $('#loading-note').textContent = 'The room couldn’t load. Try reloading; your focus timer is still ready.';
@@ -184,6 +187,7 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   app.houseUI?.dispose();
   app.lake.dispose();
   app.moments?.dispose();
+  app.delights?.dispose();
   app.room?.dispose?.();
   audio.dispose();
 });

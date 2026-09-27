@@ -493,6 +493,24 @@ try {
     assert.ok(shadowMap.renderList !== casters && shadowMap.renderList.includes(model.body) && frames.size === 0, 'its shadow redraws at the bed, then the room is idle');
   }
   room.setEditMode(decorating); advance(3);
+  {
+    room.setEditMode(false); room.setLayout(createLayout('writers-loft')); advance(3);
+    const realTimeout = globalThis.setTimeout, timers = [];
+    globalThis.setTimeout = (callback, ms) => { timers.push({ callback, ms }); return 0; };
+    try {
+      time += 30000;
+      assert.equal(room.petRitual('play'), true); advance(2);
+      assert.equal(diagnostics().pet.ritual, 'play', 'idle time before play does not consume the ritual');
+      time += 3100; timers.at(-1).callback(); advance(200);
+      assert.equal(diagnostics().pet.ritual, null, 'the ritual ends on its own deadline');
+      time += 30000;
+      assert.equal(room.invitePet(), true); advance(2);
+      assert.equal(diagnostics().pet.state, 'sitting', 'idle time before an invitation does not send the pet home');
+      const wake = timers.at(-1); time += wake.ms; wake.callback(); advance(200);
+      assert.equal(diagnostics().pet.state, 'sleeping', 'the invited pet settles home after its visit');
+    } finally { globalThis.setTimeout = realTimeout; }
+    room.setEditMode(decorating); advance(3);
+  }
   console.log('PASS animations: the pet naps in its bed and breathes, a pet brings a heart that ends, a carry sets it down and it walks home; settling keeps the saved layout; reduced motion holds still and sends a dropped pet home.');
   const savedRoutineLayout = diagnostics().layout;
   motion.matches = false; motion.emit('change', { matches: false });

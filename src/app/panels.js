@@ -8,6 +8,7 @@ export function createPanels(app) {
     const panel = $('#room-panel');
     const leavingAvatar = app.avatar.syncEditing(current);
     panel.hidden = !current;
+    panel.dataset.panelKind = current || '';
     document.querySelectorAll('[data-panel]').forEach(button => button.setAttribute('aria-expanded', button.dataset.panel === current));
     // Reconcile the new canvas bounds before the next frame, not one frame
     // later when ResizeObserver runs after the portrait layout disappears.

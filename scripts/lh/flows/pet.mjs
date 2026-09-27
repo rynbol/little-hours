@@ -34,6 +34,7 @@ export default {
     let tap = await tapPet(app, sleep, t.slow);
     check('tapping the cat floats two hearts up one after another', oneByOne(tap.counts), tap.counts);
     check('petting shows no words', tap.said === null, tap.said);
+    check('a room cuddle grows the saved bond once', await app.js('window.__littleHours.state.petBonds.cat.affection === 2'));
     const again = await petAgain(app, sleep, tap.spot, 4);
     check('four more taps stack a heart each', again.hearts >= 5, again);
     check('more taps hold the lean instead of starting it over', again.ages.every(age => age >= .3 && age < 2.6), again.ages);
@@ -81,8 +82,11 @@ export default {
     check('adopting Hoshi spends 90 coins', await shop.text('#coin-balance') === '30', await shop.text('#coin-balance'));
     check('the fox is in the room and named', await shop.js('window.__littleHours.room.diagnostics().petSpecies') === 'fox' && await shop.text('#pet-button-label') === 'Hoshi');
     check('the fox now lives with you and the save knows it', JSON.stringify((await shop.saved())?.pets) === '["cat","dog","fox"]' && !(await shop.js(`document.querySelector('[data-pet-choice="fox"]').classList.contains('is-locked')`)));
+    await shop.clickSel('#close-panel');
+    await shop.waitFor(`(() => { const pet = window.__littleHours.room.diagnostics().pet; return pet.petAge === Infinity && pet.hearts.length === 0 && pet.ritual === null; })()`, { what: 'the welcome play to finish' });
     const foxTap = await tapPet(shop, sleep, t.slow);
     check('tapping the fox gets hearts too', oneByOne(foxTap.counts), foxTap.counts);
+    check('the fox remembers the cuddle after welcome play', (await shop.saved())?.petBonds.fox.affection === 1);
     await t.shot(shop, 'fox-hearts');
     await t.close(shop);
   },

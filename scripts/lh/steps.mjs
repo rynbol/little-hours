@@ -10,6 +10,7 @@ export const steps = {
 };
 
 export const cycles = {
+  pet: { about: 'choose the cat and puppy, open and close the pet notebook', async run(app) { await app.clickSel('#pet-button'); await app.clickSel('[data-pet-choice="dog"]'); await app.clickSel('[data-pet-choice="cat"]'); await app.clickSel('#close-panel'); await app.settle(); } },
   house: { about: 'open the house page, then go back to the room', async run(app) { await steps.openHouse(app); await steps.backToRoom(app); } },
   decorate: { about: 'open Decorate, then leave it', async run(app) { await steps.openDecorate(app); await steps.closeDecorate(app); } },
   avatar: { about: 'open the avatar editor, then press Done', async run(app) { await steps.openAvatar(app); await steps.closeAvatar(app); } },
@@ -17,6 +18,7 @@ export const cycles = {
 };
 
 export const views = {
+  pet: { about: 'your pet notebook', async go(app) { await app.clickSel('#pet-button'); await app.settle(); } },
   room: { about: 'the room at rest', async go() {} },
   house: { about: 'the house page, open', async go(app) { await steps.openHouse(app); } },
   'house-closed': { about: 'the house page, closed', async go(app) { await steps.openHouse(app); await steps.toggleHouse(app); } },

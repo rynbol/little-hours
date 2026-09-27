@@ -35,11 +35,11 @@ test('pause intent at the deadline completes once without starting another sessi
   store.setRunning(true);
   now += 25 * 60_000;
   const paused = store.setRunning(false);
-  assert.equal(paused.completed, true);
+  assert.equal(Boolean(paused.completion), true);
   assert.equal(paused.state.session.running, false);
   assert.equal(paused.state.session.remaining, 0);
   assert.equal(paused.state.history.length, 1);
-  assert.equal(store.setRunning(false).completed, false);
+  assert.equal(Boolean(store.setRunning(false).completion), false);
   assert.equal(store.state.history.length, 1);
   const restarted = store.setRunning(true);
   assert.equal(restarted.state.session.running, true);
@@ -69,11 +69,11 @@ test('two stores settling the same expired session preserve a single completion'
   first.setRunning(true);
   const second = createStateStore(storage, () => now);
   now += 25 * 60_000;
-  assert.equal(first.update().completed, true);
-  assert.equal(second.update().completed, false);
+  assert.equal(Boolean(first.update().completion), true);
+  assert.equal(Boolean(second.update().completion), false);
   second.update(draft => { draft.task = 'Next chapter'; });
   assert.equal(first.refresh().history.length, 1);
-  assert.equal(createStateStore(storage, () => now).update().completed, false);
+  assert.equal(Boolean(createStateStore(storage, () => now).update().completion), false);
 });
 
 test('restoring tomorrow credits the deadline date rather than the reopen date', () => {
@@ -85,7 +85,7 @@ test('restoring tomorrow credits the deadline date rather than the reopen date',
   now = new Date(2026, 8, 22, 10, 0).getTime();
   const reopened = createStateStore(storage, () => now);
   const result = reopened.update();
-  assert.equal(result.completed, true);
+  assert.equal(Boolean(result.completion), true);
   assert.deepEqual(result.state.history, [{ date: localDate(deadline), minutes: 25 }]);
   assert.notEqual(result.state.history[0].date, localDate(now));
 });
@@ -207,7 +207,7 @@ test('a finished session is a short break, then reads as a fresh timer', () => {
   const storage = memoryStorage(), store = createStateStore(storage, () => now);
   store.setRunning(true); now += 1_500_000;
   const result = store.update();
-  assert.equal(result.completed, true);
+  assert.equal(Boolean(result.completion), true);
   assert.equal(result.state.session.completedAt, 1_501_000, 'completion records when the session ended');
   assert.equal(createStateStore(storage, () => now).state.session.completedAt, 1_501_000, 'the finish time survives a reload');
   const finished = result.state.session;

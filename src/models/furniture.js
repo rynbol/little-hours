@@ -1713,6 +1713,9 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
           if (openHands) { reachArm(joints['shoulder' + key], target.set(side * .07, hip + .45, -.34), side, -.8, .3); blendArm(key, openHands); }
           hand.y += Math.sin(seconds * .9 + side) * .01 * pw;
         }
+        if (pose.celebration && !reducedMotion) {
+          reachArm(joints['shoulder' + key], target.set(side * .36, hip + .98 + Math.sin(seconds * 9 + side) * .045, -.28), side, -.7, .3); blendArm(key, pose.celebration);
+        }
         if (!w) continue;
         const shoulder = joints['shoulder' + key], H = hip;
         // The right hand does the work; the left one helps or rests.
@@ -1858,7 +1861,7 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
     });
     result.metadata.study = true; result.metadata.avatar = avatar;
     let workStartedAt = null;
-    animations.push((seconds, focused, reducedMotion) => {
+    animations.push((seconds, focused, reducedMotion, celebration = 0) => {
       // An inactive desk keeps its companion hidden; its separate cup can still steam.
       if (!avatar.isEnabled()) { workStartedAt = null; return; }
       if (!focused || reducedMotion) workStartedAt = null;
@@ -1902,6 +1905,15 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
         hands[1].position.x += (0.025 - hands[1].position.x) * trackpad;
         hands[1].position.z += (-0.76 - hands[1].position.z) * trackpad;
         hands[1].position.y += (1.37 - hands[1].position.y) * trackpad;
+      }
+      if (celebration) {
+        for (let i = 0; i < hands.length; i++) {
+          const hand = hands[i], side = i ? 1 : -1;
+          hand.position.x += (side * .36 - hand.position.x) * celebration;
+          hand.position.y += (1.88 + Math.sin(seconds * 9 + i) * .055 - hand.position.y) * celebration;
+          hand.position.z += (-.42 - hand.position.z) * celebration;
+        }
+        head.rotation.x -= .12 * celebration; head.rotation.z += Math.sin(seconds * 5) * .07 * celebration;
       }
       articulateUpper(lean, roll, breath, hands, false);
     });
@@ -2007,8 +2019,8 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
     result.metadata.setPhase(4);
   }
   if (type === 'low-cabinet') animations.push(createSpinningRecord(result));
-  if (animations.length) result.metadata.animate = (seconds, focused, reducedMotion) => {
-    for (const animate of animations) animate(seconds, focused, reducedMotion);
+  if (animations.length) result.metadata.animate = (seconds, focused, reducedMotion, celebration = 0) => {
+    for (const animate of animations) animate(seconds, focused, reducedMotion, celebration);
   };
   return result;
 }

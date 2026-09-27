@@ -50,13 +50,15 @@ export function createCompanionUI(app) {
     $('#companion-status').dataset.state = mood;
     $('#companion-status-text').textContent = `Companion · ${task || labels[mood] || 'In the room'}`;
     renderNote();
+    if (mood === 'busy' && ['tea', 'water', 'read', 'record'].includes(doing)) app.delights?.show(doing);
+    if (mood === 'resting') app.delights?.show('rest');
     if (mood === 'busy' && AVATAR_LINES.activity[doing]) say(AVATAR_LINES.activity[doing], { gap: 4000 });
     else if (mood === 'resting') say(doing === 'read' ? AVATAR_LINES.activity.read : 'rest');
     else if (mood === 'sleeping') say('doze');
   }
 
   // A hello after a long time away, but never in the middle of focus.
-  function welcome() { if (!app.state.session.running) say('welcome', { force: true }); }
+  function welcome() { if (!app.state.session.running) { say('welcome', { force: true }); app.delights?.show('hello', 'pet'); } }
 
   return { say, syncIntent, renderNote, onItemInteraction, onCompanionTap, onCompanionState, welcome };
 }

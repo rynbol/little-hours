@@ -1,7 +1,9 @@
 import { createSession, remainingAt, formatTime, spokenTime, sessionPhase, displayedRemaining, DIAL_MINUTES } from '../../core/session.js';
 import { plantPhase } from '../../core/room-types.js';
+import { petName, focusPetId } from '../../core/pet-bonds.js';
+import { petEntry } from '../../core/pets.js';
 import { localDate } from '../../core/state.js';
-import { focusCoins, nextExpansion } from '../../core/house.js';
+import { focusCoins } from '../../core/house.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 import { sproutArt } from '../../ui/ui-art.js';
@@ -11,10 +13,12 @@ export function createTimerUI(app) {
 
   function renderFocusReward() {
     const { state } = app;
-    const reward = focusCoins(state.session.duration / 60_000), next = nextExpansion(state.house);
-    const name = next?.id === 'garden' ? 'garden wing' : 'upstairs hideaway';
-    const progress = !next ? 'A little more saved for your home' : state.house.coins >= next.price ? `Your ${name} is ready to build` : `${next.price - state.house.coins} coins to your ${name}`;
-    $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>${reward ? `+${reward} coins` : 'Coins from 5 min'}</strong><small>${progress}</small></span>`;
+    const reward = focusCoins(state.session.duration / 60_000);
+    const together = focusPetId(state);
+    const wish = petEntry(state.petWish);
+    const progress = wish ? (state.house.coins >= wish.price ? `${wish.name} is ready to come home` : `${wish.price - state.house.coins} coins to welcome ${wish.name}`) : reward ? `+${Math.floor(reward / 5)} hearts with ${petName(state, together)}` : 'Hearts from 5 focus minutes';
+    $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>${reward ? `+${reward} coins` : 'Coins from 5 min'}</strong><small></small></span>`;
+    $('#focus-reward small').textContent = progress;
   }
 
   function renderJournal() {
@@ -43,11 +47,13 @@ export function createTimerUI(app) {
     }
   }
 
-  function showCelebration(earned) {
+  function showCelebration(completion) {
     const modal = $('#session-celebration');
-    $('#celebration-copy').textContent = `${earned} quiet minutes, just for you. Small beginnings add up to something good.`;
-    $('#celebration-earned').textContent = `+${earned} coins`;
-    if (!modal.open) modal.showModal();
+    const { minutes, coins, pet } = completion;
+    $('#celebration-copy').textContent = `${minutes} quiet minutes. You showed up for yourself, and ${pet.name} was right there with you.`;
+    $('#celebration-bond').textContent = pet.hearts ? `+${pet.hearts} hearts with ${pet.name} · ${pet.bondTitle}` : 'Every little beginning counts.';
+    $('#celebration-earned').textContent = `+${coins} coins`;
+    if (!modal.open) modal.show();
     app.feedback.celebrate($('.celebration-flower'));
   }
 
@@ -145,7 +151,7 @@ export function createTimerUI(app) {
     if (!state.session.running) app.audio.unlock();
     // Preserve the action shown on the button if the deadline just passed.
     app.acceptUpdate(app.store.setRunning(!state.session.running));
-    if (app.state.session.running) app.companion.say(resuming ? 'resume' : 'start', { force: true });
+    if (app.state.session.running) { app.companion.say(resuming ? 'resume' : 'start', { force: true }); app.delights?.show('start'); if (!resuming) app.room?.invitePet(); }
     else if (remainingAt(app.state.session) > 0) app.companion.say('pause', { force: true });
   });
   $('#reset-session').addEventListener('click', () => {

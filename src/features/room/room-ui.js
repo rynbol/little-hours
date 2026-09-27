@@ -22,7 +22,7 @@ export function createRoomUI(app) {
 
   // The room's accessible name says how to use it, with the current pet.
   function renderLabel() {
-    const entry = petEntry(app.state.pet) || petEntry('cat'), pet = `${entry.name} the ${entry.kind}`;
+    const entry = petEntry(app.state.pet) || petEntry('cat'), pet = `${app.pet.name()} the ${entry.kind}`;
     const label = app.avatar.active
       ? 'Avatar preview. Drag left or right over the character to turn them. Your focus timer is paused while editing.'
       : app.decorate.active

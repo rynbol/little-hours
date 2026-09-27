@@ -53,8 +53,8 @@ test('focus earns coins once across expiry, reload and a second tab; paused/rese
   f.store.update(s => { s.session = createSession(); });
   assert.equal(f.store.state.house.coins, 0);
   const result = finish(f, 50);
-  assert.equal(result.earned, 50); assert.equal(result.state.house.coins, 50);
-  assert.equal(second.update().earned, 0); assert.equal(f.reopen().update().earned, 0);
+  assert.equal((result.completion?.coins || 0), 50); assert.equal(result.state.house.coins, 50);
+  assert.equal(second.update().completion, null); assert.equal(f.reopen().update().completion, null);
   assert.equal(f.reopen().state.house.coins, 50);
 });
 
@@ -80,7 +80,7 @@ test('building enforces the next site, valid design, price and one purchase', ()
 test('a session that expires at purchase is awarded before checking affordability', () => {
   const f = fixture(); f.store.setRunning(true); f.advance(25 * 60_000);
   const result = f.store.buildRoom('garden', 'cloud-loft');
-  assert.equal(result.completed, true); assert.equal(result.built, true); assert.equal(result.state.house.coins, 0);
+  assert.equal(Boolean(result.completion), true); assert.equal(result.built, true); assert.equal(result.state.house.coins, 0);
 });
 
 test('two rooms with the same design keep independent furniture, colors and names', () => {
@@ -210,7 +210,7 @@ test('building saves an optional bounded room name in the same purchase and pres
 test('blank names at purchase use the room name, including a session expiring during purchase', () => {
   const f = fixture(); f.store.setRunning(true); f.advance(25 * 60_000);
   const result = f.store.buildRoom('garden', 'cloud-loft', '   ');
-  assert.equal(result.built, true); assert.equal(result.completed, true);
+  assert.equal(result.built, true); assert.equal(Boolean(result.completion), true);
   assert.equal(f.reopen().state.house.rooms[1].name, 'Greenhouse');
 });
 

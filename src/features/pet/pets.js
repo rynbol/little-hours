@@ -11,6 +11,7 @@ import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
 import { Skeleton } from '@babylonjs/core/Bones/skeleton.js';
 import { Bone } from '@babylonjs/core/Bones/bone.js';
 import { createContactShadow } from '../../models/furniture.js';
+import { BOND_LEVELS } from '../../core/pet-bonds.js';
 import { PET_REACTION, HEART_LIFE, MAX_HEARTS } from './pet.js';
 
 // Hand-built pets. Each pet is one vertex-colored mesh on a small rig of
@@ -216,7 +217,7 @@ function buildFace(rig, spec, c) {
   rig.ellipsoid('head', [hx, hy, hz], [0, 0, 0], c.fur, { segments: 10 });
 }
 
-function buildPet(species) {
+function buildPet(species, ribbon) {
   const spec = SPECIES[species], c = spec.colors, rig = rigBuilder(), dog = spec.look === 'dog', legTone = c.leg || c.fur;
   const [cx, cy] = spec.chest, [hx, hy] = spec.hips, front = spec.spineHalf + spec.chest[2], back = spec.spineHalf + spec.hips[2];
   const profile = [[-front, 0, 0, -0.01], [-front + 0.035, cx * 0.62, cy * 0.64, -0.01], [-front + 0.1, cx * 0.95, cy * 0.96, 0], [-spec.spineHalf, cx, cy, 0],
@@ -236,6 +237,13 @@ function buildPet(species) {
     rig.cone('collar', 0.105, 0.1, 0.04, [0, -0.02, 0], c.collar, { depth: 0.95 });
     rig.ellipsoid('collar', [0.022, 0.026, 0.008], [0, -0.05, -0.1], c.tag, { segments: 5 });
   }
+  const ribbonColor = BOND_LEVELS[ribbon]?.color || BOND_LEVELS[0].color;
+  for (const side of [-1, 1]) rig.ellipsoid('head', [.048, .027, .017], [side * .038, -.125, -.11], ribbonColor, { rot: [0, 0, side * -.3], segments: 3 });
+  rig.ellipsoid('head', [.023, .023, .022], [0, -.125, -.125], ribbonColor, { segments: 3 });
+  rig.ellipsoid('toy', [.062, .062, .062], [0, .063, 0], '#a9bca0', { segments: 4, show: 'play' });
+  rig.ellipsoid('toy', [.063, .015, .063], [0, .063, 0], '#e8d4a6', { segments: 3, show: 'play' });
+  rig.ellipsoid('snack', [.055, .022, .04], [0, .023, 0], '#dfb071', { segments: 3, show: 'treat' });
+  for (const x of [-.021, .021]) rig.ellipsoid('snack', [.006, .003, .006], [x, .044, 0], '#bd8752', { segments: 3, show: 'treat' });
   buildFace(rig, spec, c);
   for (const side of [-1, 1]) {
     const bone = side < 0 ? 'earL' : 'earR';
@@ -280,8 +288,8 @@ function heartData() {
   const data = new VertexData(); Object.assign(data, { positions, colors, indices, normals }); return data;
 }
 
-export function createPetModel(scene, species = 'cat') {
-  const spec = SPECIES[species] || SPECIES.cat, built = buildPet(SPECIES[species] ? species : 'cat');
+export function createPetModel(scene, species = 'cat', ribbon = 0) {
+  const spec = SPECIES[species] || SPECIES.cat, built = buildPet(SPECIES[species] ? species : 'cat', ribbon);
   const root = new TransformNode(`pet-${species}`, scene); root.scaling.setAll(spec.scale);
   // Every part rides one bone. Eyes and tongue have their own bones, which
   // shrink away while hidden.
@@ -374,9 +382,13 @@ export function createPetModel(scene, species = 'cat') {
     return nearest;
   }
   return {
-    root, body, contact, heart, hearts, sleepLetters, species, headPoint, hitTest,
+    root, body, contact, heart, hearts, sleepLetters, species, ribbon, headPoint, hitTest,
     animate(pose, dt, seconds, reducedMotion) {
-      const action = goals[pose.action] ? pose.action : 'sleep';
+      const ritual = pose.ritual, ritualAge = ritual && Number.isFinite(pose.ritualAge) ? pose.ritualAge : 0;
+      const ritualWeight = ritual && !reducedMotion ? Math.min(1, ritualAge / .4, (3 - ritualAge) / .6) : 0;
+      const playful = ritual === 'play' ? ritualWeight : 0, nibble = ritual === 'treat' ? ritualWeight : 0;
+      const hop = playful * Math.max(0, Math.sin(ritualAge * Math.PI * 2.3)) * (species === 'bunny' ? .13 : .07);
+      const action = ritual && ritual !== 'cuddle' ? 'stand' : goals[pose.action] ? pose.action : 'sleep';
       // A settled nap only breathes, slowly: the rig updates at half rate
       // and keeps its bones (and the GPU's copy) in between.
       const napping = action === 'sleep' && !pose.moving && pose.petAge === Infinity && !reducedMotion && current.eyes < 0.02;
@@ -402,15 +414,17 @@ export function createPetModel(scene, species = 'cat') {
       const pitch = current.pitch, curl = current.curl, roll = current.roll + reaction * 0.1;
       Quaternion.RotationYawPitchRollToRef(curl, pitch + current.chestPitch, roll, qChest);
       Quaternion.RotationYawPitchRollToRef(-curl, pitch, roll, qHips);
-      spine.set(0, current.spineY + bob, 0);
+      spine.set(0, current.spineY + bob + hop, 0);
       v.set(0, 0, -spec.spineHalf).rotateByQuaternionToRef(qChest, chest); chest.addInPlace(spine);
       v.set(0, 0, spec.spineHalf).rotateByQuaternionToRef(qHips, hips); hips.addInPlace(spine);
       w.copyFrom(spine); w.y += spec.chest[1] * (breathChest.y - 1); place('chest', qChest, w, breathChest);
       w.copyFrom(spine); w.y += spec.hips[1] * (breathHips.y - 1); place('hips', qHips, w, breathHips);
       Vector3.FromArrayToRef(spec.neck, 0, v); v.rotateByQuaternionToRef(qChest, neck); neck.addInPlace(chest); neck.y += current.neckLift + reaction * lifted - bob * 0.5;
-      Quaternion.RotationYawPitchRollToRef(curl + current.headYaw + look * (1 - reaction), current.headPitch + reaction * 0.3, current.headRoll + reaction * 0.3, qHead);
+      Quaternion.RotationYawPitchRollToRef(curl + current.headYaw + look * (1 - reaction), current.headPitch + reaction * 0.3 - nibble * (.35 + Math.sin(ritualAge * 19) * .06), current.headRoll + reaction * 0.3 + playful * Math.sin(ritualAge * 5) * .2, qHead);
       Vector3.FromArrayToRef(spec.head, 0, v); v.rotateByQuaternionToRef(qHead, head); head.addInPlace(neck);
       place('head', qHead, head);
+      v.set(reducedMotion ? 0 : Math.sin(ritualAge * 5) * .1, 0, -.47); place('toy', IDENTITY, v);
+      v.set(0, 0, -.48); place('snack', IDENTITY, v);
       // The collar rings the neck, from the chest toward the head.
       if (bones.has('collar')) { head.subtractToRef(neck, dir); dir.normalize(); Quaternion.FromUnitVectorsToRef(UP, dir, qLocal); dir.scaleInPlace(0.02).addInPlace(neck); place('collar', qLocal, dir); }
       // Ears flick now and then, and fold back while being petted.
@@ -429,9 +443,9 @@ export function createPetModel(scene, species = 'cat') {
       }
       // Paws: stride offsets on top of the pose's paw targets.
       stepWalking = walking; stepGait = gait;
-      for (const key of PAWS) { paws[key].z += stepZ(key); paws[key].y += stepY(key); }
+      for (const key of PAWS) { paws[key].z += stepZ(key); paws[key].y += stepY(key) + hop; }
       leg('fl', spec.front, qChest, chest); leg('fr', spec.front, qChest, chest); leg('bl', spec.hind, qHips, hips); leg('br', spec.hind, qHips, hips);
-      for (const key of PAWS) { paws[key].z -= stepZ(key); paws[key].y -= stepY(key); }
+      for (const key of PAWS) { paws[key].z -= stepZ(key); paws[key].y -= stepY(key) + hop; }
       // Tail: each joint turns a little further than the last, and joints
       // that would dip below the floor rest on it instead.
       const tail = spec.tail;
@@ -450,7 +464,7 @@ export function createPetModel(scene, species = 'cat') {
       eyesShown = current.eyes < 0.5 || reaction > 0.3 || blinking ? 'closed' : 'open';
       mouthShown = spec.look === 'dog' && (current.mouth > 0.5 || reaction > 0.3 || walking > 0);
       for (const entry of skin) {
-        const hidden = entry.show === 'open' ? eyesShown !== 'open' : entry.show === 'closed' ? eyesShown !== 'closed' : entry.show === 'tongue' ? !mouthShown : false;
+        const hidden = entry.show === 'open' ? eyesShown !== 'open' : entry.show === 'closed' ? eyesShown !== 'closed' : entry.show === 'tongue' ? !mouthShown : entry.show === 'play' ? ritual !== 'play' : entry.show === 'treat' ? ritual !== 'treat' : false;
         // A hidden part shrinks to a speck inside its bone, so normals stay valid.
         if (hidden) shrink.multiplyToRef(bones.get(entry.source), entry.bone.getLocalMatrix());
         else entry.bone.getLocalMatrix().copyFrom(bones.get(entry.source));
