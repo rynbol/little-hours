@@ -1785,7 +1785,7 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
       torsoPoint(0, 1.02, -.09, hip + breath, lean, roll, head.position);
       const look = w * (LOOK[kind] ?? 0), glance = kind === 'window' ? w * calm * Math.sin(seconds * .31) * .3 : 0;
       // The head stays steadier than the body under it.
-      head.rotation.set(lean * (1 - g * .6) - pose.doze * .36 * (kind === 'read' ? .5 : 1) + look, (reducedMotion ? 0 : Math.sin(seconds * .45) * .055 * sit) + glance, roll * .4 + pose.doze * .09);
+      head.rotation.set(lean * (1 - g * .6) - pose.doze * .36 * (kind === 'read' ? .5 : 1) + look, (reducedMotion ? 0 : Math.sin(seconds * .45) * .055 * sit) + glance + (pose.glance || 0), roll * .4 + pose.doze * .09);
       if (kind === 'tea') head.rotation.x -= (.12 - sip * .10) * w;
       // In the editor the head looks around a little and tilts at each choice.
       if (pw) head.rotation.addInPlaceFromFloats(Math.sin(seconds * .37) * .035 * pw - lookDown * .38, (Math.sin(seconds * .53) * .1 + Math.sin(seconds * .21 + 2) * .06) * pw * (1 - react), Math.sin(seconds * .61 + 1) * .04 * pw + react * .12);

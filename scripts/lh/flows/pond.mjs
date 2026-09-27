@@ -1,6 +1,6 @@
 import { steps } from '../steps.mjs';
 
-const LAKE = `(() => { const lake = window.__littleHours.lake, d = lake.diagnostics(); return { open: lake.isOpen, phase: d?.phase ?? null, ui: d?.ui ?? null, need: d?.need ?? 0 }; })()`;
+const LAKE = `(() => { const lake = window.__littleHours.lake, d = lake.diagnostics(); return { open: lake.isOpen, phase: d?.phase ?? null, ui: d?.ui ?? null, fight: d?.fight ?? null }; })()`;
 const POND = `(() => { const p = window.__littleHours.state.pond; return { bait: p.bait.map(b => b.minutes), found: Object.keys(p.journal).length, caught: Object.values(p.journal).reduce((n, e) => n + e.count, 0), last: p.log.at(-1) ?? null }; })()`;
 const shown = selector => `!document.querySelector(${JSON.stringify(selector)}).hidden`;
 
@@ -10,7 +10,7 @@ async function castForBite(app) {
 }
 
 export default {
-  about: 'the pond: the island pond tag opens the lake, bait from sessions sits in ranges with their odds, a cast gets a bite, reeling lands a fish that fills the journal and spends one bait, a missed bite keeps the bait, Escape closes the card, then the journal, then the lake, and the catch survives a reload',
+  about: 'the pond: the island pond tag opens the lake, bait from sessions sits in ranges with their odds, a cast gets a bite, holding to reel against the line tension lands a fish that fills the journal and spends one bait, a missed bite keeps the bait, Escape closes the card, then the journal, then the lake, and the catch survives a reload',
   async run(t) {
     const { check } = t;
     const app = await t.open({ seed: 'pond' });
@@ -27,10 +27,21 @@ export default {
     await castForBite(app);
     check('a cast gets a bite with a reel button', (await app.js(LAKE)).phase === 'bite');
     await t.shot(app, 'bite');
-    await app.clickSel('#lake-reel');
+    const reel = await app.box('#lake-reel');
+    await app.press(reel.x, reel.y);
     const hooked = await app.js(LAKE);
-    check('reeling on the bite hooks the fish and asks for pulls', hooked.phase === 'reel' && hooked.need >= 4, hooked);
-    for (let i = 0; i < hooked.need; i++) await app.clickSel('#lake-reel');
+    check('pressing on the bite hooks the fish and shows the line tension', hooked.phase === 'reel' && hooked.fight?.line <= 1 && await app.visible('#lake-tension'), hooked);
+    let held = true, peak = 0, fought = null;
+    for (let i = 0; i < 600; i++) {
+      fought = await app.js(LAKE);
+      if (!fought.fight) break;
+      peak = Math.max(peak, fought.fight.tension);
+      if (held && fought.fight.tension > .7) { await app.release(reel.x, reel.y); held = false; }
+      else if (!held && fought.fight.tension < .5) { await app.press(reel.x, reel.y); held = true; }
+      await new Promise(resolve => setTimeout(resolve, 30));
+    }
+    if (held) await app.release(reel.x, reel.y);
+    check('holding tightens the line and easing off before the red lands it without a snap', peak > .5 && peak < 1 && fought.ui !== 'idle', { peak, fought });
     await app.waitFor(`document.querySelector('#lake-card.is-shown') !== null`, { what: 'the catch card', timeout: 8000 });
     const after = await app.js(POND), name = await app.text('#lake-card-name');
     check('the fish leaps out and its card names it', (await app.js(LAKE)).phase === 'shown' && Boolean(name), name);

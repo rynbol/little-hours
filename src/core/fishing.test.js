@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rollCatch, baitRange, SPECIES, TIERS, BAIT_RANGES } from './fishing.js';
+import { rollCatch, baitRange, startFight, stepFight, SPECIES, TIERS, BAIT_RANGES } from './fishing.js';
 import { createStateStore, restoreState, freshState } from './state.js';
 
 const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
@@ -73,4 +73,40 @@ test('a broken saved pond is cleaned up', () => {
   const pond = restoreState(JSON.stringify({ pond: { bait: [{ minutes: 3, at: 1 }, { minutes: 30, at: 2 }, 'x'], journal: { koi: { count: 2, best: 44, first: 9 }, dragon: { count: 1, best: 1, first: 1 }, perch: { count: -1 } }, log: [{ species: 'nope' }] } })).pond;
   assert.deepEqual(pond, { bait: [{ minutes: 30, at: 2 }], journal: { koi: { count: 2, best: 44, first: 9 } }, log: [] });
   assert.deepEqual(restoreState('{}').pond.bait, [{ minutes: 10, at: 0 }]);
+});
+
+const lcg = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+function play(tier, seed, holds) {
+  const fight = startFight(tier), random = lcg(seed);
+  let seconds = 0;
+  while (!fight.outcome && seconds < 60) { stepFight(fight, 1 / 30, holds(fight), random); seconds += 1 / 30; }
+  return { outcome: fight.outcome, seconds };
+}
+const outcomes = (tier, holds) => Array.from({ length: 50 }, (_, i) => play(tier, i * 7919 + 1, holds).outcome);
+
+test('easing off when the line is tight lands every tier, bigger fish taking longer', () => {
+  const patient = fight => fight.tension < .7;
+  for (const tier of TIERS) assert.deepEqual([...new Set(outcomes(tier.id, patient))], ['landed'], tier.id);
+  const common = play('common', 11, patient).seconds, legend = play('legendary', 11, patient).seconds;
+  assert.ok(common > 4 && common < legend && legend < 20, `${common} then ${legend}`);
+});
+
+test('holding the reel down through every run snaps the line on a legend, not on a minnow', () => {
+  const always = () => true;
+  assert.ok(outcomes('legendary', always).filter(o => o === 'snapped').length >= 40);
+  assert.deepEqual([...new Set(outcomes('common', always))], ['landed']);
+});
+
+test('a fish left on a slack line throws the hook', () => {
+  const { outcome, seconds } = play('rare', 3, () => false);
+  assert.equal(outcome, 'escaped');
+  assert.ok(seconds > 3 && seconds < 8, seconds);
+});
+
+test('landing a fish keeps the catch rolled when it was hooked', () => {
+  const state = freshState(); state.pond.bait = [{ minutes: 20, at: 5 }];
+  const f = fixture(state), caught = f.store.landFish(0, { species: 'koi', size: 41.5 }).caught;
+  assert.deepEqual([caught.species, caught.size, caught.isNew], ['koi', 41.5, true]);
+  const saved = f.reopen().state.pond;
+  assert.deepEqual([saved.journal.koi.count, saved.journal.koi.best, saved.bait.length], [1, 41.5, 0]);
 });

@@ -414,22 +414,27 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   }
 
   const tip = new Vector3(), tipLocal = new Vector3(), base = new Vector3(), dir = new Vector3(), bend = new Vector3(), bobberAt = new Vector3(), castFrom = new Vector3(), castTo = new Vector3(), reelFrom = new Vector3(), hover = new Vector3(), world = new Matrix();
-  let clock = 0, phase = 'idle', phaseAt = 0, progress = 0, tug = 0, lastTap = -9, leapDone = null, castDone = null, rise = 4, catchInfo = null, stowAt = -1;
+  let clock = 0, phase = 'idle', phaseAt = 0, leapDone = null, castDone = null, rise = 4, catchInfo = null, stowAt = -1, jumpAt = -9, jumps = 0, fidget = null, fidgetAt = 5, fidgets = 0;
+  const struggle = { tension: 0, line: 1, pull: 0, mood: 'tug', holding: false };
+  const away = new Vector3();
   const setPhase = next => { phase = next; phaseAt = clock; };
   const lively = { weight: 1, reactAt: -9, part: 'catch' };
+  const FIDGETS = ['jig', 'pet', 'jig', 'look', 'bounce'];
+  const fidgetK = span => fidget ? Math.max(0, Math.sin(Math.min(1, (clock - fidget.at) / span) * Math.PI)) : 0;
   let last = performance.now(), disposed = false;
 
   function rodShape(t) {
     const p = t - phaseAt;
     let theta = .8 + (reducedMotion ? 0 : Math.sin(clock * .8) * .03), flex = .05, lift = 0;
+    const jig = fidget?.kind === 'jig' ? fidgetK(.8) : 0;
     if (phase === 'cast') {
       if (p < .55) { const k = ease(p / .55); theta = .8 - k * 1.35; lift = k; flex = -.08 * k; }
       else if (p < .9) { const k = easeOut((p - .55) / .35); theta = -.55 + k * 1.85; lift = 1 - k * 1.3; flex = .25 * Math.sin(k * Math.PI); }
       else { const k = ease((p - .9) / .5); theta = 1.3 - k * .3; lift = -.3 + k * .3; flex = .08; }
-    } else if (phase === 'wait') { theta = 1 + (reducedMotion ? 0 : Math.sin(clock * .9) * .02); flex = .1; }
+    } else if (phase === 'wait') { theta = 1 + (reducedMotion ? 0 : Math.sin(clock * .9) * .02) - jig * .22; flex = .1 + jig * .1; lift = jig * .25; }
     else if (phase === 'bite') { theta = .95 + Math.sin(clock * 30) * .02; flex = .38 + Math.sin(clock * 22) * .06; }
-    else if (phase === 'reel') { const sinceTap = clock - lastTap; theta = .62 + Math.min(.3, sinceTap * .5); lift = .35 - Math.min(.35, sinceTap); flex = .55 + Math.sin(clock * 14) * .05 * (1 - progress) + tug * .2; }
-    else if (phase === 'leap') { theta = .45; lift = .5; flex = .15 * Math.max(0, 1 - p); }
+    else if (phase === 'reel') { const t = struggle.tension; theta = .72 - t * .22 + (struggle.holding ? 0 : .14); lift = struggle.holding ? .3 : .05; flex = .18 + t * .72 + (reducedMotion ? 0 : Math.sin(clock * (t > .86 ? 40 : 12)) * .03 * (.3 + t)); }
+    else if (phase === 'leap') { theta = p < .35 ? .5 : .45; lift = .5; flex = p < .35 ? .7 : .15 * Math.max(0, 1 - (p - .35)); }
     else if (phase === 'escape') { theta = .8 + Math.max(0, .4 - p) * .5; flex = 0; }
     return { theta, flex, lift };
   }
@@ -439,8 +444,18 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     const shape = rodShape(clock);
     pose.grip.set(.2, 1.02 + shape.lift * .3, -.36 + shape.lift * .16);
     pose.activityTime += dt;
-    pose.doze += ((!reducedMotion && phase === 'idle' && clock - phaseAt > 20 ? 1 : 0) - pose.doze) * Math.min(1, dt * .7);
-    lively.weight = 1 - pose.doze; pose.preview = reducedMotion ? null : lively; petPose.action = pose.doze > .6 ? 'sleep' : 'sit';
+    if (!reducedMotion && (phase === 'idle' || phase === 'wait') && clock > fidgetAt) {
+      let kind = FIDGETS[fidgets++ % FIDGETS.length];
+      if (kind === 'jig' && phase !== 'wait') kind = 'look';
+      fidget = { kind, at: clock }; fidgetAt = clock + 5 + clockRandom() * 4;
+      if (kind === 'bounce') lively.reactAt = clock;
+      if (kind === 'pet') petPose.petAge = 0;
+      if (kind === 'jig') ripple(castTo.x, castTo.z, .5, 1);
+    }
+    if (fidget && clock - fidget.at > 2.6) fidget = null;
+    const glance = fidget?.kind === 'pet' ? -.75 : fidget?.kind === 'look' ? .6 : 0;
+    pose.glance = glance * fidgetK(2.6) + (phase === 'reel' ? Math.sin(clock * 1.7) * .08 : 0);
+    pose.preview = reducedMotion ? null : lively;
     companion.animate(pose, clock, reducedMotion, DOCK_Y);
     if (petModel) { if (petPose.petAge !== Infinity) petPose.petAge += dt; if (petPose.petAge > 4) petPose.petAge = Infinity; petModel.animate(petPose, dt, clock, reducedMotion); }
     const wrist = joints.wristR;
@@ -475,11 +490,26 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
       bobberAt.set(castTo.x + Math.sin(p * 17) * .05, -plunge, castTo.z + Math.cos(p * 13) * .04); slack = .05;
       if (Math.floor(p / .33) !== Math.floor((p - dt) / .33)) { ripple(bobberAt.x, bobberAt.z, 1, 1); splash(bobberAt, 5, .45); }
     } else if (phase === 'reel') {
-      tug = Math.max(0, tug - dt * 3);
-      Vector3.LerpToRef(reelFrom, HOME_BOBBER, easeOut(progress) * .85, bobberAt);
-      bobberAt.x += Math.sin(clock * 5.3) * .35 * (1 - progress); bobberAt.y = -.06 - tug * .08;
-      if (Math.floor(clock / .45) !== Math.floor((clock - dt) / .45)) ripple(bobberAt.x, bobberAt.z, .8, 1);
-      slack = 0;
+      const reach = .15 + struggle.line * .85, dart = reducedMotion ? 0 : struggle.pull * reach;
+      Vector3.LerpToRef(HOME_BOBBER, reelFrom, reach, bobberAt);
+      bobberAt.x += Math.sin(clock * 2.3) * .5 * dart + Math.sin(clock * 6.1) * .08 * dart; bobberAt.y = -.03 - struggle.tension * .07;
+      if (Math.floor(clock / .45) !== Math.floor((clock - dt) / .45)) ripple(bobberAt.x, bobberAt.z, .5 + struggle.pull, 1);
+      if (struggle.mood === 'run' && Math.floor(clock / .28) !== Math.floor((clock - dt) / .28)) splash(bobberAt, 4, .4);
+      slack = struggle.holding ? 0 : .12;
+      if (fish) {
+        away.set(bobberAt.x - STAND.x, 0, bobberAt.z - STAND.z).normalize();
+        const u = (clock - jumpAt) / .9, at = fish.root.position, heading = Math.atan2(-away.z, away.x);
+        at.set(bobberAt.x + away.x * .3 * fish.scale * 2, 0, bobberAt.z + away.z * .3 * fish.scale * 2);
+        if (u >= 0 && u < 1) {
+          at.y = -.15 + Math.sin(u * Math.PI) * (.75 + fish.scale * .5);
+          fish.root.rotation.set(Math.sin(u * 14) * .25, heading + Math.sin(clock * 3) * .3, Math.cos(u * Math.PI) * 1.1);
+          if (Math.floor(u * 10) !== Math.floor((u - dt / .9) * 10) && (u < .12 || u > .85)) { splash(at, 14, .75); ripple(at.x, at.z, 1.2, 0); }
+        } else {
+          at.y = struggle.mood === 'rest' ? -.32 : -.06 - (1 - struggle.pull) * .12;
+          fish.root.rotation.set(Math.sin(clock * 4) * .12, heading + Math.sin(clock * 2.3) * .5 * struggle.pull, 0);
+        }
+        fish.tail.rotation.y = reducedMotion ? 0 : Math.sin(clock * (8 + struggle.pull * 18)) * (.25 + struggle.pull * .35);
+      }
     } else if (phase === 'leap' || phase === 'shown') {
       visible = false; slack = 0;
     } else if (phase === 'escape') {
@@ -496,8 +526,12 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     line.setEnabled(phase !== 'shown');
 
     if (fish && (phase === 'leap' || phase === 'shown')) {
-      const k = Math.min(1, p / 1.25);
-      if (phase === 'leap') {
+      const k = Math.max(0, Math.min(1, (p - .35) / 1.25));
+      if (phase === 'leap' && p < .35) {
+        const at = fish.root.position; at.set(reelFrom.x + Math.sin(p * 40) * .06, -.05 + Math.abs(Math.sin(p * 18)) * .12, reelFrom.z);
+        fish.root.rotation.set(Math.sin(p * 30) * .5, fish.root.rotation.y, .3);
+        if (Math.floor(p / .1) !== Math.floor((p - dt) / .1)) splash(at, 6, .55);
+      } else if (phase === 'leap') {
         const at = fish.root.position;
         Vector3.LerpToRef(reelFrom, hover, easeOut(k), at); at.y = reelFrom.y + Math.sin(k * Math.PI) * 1.5 + k * (hover.y - reelFrom.y) * 1;
         const vy = Math.cos(k * Math.PI) * 1.5;
@@ -584,16 +618,30 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     },
     nibble() { if (phase !== 'wait') return; ripple(castTo.x, castTo.z, .45, 1); bobberAt.y -= .03; bobber.position.y -= .04; },
     bite() { if (phase !== 'wait') return; setPhase('bite'); lively.reactAt = clock; petPose.petAge = 0; ripple(castTo.x, castTo.z, 1.2, 1); splash(castTo, 10, .6); },
-    hook() { reelFrom.copyFrom(bobber.position); reelFrom.y = 0; progress = 0; setPhase('reel'); lastTap = clock; splash(reelFrom, 10, .7); },
-    reel(next) { progress = Math.min(1, next); tug = 1; lastTap = clock; splash(bobber.position, 6, .55); ripple(bobber.position.x, bobber.position.z, .9); },
+    hook(rolled) {
+      reelFrom.copyFrom(bobber.position); reelFrom.y = 0; setPhase('reel'); splash(reelFrom, 10, .7);
+      fish?.root.dispose(false, true); fish = buildFish(rolled.species, rolled.size); fish.root.position.set(reelFrom.x, -.3, reelFrom.z);
+      jumps = 0; jumpAt = -9; struggle.line = 1; struggle.tension = 0; lively.reactAt = clock;
+    },
+    fight(state, holding) {
+      struggle.tension = state.tension; struggle.line = state.line; struggle.pull = state.pull; struggle.mood = state.mood; struggle.holding = holding;
+      if (state.runs > jumps) { jumps = state.runs; if (!reducedMotion && clock - jumpAt > 1.2) jumpAt = clock; }
+    },
     leap(caught) {
-      catchInfo = caught; fish?.root.dispose(false, true); fish = buildFish(caught.species, caught.size); fish.splashed = false;
-      reelFrom.copyFrom(bobber.position); reelFrom.y = 0; hover.set(STAND.x + .9, DOCK_Y + 1.75, STAND.z - 1.05);
-      fish.root.position.copyFrom(reelFrom); setPhase('leap');
+      catchInfo = caught;
+      if (!fish) fish = buildFish(caught.species, caught.size);
+      fish.splashed = false;
+      reelFrom.copyFrom(fish.root.position); reelFrom.y = 0; hover.set(STAND.x + .9, DOCK_Y + 1.75, STAND.z - 1.05);
+      setPhase('leap');
       return new Promise(resolve => { leapDone = resolve; if (reducedMotion) phaseAt = clock - 1.3; });
     },
     stow() { if (fish) stowAt = clock; setPhase('idle'); },
-    escape() { setPhase('escape'); splash(castTo, 8, .5); },
+    escape(snapped = false) {
+      if (fish) { splash(fish.root.position, snapped ? 18 : 10, .7); ripple(fish.root.position.x, fish.root.position.z, 1.3, 0); fish.root.dispose(false, true); fish = null; }
+      if (phase === 'reel') castTo.copyFrom(bobber.position);
+      if (snapped) lively.reactAt = clock;
+      setPhase('escape'); splash(castTo, 8, .5);
+    },
     reset() { setPhase('idle'); },
     get phase() { return phase; },
     screenPoint() {
