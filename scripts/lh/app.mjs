@@ -53,8 +53,8 @@ export async function openApp(url, { seed = 'three-rooms', theme, reducedMotion 
       text: selector => browser.js(`document.querySelector(${JSON.stringify(selector)})?.textContent?.trim() ?? null`),
       attr: (selector, name) => browser.js(`document.querySelector(${JSON.stringify(selector)})?.getAttribute(${JSON.stringify(name)}) ?? null`),
       visible: async selector => Boolean(await browser.box(selector)),
-      house: () => browser.js(`(() => { const d = window.__littleHours.house.diagnostics(); return d ? { open: d.open, closed: d.closed ?? null, builds: d.builds, renderCount: d.renderCount, activeRoomMotions: d.activeRoomMotions, drawCalls: d.drawCalls } : null; })()`),
-      room: () => browser.js(`(() => { const d = window.__littleHours.room.diagnostics(); return { selectedId: d.selectedId, editing: d.editing, avatarEditing: d.avatarEditing, placement: d.placement, layout: d.layout, dragging: d.dragging, pixelRatio: d.pixelRatio, quality: d.quality }; })()`),
+      house: () => browser.js(`(() => { const d = window.__littleHours.house.diagnostics(); return d ? { open: d.open, closed: d.closed ?? null, builds: d.builds, renderCount: d.renderCount, activeRoomMotions: d.activeRoomMotions, drawCalls: d.drawCalls, angle: d.angle, tilt: d.tilt, trees: d.trees } : null; })()`),
+      room: () => browser.js(`(() => { const d = window.__littleHours.room.diagnostics(); return { selectedId: d.selectedId, editing: d.editing, avatarEditing: d.avatarEditing, placement: d.placement, layout: d.layout, dragging: d.dragging, pixelRatio: d.pixelRatio, quality: d.quality, plantPhase: d.plantPhase }; })()`),
       saved: () => browser.js(`JSON.parse(localStorage.getItem('little-hours-v1') || 'null')`),
       async waitFor(expression, { timeout = 5000, what = expression } = {}) {
         const end = Date.now() + timeout;

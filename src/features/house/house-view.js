@@ -68,7 +68,8 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const tagPoint = new Vector3(), tagProjection = new Vector3();
   let dragging = null;
   const homeAngle = Math.PI / 2.8;
-  let targetAngle = homeAngle, lastPick = 0, hovering = null, burst = null;
+  const turnTo = angle => Math.max(-.3, Math.min(2.45, angle)), tiltTo = beta => Math.max(.72, Math.min(1.3, beta));
+  let targetAngle = homeAngle, targetTilt = 1.02, lastPick = 0, hovering = null, burst = null;
   let model, frame = 0, disposed = false, suspended = false, renderCount = 0, builds = 0, lastDraw = 0;
   // The whole house opens like a dollhouse front. It arrives closed, unless motion is reduced.
   const arrival = () => motion.matches ? 0 : performance.now() + 650;
@@ -86,15 +87,18 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     if (disposed || suspended || document.hidden) return;
     const dt = lastDraw ? Math.min(.1, (now - lastDraw) / 1000) : 0;
     // Motion you cause runs at 60 fps; the idle drift stays at 30.
-    const lively = dragging?.moved || Math.abs(targetAngle - camera.alpha) > .001 || roomMotion.activeCount > 0 || model.openAmount !== (!closed && now >= openAt ? 1 : 0);
+    const lively = dragging?.moved || Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001 || roomMotion.activeCount > 0 || model.openAmount !== (!closed && now >= openAt ? 1 : 0);
     if (!motion.matches && now - lastDraw < 1000 / (lively ? 60 : 30) - 1) { requestRender(); return; }
     lastDraw = now;
     const seconds = motion.matches ? 0 : now / 1000;
     const wasReacting = roomMotion.activeCount > 0;
     roomMotion.restore();
     model.animate(seconds, focused, motion.matches);
-    const turning = Math.abs(targetAngle - camera.alpha) > .001;
-    if (turning) { camera.alpha = motion.matches || dragging?.moved ? targetAngle : targetAngle + (camera.alpha - targetAngle) * Math.exp(-dt * 11); fitCamera(); }
+    const turning = Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001;
+    if (turning) {
+      const ease = motion.matches || dragging?.moved ? 0 : Math.exp(-dt * 11);
+      camera.alpha = targetAngle + (camera.alpha - targetAngle) * ease; camera.beta = targetTilt + (camera.beta - targetTilt) * ease; fitCamera();
+    }
     const reacting = roomMotion.update(now, motion.matches);
     const swinging = stepOpen(now);
     if (reacting || wasReacting) { shadows.getShadowMap().resetRefreshCounter(); positionTags(); }
@@ -168,7 +172,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   }
   // Close the whole house (the postcard look), or open it again.
   function setClosed(value) { closed = Boolean(value); openAt = 0; lastOpenStep = 0; present(); }
-  function turn(direction) { targetAngle = direction === 0 ? homeAngle : Math.max(.65, Math.min(1.45, targetAngle + direction * .22)); requestRender(); }
+  function turn(direction) { if (direction === 0) { targetAngle = homeAngle; targetTilt = 1.02; } else targetAngle = turnTo(targetAngle + direction * .22); requestRender(); }
   controls.addEventListener('click', event => {
     const button = event.target.closest('button'); if (!button) return;
     if (button.dataset.houseOpen !== undefined) setClosed(!closed);
@@ -221,7 +225,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     // Babylon converts CSS pixels to render pixels using hardware scaling.
     return scene.pick(event.clientX - rect.left, event.clientY - rect.top)?.pickedMesh?.metadata?.houseSlot;
   }
-  const onDown = event => { if (event.button !== 0 || dragging) return; dragging = { id: event.pointerId, x: event.clientX, y: event.clientY, angle: targetAngle, moved: false }; };
+  const onDown = event => { if (event.button !== 0 || dragging) return; dragging = { id: event.pointerId, x: event.clientX, y: event.clientY, angle: targetAngle, tilt: targetTilt, moved: false }; };
   const onUp = event => {
     const gesture = dragging; if (!gesture || gesture.id !== event.pointerId) return; dragging = null;
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
@@ -236,7 +240,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       if (!dragging.moved && Math.hypot(dx, dy) < 6) return;
       if (!dragging.moved && event.pointerType === 'touch' && Math.abs(dy) > Math.abs(dx)) { onCancel(); return; }
       dragging.moved = true; canvas.setPointerCapture(event.pointerId); canvas.style.cursor = 'grabbing';
-      targetAngle = Math.max(.65, Math.min(1.45, dragging.angle - dx * .004)); requestRender(); return;
+      targetAngle = turnTo(dragging.angle - dx * .004); targetTilt = tiltTo(dragging.tilt - dy * .003); requestRender(); return;
     }
     if (performance.now() - lastPick < 55) return;
     lastPick = performance.now(); const id = pick(event);
@@ -272,7 +276,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       resize();
     },
     setFocused(value) { if (focused === Boolean(value)) return; focused = Boolean(value); requestRender(); },
-    diagnostics: () => ({ scene, engine, closed, builds, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
+    diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, trees: model.trees, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
     dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); controls.remove(); tags.remove(); note.remove(); },
   };
 }

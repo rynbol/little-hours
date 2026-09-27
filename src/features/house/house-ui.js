@@ -3,6 +3,7 @@ import { createHouseView } from './house-view.js';
 import { HOUSE_SLOTS, nextExpansion } from '../../core/house.js';
 import { PRESETS, roomDesign, createLayout } from '../../core/layout.js';
 import { clockRandom } from '../../core/test-pins.js';
+import { studyTrees } from '../../core/garden.js';
 
 const escape = text => String(text).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const moods = {
@@ -130,13 +131,13 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     }
     const canPreview = !entry && next?.id === selectedId, previewing = canPreview && preview;
     const previewLayout = previewing ? createLayout(plan.design) : null;
-    const modelHouse = previewing ? { ...house, rooms: [...house.rooms, { id: selectedId, name: slot.label, layout: previewLayout }] } : house;
+    const modelHouse = { ...house, garden: studyTrees(store.state.history), rooms: previewing ? [...house.rooms, { id: selectedId, name: slot.label, layout: previewLayout }] : house.rooms };
     $('#house-canvas').setAttribute('aria-label', previewing ? `Preview of ${roomDesign(previewLayout).name} in your new ${slot.label}` : 'Your connected rooms');
     $('.house-map-hint').textContent = previewing ? `✧ Dreaming of ${roomDesign(previewLayout).name}` : canPreview ? 'Your home, before its next little chapter' : 'Tap a room to see what’s inside';
     $('#house-preview-toggle').hidden = !canPreview;
     $('#house-preview-toggle').textContent = preview ? 'Show before' : 'Show my dream';
     $('#house-preview-toggle').setAttribute('aria-pressed', String(preview));
-    const nextModel = JSON.stringify([modelHouse.rooms, house.activeId, selectedId, store.state.theme, store.state.avatar]);
+    const nextModel = JSON.stringify([modelHouse.rooms, modelHouse.garden, house.activeId, selectedId, store.state.theme, store.state.avatar]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
       const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: select };

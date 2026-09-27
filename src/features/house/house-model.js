@@ -129,6 +129,23 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     }
   }
   });
+  const trees = house.garden || [];
+  batch('orchard', JSON.stringify(trees.map(tree => [tree.date, Math.round(tree.growth * 20)])), () => {
+    box(8.75, -.52, 0, 5.5, .48, 6.4, '#63765e'); box(8.75, -.25, 0, 5.3, .15, 6.2, '#a9b98f');
+    for (let i = 0; i < 7; i++) box(6.45 + i * .78, .04, -2.86, .1, .58, .1, '#c6b99b');
+    box(8.75, .07, -2.86, 4.8, .07, .08, '#c6b99b'); box(8.75, .3, -2.86, 4.8, .07, .08, '#c6b99b');
+    trees.forEach((tree, index) => {
+      const row = Math.floor(index / 6), col = index % 6, seed = [...tree.date].reduce((sum, char) => sum * 31 + char.charCodeAt(0), 7) >>> 0;
+      const x = 6.75 + col * .8 + (row % 2) * .38 + (seed % 7 - 3) * .025, z = -2.25 + row * 1.08 + (seed % 5 - 2) * .04, g = tree.growth;
+      const tall = .28 + 1.35 * g, crown = .3 + .55 * g, blossom = g >= 1 && seed % 3 === 0;
+      box(x, -.17 + tall / 2, z, .05 + .06 * g, tall, .05 + .06 * g, '#7a5a42');
+      const leaves = blossom ? ['#e3b7bd', '#f0d3cf'] : [['#6f8a62', '#8fa77c'], ['#7c946a', '#a2b584'], ['#5f7d5c', '#86a077']][seed % 3];
+      for (let i = 0; i < (g < .3 ? 2 : 4); i++) {
+        const a = i * 2.4 + seed % 6;
+        ball(x + Math.cos(a) * crown * .28, -.17 + tall + (i % 2) * crown * .22, z + Math.sin(a) * crown * .24, crown, crown * .82, crown, leaves[i % 2]);
+      }
+    });
+  });
   for (const entry of house.rooms) batch(entry.id, JSON.stringify([entry.layout, theme, entry.id === house.activeId && avatar, house.rooms.length === 1]), () => {
     origin = HOUSE_POSITIONS[entry.id];
     const style = roomDesign(entry.layout).style || 'retreat';
@@ -229,7 +246,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   applyOpen(); refresh();
   // A getter, not a copied value: Object.assign would freeze it at 0.
   Object.defineProperty(model, 'openAmount', { get: () => openAmount });
-  return Object.assign(model, { meshes, live, shells, framing, levels, shared, pieces, refresh, chimney,
+  return Object.assign(model, { meshes, live, shells, framing, levels, shared, pieces, refresh, chimney, trees: trees.map(tree => tree.growth),
     // 0 is a closed house and 1 is fully open, like a dollhouse.
     setOpen(amount) { openAmount = amount; applyOpen(); refresh(); },
     animate(seconds, focused, reducedMotion) { for (const root of live) root.metadata.animate?.(seconds, focused, reducedMotion); },

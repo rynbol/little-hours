@@ -137,7 +137,7 @@ test('house uses real furniture and architecture, batches static paint and relea
   try {
     for (let count = 1; count <= 3; count++) {
       const model = createHouseModel(scene, f.store.state.house, 'studio');
-      assert.ok(model.meshes.length <= 4 + count * 5, 'grounds, the site, its blueprint, the selection edge, and per room its batch and up to four outside parts');
+      assert.ok(model.meshes.length <= 5 + count * 5, 'grounds, the garden, the site, its blueprint, the selection edge, and per room its batch and up to four outside parts');
       const vertices = model.meshes.reduce((total, mesh) => total + mesh.getTotalVertices(), 0);
       assert.ok(vertices > 10_000 && vertices < 1_000_000);
       for (const mesh of model.meshes) assert.ok(mesh.getVerticesData('position').every(Number.isFinite));
@@ -211,4 +211,28 @@ test('blank names at purchase use the room name, including a session expiring du
   const result = f.store.buildRoom('garden', 'cloud-loft', '   ');
   assert.equal(result.built, true); assert.equal(result.completed, true);
   assert.equal(f.reopen().state.house.rooms[1].name, 'Greenhouse');
+});
+
+test('the garden grows one tree per study day and a new day rebuilds only the garden', () => {
+  const previousDocument = globalThis.document;
+  const context = new Proxy({}, { get: (_, key) => String(key).includes('Gradient') ? () => ({ addColorStop() {} }) : key === 'measureText' ? () => ({ width: 20 }) : () => {} });
+  globalThis.document = { addEventListener() {}, removeEventListener() {}, createElement: () => ({ width: 256, height: 256, getContext: () => context }) };
+  const engine = new NullEngine(), scene = new Scene(engine), f = fixture();
+  const byName = model => Object.fromEntries(model.meshes.map(mesh => [mesh.name, mesh]));
+  const days = growths => ({ ...f.store.state.house, garden: growths.map((growth, i) => ({ date: `2026-09-${String(i + 1).padStart(2, '0')}`, minutes: growth * 60, growth })) });
+  try {
+    const bare = createHouseModel(scene, days([]), 'studio');
+    const one = createHouseModel(scene, days([.25]), 'studio', 'day', undefined, bare); bare.dispose();
+    const a = byName(one), sprout = a['house-orchard'].getTotalVertices();
+    assert.equal(a['house-studio'].isDisposed(), false);
+    const two = createHouseModel(scene, days([.25, 1]), 'studio', 'day', undefined, one); one.dispose();
+    const b = byName(two);
+    assert.equal(b['house-studio'], a['house-studio'], 'a new tree leaves the rooms alone');
+    assert.notEqual(b['house-orchard'], a['house-orchard']); assert.ok(a['house-orchard'].isDisposed());
+    assert.ok(b['house-orchard'].getTotalVertices() > sprout);
+    const tops = model => model.meshes.find(mesh => mesh.name === 'house-orchard').getBoundingInfo().boundingBox.maximumWorld.y;
+    const short = createHouseModel(scene, days([.1]), 'studio'), tall = createHouseModel(scene, days([1]), 'studio');
+    assert.ok(tops(tall) > tops(short) + .8, 'an hour grows a much taller tree than a few minutes');
+    for (const model of [two, short, tall]) model.dispose();
+  } finally { scene.dispose(); engine.dispose(); globalThis.document = previousDocument; }
 });

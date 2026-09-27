@@ -395,3 +395,6 @@ body .focus-reward { padding: 8px 11px; align-items: center; }
 body .time-toggle { min-width: 0; width: 38px; padding: 5px; }
 body .house-page .eyebrow, body .house-page .room-subtitle, body .house-fine-print, body .house-progress-copy, body .preset-note, body .moments-footnote,
 body .room-travel small, body .celebration-note, body .pet-actions .performance-note, body .quality-options ~ .performance-note { display: none; }
+body .house-address, body .house-scene-caption, body .house-map-hint, body .house-room-link .house-slot-label, body .house-room-tag small, body .house-paper-top, body .house-description, body .house-owned-art small,
+body .house-underworld p, body .house-next-note:not(:has(#show-next-room)), body .house-postcard-heading .eyebrow, body .house-postcard-actions p { display: none; }
+body .room-name-form label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

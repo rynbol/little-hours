@@ -7,6 +7,9 @@ export default {
     const { check, steps, sleep } = t;
     const app = await t.open({ seed: 'three-rooms' });
     await app.settle();
+    const copy = ['.brand-tagline', '.room-subtitle', '.focus-intro', '.timer-caption', '.daily-note'];
+    const shown = []; for (const selector of copy) if (await app.visible(selector)) shown.push(selector);
+    check('the room page shows no decorative copy', shown.length === 0, shown);
 
     await app.clickSel('[data-panel="atmosphere"]');
     await app.waitFor(`document.querySelectorAll('[data-theme-choice]').length === 3`, { what: 'the ambience panel' });

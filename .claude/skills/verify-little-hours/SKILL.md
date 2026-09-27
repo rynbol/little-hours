@@ -19,6 +19,14 @@ Drive the real app in Chrome with real mouse and keyboard input, collect evidenc
    - Leaks: `lh heap <cycle> --against main`. Early cycles grow while caches warm up; the verdict uses the second half.
 5. **Clean up.** `npm run lh -- cleanup`. It stops only browsers and servers lh started.
 
+## Seeds
+
+`--seed <name>` for `run`, `shot`, `perf`. Defined in `scripts/lh/seeds.mjs`: `fresh`, `one-room`, `one-room-rich`, `two-rooms`, `three-rooms`, `greenhouse`, `greenhouse-<seed|sprout|youngling|budding|bloom>`, `greenhouse-cloud-loft`, `greenhouse-ember-library`, `attic`, `attic-stars`, `garden-days`.
+
+## Look
+
+Keep the UI minimal: no taglines, eyebrows, subtitles or captions. The `controls` and `house` flows check that the hidden copy stays hidden. Screen-reader labels stay in the DOM.
+
 ## Rules
 
 - Input is real: clicks, drags and keys go through Chrome's input pipeline. The `window.__littleHours` hook is for setup and reading state (`ready`, `settled`, `screenPoint`, `stats`), never for triggering the behaviour under test.

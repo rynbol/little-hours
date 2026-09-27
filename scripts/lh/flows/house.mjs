@@ -1,5 +1,5 @@
 export default {
-  about: 'the house page: the dollhouse arrives closed, opens, closes on the toggle, picks a room from the 3D view, and comes back fast',
+  about: 'the house page: the dollhouse arrives closed, opens, closes on the toggle, picks a room from the 3D view, comes back fast, grows a tree per study day and turns freely',
   async run(t) {
     const { check, steps, sleep } = t;
     let app = await t.open({ seed: 'three-rooms' });
@@ -9,6 +9,9 @@ export default {
     check('the house arrives closed', !early || early.open < .2, early);
     await app.settle();
     check('then it opens by itself', (await app.house()).open === 1);
+    const copy = ['.house-address', '.house-scene-caption', '.house-map-hint', '.house-description', '.house-paper-top', '.house-underworld p', '.house-room-link .house-slot-label'];
+    const shown = []; for (const selector of copy) if (await app.visible(selector)) shown.push(selector);
+    check('the house page shows no decorative copy', shown.length === 0, shown);
     check('the toggle offers to close it', await app.text('[data-house-open]') === 'Close the house' && await app.attr('[data-house-open]', 'aria-pressed') === 'true');
     await steps.toggleHouse(app);
     check('a click closes the house', (await app.house()).open === 0);
@@ -46,6 +49,25 @@ export default {
     check('leaving before the first build still builds the house later', (await app.house())?.open === 1, await app.house());
     const site = await app.point({ houseRoom: 'garden' });
     check('the unbuilt garden wing shows on screen', site?.visible, site);
+    await t.close(app);
+
+    app = await t.open({ seed: 'garden-days', label: 'garden' });
+    await steps.openHouse(app);
+    const garden = await app.house();
+    check('the garden has one tree per study day, full grown at an hour', garden.trees?.length === 14 && garden.trees[2] === 1 && Math.abs(garden.trees[0] - 10 / 60) < 1e-9, garden.trees);
+    const box = await app.box('#house-canvas canvas');
+    const left = { x: box.x - box.width / 3, y: box.y - 60 }, right = { x: box.x + box.width / 3, y: box.y + 60 };
+    await app.drag(left, { x: left.x + 420, y: left.y + 150 }, 24); await app.settle();
+    const turned = await app.house();
+    check('dragging turns the house well past the old limit and tilts it', turned.angle < .5 && turned.tilt < .9, { angle: turned.angle, tilt: turned.tilt });
+    await t.shot(app, 'garden-turned');
+    for (let i = 0; i < 2; i++) { await app.drag(right, { x: right.x - 450, y: right.y - 150 }, 24); await app.settle(); }
+    const far = await app.house();
+    check('the other way it stops at a view that still shows the house', far.angle > 2 && far.angle <= 2.45 + 1e-6 && far.tilt <= 1.3 + 1e-6, { angle: far.angle, tilt: far.tilt });
+    await t.shot(app, 'garden-back');
+    await app.clickSel('#house-reset-view'); await app.settle();
+    const home = await app.house();
+    check('the home button puts the camera back', Math.abs(home.angle - Math.PI / 2.8) < .01 && Math.abs(home.tilt - 1.02) < .01, { angle: home.angle, tilt: home.tilt });
     await t.close(app);
 
     app = await t.open({ seed: 'three-rooms', reducedMotion: true, label: 'reduced motion' });

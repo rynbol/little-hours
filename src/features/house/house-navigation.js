@@ -2,6 +2,7 @@ import { nextExpansion, houseConnections } from '../../core/house.js';
 import { DOOR_OPEN_SECONDS } from '../companion/index.js';
 import { $ } from '../../ui/dom.js';
 import { createHouseView } from './house-view.js';
+import { studyTrees } from '../../core/garden.js';
 
 export function createHouseNavigation(app) {
   let houseOpen = false, connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
@@ -36,7 +37,7 @@ export function createHouseNavigation(app) {
   }
   function renderConnections(updateModel = true) {
     connectedView?.setFocused(app.state.session.running);
-    const key = JSON.stringify([app.state.house, app.state.theme, app.state.avatar, Boolean(connectedView)]);
+    const key = JSON.stringify([app.state.house, app.state.history.length, app.state.theme, app.state.avatar, Boolean(connectedView)]);
     if (connectionsKey === key) return;
     connectionsKey = key;
     const nav = $('#home-connections'); nav.replaceChildren();
@@ -57,15 +58,16 @@ export function createHouseNavigation(app) {
     }
     const wide = document.createElement('button'); wide.className = 'home-wide'; wide.textContent = connectedView ? 'Back to my room' : 'Whole house'; wide.setAttribute('aria-pressed', String(Boolean(connectedView)));
     wide.addEventListener('click', () => setConnectedView(!connectedView)); nav.append(wide);
-    if (connectedView && updateModel) connectedView.update(app.state.house, app.state.house.activeId, app.state.theme, app.state.avatar);
+    if (connectedView && updateModel) connectedView.update(withGarden(), app.state.house.activeId, app.state.theme, app.state.avatar);
   }
+  const withGarden = () => ({ ...app.state.house, garden: studyTrees(app.state.history) });
   function setConnectedView(open) {
     if (travelling || open === Boolean(connectedView)) return;
     if (open && app.panels.current === 'avatar') app.panels.close();
     if (open && app.decorate.active) app.decorate.setEditMode(false);
     if (open) {
       $('#house-in-room').hidden = false;
-      connectedView = createHouseView($('#house-in-room'), { house: app.state.house, selectedId: app.state.house.activeId, theme: app.state.theme, avatar: app.state.avatar, focused: app.state.session.running, onSelect: visitRoom });
+      connectedView = createHouseView($('#house-in-room'), { house: withGarden(), selectedId: app.state.house.activeId, theme: app.state.theme, avatar: app.state.avatar, focused: app.state.session.running, onSelect: visitRoom });
     } else { connectedView.dispose(); connectedView = null; $('#house-in-room').hidden = true; }
     $('#room-canvas').hidden = open;
     document.body.classList.toggle('is-connected', open); app.roomUI.renderHeading();
