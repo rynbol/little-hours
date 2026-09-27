@@ -14,7 +14,7 @@ export function createTimerUI(app) {
     const reward = focusCoins(state.session.duration / 60_000), next = nextExpansion(state.house);
     const name = next?.id === 'garden' ? 'garden wing' : 'upstairs hideaway';
     const progress = !next ? 'A little more saved for your home' : state.house.coins >= next.price ? `Your ${name} is ready to build` : `${next.price - state.house.coins} coins to your ${name}`;
-    $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>Your time grows your home</strong><span>${reward ? `+${reward} coins when you finish` : 'Coins start at 5 minutes'}</span><small>${progress}</small></span>`;
+    $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>${reward ? `+${reward} coins` : 'Coins from 5 min'}</strong><small>${progress}</small></span>`;
   }
 
   function renderJournal() {
@@ -27,16 +27,11 @@ export function createTimerUI(app) {
     const list = $('#today-sessions');
     list.replaceChildren();
     if (!entries.length) {
-      const note = document.createElement('p');
-      note.textContent = 'A fresh page. Your first little win is waiting.';
       const mark = document.createElement('span');
       mark.className = 'journal-sprout';
       mark.innerHTML = sproutArt();
-      list.append(mark, note);
+      list.append(mark);
     } else {
-      const note = document.createElement('p');
-      note.textContent = `${entries.length} ${entries.length === 1 ? 'session' : 'sessions'} completed. Every little bit counts.`;
-      list.append(note);
       const chips = document.createElement('div');
       chips.className = 'journal-sessions';
       for (const entry of entries.slice(-12)) {

@@ -48,8 +48,8 @@ export const shellMarkup = (audioPrefs) => `
       <aside class="focus-card" id="focus-card" tabindex="-1" aria-labelledby="focus-title">
         <div class="card-top"><span class="eyebrow">A MOMENT FOR YOU</span><span class="tiny-flower" aria-hidden="true">${blossomArt()}</span></div>
         <h2 id="focus-title">Little by <em>little.</em></h2><p class="focus-intro">Make space for one good thing.</p>
-        <label class="field-label" for="task">Your little intention</label>
-        <input id="task" maxlength="180" placeholder="Read a chapter, dream something up…" autocomplete="off" />
+        <label class="field-label sr-only" for="task">What you’re working on</label>
+        <input id="task" maxlength="180" placeholder="What are you working on?" autocomplete="off" />
         <div class="timer-area">
           <div class="timer-dial" id="timer-dial">
             <svg class="timer-ring" id="timer-ring" viewBox="0 0 200 200" role="slider" tabindex="0" aria-label="Focus length" aria-valuemin="1" aria-valuemax="120" aria-valuenow="25" aria-valuetext="25 minutes"><circle class="timer-track" cx="100" cy="100" r="91"/><circle class="timer-progress" id="timer-progress" cx="100" cy="100" r="91" pathLength="100"/><circle class="timer-seed" cx="100" cy="9" r="5"/></svg>
@@ -59,9 +59,9 @@ export const shellMarkup = (audioPrefs) => `
         </div>
         <button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
         <button class="reset-session" id="reset-session" hidden>Start over</button>
-        <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="${audioPrefs.volume}" aria-label="Rain volume" disabled /><label class="chime-toggle"><span>Chime when a session ends</span><input type="checkbox" id="chime-toggle" ${audioPrefs.chime ? 'checked' : ''} /></label></div>
+        <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="${audioPrefs.volume}" aria-label="Rain volume" disabled /><label class="chime-toggle"><span>Chime at the end</span><input type="checkbox" id="chime-toggle" ${audioPrefs.chime ? 'checked' : ''} /></label></div>
         <div id="focus-reward" class="focus-reward"></div>
-        <details class="session-journal"><summary><span>Today’s little wins</span><span id="today-total">0 min</span></summary><div id="today-sessions"></div></details>
+        <details class="session-journal"><summary><span>Today</span><span id="today-total">0 min</span></summary><div id="today-sessions"></div></details>
         <div class="daily-note" id="daily-note">Good things begin with a little time.</div>
       </aside>
     </main>

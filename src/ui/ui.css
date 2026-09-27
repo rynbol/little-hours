@@ -82,6 +82,7 @@ body:not(.is-avatar-editing) .room-hint { color: #b5a3b1; font-size: 10px; botto
 .timer-ring .timer-seed { fill: #b97885; stroke: var(--ui-paper); stroke-width: 2; transform: rotate(90deg); transform-origin: center; }
 .timer-dial[data-settable] .timer-ring { cursor: grab; touch-action: none; }
 .timer-dial[data-settable] .timer-seed { r: 8; transition: none; }
+.timer-dial[data-settable] .timer-progress { transition: none; }
 .timer-ring:focus-visible { outline: 2px solid #b47a86; outline-offset: 4px; border-radius: 50%; }
 .timer-dial[data-phase='focusing'] .timer-progress, .timer-dial[data-phase='complete'] .timer-progress { stroke: #82916d; }
 .timer-dial[data-phase='focusing'] .timer-seed, .timer-dial[data-phase='complete'] .timer-seed { fill: #82916d; }
@@ -383,3 +384,14 @@ body.is-decorating:not(.is-avatar-editing) .room-heading h1 { font-size: 28px; }
   .coin-wallet, .time-toggle, .focus-toggle { min-height: 44px; min-width: 44px; }
   body:not(.is-avatar-editing) .panel-heading .icon-button { width: 44px; height: 44px; }
 }
+
+body .brand-tagline, body .room-heading .eyebrow, body .room-subtitle, body .focus-card .card-top, body .focus-intro, body .timer-caption,
+body .daily-note, body .app-footer > span, body .collection-footnote, body .room-company, body .sound-state, body .focus-reward small,
+body .coin-wallet > span:last-child, body .time-toggle > span, body .avatar-stage-heading .eyebrow { display: none; }
+body:not(.is-decorating):not(.is-avatar-editing) .room-hint { display: none; }
+body .stage-presence, body .companion-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; padding: 0; border: 0; }
+body .session-label { opacity: .75; }
+body .focus-reward { padding: 8px 11px; align-items: center; }
+body .time-toggle { min-width: 0; width: 38px; padding: 5px; }
+body .house-page .eyebrow, body .house-page .room-subtitle, body .house-fine-print, body .house-progress-copy, body .preset-note, body .moments-footnote,
+body .room-travel small, body .celebration-note, body .pet-actions .performance-note, body .quality-options ~ .performance-note { display: none; }
