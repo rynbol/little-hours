@@ -34,6 +34,8 @@ Options:
   --theme <name>     dusk, day or rain
   --size <WxH>       viewport in CSS pixels (default 1440x1000)
   --scale <n>        device pixel ratio (default 2 for perf, 1 for shots)
+  --turn <n>         house shots: press the turn buttons n times first (negative turns left)
+  --closed           house shots: close the house first
   --still            prefers-reduced-motion: reduce
   --headed           show the browser window
   --rounds <n>       perf rounds per side (default 1, or 2 with --against)
@@ -183,7 +185,11 @@ async function shots() {
     if (!views[name]) throw new Error(`Unknown view "${name}". Views: ${Object.keys(views).join(', ')}`);
     const app = await openApp(side.url, { ...viewport, scale: Number(options.scale || 1), seed: options.seed || 'three-rooms', theme: options.theme });
     try {
-      await sleep(800); await app.settle(); await views[name].go(app); await sleep(Number(options.wait || 600));
+      await sleep(800); await app.settle(); await views[name].go(app);
+      for (let i = 0; i < Math.abs(Number(options.turn || 0)); i++) { await app.clickSel(Number(options.turn) < 0 ? '#house-turn-left' : '#house-turn-right'); await sleep(60); }
+      if (options.closed) await app.clickSel('[data-house-open]');
+      if (options.turn || options.closed) await app.settle();
+      await sleep(Number(options.wait || 600));
       const file = await app.shot(join(out, `${name}-${list.length > 1 ? (side === list[0] ? 'this' : String(options.against).replace(/[^\w.-]+/g, '_')) : 'this'}.jpg`));
       console.log(`${side.label} ${name}: ${file}${app.errors.length ? `  page errors: ${app.errors.join(' | ').slice(0, 200)}` : ''}`);
     } finally { await app.close(); }
