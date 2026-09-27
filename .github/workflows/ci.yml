@@ -42,7 +42,12 @@ jobs:
 
   flows:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        flow: [avatar, controls, decorate, doors, house, pet, rooms, timer]
+    name: flow (${{ matrix.flow }})
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -52,12 +57,12 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: echo "CHROME_PATH=$(node -e "import('@playwright/test').then(p => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
-      - run: npm run lh -- run all
+      - run: npm run lh -- run ${{ matrix.flow }}
         env:
           LH_SLOW: '4'
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: lh-evidence
+          name: lh-evidence-${{ matrix.flow }}
           path: .lh/out
           retention-days: 7
