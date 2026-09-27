@@ -1,0 +1,33 @@
+.pet-scene { display: block; width: 100%; height: auto; overflow: visible; pointer-events: none; }
+.pet-scene .pet-scene-character { transform-box: fill-box; transform-origin: 50% 100%; }
+.pet-scene .pet-scene-head { transform-box: fill-box; transform-origin: 50% 88%; }
+.pet-scene .pet-scene-tail { transform-box: fill-box; transform-origin: 15% 85%; }
+.pet-scene .pet-scene-ball, .pet-scene .pet-scene-treat, .pet-scene .pet-scene-leaf, .pet-scene .pet-scene-quiet-prop { transform-box: fill-box; transform-origin: center; }
+.pet-scene .pet-scene-snack-prop, .pet-scene .pet-scene-quiet-prop, .pet-scene .pet-scene-leaf { opacity: 0; }
+[data-moment='play'] .pet-scene .pet-scene-character { animation: pet-scene-play 2.5s ease-in-out both; }
+[data-moment='play'] .pet-scene .pet-scene-character-right { animation-delay: .16s; }
+[data-moment='play'] .pet-scene .pet-scene-tail { animation: pet-scene-wag .45s ease-in-out 5; }
+[data-moment='play'] .pet-scene .pet-scene-ball { animation: pet-scene-ball 2.5s ease-in-out both; }
+[data-moment='play'] .pet-scene .pet-scene-leaf { animation: pet-scene-leaf 2.5s ease-in-out both; }
+[data-moment='snack'] .pet-scene .pet-scene-play-prop, [data-moment='quiet'] .pet-scene .pet-scene-play-prop { opacity: 0; }
+[data-moment='snack'] .pet-scene .pet-scene-snack-prop { opacity: 1; }
+[data-moment='snack'] .pet-scene .pet-scene-head { animation: pet-scene-nibble 2.5s ease-in-out both; }
+[data-moment='snack'] .pet-scene .pet-scene-character-right .pet-scene-head { animation-delay: .12s; }
+[data-moment='snack'] .pet-scene .pet-scene-treat { animation: pet-scene-treat 2.5s ease-in-out both; }
+[data-moment='quiet'] .pet-scene .pet-scene-character-left, [data-moment='quiet'] .pet-scene .pet-scene-character-solo { animation: pet-scene-lean 2.5s ease-in-out both; }
+[data-moment='quiet'] .pet-scene .pet-scene-character-right { animation: pet-scene-lean-back 2.5s ease-in-out both; }
+[data-moment='quiet'] .pet-scene .pet-scene-quiet-prop { animation: pet-scene-heart 2.5s ease-in-out both; }
+[data-moment='quiet'] .pet-scene .pet-scene-prop-shadow { opacity: 0; }
+@keyframes pet-scene-play { 0%, 100% { transform: none; } 17%, 53% { transform: translateY(-9px) rotate(-3deg); } 35%, 71% { transform: translateY(0) scale(1.035, .96); } }
+@keyframes pet-scene-wag { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(8deg); } }
+@keyframes pet-scene-ball { 0%, 100% { transform: none; } 24% { transform: translate(-17px, -21px) rotate(-35deg); } 48% { transform: translate(18px, 0) rotate(38deg); } 72% { transform: translate(10px, -13px) rotate(65deg); } }
+@keyframes pet-scene-leaf { 0%, 100% { opacity: 0; transform: translate(0, 10px) rotate(-20deg); } 20% { opacity: 1; } 70% { opacity: 1; transform: translate(-28px, -25px) rotate(25deg); } }
+@keyframes pet-scene-nibble { 0%, 100% { transform: none; } 20%, 46%, 72% { transform: translateY(4px) rotate(-4deg); } 33%, 59% { transform: translateY(1px) rotate(1deg); } }
+@keyframes pet-scene-treat { 0%, 100% { transform: none; } 24%, 58% { transform: translateY(-3px) rotate(3deg); } }
+@keyframes pet-scene-lean { 0%, 100% { transform: none; } 25%, 75% { transform: rotate(6deg); } }
+@keyframes pet-scene-lean-back { 0%, 100% { transform: none; } 25%, 75% { transform: rotate(-6deg); } }
+@keyframes pet-scene-heart { 0%, 100% { opacity: 0; transform: translateY(8px) scale(.7); } 22%, 76% { opacity: 1; transform: translateY(-5px) scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .pet-scene * { animation: none !important; }
+  [data-moment='quiet'] .pet-scene .pet-scene-quiet-prop, [data-moment='play'] .pet-scene .pet-scene-leaf { opacity: 1; }
+}

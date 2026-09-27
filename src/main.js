@@ -19,6 +19,7 @@ import { createHouseUI, createHouseNavigation } from './features/house/index.js'
 import { createAvatarPanel } from './features/avatar/index.js';
 import './features/avatar/wardrobe.css';
 import './features/pet/pet.css';
+import './features/pet/pet-scenes.css';
 import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
@@ -127,7 +128,7 @@ try {
   const speechLayer = document.createElement('div'); speechLayer.className = 'speech-layer';
   $('#room-canvas').appendChild(speechLayer);
   app.speech = createSpeech(speechLayer, { anchor: who => app.room?.anchor(who), reducedMotion: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
-  app.delights = createDelights($('#room-canvas'), { room: app.room, signal: listeners.signal, unavailable: () => app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact });
+  app.delights = createDelights($('#room-canvas'), { room: app.room, signal: listeners.signal, unavailable: () => app.panels.current === 'pet' || app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact });
   app.moments = createMomentsUI($('#stage'), { room: app.room, signal: listeners.signal, getState: () => ({ items: app.state.layout.items, focusing: app.state.session.running, unavailable: app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact }) });
 } catch (error) {
   $('#loading-note').textContent = 'The room couldn’t load. Try reloading; your focus timer is still ready.';

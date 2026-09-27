@@ -1,4 +1,5 @@
 import { PET_SHOP, petEntry } from './pets.js';
+import { sessionStarted } from './session.js';
 
 export const PET_PERSONALITIES = Object.freeze({
   cat: { trait: 'Quiet company', loves: 'Warm windows & slow mornings', favorite: 'window', ritual: 'cuddle', color: '#cf966a' },
@@ -16,7 +17,7 @@ export const BOND_LEVELS = Object.freeze([
 ]);
 const count = value => Number.isSafeInteger(value) && value >= 0 ? Math.min(value, 1_000_000_000) : 0;
 export const petName = (state, id = state.pet) => state.petBonds?.[id]?.name || petEntry(id)?.name || 'Miso';
-export const focusPetId = state => state.session.running || (state.session.remaining > 0 && state.session.remaining < state.session.duration) ? state.session.petId || state.pet : state.pet;
+export const focusPetId = state => sessionStarted(state.session) ? state.session.petId || state.pet : state.pet;
 export const cleanPetName = (value, fallback) => typeof value === 'string' && value.trim() ? value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 24) || fallback : fallback;
 export function bondLevel(bond) {
   const points = count(bond?.affection);

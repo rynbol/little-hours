@@ -109,7 +109,7 @@ test('restore skips corrupted history entries without discarding valid preferenc
   const restored = restoreState(JSON.stringify(saved));
   assert.equal(restored.theme, 'rain');
   assert.equal(restored.task, 'Keep this task');
-  assert.deepEqual(restored.session, saved.session);
+  assert.deepEqual(restored.session, { ...saved.session, friendPair: null });
   assert.deepEqual(restored.history, [{ date: '2026-09-21', minutes: 50 }]);
 });
 
@@ -124,7 +124,7 @@ test('restore rejects malformed session values and invalid JSON safely', () => {
   }
   // A clock moved backwards can leave more time than the duration: cap it and keep the session.
   const ahead = { duration: 1_500_000, remaining: 1_560_000, endsAt: null, running: false };
-  assert.deepEqual(restoreState(JSON.stringify({ session: ahead })).session, { ...ahead, remaining: 1_500_000 });
+  assert.deepEqual(restoreState(JSON.stringify({ session: ahead })).session, { ...ahead, remaining: 1_500_000, friendPair: null });
   assert.deepEqual(restoreState('{broken json'), freshState());
 });
 
@@ -142,7 +142,7 @@ test('existing focus saves gain a furnished room without losing their session', 
   const session = startSession(createSession(50), 1234);
   const restored = restoreState(JSON.stringify({ theme: 'rain', task: 'An old room', session }));
   assert.deepEqual(restored.layout, createLayout());
-  assert.deepEqual(restored.session, session);
+  assert.deepEqual(restored.session, { ...session, friendPair: null });
   assert.equal(restored.task, 'An old room');
 });
 

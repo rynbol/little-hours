@@ -1,7 +1,8 @@
-import { createSession, remainingAt, formatTime, spokenTime, sessionPhase, displayedRemaining, DIAL_MINUTES } from '../../core/session.js';
+import { createSession, remainingAt, formatTime, spokenTime, sessionPhase, displayedRemaining, DIAL_MINUTES, sessionStarted } from '../../core/session.js';
 import { plantPhase } from '../../core/room-types.js';
 import { petName, focusPetId } from '../../core/pet-bonds.js';
 import { petEntry } from '../../core/pets.js';
+import { petEntity, pairMembers } from '../../core/friendships.js';
 import { localDate } from '../../core/state.js';
 import { focusCoins } from '../../core/house.js';
 import { $ } from '../../ui/dom.js';
@@ -9,14 +10,16 @@ import { icon } from '../../ui/icons.js';
 import { sproutArt } from '../../ui/ui-art.js';
 
 export function createTimerUI(app) {
-  let lastSessionRender = '', journalSignature = '', focusCollapsed = false;
+  let lastSessionRender = '', journalSignature = '', lastDay = '', focusCollapsed = false;
 
   function renderFocusReward() {
     const { state } = app;
     const reward = focusCoins(state.session.duration / 60_000);
     const together = focusPetId(state);
     const wish = petEntry(state.petWish);
-    const progress = wish ? (state.house.coins >= wish.price ? `${wish.name} is ready to come home` : `${wish.price - state.house.coins} coins to welcome ${wish.name}`) : reward ? `+${Math.floor(reward / 5)} hearts with ${petName(state, together)}` : 'Hearts from 5 focus minutes';
+    const owner = petEntity(together), pair = sessionStarted(state.session) ? state.session.friendPair : pairMembers(owner, state.friendships.focusBuddies[owner], state.pets.map(petEntity));
+    const company = pair ? pair.map(member => petName(state, member.slice(4))).join(' & ') : petName(state, together);
+    const progress = wish ? (state.house.coins >= wish.price ? `${wish.name} is ready to come home` : `${wish.price - state.house.coins} coins to welcome ${wish.name}`) : reward ? `+${Math.floor(reward / 5)} ♡ · ${company}` : '♡ from 5 min';
     $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>${reward ? `+${reward} coins` : 'Coins from 5 min'}</strong><small></small></span>`;
     $('#focus-reward small').textContent = progress;
   }
@@ -49,10 +52,12 @@ export function createTimerUI(app) {
 
   function showCelebration(completion) {
     const modal = $('#session-celebration');
-    const { minutes, coins, pet } = completion;
-    $('#celebration-copy').textContent = `${minutes} quiet minutes. You showed up for yourself, and ${pet.name} was right there with you.`;
-    $('#celebration-bond').textContent = pet.hearts ? `+${pet.hearts} hearts with ${pet.name} · ${pet.bondTitle}` : 'Every little beginning counts.';
+    const { minutes, coins, pet, friendship } = completion;
+    $('#celebration-copy').textContent = `${minutes} minutes with ${friendship ? friendship.names.join(' & ') : pet.name}.`;
+    $('#celebration-bond').textContent = pet.hearts ? `+${pet.hearts} ♡ · ${pet.name} · ${pet.bondTitle}` : '♡';
     $('#celebration-earned').textContent = `+${coins} coins`;
+    $('#celebration-friendship').textContent = friendship ? `+${friendship.hearts} ♡ · ${friendship.names.join(' & ')} · ${friendship.bondTitle}` : '';
+    $('#celebration-friendship').hidden = !friendship;
     if (!modal.open) modal.show();
     app.feedback.celebrate($('.celebration-flower'));
   }
@@ -62,9 +67,11 @@ export function createTimerUI(app) {
     app.moments?.refresh();
     const ms = displayedRemaining(state.session);
     const formatted = formatTime(ms);
+    const pageClock = $('#pet-page-clock'); if (pageClock && pageClock.textContent !== formatted) pageClock.textContent = formatted;
     const presence = sessionPhase(state.session);
     app.companion.syncIntent();
     const today = localDate();
+    if (today !== lastDay) { lastDay = today; app.pet?.sync(); }
     const minutes = state.history.filter(h => h.date === today).reduce((sum, h) => sum + h.minutes, 0);
     const renderKey = `${formatted}:${presence}:${state.session.duration}:${today}:${minutes}:${editingAvatar}:${travelling}`;
     // The clock polls for deadlines twice a second, but idle rooms and unchanged

@@ -60,7 +60,7 @@ export default {
     await t.shot(app, 'dog-hearts');
     await app.clickSel('#pet-button');
     await app.waitFor(`document.getElementById('pet-now') !== null`, { what: 'the pet panel' });
-    check('the panel button offers to pet Mochi', (await app.text('#pet-now'))?.includes('Give Mochi a pet'), await app.text('#pet-now'));
+    check('the panel button offers to pet Mochi', (await app.attr('#pet-now', 'aria-label')).startsWith('Give Mochi a pet'), await app.attr('#pet-now', 'aria-label'));
     await app.clickSel('[data-pet-choice="cat"]');
     await app.waitFor(`document.querySelector('[data-pet-choice="cat"]')?.getAttribute('aria-pressed') === 'true'`, { what: 'the cat to be chosen' });
     check('switching back to the cat is saved too', (await app.saved())?.pet === 'cat' && await app.text('#pet-button-label') === 'Miso');

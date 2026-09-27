@@ -13,7 +13,6 @@ const settings = {
   play: { shape: 'star', label: 'A tiny happy dance', color: '#f2ce7e' },
   treat: { shape: 'leaf', label: 'Saved you a little something', color: '#bfd197' },
   hello: { shape: 'heart', label: 'Your favorite company', color: '#e8b9b2' },
-  adopt: { shape: 'heart', label: 'Welcome home', color: '#f0b5bd' },
   bond: { shape: 'star', label: 'A little closer', color: '#cbb7e2' },
   water: { shape: 'leaf', label: 'A little care', color: '#bfd197' },
   tea: { shape: 'heart', label: 'Time for a little pause', color: '#e6bc93' },
@@ -39,7 +38,7 @@ export function createDelights(host, { room, unavailable, signal }) {
     const effect = settings[kind]; if (!effect) return;
     clear(who);
     const node = document.createElement('div'); node.className = 'room-delight'; node.dataset.kind = kind; node.dataset.speaker = who; node.style.setProperty('--delight-color', effect.color);
-    node.innerHTML = `<span class="delight-medallion"><svg viewBox="0 0 48 48">${drawings[effect.shape]}</svg></span>${motion.matches ? '' : Array.from({ length: kind === 'finish' || kind === 'adopt' ? 9 : 5 }, (_, i) => `<i style="--dx:${Math.cos(i * 2.4) * (34 + i * 4)}px;--dy:${-22 - (i % 4) * 18}px;--delay:${i * .07}s;--turn:${i % 2 ? 55 : -45}deg"><svg viewBox="0 0 48 48">${drawings[i % 3 ? 'star' : effect.shape]}</svg></i>`).join('')}`;
+    node.innerHTML = `<span class="delight-medallion"><svg viewBox="0 0 48 48">${drawings[effect.shape]}</svg></span>${motion.matches ? '' : Array.from({ length: kind === 'finish' ? 9 : 5 }, (_, i) => `<i style="--dx:${Math.cos(i * 2.4) * (34 + i * 4)}px;--dy:${-22 - (i % 4) * 18}px;--delay:${i * .07}s;--turn:${i % 2 ? 55 : -45}deg"><svg viewBox="0 0 48 48">${drawings[i % 3 ? 'star' : effect.shape]}</svg></i>`).join('')}`;
     node.setAttribute('data-label', effect.label); layer.append(node);
     active.set(who, { node, timer: setTimeout(() => clear(who), motion.matches ? 1800 : 3400) }); update();
   }

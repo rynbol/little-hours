@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flow: [avatar, companions, controls, decorate, doors, house, pet, pond, rooms, timer]
+        flow: [avatar, companions, controls, decorate, doors, friendships, house, pet, pond, rooms, timer]
     name: flow (${{ matrix.flow }})
     steps:
       - uses: actions/checkout@v7
