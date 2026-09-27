@@ -8,7 +8,7 @@ async function tapPet(app, sleep, slow) {
     if (spot?.visible) {
       await app.click(spot.x, spot.y);
       const counts = [];
-      for (let k = 0; k < 14 * slow; k++) { counts.push(await app.js(HEARTS)); await sleep(100 / slow); }
+      for (let k = 0; k < 42 * slow && !counts.includes(3); k++) { counts.push(await app.js(HEARTS)); await sleep(100 / slow); }
       if (counts.some(Boolean)) return { spot, counts, said: await app.js(BUBBLE) };
     }
     await sleep(300);
