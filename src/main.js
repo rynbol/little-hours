@@ -632,7 +632,6 @@ function enterFocusMode() {
   focusMode = true;
   document.body.classList.add('is-focus-mode');
   $('#focus-mode-hud').hidden = false;
-  room?.setFocusMode?.(true);
   $('#focus-mode-exit').focus({ preventScroll: true });
 }
 function leaveFocusMode({ restoreFocus = true } = {}) {
@@ -640,7 +639,6 @@ function leaveFocusMode({ restoreFocus = true } = {}) {
   focusMode = false;
   document.body.classList.remove('is-focus-mode');
   $('#focus-mode-hud').hidden = true;
-  room?.setFocusMode?.(false);
   if (restoreFocus) (focusModeReturnFocus?.isConnected ? focusModeReturnFocus : $('#focus-mode-enter')).focus({ preventScroll: true });
   focusModeReturnFocus = null;
 }

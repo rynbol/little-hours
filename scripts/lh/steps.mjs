@@ -10,7 +10,7 @@ export const steps = {
     if (!await app.js(`Boolean(document.querySelector('#focus-mode-enter'))`)) return;
     await app.clickSel('#focus-mode-enter');
     await app.waitFor(`document.body.classList.contains('is-focus-mode')`, { what: 'Focus mode' });
-    await app.waitFor(`window.__littleHours.room.diagnostics().focusCameraApplied`, { what: 'the companion to reach the active desk', timeout: 20000 });
+    await app.waitFor(`window.__littleHours.room.diagnostics().companion.atDesk && window.__littleHours.room.diagnostics().companion.state === 'working'`, { what: 'the companion to work at the active desk', timeout: 20000 });
   },
 };
 
@@ -28,5 +28,5 @@ export const views = {
   'house-closed': { about: 'the house page, closed', async go(app) { await steps.openHouse(app); await steps.toggleHouse(app); } },
   decorate: { about: 'Decorate mode', async go(app) { await steps.openDecorate(app); } },
   avatar: { about: 'the avatar editor', async go(app) { await steps.openAvatar(app); } },
-  focus: { about: 'Focus mode with the avatar at the active desk and its quiet timer', async go(app) { await steps.openFocusMode(app); } },
+  focus: { about: 'the whole room with the working companion and its quiet timer', async go(app) { await steps.openFocusMode(app); } },
 };
