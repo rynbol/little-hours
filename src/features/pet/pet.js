@@ -2,15 +2,13 @@ import { getFurniture } from '../../core/catalog.js';
 import { petBed, ROOM_BOUNDS } from '../../core/layout.js';
 import { navigationObstacles, walkable, clearSegment, findWalkingPath, localPoint, seatsFor, reachableFloor, reaches, cellPoint } from '../companion/index.js';
 import { clockRandom } from '../../core/test-pins.js';
+import { PET_SHOP } from '../../core/pets.js';
 
 // The pet's own day: it naps in its bed, wakes with a stretch, strolls to a
 // favorite spot (the fire, the window, a rug, beside you), sits a while and
 // walks home to sleep. Pure logic; the room owns the model and the input.
 export const PET_RADIUS = 0.25;
-export const PETS = Object.freeze({
-  cat: Object.freeze({ id: 'cat', name: 'Miso', speed: 0.5 }),
-  dog: Object.freeze({ id: 'dog', name: 'Mochi', speed: 0.62 }),
-});
+export const PETS = Object.freeze(Object.fromEntries(PET_SHOP.map(pet => [pet.id, pet])));
 export const PET_REACTION = 2.6;
 export const PET_HOLD = 0.6;
 export const HEART_LIFE = 1.7, MAX_HEARTS = 8, BIG_HEART_EVERY = 5;

@@ -13,6 +13,21 @@ export const PET_LINES = {
     hello: ['Arf!', 'Wuff.'],
     friend: ['Snff…', 'Wuff.'],
   },
+  bunny: {
+    carry: ['Eep?', 'Nnf!', '…!'],
+    hello: ['Nose twitch.', 'Binky!'],
+    friend: ['Purr-hum…', 'Nuzzle.'],
+  },
+  fox: {
+    carry: ['Kek?', 'Yip-yip!', 'Hmf!'],
+    hello: ['Yip!', 'Kek-kek.'],
+    friend: ['Chrr…', 'Yip.'],
+  },
+  panda: {
+    carry: ['Huff?', 'Squee!', 'Mmf?'],
+    hello: ['Squeak!', 'Huff-huff.'],
+    friend: ['Twitter…', 'Mmm.'],
+  },
 };
 
 // The companion speaks at the edges of focus, never during it.

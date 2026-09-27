@@ -1,5 +1,6 @@
 import { roomDesign } from '../../core/layout.js';
 import { activeHouseRoom } from '../../core/house.js';
+import { petEntry } from '../../core/pets.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 
@@ -21,7 +22,7 @@ export function createRoomUI(app) {
 
   // The room's accessible name says how to use it, with the current pet.
   function renderLabel() {
-    const pet = app.state.pet === 'dog' ? 'Mochi the puppy' : 'Miso the ginger cat';
+    const entry = petEntry(app.state.pet) || petEntry('cat'), pet = `${entry.name} the ${entry.kind}`;
     const label = app.avatar.active
       ? 'Avatar preview. Drag left or right over the character to turn them. Your focus timer is paused while editing.'
       : app.decorate.active

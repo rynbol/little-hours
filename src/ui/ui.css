@@ -143,6 +143,41 @@ body:not(.is-avatar-editing) .panel-heading .icon-button { width: 34px; height: 
 .pet-option strong { color: #684552; }
 .pet-option small { font-size: 10px; color: #826670; }
 .pet-actions { border-color: var(--ui-border); }
+.pet-option { position: relative; transition: transform .18s ease, box-shadow .18s ease; }
+.pet-option:hover { transform: translateY(-1px); box-shadow: 0 6px 14px #7c4c6414; }
+.pet-shop-label { display: flex; justify-content: space-between; align-items: center; margin: 16px 2px 8px; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #9a7d86; }
+.pet-shop-label span { display: inline-flex; gap: 4px; align-items: center; letter-spacing: 0; text-transform: none; color: #8a5f2b; font-variant-numeric: tabular-nums; }
+.pet-shop-label svg { width: 11px; height: 11px; }
+.pet-shop { display: grid; grid-template-columns: repeat(var(--pet-shop-columns, 3), minmax(0, 1fr)); gap: 8px; }
+.pet-option.is-locked { flex-direction: column; align-items: center; gap: 5px; padding: 12px 6px 10px; background: #f3ebe6; border: 1px dashed #dcc6cc; text-align: center; }
+.pet-option.is-locked .pet-art { width: 52px; height: 52px; filter: saturate(.55); opacity: .8; transition: filter .2s ease, opacity .2s ease, transform .2s ease; }
+.pet-option.is-locked:hover .pet-art, .pet-option.is-offered .pet-art { filter: none; opacity: 1; transform: scale(1.06); }
+.pet-option.is-locked strong { color: #7d5f69; font-size: 12px; }
+.pet-option.is-locked .pet-tag { position: static; }
+.pet-adopt-about { font-size: 10.5px; line-height: 1.35; color: #8d7179; }
+.pet-option.is-offered { border-color: #c79aa6; box-shadow: inset 0 0 0 1px #c79aa6, 0 6px 14px #7c4c6414; }
+.pet-tag { position: absolute; top: 10px; right: 9px; font-style: normal; font-size: 9px; font-weight: 600; letter-spacing: .3px; padding: 3px 7px; border-radius: 99px; background: #fff7f0; color: #8d7179; }
+.pet-tag.is-here { background: #e0e7d4; color: #566748; }
+.pet-tag.is-price { display: inline-flex; gap: 3px; align-items: center; background: #f6e3c2; color: #8a5f2b; }
+.pet-tag.is-price svg { width: 10px; height: 10px; }
+.pet-adopt { display: flex; gap: 14px; align-items: center; margin-top: 12px; padding: 14px; border-radius: 16px; background: linear-gradient(135deg, #fbeee6, #f4e6ee); border: 1px solid #ecd3d8; animation: pet-adopt-in .32s cubic-bezier(.2, .9, .3, 1.2); }
+.pet-adopt-art { flex: none; width: 76px; height: 76px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #fffaf5, #f3dcd9); display: grid; place-items: center; box-shadow: inset 0 -3px 8px #c79aa633; }
+.pet-adopt-art .pet-art { width: 64px; height: 64px; animation: pet-adopt-bob 2.4s ease-in-out infinite; }
+.pet-adopt-copy { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.pet-adopt-copy .eyebrow { margin: 0; font-size: 9px; letter-spacing: 1.2px; color: #a65766; }
+.pet-adopt-copy strong { font-size: 15px; color: #5b3f49; }
+.pet-adopt-budget { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; color: #8a5f2b; font-weight: 600; }
+.pet-adopt-budget span { display: inline-flex; gap: 4px; align-items: center; }
+.pet-adopt-budget svg { width: 12px; height: 12px; }
+.pet-adopt-budget small { font-weight: 400; color: #8d7179; font-variant-numeric: tabular-nums; }
+.pet-adopt-bar { height: 6px; border-radius: 99px; background: #ead9d6; overflow: hidden; }
+.pet-adopt-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #e3b566, #d9868f); }
+.pet-adopt-note { margin: 0; font-size: 10.5px; color: #8d7179; }
+.pet-adopt .start-button { min-height: 40px; margin-top: 2px; font-size: 12px; background: var(--ui-rose); color: #fff8f4; }
+.pet-adopt .start-button:disabled { opacity: .5; cursor: not-allowed; }
+@keyframes pet-adopt-in { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+@keyframes pet-adopt-bob { 50% { transform: translateY(-3px) rotate(-2deg); } }
+@media (prefers-reduced-motion: reduce) { .pet-adopt, .pet-adopt-art .pet-art { animation: none; } }
 body:not(.is-avatar-editing) .room-panel .quiet-button { min-height: 40px; background: #f1e2e2; color: #8d5263; border-color: #dcc0c7; border-radius: 10px; padding: 9px 12px; }
 .performance-note { color: #816e76; line-height: 1.65; }
 .quality-options button { border-radius: 10px; min-height: 42px; background: #eee4dc; color: #785f69; }

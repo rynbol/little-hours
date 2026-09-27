@@ -4,6 +4,7 @@ import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCo
 import { fitRoomType } from './room-types.js';
 import { AVATAR_DEFAULT, normalizeAvatarAppearance } from './avatar.js';
 import { clockNow } from './test-pins.js';
+import { normalizeOwnedPets, adoptionVerdict, FREE_PETS } from './pets.js';
 
 export const storageKey = 'little-hours-v1';
 // The save as it was just before a backup replaced it.
@@ -11,7 +12,7 @@ export const recoveryKey = 'little-hours-v1-before-restore';
 
 export function freshState() {
   const layout = createLayout();
-  return { theme: 'dusk', pet: 'cat', avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [] };
+  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [] };
 }
 
 export function localDate(timestamp = clockNow()) {
@@ -27,7 +28,8 @@ export function restoreState(raw) {
   if (['dusk', 'rain', 'day'].includes(saved.theme)) initial.theme = saved.theme;
   if (typeof saved.task === 'string') initial.task = saved.task.slice(0, 180);
   initial.avatar = normalizeAvatarAppearance(saved.avatar);
-  if (['cat', 'dog'].includes(saved.pet)) initial.pet = saved.pet;
+  initial.pets = normalizeOwnedPets(saved.pets);
+  if (initial.pets.includes(saved.pet)) initial.pet = saved.pet;
   if (Number.isSafeInteger(saved.seenAt) && saved.seenAt > 0) initial.seenAt = saved.seenAt;
   for (const key of Object.keys(initial.decor)) {
     if (typeof saved.decor?.[key] === 'boolean') initial.decor[key] = saved.decor[key];
@@ -149,6 +151,17 @@ export function createStateStore(storage, now = clockNow) {
         draft.house.rooms.push({ id: slotId, type: verdict.slot.type, name: cleanName(name, verdict.slot.label), layout: fitRoomType(createLayout(presetId), verdict.slot.type) });
       });
       return { ...result, built: verdict.ok, reason: verdict.reason };
+    },
+    adoptPet(id) {
+      let verdict;
+      const result = update(draft => {
+        verdict = adoptionVerdict(draft, id);
+        if (!verdict.ok) return;
+        draft.house.coins -= verdict.pet.price;
+        draft.pets = [...draft.pets, id];
+        draft.pet = id;
+      });
+      return { ...result, adopted: verdict.ok, reason: verdict.reason };
     },
     renameHouse(name) { return update(draft => { draft.house.name = cleanName(name, draft.house.name); }); },
     renameRoom(id, name) { return update(draft => { const room = draft.house.rooms.find(entry => entry.id === id); if (room) room.name = cleanName(name, room.name); }); },

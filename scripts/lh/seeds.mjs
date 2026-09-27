@@ -23,6 +23,8 @@ export const SEEDS = {
   'attic-stars': { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft', sessions: starLog } },
   'garden-days': { ...house(3), history: studyDays },
   attic: { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft' } },
+  ...Object.fromEntries(['bunny', 'fox', 'panda'].map(pet => [`pet-${pet}`, { ...house(1), pet, pets: ['cat', 'dog', pet] }])),
+  'pet-shop': house(1, 120),
 };
 
 export function seedState(name, { theme } = {}) {

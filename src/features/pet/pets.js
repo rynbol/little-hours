@@ -31,6 +31,7 @@ const SPECIES = {
     // standing cat carries its tail up with a curl at the tip.
     poses: { sit: { spineY: 0.235 }, stand: { tailPitch: 1.25, tailBend: -0.3 }, walk: { tailPitch: 1.0, tailBend: -0.22 } },
     colors: { fur: '#d4904f', light: '#e9b377', cream: '#f5e6cb', stripe: '#b5703b', ear: '#eba99c', nose: '#dc8a8a', eye: '#3a2a22', shine: '#fffaf0', blush: '#f2a092', mouth: '#7a4a36' },
+    look: 'cat', coat: 'tabby', ears: 'pointed', flick: true,
   },
   dog: {
     scale: 1.45, stride: 0.23, spineHalf: 0.13, chest: [0.155, 0.15, 0.2], hips: [0.15, 0.142, 0.18],
@@ -41,7 +42,43 @@ const SPECIES = {
     // A short, happy tail that curls up over the back.
     poses: { sit: { spineY: 0.25, tailPitch: -0.2, tailWrap: 0.3 }, stand: { tailPitch: 1.35, tailBend: -0.38 }, walk: { tailPitch: 1.35, tailBend: -0.38 }, settle: { tailPitch: 1.2, tailBend: -0.3 }, stretch: { tailPitch: 1.4, tailBend: -0.3 } },
     colors: { fur: '#efddbd', light: '#f6e9d2', cream: '#fcf6ea', stripe: '#b8794c', ear: '#a9683f', nose: '#352a26', eye: '#33241d', shine: '#fffaf0', blush: '#f3a698', mouth: '#6d4632', tongue: '#ee8a8f', collar: '#c8674f', tag: '#e3bb5f' },
+    look: 'dog', coat: 'saddle', ears: 'floppy', wag: true, collar: true,
   },
+  bunny: {
+    scale: 1.4, stride: 0.17, spineHalf: 0.1, chest: [0.15, 0.14, 0.17], hips: [0.17, 0.165, 0.19],
+    neck: [0, 0.07, -0.14], head: [0, 0.085, -0.06], headRadii: [0.162, 0.148, 0.148],
+    front: { anchor: [0.08, -0.07, -0.05], lengths: [0.1, 0.1], radii: [0.04, 0.036] },
+    hind: { anchor: [0.1, -0.06, 0.05], lengths: [0.12, 0.12], radii: [0.058, 0.048] },
+    tail: { anchor: [0, 0.1, 0.19], count: 1, length: 0.03, radii: [0.07, 0.072] },
+    poses: { sit: { spineY: 0.26, tailPitch: 0.3, tailWrap: 0 }, stand: { tailPitch: 0.6, tailBend: 0 }, walk: { tailPitch: 0.6, tailBend: 0 }, loaf: { tailPitch: 0.4, tailWrap: 0 }, sleep: { tailPitch: 0.4, tailWrap: 0, tailYaw: 0 } },
+    colors: { fur: '#ead8c2', light: '#f2e5d4', cream: '#fbf6ee', stripe: '#cdb8a3', ear: '#f0b3b0', nose: '#e5949a', eye: '#3a2a22', shine: '#fffaf0', blush: '#f4a9a6', mouth: '#8a5d4d' },
+    look: 'cat', coat: 'plain', ears: 'long', earSpot: [0.06, 0.12, 0.12], flick: true,
+  },
+  fox: {
+    scale: 1.45, stride: 0.22, spineHalf: 0.125, chest: [0.14, 0.14, 0.19], hips: [0.135, 0.13, 0.17],
+    neck: [0, 0.075, -0.16], head: [0, 0.09, -0.07], headRadii: [0.155, 0.138, 0.15],
+    front: { anchor: [0.08, -0.07, -0.05], lengths: [0.13, 0.13], radii: [0.04, 0.034] },
+    hind: { anchor: [0.085, -0.05, 0.06], lengths: [0.14, 0.14], radii: [0.046, 0.037] },
+    tail: { anchor: [0, 0.06, 0.17], count: 6, length: 0.074, radii: [0.062, 0.078] },
+    poses: { sit: { spineY: 0.245, tailWrap: 0.5 }, stand: { tailPitch: 0.45, tailBend: 0.02 }, walk: { tailPitch: 0.5, tailBend: -0.02 }, settle: { tailPitch: 0.45 } },
+    colors: { fur: '#df7a3c', light: '#ea9458', cream: '#fbf1e2', stripe: '#c7652e', ear: '#fbf1e2', nose: '#2f2320', eye: '#2d211c', shine: '#fffaf0', blush: '#f2a092', mouth: '#5e3a2c', leg: '#4a342b', paw: '#3a2a24' },
+    look: 'cat', coat: 'fox', ears: 'pointed', flick: true, tailTip: 2,
+  },
+  panda: {
+    scale: 1.42, stride: 0.19, spineHalf: 0.12, chest: [0.155, 0.14, 0.19], hips: [0.15, 0.142, 0.18],
+    neck: [0, 0.07, -0.16], head: [0, 0.09, -0.07], headRadii: [0.172, 0.15, 0.152],
+    front: { anchor: [0.085, -0.07, -0.05], lengths: [0.11, 0.11], radii: [0.048, 0.044] },
+    hind: { anchor: [0.09, -0.05, 0.06], lengths: [0.12, 0.12], radii: [0.053, 0.046] },
+    tail: { anchor: [0, 0.06, 0.17], count: 7, length: 0.068, radii: [0.06, 0.056] },
+    poses: { sit: { spineY: 0.265, tailWrap: 0.4 }, stand: { tailPitch: 0.7, tailBend: -0.05 }, walk: { tailPitch: 0.55, tailBend: -0.02 } },
+    colors: { fur: '#b9552c', light: '#c8683a', cream: '#f6ead9', stripe: '#8e3f22', ear: '#f6ead9', nose: '#2c201c', eye: '#2a1e1a', shine: '#fffaf0', blush: '#f2a092', mouth: '#5a3325', leg: '#3a2622', paw: '#2e201c', ring: '#e8b47f' },
+    look: 'cat', coat: 'panda', ears: 'round', earSpot: [0.11, 0.095, 0.55], rings: true,
+  },
+};
+const tailColor = (spec, i) => {
+  const c = spec.colors, last = spec.tail.count - 1;
+  if (spec.rings) return i % 2 ? c.ring : c.fur;
+  return i > last - (spec.tailTip || 1) ? c.cream : c.fur;
 };
 
 // Pose targets in the pet's own frame (it faces -z, paws on y = 0). Pitch
@@ -145,7 +182,8 @@ function rigBuilder() {
   };
 }
 
-function buildFace(rig, spec, c, dog) {
+function buildFace(rig, spec, c) {
+  const dog = spec.look === 'dog';
   const [hx, hy, hz] = spec.headRadii, ez = -hz * 0.9;
   for (const side of [-1, 1]) {
     const x = side * 0.066;
@@ -161,56 +199,71 @@ function buildFace(rig, spec, c, dog) {
     rig.tube('head', [[-0.03, -0.075, -hz * 1.3], [-0.015, -0.085, -hz * 1.33], [0, -0.078, -hz * 1.36], [0.015, -0.085, -hz * 1.33], [0.03, -0.075, -hz * 1.3]], 0.0042, c.mouth);
     rig.ellipsoid('head', [0.022, 0.012, 0.03], [0, -0.1, -hz * 1.28], c.tongue, { segments: 5, show: 'tongue' });
   } else {
+    if (spec.coat === 'fox') {
+      rig.ellipsoid('head', [0.058, 0.044, 0.07], [0, -0.05, -hz * 0.92], c.cream, { segments: 7 });
+      rig.ellipsoid('head', [0.018, 0.014, 0.013], [0, -0.035, -hz * 1.36], c.nose, { segments: 5 });
+    }
+    if (spec.coat === 'panda') for (const side of [-1, 1]) rig.ellipsoid('head', [0.024, 0.012, 0.008], [side * 0.062, 0.06, -hz * 0.9], c.cream, { rot: [-0.3, side * 0.3, side * -0.2], segments: 5 });
+    if (spec.coat === 'panda') for (const side of [-1, 1]) rig.ellipsoid('head', [0.028, 0.05, 0.012], [side * 0.07, -0.025, -hz * 0.86], c.stripe, { rot: [0, side * 0.4, side * 0.3], segments: 5 });
     for (const side of [-1, 1]) rig.ellipsoid('head', [0.056, 0.045, 0.046], [side * 0.035, -0.052, -hz * 0.8], c.cream, { segments: 6 });
     rig.ellipsoid('head', [0.05, 0.028, 0.04], [0, -0.085, -hz * 0.7], c.cream, { segments: 6 });
     rig.ellipsoid('head', [0.019, 0.013, 0.012], [0, -0.027, -hz * 1.04], c.nose, { segments: 5 });
     rig.tube('head', [[-0.028, -0.061, -0.165], [-0.014, -0.07, -0.169], [0, -0.059, -0.17], [0.014, -0.07, -0.169], [0.028, -0.061, -0.165]], 0.0038, c.mouth);
     // Tabby marks on the forehead, laid on the curve of the head, and fluffy cheeks.
     const surface = (x, y) => -hz * Math.sqrt(Math.max(0, 1 - (x / hx) ** 2 - (y / hy) ** 2)) - 0.002;
-    for (const [x, y, h] of [[0, 0.098, 0.034], [-0.036, 0.09, 0.026], [0.036, 0.09, 0.026]]) rig.ellipsoid('head', [0.009, h, 0.005], [x, y, surface(x, y) + 0.002], c.stripe, { rot: [-0.75, -x * 5, x * 4], segments: 4 });
+    if (spec.coat === 'tabby') for (const [x, y, h] of [[0, 0.098, 0.034], [-0.036, 0.09, 0.026], [0.036, 0.09, 0.026]]) rig.ellipsoid('head', [0.009, h, 0.005], [x, y, surface(x, y) + 0.002], c.stripe, { rot: [-0.75, -x * 5, x * 4], segments: 4 });
   }
   rig.ellipsoid('head', [hx, hy, hz], [0, 0, 0], c.fur, { segments: 10 });
 }
 
 function buildPet(species) {
-  const spec = SPECIES[species], c = spec.colors, rig = rigBuilder(), dog = species === 'dog';
+  const spec = SPECIES[species], c = spec.colors, rig = rigBuilder(), dog = spec.look === 'dog', legTone = c.leg || c.fur;
   const [cx, cy] = spec.chest, [hx, hy] = spec.hips, front = spec.spineHalf + spec.chest[2], back = spec.spineHalf + spec.hips[2];
   const profile = [[-front, 0, 0, -0.01], [-front + 0.035, cx * 0.62, cy * 0.64, -0.01], [-front + 0.1, cx * 0.95, cy * 0.96, 0], [-spec.spineHalf, cx, cy, 0],
     [0, (cx + hx) / 2 * 0.95, (cy + hy) / 2 * 0.95, 0.005], [spec.spineHalf, hx, hy, 0], [back - 0.08, hx * 0.93, hy * 0.92, 0], [back - 0.03, hx * 0.6, hy * 0.6, 0], [back, 0, 0, 0]];
   rig.torso('chest', 'hips', profile, (z, up, x) => {
-    if (up < -0.45 || (z < -spec.spineHalf - 0.06 && up < 0.25)) return c.cream;
+    const front = z < -spec.spineHalf - 0.06 && up < 0.25;
+    if (spec.coat === 'panda') return up < -0.3 || front ? legTone : up > 0.5 ? c.fur : c.light;
+    if (up < -0.45 || front) return c.cream;
+    if (spec.coat === 'plain' || spec.coat === 'fox') return up > 0.5 ? c.fur : c.light;
     if (dog) return up > 0.3 && z > -0.14 && z < back - 0.06 ? c.stripe : c.fur;
     // Soft tabby bands across the back, narrowing down the sides.
     for (const band of [-0.2, -0.1, 0, 0.1, 0.19]) if (up > 0.15 && Math.abs(z - band) < 0.026 * (0.4 + up * 0.8)) return c.stripe;
     return up > 0.5 ? c.fur : c.light;
   });
-  if (dog) {
+  if (spec.collar) {
     // A little collar and its golden tag.
     rig.cone('collar', 0.105, 0.1, 0.04, [0, -0.02, 0], c.collar, { depth: 0.95 });
     rig.ellipsoid('collar', [0.022, 0.026, 0.008], [0, -0.05, -0.1], c.tag, { segments: 5 });
   }
-  buildFace(rig, spec, c, dog);
+  buildFace(rig, spec, c);
   for (const side of [-1, 1]) {
     const bone = side < 0 ? 'earL' : 'earR';
-    if (dog) rig.ellipsoid(bone, [0.05, 0.095, 0.024], [0, -0.075, 0], c.ear, { segments: 7 });
-    else {
+    if (spec.ears === 'floppy') rig.ellipsoid(bone, [0.05, 0.095, 0.024], [0, -0.075, 0], c.ear, { segments: 7 });
+    else if (spec.ears === 'long') {
+      rig.ellipsoid(bone, [0.04, 0.125, 0.022], [0, 0.115, 0], c.fur, { segments: 8 });
+      rig.ellipsoid(bone, [0.024, 0.098, 0.01], [0, 0.118, -0.016], c.ear, { segments: 6 });
+    } else if (spec.ears === 'round') {
+      rig.cone(bone, 0.068, 0.028, 0.085, [0, 0, 0], c.fur, { depth: 0.55 });
+      rig.cone(bone, 0.046, 0.02, 0.066, [0, 0.006, -0.014], c.ear, { depth: 0.35 });
+    } else {
       rig.cone(bone, 0.062, 0.006, 0.1, [0, 0, 0], c.fur, { depth: 0.5 });
       rig.cone(bone, 0.04, 0.004, 0.075, [0, 0.004, -0.013], c.ear, { depth: 0.35 });
     }
   }
   for (const leg of PAWS) {
     const limb = leg[0] === 'f' ? spec.front : spec.hind;
-    rig.segment(`${leg}-upper`, limb.radii[0], (limb.radii[0] + limb.radii[1]) / 2, c.fur);
-    rig.segment(`${leg}-lower`, (limb.radii[0] + limb.radii[1]) / 2, limb.radii[1], c.fur);
+    rig.segment(`${leg}-upper`, limb.radii[0], (limb.radii[0] + limb.radii[1]) / 2, legTone);
+    rig.segment(`${leg}-lower`, (limb.radii[0] + limb.radii[1]) / 2, limb.radii[1], legTone);
     const knee = (limb.radii[0] + limb.radii[1]) / 2;
-    rig.ellipsoid(`${leg}-knee`, [knee, knee, knee], [0, 0, 0], c.fur, { segments: 6 });
-    rig.ellipsoid(`${leg}-paw`, [limb.radii[1] * 1.1, 0.035, limb.radii[1] * 1.35], [0, 0, -0.01], c.cream, { segments: 6 });
+    rig.ellipsoid(`${leg}-knee`, [knee, knee, knee], [0, 0, 0], legTone, { segments: 6 });
+    rig.ellipsoid(`${leg}-paw`, [limb.radii[1] * 1.1, 0.035, limb.radii[1] * 1.35], [0, 0, -0.01], c.paw || c.cream, { segments: 6 });
   }
   const tail = spec.tail;
   for (let i = 0; i < tail.count; i++) {
     const r0 = tail.radii[0] + (tail.radii[1] - tail.radii[0]) * i / tail.count, r1 = tail.radii[0] + (tail.radii[1] - tail.radii[0]) * (i + 1) / tail.count;
-    rig.segment(`tail${i}`, r0, r1, c.fur);
-    rig.ellipsoid(`tailJoint${i}`, [r1, r1, r1], [0, 0, 0], i === tail.count - 1 ? c.cream : c.fur, { segments: 6 });
+    rig.segment(`tail${i}`, r0, r1, tailColor(spec, i));
+    rig.ellipsoid(`tailJoint${i}`, [r1, r1, r1], [0, 0, 0], tailColor(spec, i), { segments: 6 });
   }
   return rig.finish();
 }
@@ -253,7 +306,7 @@ export function createPetModel(scene, species = 'cat') {
   body.material = fur; body.useVertexColors = true; body.hasVertexAlpha = false; body.receiveShadows = false; body.isPickable = false;
   body.metadata = { pet: species, cat: true, castShadow: false };
   // The rest geometry sits around the origin, so the box covers every pose.
-  body.setBoundingInfo(new BoundingInfo(new Vector3(-0.6, -0.05, -0.75), new Vector3(0.6, 1.0, 0.75)));
+  body.setBoundingInfo(new BoundingInfo(new Vector3(-0.6, -0.05, -0.75), new Vector3(0.6, 1.0, 0.85)));
   const bones = new Map(), shrink = Matrix.Scaling(1e-4, 1e-4, 1e-4);
   for (const part of built.parts) for (const name of [part.bone, part.blend]) if (name && !bones.has(name)) bones.set(name, Matrix.Identity());
   // Floating letters for a nap: three small Zs rise, grow and shrink away.
@@ -343,7 +396,7 @@ export function createPetModel(scene, species = 'cat') {
       const breathe = awake ? 0.018 : 0.045;
       breathChest.set(1 + breath * breathe * 0.3, 1 + breath * breathe, 1 + breath * breathe * 0.35); breathHips.set(1 + breath * breathe * 0.2, 1 + breath * breathe * 0.8, 1);
       const look = still * (action === 'sit' || action === 'loaf' ? Math.sin(seconds * 0.37) * 0.45 + Math.sin(seconds * 0.93 + 1) * 0.14 : action === 'stand' ? Math.sin(seconds * 0.6) * 0.3 : 0);
-      const bob = walking * Math.sin(gait * 2) * 0.008, wag = species === 'dog' ? (0.14 * still + reaction * 0.5 + walking * 0.2) * Math.sin(seconds * (reaction ? 17 : 9)) : still * Math.sin(seconds * 1.1) * 0.07;
+      const bob = walking * Math.sin(gait * 2) * 0.008, wag = spec.wag ? (0.14 * still + reaction * 0.5 + walking * 0.2) * Math.sin(seconds * (reaction ? 17 : 9)) : still * Math.sin(seconds * 1.1) * 0.07;
       const sway = walking * Math.sin(gait) * 0.14 + (action === 'held' ? still * Math.sin(seconds * 2.1) * 0.2 : 0);
       const lifted = action === 'sleep' ? 0.11 : 0.04;
       const pitch = current.pitch, curl = current.curl, roll = current.roll + reaction * 0.1;
@@ -361,15 +414,16 @@ export function createPetModel(scene, species = 'cat') {
       // The collar rings the neck, from the chest toward the head.
       if (bones.has('collar')) { head.subtractToRef(neck, dir); dir.normalize(); Quaternion.FromUnitVectorsToRef(UP, dir, qLocal); dir.scaleInPlace(0.02).addInPlace(neck); place('collar', qLocal, dir); }
       // Ears flick now and then, and fold back while being petted.
-      const flick = still * (species === 'cat' ? Math.max(0, Math.sin(seconds * 0.43 + 2) - 0.96) * 12 : 0);
+      const flick = still * (spec.flick ? Math.max(0, Math.sin(seconds * 0.43 + 2) - 0.96) * 12 : 0);
       for (const side of [-1, 1]) {
         const name = side < 0 ? 'earL' : 'earR', back = current.earBack + reaction * 0.35 + (side < 0 ? flick * 0.3 : 0);
-        if (species === 'dog') {
+        if (spec.ears === 'floppy') {
           v.set(side * 0.135, 0.07, 0.005);
           Quaternion.RotationYawPitchRollToRef(0, back * 0.6 + walking * Math.sin(gait * 2 + side) * 0.12, side * (0.28 + reaction * 0.2), qLocal);
         } else {
-          v.set(side * 0.095, 0.105, 0.01);
-          Quaternion.RotationYawPitchRollToRef(side * -0.25, back * 0.9, side * -0.3, qLocal);
+          const [ex, ey, roll] = spec.earSpot || [0.095, 0.105, 0.3];
+          v.set(side * ex, ey, 0.01);
+          Quaternion.RotationYawPitchRollToRef(side * -0.25, back * (spec.ears === 'long' ? 1.3 : 0.9) + (spec.ears === 'long' ? 0.12 + still * Math.sin(seconds * 0.8 + side) * 0.05 : 0), side * -roll, qLocal);
         }
         v.rotateByQuaternionToRef(qHead, w); w.addInPlace(head); qHead.multiplyToRef(qLocal, qTemp); place(name, qTemp, w);
       }
@@ -384,7 +438,7 @@ export function createPetModel(scene, species = 'cat') {
       Vector3.FromArrayToRef(tail.anchor, 0, v); v.rotateByQuaternionToRef(qHips, joints[0]); joints[0].addInPlace(hips);
       for (let i = 0; i < tail.count; i++) {
         const t = i / tail.count, radius = tail.radii[0] + (tail.radii[1] - tail.radii[0]) * t;
-        const segPitch = current.tailPitch + i * current.tailBend + (species === 'cat' ? still * reaction * Math.sin(seconds * 3 + i) * 0.05 * t : 0);
+        const segPitch = current.tailPitch + i * current.tailBend + (spec.flick ? still * reaction * Math.sin(seconds * 3 + i) * 0.05 * t : 0);
         const segYaw = -curl + current.tailYaw + i * current.tailWrap + (wag + sway) * (0.4 + t);
         joints[i + 1].set(Math.sin(segYaw) * Math.cos(segPitch), Math.sin(segPitch), Math.cos(segYaw) * Math.cos(segPitch)).scaleInPlace(tail.length).addInPlace(joints[i]);
         joints[i + 1].y = Math.max(joints[i + 1].y, radius + 0.004);
@@ -394,7 +448,7 @@ export function createPetModel(scene, species = 'cat') {
       if (seconds > blinkAt + 0.14) blinkAt = seconds + 2.5 + (Math.sin(seconds * 12.9898) * 0.5 + 0.5) * 3;
       const blinking = still && seconds > blinkAt && seconds < blinkAt + 0.14;
       eyesShown = current.eyes < 0.5 || reaction > 0.3 || blinking ? 'closed' : 'open';
-      mouthShown = species === 'dog' && (current.mouth > 0.5 || reaction > 0.3 || walking > 0);
+      mouthShown = spec.look === 'dog' && (current.mouth > 0.5 || reaction > 0.3 || walking > 0);
       for (const entry of skin) {
         const hidden = entry.show === 'open' ? eyesShown !== 'open' : entry.show === 'closed' ? eyesShown !== 'closed' : entry.show === 'tongue' ? !mouthShown : false;
         // A hidden part shrinks to a speck inside its bone, so normals stay valid.

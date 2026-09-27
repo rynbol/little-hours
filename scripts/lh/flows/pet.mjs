@@ -25,7 +25,7 @@ async function petAgain(app, sleep, spot, times) {
 }
 
 export default {
-  about: 'the pet: a tap gets two hearts one after another and no words, more taps stack a heart each without starting the lean over, the pet panel switches between the cat and the dog, and the choice survives a reload',
+  about: 'the pet: a tap gets two hearts one after another and no words, more taps stack a heart each without starting the lean over, the pet panel switches between the cat and the dog, the choice survives a reload, and coins adopt a fox while the red panda stays locked',
   async run(t) {
     const { check, sleep } = t;
     const app = await t.open({ seed: 'three-rooms' });
@@ -39,7 +39,8 @@ export default {
     check('more taps hold the lean instead of starting it over', again.ages.every(age => age >= .3 && age < 2.6), again.ages);
     await t.shot(app, 'cat-hearts');
     await app.clickSel('#pet-button');
-    await app.waitFor(`document.querySelectorAll('[data-pet-choice]').length === 2`, { what: 'the pet panel' });
+    await app.waitFor(`document.querySelectorAll('[data-pet-choice]').length === 5`, { what: 'the pet panel' });
+    check('the bunny, fox and red panda wait behind prices', (await app.js(`[...document.querySelectorAll('.pet-option.is-locked')].map(b => b.dataset.petChoice + ':' + b.querySelector('.pet-tag').textContent.trim()).join()`)) === 'bunny:40,fox:90,panda:160');
     check('the pet panel offers the cat and the dog, with the cat chosen', await app.attr('[data-pet-choice="cat"]', 'aria-pressed') === 'true' && await app.attr('[data-pet-choice="dog"]', 'aria-pressed') === 'false');
     await app.clickSel('[data-pet-choice="dog"]');
     await app.waitFor(`document.querySelector('[data-pet-choice="dog"]')?.getAttribute('aria-pressed') === 'true'`, { what: 'the dog to be chosen' });
@@ -63,5 +64,26 @@ export default {
     await app.waitFor(`document.querySelector('[data-pet-choice="cat"]')?.getAttribute('aria-pressed') === 'true'`, { what: 'the cat to be chosen' });
     check('switching back to the cat is saved too', (await app.saved())?.pet === 'cat' && await app.text('#pet-button-label') === 'Miso');
     await t.close(app);
+
+    const shop = await t.open({ seed: 'pet-shop' });
+    await shop.settle();
+    await shop.clickSel('#pet-button');
+    await shop.waitFor(`document.querySelectorAll('[data-pet-choice]').length === 5`, { what: 'the pet panel' });
+    await shop.clickSel('[data-pet-choice="panda"]');
+    await shop.waitFor(`!document.getElementById('pet-adopt').hidden`, { what: 'the adoption card' });
+    check('the red panda card says how many coins are missing and cannot be bought yet', (await shop.text('.pet-adopt-note'))?.startsWith('40 more coins') && await shop.js(`document.getElementById('pet-adopt-button').disabled`), await shop.text('.pet-adopt-note'));
+    check('looking at a pet you cannot afford changes nothing', (await shop.saved())?.pet !== 'panda' && await shop.text('#coin-balance') === '120');
+    await shop.clickSel('[data-pet-choice="fox"]');
+    await shop.waitFor(`document.querySelector('.pet-adopt strong')?.textContent.includes('Hoshi')`, { what: 'the fox card' });
+    await t.shot(shop, 'fox-offer');
+    await shop.clickSel('#pet-adopt-button');
+    await shop.waitFor(`document.querySelector('[data-pet-choice="fox"]')?.getAttribute('aria-pressed') === 'true'`, { what: 'the fox to come home' });
+    check('adopting Hoshi spends 90 coins', await shop.text('#coin-balance') === '30', await shop.text('#coin-balance'));
+    check('the fox is in the room and named', await shop.js('window.__littleHours.room.diagnostics().petSpecies') === 'fox' && await shop.text('#pet-button-label') === 'Hoshi');
+    check('the fox now lives with you and the save knows it', JSON.stringify((await shop.saved())?.pets) === '["cat","dog","fox"]' && !(await shop.js(`document.querySelector('[data-pet-choice="fox"]').classList.contains('is-locked')`)));
+    const foxTap = await tapPet(shop, sleep, t.slow);
+    check('tapping the fox gets hearts too', oneByOne(foxTap.counts), foxTap.counts);
+    await t.shot(shop, 'fox-hearts');
+    await t.close(shop);
   },
 };
