@@ -17,6 +17,7 @@ import { createMobileCompanion, disposeAvatarTemplates } from '../../models/furn
 import { createPetModel } from '../pet/index.js';
 import { speciesOf, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
+import { placeAsset } from '../../models/assets.js';
 
 const cardSide = new Vector3(), DOCK_Y = .42, STAND = new Vector3(0, DOCK_Y, 1.35), HOME_BOBBER = new Vector3(-.15, 0, .2);
 const PALETTES = {
@@ -130,10 +131,11 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   const box = (x, y, z, w, h, d, hex, rot = [0, 0, 0]) => { const m = MeshBuilder.CreateBox('p', { width: w, height: h, depth: d }, scene); m.position.set(x, y, z); m.rotation.set(...rot); paint(m, hex); };
   const ball = (x, y, z, w, h, d, hex, segments = 8, strength = 1) => { const m = MeshBuilder.CreateSphere('p', { diameter: 1, segments }, scene); m.position.set(x, y, z); m.scaling.set(w, h, d); paint(m, hex, strength); };
   const cyl = (x, y, z, top, bottom, h, hex, rot = [0, 0, 0], tessellation = 10) => { const m = MeshBuilder.CreateCylinder('p', { diameterTop: top, diameterBottom: bottom, height: h, tessellation }, scene); m.position.set(x, y, z); m.rotation.set(...rot); paint(m, hex); };
-  const tree = (x, z, s, seed, y = 0) => {
-    cyl(x, y + 1.1 * s, z, .16 * s, .26 * s, 2.2 * s, palette.trunk);
-    for (let i = 0; i < 5; i++) { const a = i * 2.3 + seed, r = i ? .55 * s : 0; ball(x + Math.cos(a) * r, y + (2.35 + (i ? .15 * (i % 3) : .5)) * s, z + Math.sin(a) * r * .8, 1.7 * s, 1.35 * s, 1.5 * s, palette.leaf[(i + seed) % 3], 7); }
-  };
+  const asset = (name, at) => baked.push(Object.assign(new VertexData(), placeAsset(name, at)));
+  const tree = (x, z, s, seed, y = 0) => asset(seed % 5 === 2 ? 'tree-pine' : ['tree-round-a', 'tree-round-b', 'tree-round-c'][seed % 3], { x, y, z, yaw: seed * 1.3, scale: s * (seed % 5 === 2 ? 1.6 : 1.9) });
+  const blossom = (x, z, s, seed) => asset(['tree-blossom-a', 'tree-blossom-b'][seed % 2], { x, z, yaw: seed, scale: s * 1.8 });
+  const willow = (x, z, s) => asset('tree-willow', { x, z, yaw: .6, scale: s * 1.7 });
+  const boat = (x, z, yaw) => asset('rowboat', { x, y: .2, z, yaw });
   const reeds = (x, z, count, seed) => {
     for (let i = 0; i < count; i++) {
       const dx = (hash(seed + i) - .5) * .8, dz = (hash(seed * 2 + i) - .5) * .5, tall = .7 + hash(seed * 3 + i) * .8, lean = (hash(i + seed * 5) - .5) * .25;
@@ -141,7 +143,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
       if (i % 3 === 0) ball(x + dx + lean * .1, tall - .12, z + dz, .06, .2, .06, '#7a553c', 6);
     }
   };
-  const rock = (x, z, s, seed) => { ball(x, .02, z, s * 1.4, s * .7, s, ['#a89f93', '#958d82', '#b8afa2'][seed % 3], 6); ball(x + s * .2, .25 * s, z - s * .15, s * .7, s * .3, s * .55, palette.leaf[seed % 3], 6); };
+  const rock = (x, z, s, seed) => asset(['rock-a', 'rock-b'][seed % 2], { x, y: -.05, z, yaw: seed * 2.1, scale: s * 1.15 });
 
   const bank = () => {
     const RINGS = [[.97, -.08, 'sand'], [1.02, .03, 'sand'], [1.07, .1, 'grass'], [1.25, .13, 'grass'], [1.7, .14, 'meadow'], [2.6, .15, 'grass'], [4.5, .15, 'meadow'], [8, .15, 'meadow']], SEG = 120;
@@ -153,10 +155,6 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
       if (r) { const n = r * SEG + i, m = r * SEG + (i + 1) % SEG; indices.push(n - SEG, n, m - SEG, m - SEG, n, m); }
     }
     const data = new VertexData(); Object.assign(data, { positions, normals, colors: new Float32Array(colors), indices }); baked.push(data);
-  };
-  const blossom = (x, z, s, seed) => {
-    cyl(x, .95 * s, z, .14 * s, .22 * s, 1.9 * s, palette.trunk);
-    for (let i = 0; i < 6; i++) { const a = i * 2.1 + seed, r = i ? .5 * s : 0; ball(x + Math.cos(a) * r, (2.05 + (i ? .12 * (i % 3) : .4)) * s, z + Math.sin(a) * r * .8, 1.25 * s, 1.05 * s, 1.15 * s, palette.blossom[(i + seed) % 3], 7); }
   };
   const flowers = (x, z, count, seed) => {
     const tint = [['#f3c3d0', '#f9e2e7'], ['#f6e3a8', '#fff3cf'], ['#c9b8e6', '#e4d9f4'], ['#f7f1e6', '#fdf9f1']][seed % 4];
@@ -178,19 +176,6 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     const [dx, dz] = at(-.6, 1.62); box(dx, .85, dz, .75, 1.35, .06, '#8f6a4f', [0, yaw, 0]);
     const [px, pz] = at(-.6, 2.05); box(px, .22, pz, 1.3, .12, .8, '#c9b69c', [0, yaw, 0]);
     return [at(.8, 1.63), at(1.75, 1.63), at(-1.6, 1.63)];
-  };
-  const willow = (x, z, s) => {
-    cyl(x, 1.2 * s, z, .3 * s, .5 * s, 2.4 * s, palette.trunk, [0, 0, .12]);
-    ball(x + .2 * s, 2.75 * s, z, 3 * s, 1.35 * s, 2.7 * s, palette.leaf[1], 9);
-    ball(x + .5 * s, 3.2 * s, z - .3 * s, 2 * s, 1 * s, 1.8 * s, palette.leaf[2], 8);
-    for (let i = 0; i < 26; i++) {
-      const a = i / 26 * Math.PI * 2 + hash(i) * .2, r = (1.25 + hash(i * 3) * .25) * s, drop = (1.7 + hash(i * 5) * .8) * s;
-      ball(x + .2 * s + Math.cos(a) * r, 2.55 * s - drop / 2 + .2 * s, z + Math.sin(a) * r * .9, .34 * s, drop, .34 * s, palette.leaf[i % 3], 6);
-    }
-  };
-  const boat = (x, z, yaw) => {
-    ball(x, -.06, z, 2.1, .62, .95, '#c46f5c', 12); ball(x, .06, z, 1.8, .5, .72, '#9b7250', 12);
-    box(x, .3, z, .18, .05, .8, '#e2c59a', [0, yaw, 0]); box(x + Math.cos(yaw) * .55, .3, z - Math.sin(yaw) * .55, .16, .05, .72, '#e2c59a', [0, yaw, 0]);
   };
   const bench = (x, z, yaw) => {
     for (const dz of [-.12, .02, .16]) box(x + Math.sin(yaw) * dz, .46, z + Math.cos(yaw) * dz, 1.3, .05, .1, '#b98d63', [0, yaw, 0]);
@@ -227,7 +212,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   for (const [x, z] of posts) { cyl(x, .95, z, .09, .11, 1.9, '#6f5240'); box(x, 1.93, z, .16, .05, .16, '#4f3d31'); }
   box(1.25, .75, 5.5, .08, 1.1, .08, '#6f5240'); box(1.25, 1.18, 5.52, .95, .42, .07, '#b98d63', [0, -.25, 0]); box(1.25, 1.18, 5.56, .8, .3, .02, '#e8d6b8', [0, -.25, 0]);
   for (let i = 0; i < 8; i++) { const t = i / 7; cyl(-.35 - t * 3.6, .17, 5.9 + Math.sin(t * Math.PI) * 1.1 - t * 1.4, .5, .52, .05, ['#e3d7c1', '#d6c8ae'][i % 2]); }
-  for (let i = 0; i < 12; i++) { const a = .55 + i / 11 * 2.05, [x, z] = rim(a, 1.4 + hash(i * 13) * .35); if (Math.abs(x) > 1.4) (i % 2 ? flowers(x, z, 12, i + 3) : ball(x, .22, z, .7, .48, .6, palette.leaf[i % 3], 8)); }
+  for (let i = 0; i < 12; i++) { const a = .55 + i / 11 * 2.05, [x, z] = rim(a, 1.4 + hash(i * 13) * .35); if (Math.abs(x) > 1.4) (i % 2 ? flowers(x, z, 12, i + 3) : asset('bush', { x, z, yaw: i, scale: 1.2 })); }
   boat(1.75, 2.6, .5); bench(-4.6, 3.9, -.35);
   const tackle = [.46, DOCK_Y + .09, 2.15];
   box(tackle[0], tackle[1], tackle[2], .36, .18, .24, '#6f8f86', [0, .2, 0]); box(tackle[0], tackle[1] + .1, tackle[2], .38, .03, .26, '#5a766e', [0, .2, 0]);

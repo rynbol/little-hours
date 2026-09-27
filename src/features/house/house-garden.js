@@ -1,3 +1,4 @@
+import { placeAsset } from '../../models/assets.js';
 import { onIsland, STREAM } from './house-island.js';
 import { inPond, DOCK } from './house-pond.js';
 import { pathDistance } from './house-paths.js';
@@ -25,25 +26,11 @@ const SPOTS = (() => {
 export const treeSpot = index => SPOTS[index % SPOTS.length];
 
 function tree(api, x, z, growth, seed) {
-  const tall = .28 + 1.3 * growth, crown = .3 + .5 * growth, top = GROUND + tall;
   api.cylinder(x, GROUND + .015, z, .36, .4, .03, soil);
-  api.cylinder(x, GROUND + tall / 2, z, .05 + .05 * growth, .07 + .07 * growth, tall, bark);
-  if (growth < .35) {
-    api.box(x + .09, GROUND + .2, z, .025, .4, .025, '#c8ab82');
-    for (const side of [-1, 1]) api.ball(x + side * .08, top, z, .16, .08, .1, '#8fae76');
-    return;
-  }
   const blossom = growth >= 1 && seed % 3 === 0, fruit = growth >= 1 && seed % 3 === 1;
-  const leaves = blossom ? ['#e3b7bd', '#f0d3cf'] : [['#6f8a62', '#8fa77c'], ['#7c946a', '#a2b584'], ['#5f7d5c', '#86a077']][seed % 3];
-  api.ball(x, top + crown * .12, z, crown, crown * .85, crown, leaves[0]);
-  for (let i = 0; i < 3; i++) {
-    const a = i * 2.1 + seed % 6;
-    api.ball(x + Math.cos(a) * crown * .3, top + crown * (.28 + (i % 2) * .12), z + Math.sin(a) * crown * .26, crown * .72, crown * .62, crown * .72, leaves[1]);
-  }
-  if (fruit) for (let i = 0; i < 5; i++) {
-    const a = i * 1.3 + seed % 5;
-    api.ball(x + Math.cos(a) * crown * .42, top + crown * (.05 + (i % 3) * .14), z + Math.sin(a) * crown * .4, .09, .09, .09, ['#e38b6d', '#f0b46a'][i % 2]);
-  }
+  const name = growth < .35 ? 'sapling' : blossom ? ['tree-blossom-a', 'tree-blossom-b'][seed % 2] : fruit ? 'tree-fruit' : ['tree-round-a', 'tree-round-b', 'tree-round-c'][seed % 3];
+  const { positions, colors, normals, indices } = placeAsset(name, { x, y: GROUND, z, yaw: seed % 628 / 100, scale: growth < .35 ? .7 + growth * 1.2 : .45 + .75 * growth });
+  api.shape(positions, colors, normals, indices);
 }
 
 function lamp(api, x, z, [glow, strength]) {

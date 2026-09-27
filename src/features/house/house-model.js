@@ -72,8 +72,8 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     const m = MeshBuilder.CreateCylinder('part', { diameter, height: depth, tessellation: 18 }, scene);
     m.position.set(x, y, z); if (sideways) m.rotation.z = Math.PI / 2; else m.rotation.x = Math.PI / 2; paint(m, hex, strength);
   }
-  function shape(positions, colors, normals) {
-    const data = new VertexData(); data.positions = positions; data.indices = Array.from({ length: positions.length / 3 }, (_, i) => i);
+  function shape(positions, colors, normals, indices = Array.from({ length: positions.length / 3 }, (_, i) => i)) {
+    const data = new VertexData(); data.positions = positions; data.indices = indices;
     data.normals = normals; data.colors = colors;
     data.transform(Matrix.Translation(...origin));
     if (!buckets.has(bucket)) buckets.set(bucket, []);

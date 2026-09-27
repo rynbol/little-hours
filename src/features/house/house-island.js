@@ -1,13 +1,13 @@
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { buildPaths } from './house-paths.js';
+import { placeAsset } from '../../models/assets.js';
 
 export const ISLAND = Object.freeze({ cx: 2.85, cz: .1, rx: 9.95, rz: 4.65, power: 4.2 });
 export const STREAM = Object.freeze([[11.75, 1.3], [12.1, 1.75], [12.5, 2.15], [12.95, 2.5]]);
 const TOP = -.175, SEGMENTS = 72, RINGS = 7;
 const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const lawn = ['#a6b68c', '#aebd92', '#9fb187', '#b4c296'];
-const rim = '#8ea477', lip = '#7a9368', soil = ['#9b7658', '#86654c'];
-const rock = ['#c7a98f', '#b39584', '#9c8285', '#83708a', '#6b5d80', '#574d6e'];
+const rim = '#8ea477', lip = '#7a9368';
 
 export function edgePoint(a, scale = 1) {
   const { cx, cz, rx, rz, power } = ISLAND, c = Math.cos(a), s = Math.sin(a);
@@ -48,50 +48,29 @@ export function buildIsland(api) {
 
   const profile = [
     { y: TOP, scale: 1, color: rim },
-    { y: TOP - .16, scale: 1.012, color: lip, drip: .16 },
-    { y: -.7, scale: 1, color: soil[0] },
-    { y: -1.2, scale: .975, color: soil[1] },
-    { y: -1.85, scale: .9, color: rock[0], rough: .05 },
-    { y: -2.5, scale: .78, color: rock[1], rough: .07 },
-    { y: -3.15, scale: .6, color: rock[2], rough: .09 },
-    { y: -3.75, scale: .4, color: rock[3], rough: .1 },
-    { y: -4.25, scale: .2, color: rock[4], rough: .08 },
+    { y: TOP - .07, scale: 1.028, color: rim },
+    { y: TOP - .2, scale: 1.03, color: lip, tongue: .34 },
   ];
   const ring = profile.map((step, r) => Array.from({ length: SEGMENTS + 1 }, (_, j) => {
-    const jj = j % SEGMENTS, rough = step.rough ? (hash(jj * 7.3 + r * 13.1) - .5) * 2 * step.rough : 0;
-    const [x, z] = edgePoint(angle(jj), step.scale * (1 + rough)), forward = ISLAND.rz * (1 - step.scale) * .82;
-    const y = step.y - (step.drip ? hash(jj * 3.1) * step.drip : 0) - (step.rough ? hash(jj * 5.7 + r) * .12 : 0);
-    return [x, y, z + forward];
+    const jj = j % SEGMENTS, [x, z] = edgePoint(angle(jj), step.scale);
+    const scallop = step.tongue ? Math.max(0, Math.sin(jj * Math.PI / 3 + hash(Math.floor(jj / 6)) * 2)) ** 2 * step.tongue * (.5 + hash(jj * 2.9) * .5) : 0;
+    return [x, step.y - scallop, z];
   }));
-  const tip = [cx + .4, -4.8, cz + ISLAND.rz * .86];
   for (let r = 0; r < profile.length - 1; r++) for (let j = 0; j < SEGMENTS; j++) {
     const u0 = ring[r][j], u1 = ring[r][j + 1], l0 = ring[r + 1][j], l1 = ring[r + 1][j + 1];
-    const shade = .92 + hash(j * 1.7 + r * 5.3) * .14, top = rgba(profile[r].color, shade), bottom = rgba(profile[r + 1].color, shade);
+    const shade = .93 + hash(j * 1.7 + r * 5.3) * .12, top = rgba(profile[r].color, shade), bottom = rgba(profile[r + 1].color, shade);
     const n = outward(j); tri(u0, l0, u1, top, bottom, top, n); tri(u1, l0, l1, top, bottom, bottom, n);
   }
-  const last = profile.length - 1;
-  for (let j = 0; j < SEGMENTS; j++) tri(ring[last][j], tip, ring[last][j + 1], rgba(profile[last].color), rgba(rock[5]), rgba(profile[last].color), outward(j));
-  api.shape(positions, colors, normals);
+  api.shape(positions.splice(0), colors.splice(0), normals.splice(0));
+  const asset = (name, at) => { const { positions: p, colors: c, normals: n, indices } = placeAsset(name, at); api.shape(p, c, n, indices); };
+  asset('island-cliff');
+  asset('islet-a', { x: -8.3, y: -1, z: 2.6, yaw: .4, scale: 1.1 });
+  asset('islet-b', { x: 13.9, y: -1.9, z: -1, yaw: 2, scale: 1 });
 
-  for (const [x, y, z, w] of [[-8.3, -1.1, 2.6, 1.05], [13.9, -2, -1, .85]]) {
-    api.cylinder(x, y - .55 * w, z, w * .9, .08, 1.1 * w, rock[3]);
-    api.cylinder(x, y + .02, z, w * 1.05, w * .9, .22 * w, soil[0]);
-    api.cylinder(x, y + .16 * w, z, w * 1.08, w * 1.05, .08, rim);
-    api.ball(x + .1 * w, y + .26 * w, z, .3 * w, .18 * w, .26 * w, lawn[2]);
-  }
-
-  for (let i = 0; i < 34; i++) {
-    const a = angle(i * 2.13 + hash(i) * 1.5), [x, z] = edgePoint(a, .985), long = .35 + hash(i * 3.3) * 1.05;
-    const vine = i % 3 === 0;
-    api.cylinder(x, -.55 - long / 2, z, vine ? .05 : .07, .015, long, vine ? '#6f8a5f' : '#6d5443');
-    if (vine) for (let k = 0; k < 3; k++) api.ball(x + (k % 2 ? .05 : -.05), -.6 - long * (k + 1) / 3.4, z, .13, .1, .13, k % 2 ? '#86a36f' : '#7a9764');
-  }
-
-  for (let i = 0; i < 46; i++) {
-    const a = angle(i * 1.57 + hash(i * 9.1) * .9), [x, z] = edgePoint(a, .975), kind = i % 4;
-    if (kind === 0) api.ball(x, TOP + .05, z, .24, .1, .2, ['#c7baa5', '#b3a692'][i % 2]);
-    else if (kind === 1) { api.box(x, TOP + .08, z, .02, .16, .02, '#6e855e'); api.ball(x, TOP + .17, z, .1, .07, .1, ['#f1d3dc', '#f5e4bd', '#c8b7d7'][i % 3]); }
-    else api.ball(x, TOP + .04, z, .22, .09, .18, ['#8fa678', '#98ae7f'][i % 2]);
+  for (let i = 0; i < 14; i++) {
+    const [x, z] = edgePoint(angle(i * 5.3 + hash(i * 3.7) * 2), .96);
+    if (!onIsland(x, z, .2) || Math.abs(z) < 3.3 && x > -6 && x < 5.5) continue;
+    asset('bush', { x, y: TOP - .02, z, yaw: i * 1.9, scale: .55 + hash(i * 2.1) * .35 });
   }
 
   STREAM.forEach(([x, z], i) => {
