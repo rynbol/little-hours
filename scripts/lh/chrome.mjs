@@ -89,6 +89,8 @@ export async function launch({ width = 1440, height = 1000, scale = 2, headed = 
       throw new Error(`Page did not load: ${url}`);
     },
     move: (x, y) => mouse('mouseMoved', x, y),
+    press: async (x, y) => { await mouse('mouseMoved', x, y); await mouse('mousePressed', x, y, 1); },
+    release: (x, y) => mouse('mouseReleased', x, y),
     async click(x, y) {
       await mouse('mouseMoved', x, y); await sleep(40);
       await mouse('mousePressed', x, y, 1); await sleep(40);

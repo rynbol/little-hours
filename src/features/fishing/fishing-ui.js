@@ -1,4 +1,4 @@
-import { BAIT_RANGES, SPECIES, TIERS, baitRange, speciesOf, tierOf } from '../../core/fishing.js';
+import { BAIT_RANGES, FIGHT, SPECIES, TIERS, baitRange, rollCatch, speciesOf, startFight, stepFight, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
 import { fishArt } from './fish-art.js';
 import { createLakeScene } from './lake-scene.js';
@@ -18,7 +18,7 @@ const cm = size => `${size.toFixed(1).replace(/\.0$/, '')} cm`;
 const escape = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 export function createFishingUI(app, { onClose } = {}) {
-  let root = null, scene = null, phase = 'idle', chosen = null, timers = [], taps = 0, need = 0, caught = null, biteTimer = 0, returnFocus = null, building = 0;
+  let root = null, scene = null, phase = 'idle', chosen = null, timers = [], caught = null, biteTimer = 0, returnFocus = null, building = 0, fight = null, hooked = null, holding = false, loop = 0, lastFrame = 0;
   const $ = selector => root.querySelector(selector);
   const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.push(id); return id; };
   const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
@@ -32,7 +32,7 @@ export function createFishingUI(app, { onClose } = {}) {
         <div class="lake-title"><h1>Willow Pond</h1><p>The pond behind the cottage</p></div>
         <button class="lake-chip lake-book" id="lake-journal-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h10a2 2 0 0 1 2 2v13H8a2 2 0 0 1-2-2Z" fill="#f1e2c9" stroke="currentColor" stroke-width="1.5"/><path d="M6 4.5v13" stroke="#a65766" stroke-width="3"/><path d="M10 9h5M10 12h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="lake-wide">Journal</span><b id="lake-found"></b></button></header>
       <p class="lake-status" id="lake-status" aria-live="polite"></p>
-      <div class="lake-bite" id="lake-bite" hidden><span class="lake-alert" id="lake-alert" aria-hidden="true">!</span><p id="lake-bite-note"></p><div class="lake-bite-ring" id="lake-bite-ring"><button type="button" id="lake-reel">Reel!</button></div></div>
+      <div class="lake-bite" id="lake-bite" hidden><span class="lake-alert" id="lake-alert" aria-hidden="true">!</span><p id="lake-bite-note"></p><div class="lake-tension" id="lake-tension" role="meter" aria-label="Line tension" aria-valuemin="0" aria-valuemax="100"><i></i></div><div class="lake-bite-ring" id="lake-bite-ring"><button type="button" id="lake-reel">Reel!</button></div></div>
       <footer class="lake-tray" id="lake-tray"><div class="lake-tackle"><div class="lake-tray-head"><p class="lake-tray-title">Tackle box</p><p class="lake-tray-sub">Bait from your focus sessions. Longer sessions draw rarer fish.</p></div>
         <div class="lake-bait" id="lake-bait" role="radiogroup" aria-label="Choose your bait"></div>
         <div class="lake-odds" id="lake-odds" aria-label="Chances for this bait"></div></div>
@@ -42,10 +42,12 @@ export function createFishingUI(app, { onClose } = {}) {
     document.body.appendChild(root);
     $('#lake-back').addEventListener('click', close);
     $('#lake-cast').addEventListener('click', cast);
-    $('#lake-reel').addEventListener('click', reelTap);
+    $('#lake-reel').addEventListener('pointerdown', press);
+    for (const type of ['pointerup', 'pointercancel', 'pointerleave']) root.addEventListener(type, letGo);
+    window.addEventListener('blur', letGo);
     $('#lake-journal-button').addEventListener('click', openJournal);
     $('#lake-bait').addEventListener('click', event => { const chip = event.target.closest('[data-bait]'); if (chip && phase === 'idle') { chosen = chip.dataset.bait; renderTray(); } });
-    root.querySelector('.lake-stage').addEventListener('pointerdown', () => { if (phase === 'bite' || phase === 'reel') reelTap(); });
+    root.querySelector('.lake-stage').addEventListener('pointerdown', press);
   }
 
   const status = text => { $('#lake-status').textContent = text; };
@@ -87,7 +89,7 @@ export function createFishingUI(app, { onClose } = {}) {
     if (phase !== 'wait') return;
     phase = 'bite'; scene.bite(); status(''); renderTray();
     $('#lake-bite').hidden = false; $('#lake-bite').dataset.index = index; $('#lake-bite').classList.remove('is-reeling');
-    $('#lake-reel').textContent = 'Reel!'; $('#lake-bite-note').textContent = 'Something’s biting!';
+    $('#lake-reel').textContent = 'Reel!'; $('#lake-bite-note').textContent = 'Something’s biting! Press and hold';
     $('#lake-bite-ring').style.setProperty('--progress', 0);
     const head = scene.screenPoint(); $('#lake-alert').style.setProperty('--x', `${head.x}px`); $('#lake-alert').style.setProperty('--y', `${head.y}px`);
     $('#lake-reel').focus({ preventScroll: true });
@@ -101,26 +103,50 @@ export function createFishingUI(app, { onClose } = {}) {
     later(() => { if (phase === 'idle') status(''); }, 3200);
     $('#lake-cast').focus({ preventScroll: true });
   }
-  function reelTap() {
-    if (phase === 'bite') {
-      clearTimeout(biteTimer);
-      const index = Number($('#lake-bite').dataset.index), result = app.store.landFish(index);
-      app.acceptUpdate(result);
-      caught = result.caught;
-      if (!caught) { phase = 'idle'; $('#lake-bite').hidden = true; renderTray(); return; }
-      phase = 'reel'; taps = 0; need = tierOf(speciesOf(caught.species).tier).pull; scene.hook();
-      $('#lake-bite').classList.add('is-reeling'); $('#lake-reel').textContent = 'Reel';
-      $('#lake-bite-note').textContent = `Tap to reel it in · ${need} pulls`; renderTray();
-      return;
-    }
-    if (phase !== 'reel') return;
-    taps++; scene.reel(taps / need);
-    $('#lake-bite-ring').style.setProperty('--progress', taps / need);
-    $('#lake-bite-note').textContent = taps >= need ? 'Here it comes!' : `${need - taps} more`;
-    if (taps >= need) land();
+  function press(event) {
+    if (phase !== 'bite' && phase !== 'reel') return;
+    event?.preventDefault?.();
+    if (phase === 'bite') hook();
+    holding = true; $('#lake-bite').classList.add('is-holding');
+  }
+  function letGo() { holding = false; root?.querySelector('#lake-bite')?.classList.remove('is-holding'); }
+  function hook() {
+    clearTimeout(biteTimer);
+    const index = Number($('#lake-bite').dataset.index), bait = pond().bait[index];
+    if (!bait) { phase = 'idle'; $('#lake-bite').hidden = true; renderTray(); return; }
+    hooked = { index, rolled: rollCatch(bait.minutes, clockRandom) };
+    fight = startFight(speciesOf(hooked.rolled.species).tier);
+    phase = 'reel'; scene.hook(hooked.rolled);
+    $('#lake-bite').classList.add('is-reeling'); $('#lake-reel').textContent = 'Hold';
+    renderTray(); lastFrame = performance.now(); loop = requestAnimationFrame(struggle);
+  }
+  function struggle(now) {
+    if (phase !== 'reel' || !fight) return;
+    stepFight(fight, Math.min(.05, (now - lastFrame) / 1000), holding, clockRandom); lastFrame = now;
+    scene?.fight(fight, holding);
+    const meter = $('#lake-tension'), tension = Math.min(1, fight.tension);
+    meter.style.setProperty('--tension', tension); meter.setAttribute('aria-valuenow', Math.round(tension * 100));
+    meter.classList.toggle('is-red', fight.tension >= FIGHT.red);
+    $('#lake-bite-ring').style.setProperty('--progress', 1 - fight.line);
+    const note = fight.tension >= FIGHT.red ? 'Too tight! Let go a moment' : fight.mood === 'run' && fight.pull > .4 ? 'It’s running! Ease off…' : fight.slack > 1.4 ? 'Keep reeling or it’ll slip off' : holding ? 'Reeling…' : 'Hold to reel it in';
+    if ($('#lake-bite-note').textContent !== note) $('#lake-bite-note').textContent = note;
+    if (fight.outcome === 'landed') land();
+    else if (fight.outcome) lost(fight.outcome);
+    else loop = requestAnimationFrame(struggle);
+  }
+  function lost(outcome) {
+    letGo(); fight = null; hooked = null;
+    phase = 'idle'; scene.escape(outcome === 'snapped'); $('#lake-bite').hidden = true;
+    status(outcome === 'snapped' ? 'Snap! The line gave way. Your bait washed back to shore.' : 'It shook the hook loose. Your bait is still on the line.'); renderTray();
+    later(() => { if (phase === 'idle') status(''); }, 3600);
+    $('#lake-cast').focus({ preventScroll: true });
   }
   function land() {
+    letGo(); fight = null;
+    const result = app.store.landFish(hooked.index, hooked.rolled); hooked = null;
+    app.acceptUpdate(result); caught = result.caught;
     phase = 'leap'; $('#lake-bite').hidden = true; status(''); renderTray();
+    if (!caught) { phase = 'idle'; renderTray(); return; }
     scene.leap(caught).then(() => { if (phase === 'leap') showCard(caught); });
   }
   function showCard(fish) {
@@ -172,11 +198,17 @@ export function createFishingUI(app, { onClose } = {}) {
       if (!$('#lake-journal').hidden) closeJournal(); else if (phase === 'card') stow(); else close();
       return;
     }
+    if ((event.key === ' ' || event.key === 'Enter') && (phase === 'bite' || phase === 'reel') && !event.target.closest('input, textarea')) {
+      event.preventDefault();
+      if (!event.repeat) press();
+      return;
+    }
     if ((event.key === ' ' || event.key === 'Enter') && !event.target.closest('button, input, textarea')) {
       event.preventDefault();
-      if (phase === 'idle') cast(); else if (phase === 'bite' || phase === 'reel') reelTap();
+      if (phase === 'idle') cast();
     }
   }
+  function onKeyUp(event) { if (event.key === ' ' || event.key === 'Enter') letGo(); }
 
   function open() {
     if (!root) build();
@@ -188,13 +220,13 @@ export function createFishingUI(app, { onClose } = {}) {
     root.dataset.theme = app.state.theme;
     status(pond().bait.length ? 'Pick a bait, then cast your line.' : ''); renderTray();
     $('#lake-card').hidden = true; $('#lake-journal').hidden = true; $('#lake-bite').hidden = true;
-    document.addEventListener('keydown', onKey, true);
+    document.addEventListener('keydown', onKey, true); document.addEventListener('keyup', onKeyUp, true);
     $('#lake-cast').disabled ? $('#lake-back').focus({ preventScroll: true }) : $('#lake-cast').focus({ preventScroll: true });
   }
   function close() {
     if (!root || root.hidden) return;
     cancelAnimationFrame(building); clearTimeout(building); building = 0;
-    clearTimers(); document.removeEventListener('keydown', onKey, true);
+    clearTimers(); cancelAnimationFrame(loop); letGo(); fight = null; hooked = null; document.removeEventListener('keydown', onKey, true); document.removeEventListener('keyup', onKeyUp, true);
     scene?.dispose(); scene = null; phase = 'idle';
     root.hidden = true; document.body.classList.remove('is-lake');
     onClose?.(); returnFocus?.focus?.({ preventScroll: true });
@@ -203,7 +235,7 @@ export function createFishingUI(app, { onClose } = {}) {
     open, close,
     get isOpen() { return Boolean(root && !root.hidden); },
     render() { if (root && !root.hidden && phase === 'idle') renderTray(); },
-    diagnostics: () => scene ? { ...scene.diagnostics(), ui: phase, need, taps } : null,
+    diagnostics: () => scene ? { ...scene.diagnostics(), ui: phase, fight: fight && { tension: fight.tension, line: fight.line, mood: fight.mood, runs: fight.runs } } : null,
     dispose() { close(); root?.remove(); root = null; },
   };
 }

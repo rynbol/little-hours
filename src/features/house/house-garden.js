@@ -1,5 +1,5 @@
 import { placeAsset } from '../../models/assets.js';
-import { onIsland, STREAM } from './house-island.js';
+import { onIsland, STREAMS } from './house-island.js';
 import { inPond, DOCK } from './house-pond.js';
 import { pathDistance } from './house-paths.js';
 
@@ -14,7 +14,7 @@ export const ARBOUR = [6.35, 3.2], BENCH = [7.55, 1.05], NEST = [11.55, -2.35];
 const clear = (x, z) => onIsland(x, z, .55) && !inPond(x, z, .7)
   && !(Math.abs(x - DOCK.x) < .75 && z > DOCK.to - .2)
   && pathDistance(x, z) > .75 && Math.hypot(x - BENCH[0], z - BENCH[1]) > .8 && Math.hypot(x - ARBOUR[0], z - ARBOUR[1]) > .8
-  && Math.hypot(x - NEST[0], z - NEST[1]) > .5 && Math.hypot(x - 8.95, z - 2.72) > .6 && STREAM.every(([sx, sz]) => Math.hypot(x - sx, z - sz) > .6) && !(x > -5.9 && x < 5.4 && z > -3.15 && z < 3.2);
+  && Math.hypot(x - NEST[0], z - NEST[1]) > .5 && Math.hypot(x - 8.95, z - 2.72) > .6 && STREAMS.flat().every(([sx, sz]) => Math.hypot(x - sx, z - sz) > .6) && !(x > -5.9 && x < 5.4 && z > -3.15 && z < 3.2);
 const SPOTS = (() => {
   const spots = [];
   for (let i = 0; spots.length < 30 && i < 4000; i++) {
@@ -29,7 +29,7 @@ function tree(api, x, z, growth, seed) {
   api.cylinder(x, GROUND + .015, z, .36, .4, .03, soil);
   const blossom = growth >= 1 && seed % 3 === 0, fruit = growth >= 1 && seed % 3 === 1;
   const name = growth < .35 ? 'sapling' : blossom ? ['tree-blossom-a', 'tree-blossom-b'][seed % 2] : fruit ? 'tree-fruit' : ['tree-round-a', 'tree-round-b', 'tree-round-c'][seed % 3];
-  const { positions, colors, normals, indices } = placeAsset(name, { x, y: GROUND, z, yaw: seed % 628 / 100, scale: growth < .35 ? .7 + growth * 1.2 : .45 + .75 * growth });
+  const { positions, colors, normals, indices } = placeAsset(name, { x, y: GROUND, z, yaw: seed % 628 / 100, scale: growth < .35 ? .7 + growth * 1.2 : (.45 + .75 * growth) * .62 });
   api.shape(positions, colors, normals, indices);
 }
 

@@ -83,7 +83,7 @@ const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', std
 function addedLines(base) {
   const added = new Map(), removed = new Set();
   let file = null;
-  for (const line of git(['diff', '--unified=0', '--no-color', '--no-ext-diff', base, '--']).split('\n')) {
+  for (const line of git(['diff', '--unified=0', '--no-color', '--no-ext-diff', base, '--', '.', ':(exclude)src/models/assets/*.json']).split('\n')) {
     if (line.startsWith('+++ ')) { file = line.startsWith('+++ b/') ? line.slice(6) : null; continue; }
     if (line.startsWith('-') && !line.startsWith('--- ')) { removed.add(line.slice(1).trim()); continue; }
     const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);

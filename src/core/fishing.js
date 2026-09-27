@@ -1,9 +1,9 @@
 export const TIERS = Object.freeze([
-  { id: 'common', label: 'Common', color: '#9fb187', pull: 4 },
-  { id: 'uncommon', label: 'Uncommon', color: '#7fb0c9', pull: 5 },
-  { id: 'rare', label: 'Rare', color: '#b594d6', pull: 6 },
-  { id: 'epic', label: 'Epic', color: '#e59a7a', pull: 8 },
-  { id: 'legendary', label: 'Legendary', color: '#f1c96b', pull: 10 },
+  { id: 'common', label: 'Common', color: '#9fb187', strength: .42, stamina: 7, temper: .2 },
+  { id: 'uncommon', label: 'Uncommon', color: '#7fb0c9', strength: .52, stamina: 8, temper: .3 },
+  { id: 'rare', label: 'Rare', color: '#b594d6', strength: .62, stamina: 9, temper: .4 },
+  { id: 'epic', label: 'Epic', color: '#e59a7a', strength: .72, stamina: 11, temper: .5 },
+  { id: 'legendary', label: 'Legendary', color: '#f1c96b', strength: .82, stamina: 13, temper: .6 },
 ].map(Object.freeze));
 
 export const SPECIES = Object.freeze([
@@ -69,14 +69,45 @@ export function addBait(pond, minutes, at) {
   pond.bait = [...pond.bait, { minutes, at }].slice(-BAIT_LIMIT);
 }
 
-export function landCatch(pond, baitIndex, random, at) {
+export function landCatch(pond, baitIndex, random, at, rolled = null) {
   const bait = pond.bait[baitIndex];
   if (!bait) return null;
-  const caught = rollCatch(bait.minutes, random), before = pond.journal[caught.species];
+  const caught = rolled ?? rollCatch(bait.minutes, random), before = pond.journal[caught.species];
   pond.bait = pond.bait.filter((_, i) => i !== baitIndex);
   pond.journal[caught.species] = before
     ? { count: before.count + 1, best: Math.max(before.best, caught.size), first: before.first }
     : { count: 1, best: caught.size, first: at };
   pond.log = [...pond.log, { ...caught, minutes: bait.minutes, at }].slice(-LOG_LIMIT);
   return { ...caught, minutes: bait.minutes, isNew: !before, record: Boolean(before) && caught.size > before.best, count: pond.journal[caught.species].count, best: pond.journal[caught.species].best };
+}
+
+export const FIGHT = Object.freeze({ red: .86, snapAfter: .9, slackAfter: 3.2, reelSpeed: .17 });
+const MOODS = Object.freeze({ rest: { pull: .15, time: [.8, 1.8] }, tug: { pull: .55, time: [1, 2.2] }, run: { pull: 1, time: [.8, 1.5] } });
+
+export function startFight(tierId) {
+  const tier = tierOf(tierId);
+  return { strength: tier.strength, stamina: tier.stamina, temper: tier.temper, line: 1, tension: .25, pull: 0, tired: 0, mood: 'tug', moodLeft: 1.2, strain: 0, slack: 0, runs: 0, time: 0, outcome: null };
+}
+
+export function stepFight(fight, dt, reeling, random) {
+  if (fight.outcome) return fight;
+  fight.time += dt; fight.moodLeft -= dt;
+  if (fight.moodLeft <= 0) {
+    const roll = random(), mood = roll < fight.temper * .5 ? 'run' : roll < .72 ? 'tug' : 'rest', [low, high] = MOODS[mood].time;
+    if (mood === 'run') fight.runs++;
+    fight.mood = mood; fight.moodLeft = low + (high - low) * random();
+  }
+  fight.tired = Math.min(1, fight.tired + dt / fight.stamina * (fight.mood === 'run' ? 1.5 : 1));
+  const wobble = fight.mood === 'tug' ? Math.sin(fight.time * 9) * .08 : 0;
+  const goal = fight.strength * (MOODS[fight.mood].pull + wobble) * (1 - .6 * fight.tired);
+  fight.pull += (goal - fight.pull) * Math.min(1, dt * 6);
+  const aim = reeling ? fight.pull * .9 + .5 : fight.pull * .55;
+  fight.tension = Math.max(0, Math.min(1.1, fight.tension + (aim - fight.tension) * Math.min(1, dt * (reeling ? 2.4 : 3.2))));
+  fight.line = reeling ? fight.line - dt * FIGHT.reelSpeed * (1 - fight.pull * .75) : Math.min(1, fight.line + dt * fight.pull * .14);
+  fight.strain = fight.tension >= FIGHT.red ? fight.strain + dt : Math.max(0, fight.strain - dt * .6);
+  fight.slack = !reeling ? fight.slack + dt : Math.max(0, fight.slack - dt * 2);
+  if (fight.line <= 0) { fight.line = 0; fight.outcome = 'landed'; }
+  else if (fight.strain >= FIGHT.snapAfter) fight.outcome = 'snapped';
+  else if (fight.slack >= FIGHT.slackAfter) fight.outcome = 'escaped';
+  return fight;
 }

@@ -196,9 +196,9 @@ export function createStateStore(storage, now = clockNow) {
       const result = update((draft, { now: at }) => { friendship = shareFriendshipMoment(draft.friendships, a, b, kind, localDate(at), at, draft.pets.map(petEntity)); });
       return { ...result, friendship };
     },
-    landFish(baitIndex) {
+    landFish(baitIndex, rolled = null) {
       let caught = null;
-      const result = update((draft, { now: timestamp }) => { caught = landCatch(draft.pond, baitIndex, clockRandom, timestamp); });
+      const result = update((draft, { now: timestamp }) => { caught = landCatch(draft.pond, baitIndex, clockRandom, timestamp, rolled); });
       return { ...result, caught };
     },
     renameHouse(name) { return update(draft => { draft.house.name = cleanName(name, draft.house.name); }); },

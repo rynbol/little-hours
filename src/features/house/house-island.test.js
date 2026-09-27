@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { onIsland, STREAM } from './house-island.js';
+import { onIsland, STREAMS, waterfalls } from './house-island.js';
 import { HOUSE_POSITIONS } from './house-model.js';
 import { GARDEN_CENTER } from './house-garden.js';
 
@@ -12,7 +12,14 @@ test('every room, the stair and the whole garden stand on the island', () => {
   for (const [x, z] of corners) assert.ok(onIsland(x, z, .15), `${x}, ${z} is off the island`);
 });
 
-test('the stream runs from the lawn to the very edge', () => {
-  assert.ok(STREAM.slice(0, -1).every(([x, z]) => onIsland(x, z, .3)));
-  assert.equal(onIsland(...STREAM.at(-1), .1), false);
+test('each stream runs from the lawn over the edge and falls clear of the island', () => {
+  assert.equal(STREAMS.length, 3);
+  for (const course of STREAMS) {
+    assert.ok(course.slice(0, -1).every(([x, z]) => onIsland(x, z, .3)), JSON.stringify(course));
+    assert.equal(onIsland(...course.at(-1), .1), false);
+  }
+  for (const { points, rim } of waterfalls()) {
+    const [, top] = points[rim], [x, bottom, z] = points.at(-1);
+    assert.ok(top > -.2 && bottom < -3.4 && !onIsland(x, z), `falls from ${top} to ${bottom}`);
+  }
 });

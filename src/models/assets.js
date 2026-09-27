@@ -1,4 +1,6 @@
 import bush from './assets/bush.json' with { type: 'json' };
+import cloudA from './assets/cloud-a.json' with { type: 'json' };
+import cloudB from './assets/cloud-b.json' with { type: 'json' };
 import islandCliff from './assets/island-cliff.json' with { type: 'json' };
 import isletA from './assets/islet-a.json' with { type: 'json' };
 import isletB from './assets/islet-b.json' with { type: 'json' };
@@ -15,7 +17,7 @@ import treeRoundB from './assets/tree-round-b.json' with { type: 'json' };
 import treeRoundC from './assets/tree-round-c.json' with { type: 'json' };
 import treeWillow from './assets/tree-willow.json' with { type: 'json' };
 
-export const ASSETS = Object.freeze({ 'bush': bush, 'island-cliff': islandCliff, 'islet-a': isletA, 'islet-b': isletB, 'rock-a': rockA, 'rock-b': rockB, 'rowboat': rowboat, 'sapling': sapling, 'tree-blossom-a': treeBlossomA, 'tree-blossom-b': treeBlossomB, 'tree-fruit': treeFruit, 'tree-pine': treePine, 'tree-round-a': treeRoundA, 'tree-round-b': treeRoundB, 'tree-round-c': treeRoundC, 'tree-willow': treeWillow });
+export const ASSETS = Object.freeze({ 'bush': bush, 'cloud-a': cloudA, 'cloud-b': cloudB, 'island-cliff': islandCliff, 'islet-a': isletA, 'islet-b': isletB, 'rock-a': rockA, 'rock-b': rockB, 'rowboat': rowboat, 'sapling': sapling, 'tree-blossom-a': treeBlossomA, 'tree-blossom-b': treeBlossomB, 'tree-fruit': treeFruit, 'tree-pine': treePine, 'tree-round-a': treeRoundA, 'tree-round-b': treeRoundB, 'tree-round-c': treeRoundC, 'tree-willow': treeWillow });
 
 const bytes = text => Uint8Array.from(atob(text), c => c.charCodeAt(0)).buffer;
 const decoded = new Map();

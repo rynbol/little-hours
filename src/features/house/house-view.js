@@ -20,6 +20,7 @@ import { createStroll } from './house-stroll.js';
 import { createHousePostcard } from './house-postcard.js';
 import { houseFrame } from './house-framing.js';
 import { createHouseMotion } from './house-motion.js';
+import { createIslandWater } from './house-water.js';
 import { nextExpansion, roomDisplayName } from '../../core/house.js';
 import './whole-house.css';
 
@@ -41,6 +42,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   scene.imageProcessingConfiguration.toneMappingEnabled = true;
   scene.imageProcessingConfiguration.toneMappingType = 1;
   scene.imageProcessingConfiguration.exposure = 1.12;
+  scene.imageProcessingConfiguration.contrast = 1.12;
   scene.skipPointerMovePicking = true; scene.skipPointerDownPicking = true; scene.skipPointerUpPicking = true;
   const camera = new ArcRotateCamera('cottage-camera', Math.PI / 2.8, 1.02, 32, new Vector3(0, 1.3, 0), scene);
   camera.mode = Camera.ORTHOGRAPHIC_CAMERA; camera.minZ = .1; camera.maxZ = 100;
@@ -48,7 +50,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const sky = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene);
   const sun = new DirectionalLight('afternoon', new Vector3(-1, -2, -1), scene);
   sun.position.set(0, 12, 6);
-  const shadows = new ShadowGenerator(1024, sun); shadows.usePercentageCloserFiltering = true; shadows.bias = .002; shadows.normalBias = .02; shadows.darkness = .22;
+  const shadows = new ShadowGenerator(2048, sun); shadows.usePercentageCloserFiltering = true; shadows.bias = .002; shadows.normalBias = .02; shadows.darkness = .3;
   shadows.getShadowMap().refreshRate = 0;
   const instrumentation = new SceneInstrumentation(scene);
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -61,6 +63,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const smokePaint = new StandardMaterial('cottage-smoke-paint', scene); smokePaint.disableLighting = true; smokePaint.emissiveColor = Color3.FromHexString('#f3ebe2'); smokePaint.alpha = .3; smoke.material = smokePaint; smoke.isPickable = false;
   const smokeMatrices = new Float32Array(5 * 16), smokeAt = new Vector3(), smokeLocal = new Vector3();
   smoke.thinInstanceSetBuffer('matrix', smokeMatrices, 16, false); smoke.alwaysSelectAsActiveMesh = true;
+  const water = createIslandWater(scene, theme);
   const moteMatrices = new Float32Array(24 * 16);
   for (let i = 0; i < 24; i++) { const n = i * 16; moteMatrices[n] = moteMatrices[n + 5] = moteMatrices[n + 10] = moteMatrices[n + 15] = 1; }
   motes.thinInstanceSetBuffer('matrix', moteMatrices, 16, false); motes.alwaysSelectAsActiveMesh = true;
@@ -105,7 +108,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const seconds = motion.matches ? 0 : now / 1000;
     const wasReacting = roomMotion.activeCount > 0;
     roomMotion.restore();
-    model.animate(seconds, focused, motion.matches);
+    model.animate(seconds, focused, motion.matches); water.animate(seconds);
     for (const root of model.live) root.metadata.avatar?.setEnabled(focused);
     stroll.setVisible(!focused);
     if (!focused) stroll.animate(seconds, motion.matches);
@@ -200,7 +203,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     roomMotion.stop();
     house = next; selectedId = selected; theme = atmosphere; avatar = appearance;
     sky.intensity = theme === 'dusk' ? .56 : .62; sun.intensity = theme === 'dusk' ? .8 : .95;
-    sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9');
+    sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9'); water.setTheme(theme);
     const previous = model;
     builds++;
     model = createHouseModel(scene, house, selectedId, theme, avatar, previous);
