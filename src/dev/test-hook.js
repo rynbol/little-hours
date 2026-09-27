@@ -50,6 +50,7 @@ export function installTestHook(app) {
     const house = document.body.classList.contains('is-house') ? views.house() : null;
     if (house && house.open !== (house.closed ? 0 : 1)) reasons.push('house opening');
     if (house?.activeRoomMotions) reasons.push('house room motion');
+    if (house?.turning) reasons.push('house camera');
     if (runningAnimations()) reasons.push('css animation');
     return reasons;
   }

@@ -19,7 +19,7 @@ export default {
     check('the header toggle follows the theme', /Rain/.test(await app.text('#time-toggle')));
     const lights = (await app.saved()).decor.lights;
     await app.clickSel('.fairy-lights input');
-    check('the lights switch saves', (await app.saved()).decor.lights === !lights);
+    check('the lights switch saves', await app.waitFor(`JSON.parse(localStorage.getItem('little-hours-v1')).decor.lights === ${!lights}`, { what: 'the lights to save' }).catch(() => false));
     await app.key('Escape');
     await app.waitFor(`document.getElementById('room-panel').hidden`, { what: 'Escape to close the panel' });
     check('Escape closes the panel and returns focus to its button', await app.js(`document.activeElement?.dataset.panel === 'atmosphere'`));

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { ensureDir, lhDir, track, untrack } from './state.mjs';
 
 export const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+export const slow = Math.max(1, Number(process.env.LH_SLOW) || 1);
 
 export const chromePath = process.env.CHROME_PATH || (process.platform === 'darwin'
   ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'

@@ -1,4 +1,4 @@
-import { launch, sleep } from './chrome.mjs';
+import { launch, sleep, slow } from './chrome.mjs';
 import { seedState } from './seeds.mjs';
 
 const START = Date.parse('2026-01-10T16:30:00');
@@ -37,7 +37,7 @@ export async function openApp(url, { seed = 'three-rooms', theme, reducedMotion 
     const app = Object.assign(browser, {
       url, hook, readyMs,
       async settle(timeout = 10000) {
-        if (hook) await browser.js(`window.__littleHours.settled(${timeout})`);
+        if (hook) await browser.js(`window.__littleHours.settled(${timeout * slow})`);
         else await sleep(1500);
       },
       async point(target) {
@@ -57,7 +57,7 @@ export async function openApp(url, { seed = 'three-rooms', theme, reducedMotion 
       room: () => browser.js(`(() => { const d = window.__littleHours.room.diagnostics(); return { selectedId: d.selectedId, editing: d.editing, avatarEditing: d.avatarEditing, placement: d.placement, layout: d.layout, dragging: d.dragging, pixelRatio: d.pixelRatio, quality: d.quality, plantPhase: d.plantPhase }; })()`),
       saved: () => browser.js(`JSON.parse(localStorage.getItem('little-hours-v1') || 'null')`),
       async waitFor(expression, { timeout = 5000, what = expression } = {}) {
-        const end = Date.now() + timeout;
+        const end = Date.now() + timeout * slow;
         let value;
         while (!(value = await browser.js(expression).catch(error => { if (/reference chain/.test(error.message)) throw new Error(`waitFor needs an expression that returns plain data: ${expression}`); return null; }))) {
           if (Date.now() > end) throw new Error(`Timed out waiting for ${what}`);

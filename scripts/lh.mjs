@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromePath, closeAll, gpuFlag, killAllNow, launch, sleep } from './lh/chrome.mjs';
+import { chromePath, closeAll, gpuFlag, killAllNow, launch, sleep, slow } from './lh/chrome.mjs';
 import { openApp } from './lh/app.mjs';
 import { serve } from './lh/server.mjs';
 import { SEEDS } from './lh/seeds.mjs';
@@ -120,7 +120,7 @@ async function runFlows(names) {
       return Boolean(ok);
     };
     const t = {
-      url: server.url, out, check, steps, sleep,
+      url: server.url, out, check, steps, slow, sleep: ms => sleep(ms * slow),
       async open(settings = {}) { const app = await openApp(server.url, { ...viewport, scale: 1, ...settings }); apps.push({ app, label: settings.label || `${settings.seed || 'three-rooms'} ${settings.width || viewport.width}x${settings.height || viewport.height}` }); return app; },
       async close(app) { const entry = apps.find(item => item.app === app); if (entry) { check(`no page errors (${entry.label})`, app.errors.length === 0, app.errors.join(' | ').slice(0, 400)); apps.splice(apps.indexOf(entry), 1); } await app.close(); },
       shot: (app, label) => app.shot(join(out, `${name}-${label}.jpg`)),

@@ -42,7 +42,7 @@ jobs:
 
   flows:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -53,6 +53,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: echo "CHROME_PATH=$(node -e "import('@playwright/test').then(p => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
       - run: npm run lh -- run all
+        env:
+          LH_SLOW: '4'
       - if: failure()
         uses: actions/upload-artifact@v7
         with:

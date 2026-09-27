@@ -2,13 +2,13 @@ const BUBBLE = `(() => { const b = document.querySelector('.speech-bubble[data-s
 const CAT = /prr|Mrr|Mew/i, DOG = /Arf|Wuff|Yip|Snff/i;
 const HEARTS = `window.__littleHours.room.diagnostics().petModel.hearts.filter(heart => heart.isEnabled()).length`;
 
-async function tapPet(app, sleep) {
+async function tapPet(app, sleep, slow) {
   for (let i = 0; i < 4; i++) {
     const spot = await app.point('pet');
     if (spot?.visible) {
       await app.click(spot.x, spot.y);
       const counts = [];
-      for (let k = 0; k < 14; k++) { counts.push(await app.js(HEARTS)); await sleep(100); }
+      for (let k = 0; k < 14 * slow; k++) { counts.push(await app.js(HEARTS)); await sleep(100 / slow); }
       if (counts.some(Boolean)) return { spot, counts, said: await app.js(BUBBLE) };
     }
     await sleep(300);
@@ -24,7 +24,7 @@ export default {
     const app = await t.open({ seed: 'three-rooms' });
     await app.settle();
     check('the room starts with Miso the cat', await app.text('#pet-button-label') === 'Miso' && await app.js('window.__littleHours.room.diagnostics().petSpecies') === 'cat');
-    let tap = await tapPet(app, sleep);
+    let tap = await tapPet(app, sleep, t.slow);
     check('tapping the cat floats three hearts up one after another', oneByOne(tap.counts), tap.counts);
     check('petting shows no words', tap.said === null, tap.said);
     await t.shot(app, 'cat-hearts');
@@ -43,7 +43,7 @@ export default {
     await app.reload();
     await app.settle();
     check('after a reload the dog is still your pet', await app.text('#pet-button-label') === 'Mochi' && await app.js('window.__littleHours.room.diagnostics().petSpecies') === 'dog');
-    tap = await tapPet(app, sleep);
+    tap = await tapPet(app, sleep, t.slow);
     check('tapping the dog after the reload gets hearts too, without words', oneByOne(tap.counts) && tap.said === null, tap);
     await t.shot(app, 'dog-hearts');
     await app.clickSel('#pet-button');
