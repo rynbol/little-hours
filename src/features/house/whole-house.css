@@ -7,12 +7,6 @@
 .house-camera-controls button[aria-pressed='true'] { background: #d5e0c8; color: #3e5042; box-shadow: 0 2px 5px #17101c1a; }
 .house-camera-controls button:focus-visible, .house-room-tag:focus-visible { outline: 2px solid #f1d2a4; outline-offset: 3px; }
 .house-camera-controls .house-camera-turn { width: 34px; padding: 6px; font-size: 17px; }
-.house-room-tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.house-room-tag { position: absolute; left: 0; top: 0; pointer-events: auto; transform: translate(-50%, 0); border: 1px solid #bead9247; border-radius: 11px; background: #302a34ed; padding: 7px 12px; color: #e8dac8; text-align: center; max-width: 180px; box-shadow: 0 5px 18px #16101c2e; }
-.house-room-tag strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 500; }
-.house-room-tag small { display: block; margin-bottom: 2px; font-size: 8px; letter-spacing: 1.2px; color: #b9c8a7; text-transform: uppercase; }
-.house-room-tag[aria-current='location'] { border-color: #c7d5b7a3; }
-.house-room-tag.is-site { border-style: dashed; }
 .house-camera-note { position: absolute; bottom: 9px; left: 50%; translate: -50% 0; width: max-content; max-width: calc(100% - 24px); color: #c6b8aa; text-align: center; font-size: 10px; pointer-events: none; }
 .house-canvas, .house-in-room { position: relative; }
 .house-in-room { position: absolute; }
@@ -22,9 +16,6 @@
 @media (max-width: 640px) {
   .house-camera-controls { top: 7px; right: 7px; max-width: calc(100% - 14px); gap: 4px; }
   .house-camera-controls button { padding: 6px 10px; font-size: 10px; min-height: 36px; }
-  .house-room-tag { padding: 4px 7px; border-radius: 8px; max-width: 125px; }
-  .house-room-tag strong { font-size: 9px; }
-  .house-room-tag small { font-size: 7px; }
   .house-camera-note { font-size: 9px; }
   .is-connected .stage-presence { top: auto; bottom: 7px; left: 7px; font-size: 10px; }
 }
@@ -39,14 +30,29 @@ body.is-connected:not(.is-avatar-editing):not(.is-decorating) .stage { height: c
   body.is-connected:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(440px, 57svh, 640px); }
 }
 .house-canvas .house-camera-note { display: none; }
-.house-canvas .house-room-tag { background: #f5eddfef; color: #514c41; border-color: #fff8e2a0; }
-.house-canvas .house-room-tag small { color: #69765c; }
-.house-canvas .house-room-tag[aria-current='location'] { border-color: #65745c; }
-.house-canvas .house-room-tag.is-site { background: #f5eddfc4; border-color: #8a7a64; }
 @media (max-width: 640px) {
   body.is-connected:not(.is-avatar-editing) .stage-presence { top: auto; bottom: 7px; left: 7px; }
 }
-.house-room-tag.is-garden { pointer-events: none; }
-.house-canvas .house-room-tag.is-pond, .house-room-tag.is-pond { background: #d6e8eaef; color: #2f4d57; border-color: #f0fbfca0; }
-.house-room-tag.is-pond small { color: #4f7f8c; }
-.house-canvas .house-room-tag.is-garden, .house-room-tag.is-garden { background: #dfe8cfef; color: #3f5238; border-color: #f4f8e8a0; }
+
+.house-room-tag { --pin-bg: #f7efe1; --pin-ink: #5b6b4f; --pin-edge: #fffaf0; --pin-half: 17px; position: absolute; left: 0; top: 0; z-index: 1; pointer-events: auto; transform: translate(calc(var(--pin-half) * -1), -100%); display: flex; align-items: center; gap: 0; padding: 0 0 9px; border: 0; background: none; color: #4f473e; font: inherit; }
+.house-room-tag::after { content: ''; position: absolute; left: var(--pin-half); bottom: 3px; width: 10px; height: 10px; margin-left: -5px; border-radius: 0 0 3px 0; background: var(--pin-bg); transform: rotate(45deg); box-shadow: 2px 2px 3px #2a1f2e26; }
+.house-pin { position: relative; z-index: 1; display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--pin-bg); color: var(--pin-ink); box-shadow: 0 0 0 2px var(--pin-edge), 0 6px 14px #241a2a40; transition: transform .2s cubic-bezier(.3, 1.5, .5, 1); }
+.house-pin svg { width: 19px; height: 19px; }
+.house-pin-label { position: relative; z-index: 0; display: grid; margin-left: -14px; padding: 0 0 0 14px; max-width: 0; overflow: hidden; opacity: 0; border-radius: 0 999px 999px 0; background: var(--pin-bg); box-shadow: 0 6px 14px #241a2a33; white-space: nowrap; text-align: left; transition: max-width .28s ease, opacity .2s ease, padding .28s ease; }
+.house-pin-label strong { font-size: 12px; font-weight: 600; line-height: 1.2; }
+.house-pin-label small { font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--pin-ink); line-height: 1.3; }
+.house-room-tag:is(:hover, :focus-visible) { z-index: 2; }
+.house-room-tag:is(:hover, :focus-visible) .house-pin { transform: translateY(-2px) scale(1.06); }
+.house-room-tag:is(:hover, :focus-visible) .house-pin-label, .house-room-tags.is-named .house-pin-label { max-width: 200px; opacity: 1; padding: 5px 14px 5px 20px; }
+.house-room-tag[aria-current='location'] { --pin-bg: #5f7456; --pin-ink: #f3ecd9; --pin-edge: #e6efd6; color: #f7f1e3; }
+.house-room-tag[aria-current='location'] .house-pin-label small { color: #d7e3c4; }
+.house-room-tag.is-pond { --pin-bg: #e3f0ee; --pin-ink: #3f7486; --pin-edge: #ffffff; color: #2f4d57; }
+.house-room-tag.is-garden { --pin-bg: #e6edd6; --pin-ink: #5c7a45; pointer-events: auto; cursor: default; }
+.house-room-tag.is-site { --pin-bg: #f5eddfd9; --pin-ink: #8a7a64; --pin-edge: #8a7a6466; }
+.house-room-tag.is-site .house-pin { box-shadow: 0 0 0 2px var(--pin-edge), 0 6px 14px #241a2a30; outline: 1.5px dashed #8a7a64; outline-offset: -5px; }
+@media (max-width: 640px) {
+  .house-pin { width: 28px; height: 28px; }
+  .house-pin svg { width: 16px; height: 16px; }
+  .house-room-tag { --pin-half: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .house-pin, .house-pin-label { transition: none; } }

@@ -1,22 +1,16 @@
 // The one cottage around all the rooms: a front that opens like a dollhouse,
 // roofs that run on from room to room, and a stair hall up to the loft.
-// Each part is built in room coordinates. Moving parts hang on hinges, so the
-// house opens by turning hinges, never by rebuilding geometry.
 export const STAIR_TOP = -1.03, WALL_TOP = 2.95, FRONT = 2.2, BACK = -2.2, HALF = 2.55, RISE = 1.75, BAY = .7;
 const plaster = '#f8ecd6', stone = '#cdbb9f', timber = '#76553f', cream = '#f6ecd6';
 const shutter = '#8fa487', door = '#8b5d44', slate = ['#5a746c', '#526a62'], ceiling = '#c9a47c', brick = '#ae8b70';
 const EAVE = .32, END = .25, slope = RISE / FRONT;
-// How far each moving part turns when the house is fully open (radians).
-export const OPEN_TURN = { front: 1.95, lid: -2.25 };
-// The front roof also rises this far as it tips up.
-export const LID_LIFT = .35;
+export const OPEN_FRONT_RAIL = .32;
 
 // What each room adds to the house, and how it joins its neighbours.
-// The studio and loft fronts open to the left, the garden wing's to the right.
 export function exteriorPlan(house, id) {
   const built = new Set(house.rooms.map(room => room.id)), loft = built.has('loft'), garden = built.has('garden');
   const options = {
-    bay: loft && id !== 'garden' ? BAY : 0, hingeRight: id === 'garden', under: id === 'studio' && loft,
+    bay: loft && id !== 'garden' ? BAY : 0, hingeRight: id === 'garden', under: id === 'studio' && loft, floor: id === 'loft' ? WALL_TOP : 0,
     leftEnd: id !== 'garden', rightEnd: id !== 'studio' || !garden, chimney: id === 'garden' || house.rooms.length === 1,
   };
   const parts = ['front', 'roof', 'back'];
@@ -33,8 +27,9 @@ export function hingeOf(part, options) {
 
 // The pose of a moving part at `eased` open (0 closed, 1 open).
 export function hingePose(part, options, eased) {
-  if (part === 'lid') return { rotation: [OPEN_TURN.lid * eased, 0, 0], lift: LID_LIFT * eased };
-  return { rotation: [0, (options.hingeRight ? OPEN_TURN.front : -OPEN_TURN.front) * eased, 0], lift: 0 };
+  if (part === 'lid') return { lift: 0, fold: 1 - eased * .98 };
+  const rest = options.floor ? -.2 : OPEN_FRONT_RAIL;
+  return { lift: -(options.floor + WALL_TOP - rest) * eased, fold: 1 };
 }
 
 const windowGlass = theme => theme === 'dusk' ? ['#ffd88f', 2.1] : theme === 'rain' ? ['#e9d6a8', 1.35] : ['#b9cfc8', 1];

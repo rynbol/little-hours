@@ -1,4 +1,5 @@
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+import { buildPaths } from './house-paths.js';
 
 export const ISLAND = Object.freeze({ cx: 2.85, cz: .1, rx: 9.95, rz: 4.65, power: 4.2 });
 export const STREAM = Object.freeze([[11.75, 1.3], [12.1, 1.75], [12.5, 2.15], [12.95, 2.5]]);
@@ -6,7 +7,6 @@ const TOP = -.175, SEGMENTS = 72, RINGS = 7;
 const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const lawn = ['#a6b68c', '#aebd92', '#9fb187', '#b4c296'];
 const rim = '#8ea477', lip = '#7a9368', soil = ['#9b7658', '#86654c'];
-const stone = i => ['#d6cab4', '#c8bba3', '#dccfb9'][i % 3];
 const rock = ['#c7a98f', '#b39584', '#9c8285', '#83708a', '#6b5d80', '#574d6e'];
 
 export function edgePoint(a, scale = 1) {
@@ -115,11 +115,7 @@ export function buildIsland(api) {
   for (let k = 0; k < 7; k++) api.ball(fx - .45 + hash(k * 4.1) * .9, fy - .1 + hash(k * 2.3) * .45, fz - .5 + hash(k * 6.7) * 1, .8 + hash(k) * .5, .5, .7, k % 2 ? '#f3e7ee' : '#e8dbe6');
   api.ball(STREAM.at(-1)[0] + .12, TOP + .03, STREAM.at(-1)[1], .3, .08, .5, '#e8f5f0');
 
-  for (let i = 0; i < 26; i++) {
-    const t = i / 25, x = -2.5 + t * 9.5, z = 3.3 + Math.sin(t * Math.PI * 2.2) * .28 + (t > .9 ? (t - .9) * -2.5 : 0);
-    api.cylinder(x + (hash(i) - .5) * .08, TOP + .015, z, .3 + hash(i * 2.7) * .1, .34 + hash(i * 2.7) * .1, .03, stone(i));
-    if (i % 3 === 1) api.ball(x + .1, TOP + .03, z + (i % 2 ? .3 : -.3), .16, .07, .12, '#93aa7c');
-  }
+  buildPaths(api);
 
   for (const [x, y, z, s] of [[-6.2, -2.5, 3.7, 1], [4.4, -4, 4.4, 1.15], [10.4, -3.1, 3.4, .8], [-8.9, -.5, -1.6, .6]]) {
     for (const [dx, dy, dz, r] of [[0, .15, 0, 1.25], [-.8, 0, .15, .9], [.85, -.02, -.05, .95], [-1.45, -.12, .05, .6], [1.5, -.1, .1, .62], [.3, .45, -.2, .8]]) api.ball(x + dx * s, y + dy * s, z + dz * s, r * 1.3 * s, r * .75 * s, r * 1.05 * s, dy > .1 ? '#fffafb' : '#f6edf2');

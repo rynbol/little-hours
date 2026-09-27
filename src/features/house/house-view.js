@@ -23,6 +23,14 @@ import { createHouseMotion } from './house-motion.js';
 import { nextExpansion } from '../../core/house.js';
 import './whole-house.css';
 
+const PIN_ICONS = {
+  room: '<path d="M5 20V10.5L12 5l7 5.5V20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20v-5.5h4V20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
+  loft: '<path d="M5 19h4v-4h4v-4h4V7h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  garden: '<path d="M12 20v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 13c0-4 2.5-6.5 6.5-6.5 0 4-2.5 6.5-6.5 6.5ZM12 15.5c0-3-2-5-5.5-5 0 3 2 5 5.5 5Z" fill="currentColor"/>',
+  pond: '<path d="M4.5 12c2.2-3.2 5.3-4.6 8.6-4.6 2.3 0 4.4 1.3 5.4 3.1L21 8.4v7.2l-2.5-2.1c-1 1.8-3.1 3.1-5.4 3.1-3.3 0-6.4-1.4-8.6-4.6Z" fill="currentColor"/><circle cx="8.7" cy="11.2" r="1.1" fill="var(--pin-bg, #fff)"/>',
+  site: '<path d="M12 6v12M6 12h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+};
+
 export function createHouseView(container, { house, selectedId, theme, avatar, onSelect, focused = false }) {
   const canvas = document.createElement('canvas');
   canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', 'Your miniature cottage. Choose a room or building site. Use the room navigation to choose with a keyboard.');
@@ -166,9 +174,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       if (!base) tagPoint.set(...(id === 'pond' ? POND_TAG : GARDEN_TAG));
       else tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : id === 'loft' ? .7 : 0), base[2] + offset.z + 2.08);
       Vector3.TransformCoordinatesToRef(tagPoint, matrix, tagProjection);
-      const half = Math.min(90, width / 4);
+      const half = Math.min(24, width / 4);
       button.style.left = `${Math.max(half, Math.min(width - half, (tagProjection.x + 1) * width / 2))}px`;
-      button.style.top = `${Math.max(52, Math.min(height - 57, (1 - tagProjection.y) * height / 2 + 5))}px`;
+      button.style.top = `${Math.max(52, Math.min(height - 12, (1 - tagProjection.y) * height / 2))}px`;
     }
   }
   function present() {
@@ -210,29 +218,31 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     layoutKeys = new Map(house.rooms.map(entry => [entry.id, JSON.stringify(entry.layout)]));
     tags.replaceChildren();
     for (const entry of house.rooms) {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'house-room-tag'; button.dataset.room = entry.id;
-      button.setAttribute('aria-label', `Visit ${entry.name}`); button.setAttribute('aria-current', entry.id === house.activeId ? 'location' : 'false');
-      const level = document.createElement('small'); level.textContent = entry.id === 'loft' ? 'Upstairs' : entry.id === house.activeId ? 'You’re here' : 'Ground floor';
-      const name = document.createElement('strong'); name.textContent = entry.name; button.append(level, name); tags.appendChild(button);
+      const here = entry.id === house.activeId;
+      const button = pin('button', entry.id === 'loft' ? 'loft' : 'room', entry.id, entry.name, here ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor');
+      button.setAttribute('aria-label', `Visit ${entry.name}`); button.setAttribute('aria-current', here ? 'location' : 'false');
     }
-    const garden = document.createElement('span'); garden.className = 'house-room-tag is-garden'; garden.dataset.room = 'orchard';
-    const days = document.createElement('strong'); days.textContent = 'Garden'; garden.append(days); tags.appendChild(garden);
-    const pond = document.createElement('button'); pond.type = 'button'; pond.className = 'house-room-tag is-pond'; pond.dataset.room = 'pond'; pond.setAttribute('aria-label', 'Go fishing at Willow Pond');
-    const pondLevel = document.createElement('small'); pondLevel.textContent = 'Go fishing'; const pondName = document.createElement('strong'); pondName.textContent = 'Willow Pond'; pond.append(pondLevel, pondName); tags.appendChild(pond);
+    pin('span', 'garden', 'orchard', 'Garden').classList.add('is-garden');
+    const pond = pin('button', 'pond', 'pond', 'Willow Pond', 'Go fishing'); pond.classList.add('is-pond'); pond.setAttribute('aria-label', 'Go fishing at Willow Pond');
     // The blueprint's tag: what grows next and how close it is.
     const site = nextExpansion(house);
     if (site && container.id === 'house-canvas') {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'house-room-tag is-site'; button.dataset.room = site.id;
+      const button = pin('button', 'site', site.id, `${site.short} · ${Math.min(house.coins, site.price)} / ${site.price}`, 'Room to grow'); button.classList.add('is-site');
       button.setAttribute('aria-label', `Plan ${site.label}, ${Math.min(house.coins, site.price)} of ${site.price} coins`);
-      const level = document.createElement('small'); level.textContent = 'Room to grow';
-      const name = document.createElement('strong'); name.textContent = `${site.short} · ${Math.min(house.coins, site.price)} / ${site.price}`;
-      button.append(level, name); tags.appendChild(button);
     }
     for (const mesh of model.meshes) mesh.receiveShadows = true;
     // Babylon removes disposed casters from this list. Keep it separate from
     // model.meshes so disposal cannot skip every other room batch.
     shadows.getShadowMap().renderList = [...model.meshes];
     shadows.getShadowMap().resetRefreshCounter(); resize();
+  }
+  function pin(tag, icon, id, title, note) {
+    const element = document.createElement(tag); element.className = 'house-room-tag'; element.dataset.room = id;
+    if (tag === 'button') element.type = 'button';
+    element.innerHTML = `<span class="house-pin" aria-hidden="true"><svg viewBox="0 0 24 24">${PIN_ICONS[icon]}</svg></span><span class="house-pin-label">${note ? '<small></small>' : ''}<strong></strong></span>`;
+    element.querySelector('strong').textContent = title;
+    if (note) element.querySelector('small').textContent = note;
+    tags.appendChild(element); return element;
   }
   function pick(event) {
     const rect = canvas.getBoundingClientRect();

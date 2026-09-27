@@ -57,7 +57,8 @@ test('the opening dollhouse keeps all authored geometry framed, picking follows 
     const front = model.meshes.find(m => m.name === 'house-outside-garden-front');
     model.setOpen(0); const shut = front.getBoundingInfo().boundingBox.maximumWorld.z;
     model.setOpen(1);
-    assert.ok(front.getBoundingInfo().boundingBox.maximumWorld.z > shut + 3, 'the garden front swings out');
+    const open = front.getBoundingInfo().boundingBox.maximumWorld;
+    assert.ok(open.y < .6 && Math.abs(open.z - shut) < 1e-6, `the garden front sinks to a low rail and never swings over the garden: ${open.y}`);
     const hit = scene.pickWithRay(new Ray(new Vector3(-2.55, 12, 0), new Vector3(0, -1, 0)), mesh => mesh.metadata?.houseSlot === 'loft');
     assert.equal(hit.pickedMesh?.metadata.houseSlot, 'loft', 'picking finds the upper floor of the open house');
     model.setOpen(0);

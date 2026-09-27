@@ -1,9 +1,10 @@
 import { onIsland, STREAM } from './house-island.js';
 import { inPond, DOCK } from './house-pond.js';
+import { pathDistance } from './house-paths.js';
 
 export const GARDEN_CENTER = [8.9, 0, 0];
 export const GARDEN_TAG = [8.2, -.15, -2.2];
-const GROUND = -.175, stone = ['#cfc3ad', '#bfb29a'], bark = '#7a5a42', soil = '#8a6a4f';
+const GROUND = -.175, bark = '#7a5a42', soil = '#8a6a4f';
 const bloom = ['#eac0b9', '#f5e4bd', '#c8b7d7', '#e6a3a0'];
 const lampGlow = theme => theme === 'dusk' ? ['#ffd88f', 2.1] : theme === 'rain' ? ['#e9d6a8', 1.35] : ['#f3e2bd', 1];
 const hash = n => { const s = Math.sin(n * 57.3 + 9.1) * 43758.5453; return s - Math.floor(s); };
@@ -11,7 +12,7 @@ export const ARBOUR = [6.35, 3.2], BENCH = [7.55, 1.05], NEST = [11.55, -2.35];
 
 const clear = (x, z) => onIsland(x, z, .55) && !inPond(x, z, .7)
   && !(Math.abs(x - DOCK.x) < .75 && z > DOCK.to - .2)
-  && Math.abs(z - 3.3) > .62 && Math.hypot(x - BENCH[0], z - BENCH[1]) > .8 && Math.hypot(x - ARBOUR[0], z - ARBOUR[1]) > .8
+  && pathDistance(x, z) > .75 && Math.hypot(x - BENCH[0], z - BENCH[1]) > .8 && Math.hypot(x - ARBOUR[0], z - ARBOUR[1]) > .8
   && Math.hypot(x - NEST[0], z - NEST[1]) > .5 && Math.hypot(x - 8.95, z - 2.72) > .6 && STREAM.every(([sx, sz]) => Math.hypot(x - sx, z - sz) > .6) && !(x > -5.9 && x < 5.4 && z > -3.15 && z < 3.2);
 const SPOTS = (() => {
   const spots = [];
@@ -71,11 +72,6 @@ export function buildGarden(api, trees, theme) {
   }
   for (const dx of [-.42, .42]) for (let k = 0; k < 3; k++) api.ball(ax + dx + (k % 2 ? .04 : -.04), GROUND + .25 + k * .3, az + .05, .13, .16, .1, k % 2 ? '#7f9a6a' : '#8fae76');
 
-  for (let i = 0; i < 9; i++) {
-    const t = i / 8, x = 7 + t * 2.35, z = 3.3 - Math.sin(t * Math.PI * .5) * .15 - (t > .7 ? (t - .7) * .5 : 0);
-    api.cylinder(x + (hash(i * 4) - .5) * .06, GROUND + .015, z, .3 + hash(i) * .08, .33 + hash(i) * .08, .03, stone[i % 2]);
-  }
-
   const [bx, bz] = BENCH, turn = [0, -.55, 0];
   const at = (dx, dz) => [bx + dx * Math.cos(.55) + dz * Math.sin(.55), bz - dx * Math.sin(.55) + dz * Math.cos(.55)];
   api.box(bx, GROUND + .3, bz, 1, .06, .3, '#d1ae86', turn);
@@ -84,6 +80,8 @@ export function buildGarden(api, trees, theme) {
 
   const glow = lampGlow(theme);
   lamp(api, ax + .75, az + .25, glow); lamp(api, bx - .55, bz - .45, glow); lamp(api, 8.95, 2.72, glow);
+  for (const [x, z] of [[-1.1, 4.05], [1.7, 4.12], [4.4, 3.88]]) lamp(api, x, z, glow);
+  api.box(-3.35, GROUND + .3, 3.55, .05, .6, .05, bark); api.box(-3.35, GROUND + .66, 3.55, .3, .2, .2, '#8fa487'); api.box(-3.35, GROUND + .66, 3.66, .02, .12, .02, '#c46f5c');
 
   const [nx, nz] = NEST;
   api.box(nx, GROUND + .45, nz, .05, .9, .05, '#8d6d53');

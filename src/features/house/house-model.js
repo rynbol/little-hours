@@ -236,7 +236,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     const eased = openAmount * openAmount * (3 - 2 * openAmount);
     for (const { key, part, options, at } of moving) {
       const pose = hingePose(part, options, eased), hinge = hinges[key];
-      hinge.rotation.set(...pose.rotation); hinge.position.y = HOUSE_POSITIONS[key.split('-')[0]][1] + at[1] + pose.lift;
+      hinge.scaling.set(1, pose.fold, pose.fold); hinge.position.y = HOUSE_POSITIONS[key.split('-')[0]][1] + at[1] + pose.lift;
     }
   }
   applyOpen(); refresh();
