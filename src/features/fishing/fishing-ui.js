@@ -28,15 +28,15 @@ export function createFishingUI(app, { onClose } = {}) {
   function build() {
     root = document.createElement('section'); root.className = 'lake'; root.id = 'lake-page'; root.hidden = true; root.setAttribute('aria-label', 'Willow Pond');
     root.innerHTML = `<div class="lake-stage"></div><div class="lake-vignette" aria-hidden="true"></div>
-      <header class="lake-top"><button class="lake-chip" id="lake-back" type="button" aria-label="Back to the island"><span aria-hidden="true">←</span><span class="lake-wide">Back to the island</span></button>
-        <div class="lake-title"><p>THE POND BEHIND THE COTTAGE</p><h1>Willow Pond</h1></div>
-        <button class="lake-chip" id="lake-journal-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h9.5A3.5 3.5 0 0 1 18 8v11.5H8.5A3.5 3.5 0 0 1 5 16Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 8.5h6M8 11.5h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="lake-wide">Journal</span><b id="lake-found"></b></button></header>
+      <header class="lake-top"><button class="lake-chip" id="lake-back" type="button" aria-label="Back to the island"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lake-wide">Island</span></button>
+        <div class="lake-title"><h1>Willow Pond</h1><p>The pond behind the cottage</p></div>
+        <button class="lake-chip lake-book" id="lake-journal-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h10a2 2 0 0 1 2 2v13H8a2 2 0 0 1-2-2Z" fill="#f1e2c9" stroke="currentColor" stroke-width="1.5"/><path d="M6 4.5v13" stroke="#a65766" stroke-width="3"/><path d="M10 9h5M10 12h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="lake-wide">Journal</span><b id="lake-found"></b></button></header>
       <p class="lake-status" id="lake-status" aria-live="polite"></p>
-      <div class="lake-bite" id="lake-bite" hidden><div class="lake-bite-ring" id="lake-bite-ring"><button type="button" id="lake-reel">Reel!</button></div><p id="lake-bite-note"></p></div>
-      <footer class="lake-tray" id="lake-tray"><div class="lake-tray-head"><p class="lake-tray-title">Your bait</p><p class="lake-tray-sub">Finished focus sessions leave bait here. Longer sessions draw rarer fish.</p></div>
+      <div class="lake-bite" id="lake-bite" hidden><span class="lake-alert" id="lake-alert" aria-hidden="true">!</span><p id="lake-bite-note"></p><div class="lake-bite-ring" id="lake-bite-ring"><button type="button" id="lake-reel">Reel!</button></div></div>
+      <footer class="lake-tray" id="lake-tray"><div class="lake-tackle"><div class="lake-tray-head"><p class="lake-tray-title">Tackle box</p><p class="lake-tray-sub">Bait from your focus sessions. Longer sessions draw rarer fish.</p></div>
         <div class="lake-bait" id="lake-bait" role="radiogroup" aria-label="Choose your bait"></div>
-        <div class="lake-odds" id="lake-odds" aria-label="Chances for this bait"></div>
-        <button class="lake-cast" id="lake-cast" type="button">Cast</button></footer>
+        <div class="lake-odds" id="lake-odds" aria-label="Chances for this bait"></div></div>
+        <button class="lake-cast" id="lake-cast" type="button"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3v5" stroke="#4b3b40" stroke-width="2" stroke-linecap="round"/><path d="M7 17a9 9 0 0 1 18 0Z" fill="#d9604f"/><path d="M7 17a9 9 0 0 0 18 0Z" fill="#fffaf1"/><path d="M7 17h18" stroke="#4b3b40" stroke-width="1.6"/></svg><span>Cast</span></button></footer>
       <div class="lake-card" id="lake-card" role="dialog" aria-modal="true" aria-labelledby="lake-card-name" hidden></div>
       <div class="lake-journal" id="lake-journal" role="dialog" aria-modal="true" aria-labelledby="lake-journal-title" hidden></div>`;
     document.body.appendChild(root);
@@ -57,17 +57,17 @@ export function createFishingUI(app, { onClose } = {}) {
   function renderTray() {
     const list = groups();
     if (!list.some(g => g.range.id === chosen)) chosen = list.at(-1)?.range.id ?? null;
-    $('#lake-bait').innerHTML = list.length ? list.map(({ range, count }) => `<button type="button" role="radio" class="lake-bait-chip" data-bait="${range.id}" aria-checked="${range.id === chosen}"${phase !== 'idle' ? ' disabled' : ''}>${baitIcon(range.id)}<span><strong>${range.label}</strong><small>${rangeText(range)}</small></span><b>×${count}</b></button>`).join('')
+    $('#lake-bait').innerHTML = list.length ? list.map(({ range, count }) => `<button type="button" role="radio" class="lake-bait-chip" data-bait="${range.id}" aria-checked="${range.id === chosen}"${phase !== 'idle' ? ' disabled' : ''}><span class="lake-tin">${baitIcon(range.id)}</span><strong>${range.label}</strong><small>${rangeText(range)}</small><b>×${count}</b></button>`).join('')
       : `<p class="lake-empty">No bait yet. Finish a focus session of 5 minutes or more and a little something turns up here.</p>`;
     const range = BAIT_RANGES.find(r => r.id === chosen) || BAIT_RANGES[0];
     $('#lake-odds').innerHTML = `<div class="lake-odds-bar">${TIERS.map((tier, i) => range.weights[i] ? `<span style="--w:${range.weights[i]};--c:${tier.color}" title="${tier.label} ${range.weights[i]}%"></span>` : '').join('')}</div>
       <ul>${TIERS.map((tier, i) => `<li class="${range.weights[i] ? '' : 'is-off'}" style="--c:${tier.color}"><i></i>${tier.label}<b>${range.weights[i]}%</b></li>`).join('')}</ul>`;
     $('#lake-odds').hidden = !list.length;
     const cast = $('#lake-cast'); cast.disabled = !list.length || phase !== 'idle';
-    cast.textContent = phase === 'idle' ? 'Cast' : phase === 'cast' ? 'Casting…' : phase === 'wait' ? 'Waiting…' : 'Reeling…';
+    cast.querySelector('span').textContent = phase === 'idle' ? 'Cast' : phase === 'cast' ? 'Casting…' : phase === 'wait' ? 'Waiting…' : 'Reeling…';
     const found = Object.keys(pond().journal).length; $('#lake-found').textContent = `${found}/${SPECIES.length}`;
     $('#lake-tray').classList.toggle('is-busy', phase !== 'idle');
-    $('#lake-tray').classList.toggle('is-away', phase === 'leap' || phase === 'card');
+    $('#lake-tray').classList.toggle('is-away', !['idle', 'cast', 'wait'].includes(phase));
   }
 
   function cast() {
@@ -89,6 +89,7 @@ export function createFishingUI(app, { onClose } = {}) {
     $('#lake-bite').hidden = false; $('#lake-bite').dataset.index = index; $('#lake-bite').classList.remove('is-reeling');
     $('#lake-reel').textContent = 'Reel!'; $('#lake-bite-note').textContent = 'Something’s biting!';
     $('#lake-bite-ring').style.setProperty('--progress', 0);
+    const head = scene.screenPoint(); $('#lake-alert').style.setProperty('--x', `${head.x}px`); $('#lake-alert').style.setProperty('--y', `${head.y}px`);
     $('#lake-reel').focus({ preventScroll: true });
     app.audio?.chime?.();
     const span = reduced() ? 3200 : 1700;
