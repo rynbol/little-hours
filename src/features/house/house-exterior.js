@@ -88,6 +88,11 @@ function gableEnd(api, x, facing, theme) {
   }
 }
 
+function endWall(api, x, floors) {
+  api.box(x - .07, WALL_TOP * floors / 2, 0, .14, WALL_TOP * floors, FRONT - BACK, plaster);
+  api.box(x - .1, .17, 0, .12, .34, FRONT - BACK, stone);
+}
+
 // Build one part of one room, in room coordinates.
 export function buildExteriorPart(api, part, id, theme, options) {
   const x0 = -HALF - options.bay, x1 = HALF;
@@ -130,9 +135,7 @@ export function buildExteriorPart(api, part, id, theme, options) {
     api.box((l + r) / 2, WALL_TOP - EAVE * slope + .02, FRONT + EAVE, r - l, .16, .1, timber);
   } else if (options.under) {
     api.box((x0 + x1) / 2, WALL_TOP + .02, FRONT + .05, x1 - x0 + .1, .12, .2, timber);
-    api.box(x0 - .07, WALL_TOP / 2, 0, .14, WALL_TOP, FRONT - BACK, plaster);
-    api.box(x0 - .07, WALL_TOP * 1.5, 0, .14, WALL_TOP, FRONT - BACK, plaster);
-    api.box(x0 - .1, .17, 0, .12, .34, FRONT - BACK, stone);
+    endWall(api, x0, 2);
   } else {
     // The back slope, the ridge, the gable ends and the chimney stay put.
     const l = x0 - (options.leftEnd ? END : 0), r = x1 + (options.rightEnd ? END : 0);
@@ -140,6 +143,7 @@ export function buildExteriorPart(api, part, id, theme, options) {
     api.box((l + r) / 2, WALL_TOP + RISE + .14, 0, r - l + .04, .14, .26, timber);
     api.box((l + r) / 2, WALL_TOP - EAVE * slope + .02, BACK - EAVE, r - l, .16, .1, timber);
     if (options.leftEnd) gableEnd(api, x0, -1, theme);
+    if (id === 'studio') endWall(api, x0, 1);
     if (options.rightEnd) gableEnd(api, x1, 1, theme);
     if (options.chimney) {
       // A brick chimney on the back slope.
