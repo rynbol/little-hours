@@ -1,9 +1,11 @@
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+import { placeAsset } from '../../models/assets.js';
 
 export const POND = Object.freeze({ x: 10, z: .7, rx: 1.95, rz: 1.45 });
 export const DOCK = Object.freeze({ x: 9.55, from: 3, to: 1.35, width: .72 });
 export const POND_TAG = [10.45, .1, -.35];
-const GROUND = -.175, WATER = GROUND + .015;
+const GROUND = -.175;
+export const WATER = GROUND + .012;
 const hash = n => { const s = Math.sin(n * 91.7 + 17.3) * 43758.5453; return s - Math.floor(s); };
 const rgba = (hex, shade = 1) => { const c = Color3.FromHexString(hex); return [c.r * shade, c.g * shade, c.b * shade, 1]; };
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
@@ -23,46 +25,42 @@ export function inPond(x, z, margin = 0) {
 }
 
 export function buildPond(api) {
-  const positions = [], colors = [], normals = [], up = [0, 1, 0], SEG = 64, RINGS = 6;
-  const deep = rgba('#5f8f9c'), mid = rgba('#7fb0b3'), shallow = rgba('#b3d8cf'), bank = rgba('#c9b58f'), grass = rgba('#9fb187');
-  const ringColor = t => t < .55 ? mix(deep, mid, t / .55) : t < .92 ? mix(mid, shallow, (t - .55) / .37) : shallow;
-  const at = (k, j, scale = 1, y = WATER) => { const [x, z] = pondPoint(j / SEG * Math.PI * 2, k / RINGS * scale); return [x, y, z]; };
-  for (let k = 0; k < RINGS; k++) for (let j = 0; j < SEG; j++) {
-    const a = at(k, j), b = at(k, j + 1), c = at(k + 1, j), d = at(k + 1, j + 1), ca = ringColor(k / RINGS), cc = ringColor((k + 1) / RINGS);
-    positions.push(...a, ...c, ...b, ...b, ...c, ...d); colors.push(...ca, ...cc, ...ca, ...ca, ...cc, ...cc);
-    for (let n = 0; n < 6; n++) normals.push(...up);
-  }
+  const positions = [], colors = [], normals = [], up = [0, 1, 0], SEG = 64, RINGS = 6, EDGE = .93;
+  const deep = rgba('#3f6f80'), mid = rgba('#5f98a2'), shallow = rgba('#98cbc2'), wet = rgba('#8c7a5c'), bank = rgba('#c9b58f'), grass = rgba('#9fb187');
+  const ringColor = t => t < .5 ? mix(deep, mid, t / .5) : mix(mid, shallow, (t - .5) / .5);
+  const at = (j, scale, y) => { const [x, z] = pondPoint(j / SEG * Math.PI * 2, scale); return [x, y, z]; };
+  const band = (j, s0, y0, c0, s1, y1, c1) => {
+    const a = at(j, s0, y0), b = at(j + 1, s0, y0), c = at(j, s1, y1), d = at(j + 1, s1, y1);
+    positions.push(...a, ...c, ...b, ...b, ...c, ...d); colors.push(...c0, ...c1, ...c0, ...c0, ...c1, ...c1);
+    for (let k = 0; k < 6; k++) normals.push(...up);
+  };
+  for (let k = 0; k < RINGS; k++) for (let j = 0; j < SEG; j++) band(j, k / RINGS * EDGE, WATER, ringColor(k / RINGS), (k + 1) / RINGS * EDGE, WATER, ringColor((k + 1) / RINGS));
   for (let j = 0; j < SEG; j++) {
-    const a = at(RINGS, j), b = at(RINGS, j + 1), c = at(RINGS, j, 1.16, GROUND + .004), d = at(RINGS, j + 1, 1.16, GROUND + .004);
-    const e = at(RINGS, j, 1.3, GROUND + .002), f = at(RINGS, j + 1, 1.3, GROUND + .002), sand = mix(bank, rgba('#d8c7a1'), hash(j) * .5);
-    positions.push(...a, ...c, ...b, ...b, ...c, ...d, ...c, ...e, ...d, ...d, ...e, ...f);
-    colors.push(...shallow, ...sand, ...shallow, ...shallow, ...sand, ...sand, ...sand, ...grass, ...sand, ...sand, ...grass, ...grass);
-    for (let n = 0; n < 12; n++) normals.push(...up);
-  }
-  for (const [a0, length, spread] of [[.4, .9, .5], [2.6, .7, .42], [4.4, .55, .6]]) for (let i = 0; i < 3; i++) {
-    const a = a0 + i * .12, [x, z] = pondPoint(a, spread + i * .08), dx = Math.cos(a + Math.PI / 2) * length / 2, dz = Math.sin(a + Math.PI / 2) * length / 2 * .6;
-    positions.push(x - dx, WATER + .004, z - dz, x + dx, WATER + .004, z + dz, x + dx * .9, WATER + .004, z + dz + .035);
-    positions.push(x - dx, WATER + .004, z - dz, x + dx * .9, WATER + .004, z + dz + .035, x - dx * .9, WATER + .004, z - dz + .035);
-    for (let n = 0; n < 6; n++) { colors.push(...rgba('#e6f3ec')); normals.push(...up); }
+    const sand = mix(bank, rgba('#d8c7a1'), hash(j) * .5);
+    band(j, EDGE, WATER, shallow, EDGE + .03, WATER + .008, mix(shallow, wet, .6));
+    band(j, EDGE + .03, WATER + .008, mix(shallow, wet, .6), 1.02, GROUND + .05, wet);
+    band(j, 1.02, GROUND + .05, wet, 1.13, GROUND + .035, sand);
+    band(j, 1.13, GROUND + .035, sand, 1.28, GROUND + .003, grass);
   }
   api.shape(positions, colors, normals);
 
-  for (let i = 0; i < 30; i++) {
-    const a = i / 30 * Math.PI * 2 + hash(i) * .12;
-    if (a > 1.2 && a < 1.9) continue;
-    const [x, z] = pondPoint(a, 1.06 + hash(i * 3) * .08), s = .17 + hash(i * 7) * .16;
-    api.ball(x, GROUND + .03, z, s * 1.3, s * .55, s, ['#cfc3ad', '#bfb29a', '#d9cdb6', '#b7ab94'][i % 4]);
-    if (i % 4 === 1) api.ball(x + .08, GROUND + .08, z - .03, s * .8, s * .35, s * .6, '#8fa678');
-  }
-  for (const [x, z, s] of [[8.3, -.4, .42], [11.7, -.25, .5], [11.35, 1.95, .34]]) {
-    api.ball(x, GROUND + s * .3, z, s * 1.35, s * .8, s, '#b9ad96');
-    api.ball(x + s * .15, GROUND + s * .62, z - s * .1, s * .8, s * .3, s * .6, '#8ea477');
+  const asset = (name, at) => { const { positions: p, colors: c, normals: n, indices } = placeAsset(name, at); api.shape(p, c, n, indices); };
+  const runs = [[-.35, .2], [.72, 1.05], [2.1, 3.0], [3.55, 4.75], [5.2, 5.75]];
+  runs.forEach(([from, to], r) => {
+    for (let a = from, i = 0; a < to; a += .16 + hash(i * 3 + r) * .12, i++) {
+      const [x, z] = pondPoint(a, 1 + (hash(i * 5 + r) - .5) * .08);
+      asset(['rock-a', 'rock-b'][(i + r) % 2], { x, y: GROUND - .06, z, yaw: i * 2.1 + r, scale: .2 + hash(i * 7 + r * 3) * .2 });
+    }
+  });
+  for (const [x, z, s] of [[8.3, -.4, .75], [11.7, -.25, .85], [11.35, 1.95, .6]]) {
+    asset('rock-b', { x, y: GROUND - .1, z, yaw: x, scale: s });
+    asset('rock-a', { x: x + s * .45, y: GROUND - .08, z: z + s * .3, yaw: z, scale: s * .5 });
   }
 
   const pads = [[9.1, .15, .36], [9.45, -.3, .28], [10.9, .05, .4], [11.1, .55, .26], [10.35, -.25, .3], [8.85, .85, .3], [10.8, 1.35, .33], [9.9, .3, .22]];
   pads.forEach(([x, z, r], i) => {
-    api.cylinder(x, WATER + .012, z, r, r, .014, ['#6f9460', '#7fa36a', '#89aa70'][i % 3]);
-    api.box(x + r * .22, WATER + .021, z, r * .45, .004, .018, '#5f8455', [0, i * .9, 0]);
+    api.cylinder(x, WATER + .016, z, r, r, .014, ['#6f9460', '#7fa36a', '#89aa70'][i % 3]);
+    api.box(x + r * .22, WATER + .025, z, r * .45, .004, .018, '#5f8455', [0, i * .9, 0]);
     if (i % 3 === 0) {
       for (let p = 0; p < 6; p++) { const a = p / 6 * Math.PI * 2; api.ball(x + Math.cos(a) * .045, WATER + .06, z + Math.sin(a) * .045, .07, .06, .045, p % 2 ? '#f3c7d3' : '#f7dbe2'); }
       api.ball(x, WATER + .075, z, .05, .04, .05, '#f3d98a');
@@ -88,12 +86,5 @@ export function buildPond(api) {
   api.box(x - width / 2 + .12, GROUND + .19, to + .25, .22, .12, .16, '#9a7458');
   api.cylinder(x - width / 2 + .12, GROUND + .26, to + .25, .14, .16, .03, '#a3b88a');
 
-  const boat = [10.55, 1.65];
-  for (let i = 0; i < 7; i++) {
-    const t = i / 6 - .5, w = .42 * Math.cos(t * 2.4);
-    api.box(boat[0] + t * 1, WATER + .07, boat[1], .15, .1, w, i % 2 ? '#c46f5c' : '#b8604f', [0, .35, 0]);
-  }
-  api.box(boat[0], WATER + .13, boat[1], .95, .03, .34, '#e8d7b8', [0, .35, 0]);
-  api.box(boat[0] - .05, WATER + .15, boat[1], .07, .03, .36, '#9a7458', [0, .35, 0]);
-  api.box(boat[0] - .02, WATER + .2, boat[1] + .02, .6, .025, .03, '#8d6849', [0, 1.1, .1]);
+  asset('rowboat', { x: 10.55, y: WATER + .08, z: 1.65, yaw: -.35, scale: .44 });
 }

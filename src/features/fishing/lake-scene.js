@@ -56,8 +56,8 @@ void main() {
   n = normalize(n);
   vec3 v = normalize(eye - vWorld), r = reflect(-v, n);
   float fres = pow(1. - max(dot(n, v), 0.), 4.);
-  float depth = 1. - smoothstep(.35, .98, length((q - vec2(0., -3.2)) / vec2(8.6, 7.2)));
-  vec3 base = mix(shallow, deep, depth);
+  float edge = length((q - vec2(0., -3.2)) / vec2(8.6, 7.2)), depth = 1. - smoothstep(.3, .95, edge);
+  vec3 base = mix(mix(shallow, deep, depth), shallow * 1.25 + vec3(.07, .06, .02), smoothstep(.84, .99, edge) * .55);
   vec3 sky = mix(skyLow, skyMid, clamp(r.y * 2.2, 0., 1.));
   vec3 col = mix(base, sky, clamp(.18 + fres * .75, 0., .88));
   col += glint * pow(max(dot(r, normalize(sunDir)), 0.), 90.) * 1.1;
@@ -66,6 +66,24 @@ void main() {
   col += vec3(.95, .97, 1.) * min(foam * .9, .6);
   float fog = smoothstep(16., 42., length(vWorld.xz - eye.xz));
   gl_FragColor = vec4(mix(col, skyLow, fog * .85), 1.);
+}`;
+const FALL_VERTEX = `precision highp float;
+attribute vec3 position; attribute vec2 uv; uniform mat4 viewProjection; varying vec2 vUv;
+void main() { vUv = uv; gl_Position = viewProjection * vec4(position, 1.); }`;
+const FALL_FRAGMENT = `precision highp float;
+varying vec2 vUv; uniform float time, pool; uniform vec3 deep, shallow, foam;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(hash(i), hash(i + vec2(1., 0.)), f.x), mix(hash(i + vec2(0., 1.)), hash(i + vec2(1., 1.)), f.x), f.y); }
+void main() {
+  if (pool > .5) {
+    float n = noise(vec2(vUv.x * 22., vUv.y * 5. - time * 1.1)) * .6 + noise(vec2(vUv.x * 41., vUv.y * 9. - time * 1.9)) * .4;
+    gl_FragColor = vec4(foam, (1. - smoothstep(.15, 1., vUv.y)) * (.35 + .65 * n) * .9);
+    return;
+  }
+  float streak = noise(vec2(vUv.x * 11., vUv.y * 2.6 - time * 1.7)) * .6 + noise(vec2(vUv.x * 27. + 3., vUv.y * 6. - time * 2.9)) * .4;
+  vec3 col = mix(shallow, deep, .25 + .35 * smoothstep(.2, .8, noise(vec2(vUv.x * 5., vUv.y - time * .8))));
+  col = mix(col, foam, clamp(smoothstep(.5, .85, streak) * .8 + smoothstep(.8, 1., vUv.y) * .7 + (1. - smoothstep(.12, .3, vUv.y)) * .25, 0., 1.));
+  gl_FragColor = vec4(col, smoothstep(0., .14, vUv.x) * smoothstep(1., .86, vUv.x) * .94);
 }`;
 const SKY_VERTEX = `precision highp float;
 attribute vec3 position; uniform mat4 worldViewProjection; varying vec3 vDir;
@@ -138,7 +156,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   const boat = (x, z, yaw) => asset('rowboat', { x, y: .2, z, yaw });
   const reeds = (x, z, count, seed) => {
     for (let i = 0; i < count; i++) {
-      const dx = (hash(seed + i) - .5) * .8, dz = (hash(seed * 2 + i) - .5) * .5, tall = .7 + hash(seed * 3 + i) * .8, lean = (hash(i + seed * 5) - .5) * .25;
+      const dx = (hash(seed + i) - .5) * .8, dz = (hash(seed * 2 + i) - .5) * .5, tall = .55 + hash(seed * 3 + i) * .6, lean = (hash(i + seed * 5) - .5) * .25;
       box(x + dx, tall / 2 - .05, z + dz, .03, tall, .03, palette.leaf[i % 3], [lean, 0, (hash(i * 7 + seed) - .5) * .25]);
       if (i % 3 === 0) ball(x + dx + lean * .1, tall - .12, z + dz, .06, .2, .06, '#7a553c', 6);
     }
@@ -166,15 +184,15 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     const yaw = -Math.atan2(to[1] - from[1], to[0] - from[0]), mx = (from[0] + to[0]) / 2, mz = (from[1] + to[1]) / 2, length = Math.hypot(to[0] - from[0], to[1] - from[1]);
     for (const y of [.34, .6]) box(mx, y, mz, length, .05, .03, '#e6dccb', [0, yaw, 0]);
   };
-  const cottage = (x, z, yaw) => {
-    const at = (dx, dz) => [x + Math.cos(yaw) * dx + Math.sin(yaw) * dz, z - Math.sin(yaw) * dx + Math.cos(yaw) * dz];
+  const cottage = (x, z, yaw, k = 1.45) => {
+    const at = (dx, dz) => [x + (Math.cos(yaw) * dx + Math.sin(yaw) * dz) * k, z + (-Math.sin(yaw) * dx + Math.cos(yaw) * dz) * k];
     const [cx, cz] = at(0, 0);
-    box(cx, 1.35, cz, 4.4, 2.6, 3.2, '#fbf0dc', [0, yaw, 0]); box(cx, .12, cz, 4.6, .24, 3.4, '#b9a58e', [0, yaw, 0]);
-    for (const side of [-1, 1]) { const [rx, rz] = at(0, side * .9); box(rx, 3.2, rz, 4.9, .14, 2.25, '#9a5f55', [side * .72, yaw, 0]); }
-    const [gx, gz] = at(0, 0); box(gx, 2.8, gz, 4.3, .75, 1.7, '#fbf0dc', [0, yaw, 0]);
-    const [chx, chz] = at(1.3, -.5); box(chx, 3.7, chz, .42, 1.1, .42, '#b3796b', [0, yaw, 0]);
-    const [dx, dz] = at(-.6, 1.62); box(dx, .85, dz, .75, 1.35, .06, '#8f6a4f', [0, yaw, 0]);
-    const [px, pz] = at(-.6, 2.05); box(px, .22, pz, 1.3, .12, .8, '#c9b69c', [0, yaw, 0]);
+    box(cx, 1.35 * k, cz, 4.4 * k, 2.6 * k, 3.2 * k, '#fbf0dc', [0, yaw, 0]); box(cx, .12 * k, cz, 4.6 * k, .24 * k, 3.4 * k, '#b9a58e', [0, yaw, 0]);
+    for (const side of [-1, 1]) { const [rx, rz] = at(0, side * .9); box(rx, 3.2 * k, rz, 4.9 * k, .14 * k, 2.25 * k, '#9a5f55', [side * .72, yaw, 0]); }
+    box(cx, 2.8 * k, cz, 4.3 * k, .75 * k, 1.7 * k, '#fbf0dc', [0, yaw, 0]);
+    const [chx, chz] = at(1.3, -.5); box(chx, 3.7 * k, chz, .42 * k, 1.1 * k, .42 * k, '#b3796b', [0, yaw, 0]);
+    const [dx, dz] = at(-.6, 1.62); box(dx, .85 * k, dz, .75 * k, 1.35 * k, .06 * k, '#8f6a4f', [0, yaw, 0]);
+    const [px, pz] = at(-.6, 2.05); box(px, .22 * k, pz, 1.3 * k, .12 * k, .8 * k, '#c9b69c', [0, yaw, 0]);
     return [at(.8, 1.63), at(1.75, 1.63), at(-1.6, 1.63)];
   };
   const bench = (x, z, yaw) => {
@@ -187,17 +205,26 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   ball(0, -1.8, -46, 110, 4.4, 24, palette.meadow, 18);
   for (let i = 0; i < 7; i++) ball(-60 + i * 20 + hash(i) * 8, 1, -70 - hash(i * 3) * 15, 30 + hash(i * 5) * 20, 10 + hash(i * 7) * 12, 14, palette.hill[i % 3], 10);
   for (let i = 0; i < 5; i++) ball(-50 + i * 26, 4, -95, 40, 22 + hash(i) * 10, 10, palette.hill[(i + 1) % 3], 10, .92);
-  const windows = cottage(5.2, -15.2, -.45);
-  for (let i = 0; i < 18; i++) { const a = -Math.PI + .15 + i / 17 * (Math.PI - .3), [x, z] = rim(a, 1.55 + hash(i * 3) * .5); if (Math.hypot(x - 5.2, z + 15.2) > 3.6) (i % 3 === 1 ? blossom : tree)(x, z, .75 + hash(i * 7) * .4, i); }
-  for (let i = 0; i < 16; i++) tree(-30 + i * 4, -28 - hash(i) * 5, .9 + hash(i * 2) * .5, i + 3, .6);
-  for (const [a, k, s] of [[.25, 1.5, .85], [.55, 1.75, .7], [2.55, 1.6, .8], [2.9, 1.45, .95]]) { const [x, z] = rim(a, k); blossom(x, z, s, Math.round(a * 10)); }
-  { const [x, z] = rim(3.2, 1.18); willow(x, z, 1.15); }
-  picket(rim(-1.35, 1.62), rim(-.62, 1.5), 12); picket(rim(-.62, 1.5), rim(-.25, 1.35), 6);
-  const reedsAt = [[2.75, 1], [2.2, .99], [-2.6, 1], [-.35, 1], [.5, .98], [.95, 1], [-1.9, .99]];
-  reedsAt.forEach(([a, k], i) => { const [x, z] = rim(a, k); reeds(x, z, 9 + (i % 3) * 3, i + 1); });
-  for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2 + hash(i) * .15, [x, z] = rim(a, 1.12 + hash(i * 11) * .3); if (Math.abs(a - Math.PI / 2) > .28) flowers(x, z, 10, i); }
-  [[2.4, 1.02, .45], [-2.9, 1.01, .5], [-.8, 1.02, .6], [.2, 1.04, .4], [1.35, 1.03, .5]].forEach(([a, k, s], i) => { const [x, z] = rim(a, k); rock(x, z, s, i); });
-  const pads = [[-2.2, -1.3, .42], [-3.1, -2.4, .34], [-1.3, -3.4, .3], [2.4, -1.8, .4], [3.2, -3, .3], [-4.2, 0, .36], [4.4, .6, .32], [-5.5, -4.3, .45], [5.8, -5.2, .38], [-.4, -6.8, .3], [-3.6, -7.6, .4], [3.4, -8.2, .36]];
+  const windows = cottage(5.4, -15.8, -.45);
+  willow(...rim(3.2, 1.16), 1.1);
+  for (const [x, z, s, seed] of [[-7.6, -12.8, 1.1, 0], [-2.6, -14, .85, 4], [9.6, -19, 1.15, 1], [12.2, -8.6, .95, 7], [-12.6, -8, 1, 3]]) tree(x, z, s, seed);
+  for (const [x, z, s] of [[-10.3, -11.2, 1.05], [13.4, -12.6, .9]]) asset('tree-pine', { x, z, yaw: x, scale: s * 1.7 });
+  for (const [x, z, s, seed] of [[1.2, -16.4, .85, 0], [11.4, -3.6, .8, 1], [-11.4, 4.6, .85, 3]]) blossom(x, z, s, seed);
+  asset('tree-fruit', { x: 10.2, z: -14.2, yaw: 1, scale: 1.45 });
+  for (let i = 0; i < 9; i++) asset('bush', { x: -44 + i * 11 + hash(i) * 4, y: -.6, z: -33 - hash(i * 3) * 6, yaw: i * 1.7, scale: 7 + hash(i * 5) * 4, tint: [.7, .78, .8] });
+  for (const [x, z, s] of [[-18, -22, 1.1], [-12, -25, .95], [16, -23, 1.2], [21, -27, 1]]) tree(x, z, s, Math.round(x));
+  picket(rim(-.9, 1.5), rim(-.25, 1.35), 10);
+  const stones = [[-2.95, -2.3], [-1.75, -1.2], [-.95, -.35], [.3, 1.05], [2.15, 2.75]];
+  stones.forEach(([from, to], run) => { for (let a = from, i = 0; a < to; a += .09 + hash(i + run * 17) * .07, i++) { const [x, z] = rim(a, 1 + (hash(i * 5 + run) - .5) * .06); asset(['rock-a', 'rock-b'][i % 2], { x, y: -.12, z, yaw: i * 2.1, scale: .45 + hash(i * 3 + run * 7) * .5 }); } });
+  const lip = rim(-2.05, 1.1), toward = [(POND.x - lip[0]), (POND.z - lip[1])].map((v, _, d) => v / Math.hypot(...d)), across = [-toward[1], toward[0]];
+  const ledge = (u, v, y, s, yaw, name = 'rock-b') => asset(name, { x: lip[0] + across[0] * u + toward[0] * v, y, z: lip[1] + across[1] * u + toward[1] * v, yaw, scale: s });
+  for (const [u, v, y, s] of [[0, -2.6, .7, 2.6], [-1.9, -1.6, .45, 2.2], [1.9, -1.7, .5, 2.3], [-1.45, -.2, -.25, 1.9], [1.5, -.3, -.2, 2], [-3, -.6, -.3, 1.8], [3.1, -.8, -.3, 1.7], [-3.4, -2.4, .1, 2], [3.3, -2.6, .15, 2.1]]) ledge(u, v, y, s, u * 2.3 + v);
+  for (const [u, v, s] of [[-1.1, .9, .7], [1.2, 1, .8], [-2.2, 1.2, .55], [2.3, 1.1, .5], [-.6, 1.5, .35]]) ledge(u, v, -.15, s, u * 3, 'rock-a');
+  for (const [u, v, s] of [[-2.3, -2.2, .9], [2.4, -2.4, 1], [0, -3.6, 1.3], [-3.6, -2, .8]]) asset('bush', { x: lip[0] + across[0] * u + toward[0] * v, y: 1.35, z: lip[1] + across[1] * u + toward[1] * v, yaw: u, scale: s });
+  { const [x, z] = [4.7, -8.3]; ball(x, -.2, z, 3.4, .8, 2.5, palette.sand, 14); ball(x, -.05, z, 2.8, .75, 2, palette.grass, 14); rock(x - 1.3, z + .8, .5, 1); rock(x + 1.4, z + .5, .4, 2); blossom(x + .2, z - .2, .55, 1); flowers(x - .6, z + .5, 8, 2); }
+  for (const [a, k, n] of [[2.75, 1, 12], [.55, .98, 9], [-.2, .99, 8], [-2.45, 1, 10]]) { const [x, z] = rim(a, k); reeds(x, z, n, Math.round(a * 10)); }
+  for (const [x, z, n, seed] of [[3.2, -12.4, 12, 0], [7.9, -12.6, 10, 1], [-5.6, 3.6, 12, 2], [-3.4, 5.2, 9, 3], [-7.2, -7.4, 10, 0], [-1.3, -9.9, 9, 1], [8.6, 1.4, 12, 2], [10.2, -1.8, 9, 3], [-10.2, .2, 10, 1]]) flowers(x, z, n, seed);
+  const pads = [[-2.2, -1.3, .42], [-3.1, -2.4, .34], [-1.3, -3.4, .3], [2.4, -1.8, .4], [3.2, -3, .3], [-4.2, 0, .36], [4.4, .6, .32], [-5.5, -4.3, .45], [6.2, -4.6, .38], [-.4, -6.8, .3], [-2.6, -7.2, .4], [1.9, -8.4, .36]];
   pads.forEach(([x, z, r], i) => {
     cyl(x, .045, z, r * 2, r * 2, .02, palette.leaf[i % 3], [0, 0, 0], 16);
     if (i % 3 === 0) { for (let p = 0; p < 7; p++) { const a = p / 7 * Math.PI * 2; ball(x + Math.cos(a) * .08, .12, z + Math.sin(a) * .08, .12, .1, .08, p % 2 ? '#f3c3d0' : '#f9dde4', 6, 1.08); } ball(x, .15, z, .08, .06, .08, '#f4d88a', 6); }
@@ -212,7 +239,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   for (const [x, z] of posts) { cyl(x, .95, z, .09, .11, 1.9, '#6f5240'); box(x, 1.93, z, .16, .05, .16, '#4f3d31'); }
   box(1.25, .75, 5.5, .08, 1.1, .08, '#6f5240'); box(1.25, 1.18, 5.52, .95, .42, .07, '#b98d63', [0, -.25, 0]); box(1.25, 1.18, 5.56, .8, .3, .02, '#e8d6b8', [0, -.25, 0]);
   for (let i = 0; i < 8; i++) { const t = i / 7; cyl(-.35 - t * 3.6, .17, 5.9 + Math.sin(t * Math.PI) * 1.1 - t * 1.4, .5, .52, .05, ['#e3d7c1', '#d6c8ae'][i % 2]); }
-  for (let i = 0; i < 12; i++) { const a = .55 + i / 11 * 2.05, [x, z] = rim(a, 1.4 + hash(i * 13) * .35); if (Math.abs(x) > 1.4) (i % 2 ? flowers(x, z, 12, i + 3) : asset('bush', { x, z, yaw: i, scale: 1.2 })); }
+  for (const [x, z, s] of [[4.2, 4.6, 1.2], [-6.6, 4.4, 1.1], [7.4, 3.2, .9]]) asset('bush', { x, z, yaw: x, scale: s });
   boat(1.75, 2.6, .5); bench(-4.6, 3.9, -.35);
   const tackle = [.46, DOCK_Y + .09, 2.15];
   box(tackle[0], tackle[1], tackle[2], .36, .18, .24, '#6f8f86', [0, .2, 0]); box(tackle[0], tackle[1] + .1, tackle[2], .38, .03, .26, '#5a766e', [0, .2, 0]);
@@ -220,6 +247,30 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   const scenery = new Mesh('lake-scenery', scene), merged = baked.shift(); merged.merge(baked, true); merged.applyToMesh(scenery);
   const sceneryPaint = new StandardMaterial('lake-scenery-paint', scene); sceneryPaint.specularColor.setAll(0);
   scenery.material = sceneryPaint; scenery.useVertexColors = true; scenery.isPickable = false; scenery.freezeWorldMatrix();
+
+  const fallPath = [[-2.4, 1.62], [-1.2, 1.6], [0, 1.55]];
+  for (let i = 1; i <= 12; i++) { const t = i / 12; fallPath.push([.2 * t + .95 * t * t, 1.55 * (1 - t ** 1.5) - .04]); }
+  const fall = { positions: [], uvs: [], indices: [] }, COLS = 8;
+  fallPath.forEach(([out, y], i) => {
+    const t = Math.max(0, i - 2) / 12, width = 1.3 + t * .45;
+    for (let c = 0; c <= COLS; c++) {
+      const u = c / COLS, side = (u - .5) * width, bow = Math.sin(u * Math.PI) * .12 * t;
+      fall.positions.push(lip[0] + toward[0] * (out + bow) + across[0] * side, y, lip[1] + toward[1] * (out + bow) + across[1] * side); fall.uvs.push(u, i / (fallPath.length - 1));
+      if (i && c) { const n = i * (COLS + 1) + c; fall.indices.push(n - COLS - 2, n - 1, n - COLS - 1, n - COLS - 1, n - 1, n); }
+    }
+  });
+  const pool = { positions: [], uvs: [], indices: [] }, [px, pz] = [lip[0] + toward[0] * 1.3, lip[1] + toward[1] * 1.3];
+  for (let r = 0; r <= 4; r++) for (let j = 0; j <= 24; j++) {
+    const a = j / 24 * Math.PI * 2, k = r / 4 * 1.5;
+    pool.positions.push(px + Math.cos(a) * k * 1.2, .05, pz + Math.sin(a) * k * .8); pool.uvs.push(j / 24, r / 4);
+    if (r && j) { const n = r * 25 + j; pool.indices.push(n - 26, n - 1, n - 25, n - 25, n - 1, n); }
+  }
+  const fallPaints = [0, 1].map(isPool => {
+    const m = new ShaderMaterial(`lake-fall-paint-${isPool}`, scene, { vertexSource: FALL_VERTEX, fragmentSource: FALL_FRAGMENT }, { attributes: ['position', 'uv'], uniforms: ['viewProjection', 'time', 'pool', 'deep', 'shallow', 'foam'], needAlphaBlending: true });
+    m.setFloat('pool', isPool); m.setColor3('deep', Color3.FromHexString(palette.deep)); m.setColor3('shallow', Color3.FromHexString(palette.shallow)); m.setColor3('foam', Color3.FromHexString('#f4fbf8').scale(palette.light)); m.backFaceCulling = false;
+    return m;
+  });
+  [fall, pool].forEach((shape, isPool) => { const mesh = new Mesh(isPool ? 'lake-fall-pool' : 'lake-fall', scene); Object.assign(new VertexData(), shape).applyToMesh(mesh); mesh.material = fallPaints[isPool]; mesh.isPickable = false; mesh.freezeWorldMatrix(); });
 
   const glowing = [], light = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.computeWorldMatrix(true); const data = VertexData.ExtractFromMesh(mesh); data.transform(mesh.getWorldMatrix()); mesh.dispose(); data.uvs = null; glowing.push(data); };
   const wires = [];
@@ -233,7 +284,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     wires.push(wire);
   }
   for (const [x, z] of posts) light(MeshBuilder.CreateSphere('p', { diameter: .19, segments: 6 }, scene), x, 2.06, z);
-  for (const [x, z] of windows) { const pane = MeshBuilder.CreateBox('p', { width: .62, height: .6, depth: .06 }, scene); pane.rotation.y = -.45; light(pane, x, 1.55, z); }
+  for (const [x, z] of windows) { const pane = MeshBuilder.CreateBox('p', { width: .9, height: .87, depth: .08 }, scene); pane.rotation.y = -.45; light(pane, x, 2.25, z); }
   const lanternGlow = new Mesh('lake-lantern', scene), litMerged = glowing.shift(); litMerged.merge(glowing, true); litMerged.applyToMesh(lanternGlow);
   const lanternPaint = new StandardMaterial('lake-lantern-paint', scene); lanternPaint.disableLighting = true; lanternPaint.emissiveColor = Color3.FromHexString('#ffd48a').scale(theme === 'day' ? .75 : 1.1);
   lanternGlow.material = lanternPaint; lanternGlow.isPickable = false; lanternGlow.freezeWorldMatrix();
@@ -494,7 +545,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     if (rise < 0 && !reducedMotion) { rise = 2.5 + clockRandom() * 4; ripple((clockRandom() - .5) * 10, -1 - clockRandom() * 7, .7); }
 
     waterPaint.setFloat('time', clock); waterPaint.setVector3('eye', camera.position); waterPaint.setArray4('ripples', ripples);
-    skyPaint.setFloat('time', clock);
+    skyPaint.setFloat('time', clock); for (const m of fallPaints) m.setFloat('time', clock);
       }
 
   engine.runRenderLoop(() => {

@@ -20,6 +20,7 @@ import { createStroll } from './house-stroll.js';
 import { createHousePostcard } from './house-postcard.js';
 import { houseFrame } from './house-framing.js';
 import { createHouseMotion } from './house-motion.js';
+import { createIslandWater } from './house-water.js';
 import { nextExpansion } from '../../core/house.js';
 import './whole-house.css';
 
@@ -61,6 +62,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const smokePaint = new StandardMaterial('cottage-smoke-paint', scene); smokePaint.disableLighting = true; smokePaint.emissiveColor = Color3.FromHexString('#f3ebe2'); smokePaint.alpha = .3; smoke.material = smokePaint; smoke.isPickable = false;
   const smokeMatrices = new Float32Array(5 * 16), smokeAt = new Vector3(), smokeLocal = new Vector3();
   smoke.thinInstanceSetBuffer('matrix', smokeMatrices, 16, false); smoke.alwaysSelectAsActiveMesh = true;
+  const water = createIslandWater(scene, theme);
   const moteMatrices = new Float32Array(24 * 16);
   for (let i = 0; i < 24; i++) { const n = i * 16; moteMatrices[n] = moteMatrices[n + 5] = moteMatrices[n + 10] = moteMatrices[n + 15] = 1; }
   motes.thinInstanceSetBuffer('matrix', moteMatrices, 16, false); motes.alwaysSelectAsActiveMesh = true;
@@ -105,7 +107,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const seconds = motion.matches ? 0 : now / 1000;
     const wasReacting = roomMotion.activeCount > 0;
     roomMotion.restore();
-    model.animate(seconds, focused, motion.matches);
+    model.animate(seconds, focused, motion.matches); water.animate(seconds);
     for (const root of model.live) root.metadata.avatar?.setEnabled(focused);
     stroll.setVisible(!focused);
     if (!focused) stroll.animate(seconds, motion.matches);
@@ -200,7 +202,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     roomMotion.stop();
     house = next; selectedId = selected; theme = atmosphere; avatar = appearance;
     sky.intensity = theme === 'dusk' ? .56 : .62; sun.intensity = theme === 'dusk' ? .8 : .95;
-    sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9');
+    sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9'); water.setTheme(theme);
     const previous = model;
     builds++;
     model = createHouseModel(scene, house, selectedId, theme, avatar, previous);

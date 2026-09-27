@@ -3,7 +3,11 @@ import { buildPaths } from './house-paths.js';
 import { placeAsset } from '../../models/assets.js';
 
 export const ISLAND = Object.freeze({ cx: 2.85, cz: .1, rx: 9.95, rz: 4.65, power: 4.2 });
-export const STREAM = Object.freeze([[11.75, 1.3], [12.1, 1.75], [12.5, 2.15], [12.95, 2.5]]);
+export const STREAMS = Object.freeze([
+  [[11.75, 1.3], [12.1, 1.75], [12.5, 2.15], [12.95, 2.5]],
+  [[-3.85, 3.5], [-4.15, 3.9], [-4.45, 4.25], [-4.8, 4.62]],
+  [[10.55, -2.7], [11, -2.88], [11.45, -3.05], [12.25, -3.42]],
+]);
 const TOP = -.175, SEGMENTS = 72, RINGS = 7;
 const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const lawn = ['#a6b68c', '#aebd92', '#9fb187', '#b4c296'];
@@ -73,26 +77,23 @@ export function buildIsland(api) {
     asset('bush', { x, y: TOP - .02, z, yaw: i * 1.9, scale: .55 + hash(i * 2.1) * .35 });
   }
 
-  STREAM.forEach(([x, z], i) => {
-    const next = STREAM[i + 1]; if (!next) return;
-    const mx = (x + next[0]) / 2, mz = (z + next[1]) / 2, length = Math.hypot(next[0] - x, next[1] - z) + .12, turn = -Math.atan2(next[1] - z, next[0] - x);
-    api.box(mx, TOP + .012, mz, length, .03, .42, '#8fb8bb', [0, turn, 0]);
-    api.box(mx, TOP + .02, mz, length, .02, .2, '#b6d5d2', [0, turn, 0]);
-    for (const side of [-1, 1]) api.ball(mx + Math.sin(-turn) * side * .3, TOP + .05, mz + Math.cos(turn) * side * .3, .2, .1, .16, ['#c3b7a2', '#a9b88f'][(i + side + 2) % 2]);
+  STREAMS.forEach((course, s) => {
+    course.forEach(([x, z], i) => {
+      const next = course[i + 1]; if (!next) return;
+      const dx = next[0] - x, dz = next[1] - z, length = Math.hypot(dx, dz), mx = (x + next[0]) / 2, mz = (z + next[1]) / 2;
+      api.box(mx, TOP + .004, mz, length + .12, .02, .5, '#6f8f84', [0, -Math.atan2(dz, dx), 0]);
+      for (const side of [-1, 1]) asset(['rock-a', 'rock-b'][(i + side + 2) % 2], { x: mx - dz / length * side * .33, y: TOP - .05, z: mz + dx / length * side * .33, yaw: i * 2 + side, scale: .22 + hash(i * 3 + s * 7 + side) * .12 });
+    });
+    if (s) {
+      const [x, z] = course[0];
+      for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2 + s; asset(k % 2 ? 'rock-a' : 'rock-b', { x: x + Math.cos(a) * .5, y: TOP - .05, z: z + Math.sin(a) * .4, yaw: k, scale: .26 + hash(k + s * 5) * .16 }); }
+      asset('bush', { x: x - .55, y: TOP, z: z - .45, yaw: s, scale: .5 });
+    }
   });
-
-  const fall = waterfallPath(), columns = 9, water = ['#9fcfcf', '#d9f0ea', '#b7ddd8', '#eef8f3'];
-  const sheet = (i, c) => { const [x, y, z] = fall[i], t = i / (fall.length - 1), a = (c / columns - .5) * Math.PI, w = .34 + t * .26; return [x + Math.cos(a) * w * .45, y, z + Math.sin(a) * w]; };
-  for (let i = 0; i < fall.length - 1; i++) for (let c = 0; c < columns; c++) {
-    const a = sheet(i, c), b = sheet(i, c + 1), d = sheet(i + 1, c), e = sheet(i + 1, c + 1), shade = rgba(water[(c + (i > 6 ? 1 : 0)) % water.length]);
-    const n = [Math.cos((c / columns - .5) * Math.PI) * .7, .5, Math.sin((c / columns - .5) * Math.PI) * .7];
-    tri(a, d, b, shade, shade, shade, n); tri(b, d, e, shade, shade, shade, n);
-    tri(a, b, d, shade, shade, shade, n); tri(b, e, d, shade, shade, shade, n);
+  for (const { points } of waterfalls()) {
+    const [fx, fy, fz] = points.at(-1);
+    for (let k = 0; k < 7; k++) api.ball(fx - .45 + hash(k * 4.1) * .9, fy + .2 + hash(k * 2.3) * .45, fz - .5 + hash(k * 6.7) * 1, .8 + hash(k) * .5, .5, .7, k % 2 ? '#f3e7ee' : '#e8dbe6');
   }
-  api.shape(positions.splice(0), colors.splice(0), normals.splice(0));
-  const [fx, fy, fz] = fall.at(-1);
-  for (let k = 0; k < 7; k++) api.ball(fx - .45 + hash(k * 4.1) * .9, fy - .1 + hash(k * 2.3) * .45, fz - .5 + hash(k * 6.7) * 1, .8 + hash(k) * .5, .5, .7, k % 2 ? '#f3e7ee' : '#e8dbe6');
-  api.ball(STREAM.at(-1)[0] + .12, TOP + .03, STREAM.at(-1)[1], .3, .08, .5, '#e8f5f0');
 
   buildPaths(api);
 
@@ -101,8 +102,10 @@ export function buildIsland(api) {
   }
 }
 
-export function waterfallPath() {
-  const [x, z] = STREAM.at(-1), points = [];
-  for (let i = 0; i <= 10; i++) { const t = i / 10; points.push([x + .05 + t * .5 - t * t * .15, TOP - .02 - t * 3.1, z + t * .15]); }
-  return points;
+export function waterfalls(drop = 3.3) {
+  return STREAMS.map(course => {
+    const points = course.map(([x, z]) => [x, TOP + .016, z]), [x, z] = course.at(-1), [px, pz] = course.at(-2), l = Math.hypot(x - px, z - pz), dx = (x - px) / l, dz = (z - pz) / l;
+    for (let i = 1; i <= 10; i++) { const t = i / 10, out = .75 * t ** .35 + .3 * t; points.push([x + dx * out, TOP - drop * t, z + dz * out]); }
+    return { points, rim: course.length - 1 };
+  });
 }
