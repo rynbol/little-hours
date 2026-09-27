@@ -619,6 +619,55 @@ function globeStand(parent) {
 }
 const GLOBE_TILT = 0.41;
 
+export const SEED_BED_SOIL = 0.715;
+function seedBed(parent) {
+  for (const x of [-0.84, 0.84]) for (const z of [-0.34, 0.34]) box(parent, [0.1, 0.26, 0.1], [x, 0.13, z], C.darkWood, 0.02);
+  box(parent, [1.8, 0.44, 0.8], [0, 0.47, 0], C.wood, 0.03);
+  for (const y of [0.4, 0.55]) box(parent, [1.82, 0.012, 0.82], [0, y, 0], C.darkWood, 0.004);
+  box(parent, [1.68, 0.03, 0.68], [0, 0.7, 0], '#6b4a36', 0.01);
+  for (const z of [-0.37, 0.37]) box(parent, [1.86, 0.07, 0.07], [0, 0.705, z], C.edge, 0.02);
+  for (const x of [-0.895, 0.895]) box(parent, [0.07, 0.07, 0.8], [x, 0.705, 0], C.edge, 0.02);
+}
+function seedlings(parent, phase) {
+  const base = SEED_BED_SOIL;
+  sphere(parent, [0.2, 0.035, 0.16], [0, base + 0.005, 0], '#8a6448');
+  if (!phase) { sphere(parent, [0.035, 0.025, 0.028], [0.02, base + 0.05, 0], '#c9a36b'); return; }
+  const tall = [0, 0.1, 0.3, 0.5, 0.52][phase], top = base + tall, leaves = [0, 2, 4, 6, 6][phase];
+  rod(parent, [0, base, 0], [0, top, 0], phase > 1 ? 0.018 : 0.011, C.darkLeaf);
+  for (let j = 0; j < leaves; j++) {
+    const angle = j * 2.4, y = phase > 1 ? base + tall * (0.3 + 0.12 * Math.floor(j / 2)) : top, size = phase > 1 ? 0.07 + phase * 0.012 : 0.045;
+    const leaf = sphere(parent, [size, size * 0.3, size * 0.5], [Math.cos(angle) * size, y, Math.sin(angle) * size], j % 2 ? C.leaf : '#95a576');
+    leaf.rotation.y = -angle;
+  }
+  if (phase === 3) sphere(parent, [0.05, 0.065, 0.05], [0, top + 0.04, 0], '#a6b77d');
+  if (phase === 4) {
+    for (let j = 0; j < 5; j++) { const angle = j * Math.PI * 2 / 5; sphere(parent, [0.07, 0.025, 0.05], [Math.cos(angle) * 0.07, top + 0.04, Math.sin(angle) * 0.07], '#e6a3a0').rotation.y = -angle; }
+    sphere(parent, [0.04, 0.03, 0.04], [0, top + 0.05, 0], '#d9a441');
+  }
+}
+export function seedBedPlant(scene, phase) {
+  const templates = cacheFor(scene).templates, key = `seedlings-${phase}`;
+  if (!templates.has(key)) {
+    const source = new TransformNode('seedling-source', scene); seedlings(source, phase);
+    const template = batch(source); template.setEnabled(false); templates.set(key, template);
+  }
+  return templates.get(key);
+}
+
+export const TELESCOPE_HUB = [0, 1.3, 0];
+const TELESCOPE_AIM = [-0.3, 0.72, -0.62];
+function telescope(parent) {
+  const [hx, hy, hz] = TELESCOPE_HUB, along = t => [hx + TELESCOPE_AIM[0] * t, hy + TELESCOPE_AIM[1] * t, hz + TELESCOPE_AIM[2] * t];
+  for (let i = 0; i < 3; i++) { const angle = i * Math.PI * 2 / 3 + 0.5; rod(parent, [Math.cos(angle) * 0.46, 0.012, Math.sin(angle) * 0.46], [Math.cos(angle) * 0.05, hy - 0.08, Math.sin(angle) * 0.05], 0.028, C.wood); }
+  cylinder(parent, 0.07, 0.09, 0.12, [hx, hy - 0.06, hz], C.darkWood);
+  sphere(parent, [0.07, 0.06, 0.07], [hx, hy + 0.02, hz], C.brass);
+  taper(parent, along(-0.5), along(0.62), 0.085, 0.1, '#3f4d6b');
+  taper(parent, along(0.62), along(0.74), 0.118, 0.118, C.brass);
+  for (const t of [-0.1, 0.25]) taper(parent, along(t), along(t + 0.04), 0.104, 0.104, C.brass);
+  taper(parent, along(-0.62), along(-0.5), 0.03, 0.05, C.brass);
+  taper(parent, along(-0.05), [hx + 0.02, hy + 0.2, hz + 0.05], 0.018, 0.018, C.brass);
+}
+
 // A painter's easel: an A-frame of oak legs, a ledge and a canvas that shows
 // the chosen picture (see createFurniture), a jar of brushes on the ledge. The
 // canvas stands well in front of the legs, clear of their outlines.
@@ -1774,7 +1823,7 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
       'study-desk': parent => studyStation(parent, false), 'writing-desk': parent => studyStation(parent, true),
       bookcase, 'lounge-chair': loungeChair, 'side-table': sideTable, 'floor-lamp': floorLamp,
       plant, rug, ottoman, 'low-cabinet': cabinet,
-      fireplace, daybed, 'moon-tree': moonTree, 'lantern-cluster': lanternCluster, 'moon-rug': moonRug, 'pet-bed': petBed,
+      fireplace, daybed, 'moon-tree': moonTree, 'lantern-cluster': lanternCluster, 'moon-rug': moonRug, 'pet-bed': petBed, 'seed-bed': seedBed, telescope,
       'tall-frame': parent => frame(parent, [1.04, 1.4], '#503d30'), 'small-frame': parent => frame(parent, [0.74, 1.02], '#ac8357'), 'wide-frame': parent => frame(parent, [1.5, 1.04], '#6b4b3b'),
       'moon-clock': moonClockCase, 'wall-clock': wallClock, 'apothecary-shelf': apothecaryShelf, 'wall-shelf': wallShelf, 'hanging-plant': hangingPlant,
       'cloud-shelf': parent => cloudShelf(parent, 2.5), 'small-cloud-shelf': parent => cloudShelf(parent, 2.1),
@@ -1939,6 +1988,18 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
     const axis = group(result, [0, 1.07, 0]); axis.rotation.z = GLOBE_TILT; axis.name = 'globe-axis';
     const globe = globeTemplate(scene).clone('painted-globe', axis); globe.setEnabled(true); globe.metadata = { dynamic: true };
     result.metadata.globe = globe;
+  }
+  if (type === 'seed-bed') {
+    let shown = null;
+    result.metadata.setPhase = phase => {
+      if (phase === shown) return;
+      shown = phase;
+      result.metadata.plant?.dispose(false, false);
+      const plant = seedBedPlant(scene, phase).clone('seed-bed-plant', result);
+      plant.scaling.setAll(1.8); plant.position.y = -SEED_BED_SOIL * 0.8;
+      plant.setEnabled(true); plant.metadata = { dynamic: true }; result.metadata.plant = plant;
+    };
+    result.metadata.setPhase(4);
   }
   if (type === 'low-cabinet') animations.push(createSpinningRecord(result));
   if (animations.length) result.metadata.animate = (seconds, focused, reducedMotion) => {

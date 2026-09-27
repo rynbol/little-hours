@@ -1,13 +1,13 @@
-import { createSession, remainingAt, startSession, pauseSession } from './session.js';
+import { createSession, remainingAt, startSession, pauseSession, isDuration } from './session.js';
 import { createLayout, normalizeLayout, PRESETS } from './layout.js';
-import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCoins, cleanName } from './house.js';
+import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCoins, cleanName, recordSession } from './house.js';
+import { fitRoomType } from './room-types.js';
 import { AVATAR_DEFAULT, normalizeAvatarAppearance } from './avatar.js';
 import { clockNow } from './test-pins.js';
 
 export const storageKey = 'little-hours-v1';
 // The save as it was just before a backup replaced it.
 export const recoveryKey = 'little-hours-v1-before-restore';
-const durations = [25, 50, 90];
 
 export function freshState() {
   const layout = createLayout();
@@ -39,7 +39,7 @@ export function restoreState(raw) {
   }
   if (initial.layout.presetId) initial.rooms[initial.layout.presetId] = structuredClone(initial.layout);
   const session = saved.session;
-  if (session && Number.isFinite(session.duration) && durations.includes(session.duration / 60_000)
+  if (session && Number.isFinite(session.duration) && isDuration(session.duration / 60_000)
     && Number.isFinite(session.remaining) && session.remaining >= 0
     && typeof session.running === 'boolean'
     && (!session.running || (Number.isSafeInteger(session.endsAt) && session.endsAt >= 0 && session.endsAt <= 8.64e15))) {
@@ -53,12 +53,14 @@ export function restoreState(raw) {
   }
   if (Array.isArray(saved.history)) {
     initial.history = saved.history.filter(entry => entry && typeof entry === 'object'
-      && typeof entry.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry.date) && durations.includes(entry.minutes))
+      && typeof entry.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry.date) && isDuration(entry.minutes))
       .slice(-365).map(({ date, minutes }) => ({ date, minutes }));
   }
   initial.house = normalizeHouse(saved.house, initial.layout, initial.history);
-  if (saved.layout !== undefined) activeHouseRoom(initial.house).layout = structuredClone(initial.layout);
-  else initial.layout = structuredClone(activeHouseRoom(initial.house).layout);
+  if (saved.layout !== undefined) {
+    initial.layout = fitRoomType(initial.layout, activeHouseRoom(initial.house).type);
+    activeHouseRoom(initial.house).layout = structuredClone(initial.layout);
+  } else initial.layout = structuredClone(activeHouseRoom(initial.house).layout);
   return initial;
 }
 
@@ -70,6 +72,7 @@ function completeDueSession(state, now) {
   state.history.push({ date: localDate(endsAt), minutes: duration / 60_000 });
   state.history = state.history.slice(-365);
   state.house.coins = Math.min(1_000_000_000, state.house.coins + focusCoins(duration / 60_000));
+  recordSession(state.house, { at: endsAt, minutes: duration / 60_000 });
   return true;
 }
 
@@ -98,6 +101,7 @@ export function createStateStore(storage, now = clockNow) {
     if (next.layout.presetId) next.rooms[next.layout.presetId] = structuredClone(next.layout);
     activeHouseRoom(next.house).layout = structuredClone(next.layout);
     mutate(next, { now: timestamp });
+    next.layout = fitRoomType(next.layout, activeHouseRoom(next.house).type);
     if (next.layout.presetId) next.rooms[next.layout.presetId] = structuredClone(next.layout);
     activeHouseRoom(next.house).layout = structuredClone(next.layout);
     state = next;
@@ -123,7 +127,7 @@ export function createStateStore(storage, now = clockNow) {
       return update(draft => {
         const owner = draft.house.rooms.find(entry => entry.id === roomId);
         if (!owner) return;
-        owner.layout = normalizeLayout(layout);
+        owner.layout = fitRoomType(normalizeLayout(layout), owner.type);
         if (draft.house.activeId === roomId) draft.layout = structuredClone(owner.layout);
       });
     },
@@ -142,7 +146,7 @@ export function createStateStore(storage, now = clockNow) {
         if (!verdict.ok) return;
         draft.house.coins -= verdict.slot.price;
         // Start from the chosen furnished design, leaving archived arrangements intact.
-        draft.house.rooms.push({ id: slotId, name: cleanName(name, verdict.slot.label), layout: createLayout(presetId) });
+        draft.house.rooms.push({ id: slotId, type: verdict.slot.type, name: cleanName(name, verdict.slot.label), layout: fitRoomType(createLayout(presetId), verdict.slot.type) });
       });
       return { ...result, built: verdict.ok, reason: verdict.reason };
     },

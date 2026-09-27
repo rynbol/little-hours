@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createStateStore, restoreState, freshState } from './state.js';
 import { createLayout } from './layout.js';
+import { fitRoomType } from './room-types.js';
 import { createSession } from './session.js';
 import { activeHouseRoom, nextExpansion, houseConnections } from './house.js';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
@@ -88,7 +89,7 @@ test('two rooms with the same design keep independent furniture, colors and name
   const studio = structuredClone(f.store.state.layout);
   f.store.setRunning(true); const timer = structuredClone(f.store.state.session);
   f.store.enterHouseRoom('garden');
-  assert.deepEqual(f.store.state.layout, createLayout('ember-library'));
+  assert.deepEqual(f.store.state.layout, fitRoomType(createLayout('ember-library'), 'greenhouse'));
   f.store.update(s => { s.layout.floor = 'walnut'; });
   const garden = structuredClone(f.store.state.layout);
   f.store.enterHouseRoom('studio');
@@ -209,5 +210,5 @@ test('blank names at purchase use the room name, including a session expiring du
   const f = fixture(); f.store.setRunning(true); f.advance(25 * 60_000);
   const result = f.store.buildRoom('garden', 'cloud-loft', '   ');
   assert.equal(result.built, true); assert.equal(result.completed, true);
-  assert.equal(f.reopen().state.house.rooms[1].name, 'Garden wing');
+  assert.equal(f.reopen().state.house.rooms[1].name, 'Greenhouse');
 });

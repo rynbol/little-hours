@@ -35,6 +35,7 @@ import { ARTWORKS, SLEEVES } from '../../core/art.js';
 import { tintPaint } from '../../core/tints.js';
 import { surfacePaint } from '../../core/surfaces.js';
 import { createRoomPassages } from './room-passages.js';
+import { createRoomRoof } from '../../models/room-roofs.js';
 import { clockNow, clockRandom } from '../../core/test-pins.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
@@ -514,11 +515,29 @@ export function createRoom(container, options = {}) {
   const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782'), playOutline = color('#d9b98a');
   const ghostMaterial = new StandardMaterial('placement-preview', scene); ghostMaterial.diffuseColor = color('#85ac80'); ghostMaterial.emissiveColor = color('#42653f'); ghostMaterial.alpha = 0.43; ghostMaterial.disableLighting = true;
   let theme = 'dusk', focused = false, petStart = -Infinity, disposed = false, readyReported = false;
-  let passages = null, houseKey = '', houseHover = null, lockedDoor = null, openingDoor = null;
+  let passages = null, houseKey = '', houseHover = null, lockedDoor = null, openingDoor = null, roof = null, roofType = 'studio', roofSessions = [], plantPhase = 4;
+  function setRoof(type) {
+    if (type === roofType) return;
+    roof?.dispose(); roof = null; roofType = type;
+    if (type !== 'studio') { roof = createRoomRoof(type, scene); roof.setSessions(roofSessions); roof.setTheme(theme); }
+    frameCorners(roof?.top || 6.02); refreshShadows();
+  }
+  function showPlant(object) {
+    if (!object.metadata.setPhase) return;
+    object.metadata.setPhase(plantPhase);
+    object.metadata.plant.getChildMeshes(false).concat(object.metadata.plant).forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = true; });
+  }
+  function setPlantPhase(phase) {
+    if (phase === plantPhase) return;
+    plantPhase = phase;
+    for (const object of placedObjects.values()) showPlant(object);
+    refreshShadows(); requestRender();
+  }
   function setHouse(house) {
-    const key = JSON.stringify([house.activeId, house.coins, house.rooms.map(entry => [entry.id, entry.name])]);
+    roofSessions = house.sessions; roof?.setSessions(house.sessions);
+    const key = JSON.stringify([house.activeId, house.coins, house.rooms.map(entry => [entry.id, entry.name, entry.type])]);
     if (key === houseKey) return;
-    houseKey = key; lockedDoor = null; openingDoor = null; houseHover = null; passages?.dispose(); passages = createRoomPassages(scene, house);
+    houseKey = key; setRoof(house.rooms.find(entry => entry.id === house.activeId)?.type || 'studio'); lockedDoor = null; openingDoor = null; houseHover = null; passages?.dispose(); passages = createRoomPassages(scene, house);
     passages.root.setEnabled(!editing); fitRoom(); requestRender();
   }
   let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true, suspended = false;
@@ -746,6 +765,7 @@ export function createRoom(container, options = {}) {
         object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type; object.metadata.tint = item.tint;
         if (customizedDesk) object.metadata.avatarAppearanceKey = avatarKey;
         object.getChildMeshes().forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = !mesh.metadata?.effect; });
+        showPlant(object);
         placedObjects.set(item.id, object);
         if (settleNew && !reducedMotion) { object.scaling.setAll(0.92); settlingPieces.set(item.id, { object, start: performance.now() }); }
       }
@@ -1061,7 +1081,7 @@ export function createRoom(container, options = {}) {
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
     const daylight = theme === 'day', night = theme === 'dusk';
     companionRoutine?.setContext({ night });
-    paintSky(theme); architecture?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
+    paintSky(theme); architecture?.setTheme(theme); roof?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
     if (!night) { shootingStar.setEnabled(false); streakMaterial.alpha = 0; }
     sun.diffuse = color(daylight ? '#fff1d2' : night ? '#c5ccec' : '#d5dfeb');
     sun.intensity = daylight ? 1.6 : night ? 0.62 : 0.82;
@@ -1387,8 +1407,13 @@ export function createRoom(container, options = {}) {
   canvas.addEventListener('pointerleave', onPointerLeave); canvas.addEventListener('lostpointercapture', onPointerCancel);
   window.addEventListener('blur', onPointerCancel);
 
-  const roomCorners = []; for (const x of [-6.19, 6.19]) for (const y of [-0.32, 6.02]) for (const z of [-4.78, 4.78]) roomCorners.push(new Vector3(x, y, z));
-  const connectedCorners = []; for (const x of [-6.19, 8.25]) for (const y of [-0.32, 6.02]) for (const z of [-4.78, 4.78]) connectedCorners.push(new Vector3(x, y, z));
+  const roomCorners = [], connectedCorners = [];
+  function frameCorners(top) {
+    roomCorners.length = connectedCorners.length = 0;
+    for (const x of [-6.19, 6.19]) for (const y of [-0.32, top]) for (const z of [-4.78, 4.78]) roomCorners.push(new Vector3(x, y, z));
+    for (const x of [-6.19, 8.25]) for (const y of [-0.32, top]) for (const z of [-4.78, 4.78]) connectedCorners.push(new Vector3(x, y, z));
+  }
+  frameCorners(6.02);
   const projectedCorner = new Vector3(); let canvasAspect = 1, fitAlpha = NaN, fitBeta = NaN;
   let avatarCameraEditing = false, avatarCameraTransition = null, savedAvatarCamera = null, savedAvatarEffects = null, avatarPoseTransition = null, avatarPreviewRotation = 0, avatarPreviewTarget = 0;
   const avatarFrameHeight = 3.45;
@@ -1735,7 +1760,7 @@ export function createRoom(container, options = {}) {
   requestRender();
 
   return {
-    setHouse,
+    setHouse, setPlantPhase,
     setDoorActive(id) { lockedDoor = id || null; hoverPlay(null); requestRender(); },
     setDoorOpen(id) { openingDoor = id || null; requestRender(); },
     walkToDoor(id, onArrive, onOpen) {
@@ -1756,6 +1781,6 @@ export function createRoom(container, options = {}) {
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { if (avatarCameraEditing) return; camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
     diagnostics() { return { scene, engine, camera, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
-    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); petModel?.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

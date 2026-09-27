@@ -29,6 +29,8 @@ export const FURNITURE = [
   { id: 'easel', name: "Painter's easel", category: 'Curios', description: 'An oak easel with a canvas, a ledge and a jar of brushes. Pick the picture.', footprint: [1, 1], height: 2.1, arts: FRAME_ARTS, color: '#f1e6cf', blocking: true },
   // The pet's own bed: one per room, always kept, never counted as a piece.
   { id: 'pet-bed', name: 'Cozy pet bed', category: 'Pets', description: 'A soft, low cushion bed where your pet naps and comes home to.', footprint: [1.2, 0.8], height: 0.18, color: '#dfd1b2', blocking: true, unique: true },
+  { id: 'seed-bed', name: 'Growing seed bed', category: 'Plants', description: 'A raised oak planter. Its plant grows through each focus session and blooms when the timer ends.', footprint: [1.9, 0.9], height: 1.795, color: '#8fa36d', blocking: true, unique: true, room: 'greenhouse' },
+  { id: 'telescope', name: 'Brass telescope', category: 'Curios', description: 'A navy and brass telescope on an oak tripod, tipped toward the skylight.', footprint: [1.2, 1.2], height: 1.914, color: '#3f4d6b', blocking: true, unique: true, room: 'attic' },
   { id: 'moon-rug', name: 'Midnight constellation rug', category: 'Rugs', description: 'A round indigo rug with a woven moon, tiny stars and a warm tasseled border.', footprint: [3.6, 3.6], height: 0.08, color: '#676779', blocking: false },
   // Wall pieces hang on the back or side wall: `size` is their width and height
   // on the wall, `depth` how far they stand out, `arts` the pictures to choose.

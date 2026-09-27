@@ -7,12 +7,19 @@ const house = (count, coins = 0) => ({
   house: { version: 1, name: 'Littlewood cottage', coins, activeId: 'studio', rooms: rooms.slice(0, count) },
 });
 
+const starLog = Array.from({ length: 60 }, (_, i) => ({ at: 1_780_000_000_000 + i * 97_531_111, minutes: i % 6 === 0 ? 50 : 25, roomId: 'loft' }));
+const growing = (phase, minutes = 25) => ({ duration: minutes * 60_000, remaining: phase === 4 ? 0 : Math.round(minutes * 60_000 * (1 - (phase + 0.5) / 4)), endsAt: null, running: false });
+
 export const SEEDS = {
   fresh: null,
   'one-room': house(1),
   'one-room-rich': house(1, 300),
   'two-rooms': house(2),
   'three-rooms': house(3),
+  greenhouse: { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'garden' } },
+  ...Object.fromEntries(['seed', 'sprout', 'youngling', 'budding', 'bloom'].map((name, phase) => [`greenhouse-${name}`, { ...house(3), layout: undefined, session: growing(phase), house: { ...house(3).house, activeId: 'garden' } }])),
+  'attic-stars': { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft', sessions: starLog } },
+  attic: { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft' } },
 };
 
 export function seedState(name, { theme } = {}) {

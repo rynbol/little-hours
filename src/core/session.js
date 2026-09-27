@@ -1,4 +1,6 @@
 import { clockNow } from './test-pins.js';
+export const DIAL_MINUTES = [...Array.from({ length: 10 }, (_, i) => i + 1), ...Array.from({ length: 22 }, (_, i) => 15 + i * 5)];
+export const isDuration = minutes => DIAL_MINUTES.includes(minutes);
 export function createSession(minutes = 25) {
   return { duration: minutes * 60_000, remaining: minutes * 60_000, endsAt: null, running: false };
 }

@@ -30,13 +30,20 @@ Each chunk is one large piece of work. Each one ends with a preview for approval
 - **First step:** still frames from the real engine for approval. Build only after a yes.
 - **Done when:** the roof is visible, the house opens and closes with real clicks in Chrome and Firefox, reduced motion has no motion, and speed is the same as main.
 
-### Chunk 2: Room types
+### Chunk 2: Room types, solo first
+
+Changed on September 26, 2026: solo first, friends later (chunks 3 and 4). The idea is still being developed and may be reworked.
 
 - A room has a `type` that is separate from its design.
-- The three fixed spots: the studio, the **Greenhouse** (glass roof, plants that grow with focus time) and the **Star attic** (a skylight, a telescope, stargazing at night).
-- Each type has its own look from outside, its own furniture set and one new break activity.
+- The three fixed spots: the studio, the **Greenhouse** and the **Star attic**.
+- **Timer dial:** drag the seed around the ring to set 1 to 120 minutes (1 to 10 by ones, then steps of 5). Arrow keys work too. The 25, 50 and 90 buttons stay as shortcuts. Coins are 1 per minute, from 5 minutes.
+- **Greenhouse:** one plant regrows each session. It goes seed, sprout, youngling, budding, bloom as the timer runs, so a longer timer grows it more slowly. Under 5 minutes it stops at budding. Pausing keeps its stage; Start over plants a new seed.
+- **Star attic:** a skylight and a telescope. Each finished session is a star, and sessions of 50 minutes or more are bright stars. The stars are mainly for a postcard (share card); in the room they are too small to read.
+- Each type has its own look from outside, its own furniture and one new break activity (water the plant, stargaze).
+- The save format keeps a log of finished sessions (when, how long, which room).
 - Old saves keep working. The save format is ready for more spots and for player-chosen building.
 - **Done when:** the new save format is final. Chunk 3 syncs this format.
+- Gifts (send a friend a piece of furniture) move to chunk 4.
 
 ### Chunk 3: Studying together, the foundation
 
@@ -51,6 +58,7 @@ Each chunk is one large piece of work. Each one ends with a preview for approval
 - Shared sessions: one person starts and the others join, with one timer for everyone. There is a bonus for finishing together.
 - A partner's or friend's avatar appears in the house and can visit on breaks.
 - A **Rooftop garden** for two, built with shared coins: fairy lights and a swing seat.
+- Gifts: send a friend a piece of furniture bought with your coins.
 
 ### Chunk 5: The house in every room
 

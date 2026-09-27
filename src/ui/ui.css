@@ -80,6 +80,9 @@ body:not(.is-avatar-editing) .room-hint { color: #b5a3b1; font-size: 10px; botto
 .timer-ring .timer-track { stroke: #e5d8cc; }
 .timer-ring .timer-progress { stroke: #b97885; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 0; transition: stroke-dashoffset .55s linear, stroke .3s; }
 .timer-ring .timer-seed { fill: #b97885; stroke: var(--ui-paper); stroke-width: 2; transform: rotate(90deg); transform-origin: center; }
+.timer-dial[data-settable] .timer-ring { cursor: grab; touch-action: none; }
+.timer-dial[data-settable] .timer-seed { r: 8; transition: none; }
+.timer-ring:focus-visible { outline: 2px solid #b47a86; outline-offset: 4px; border-radius: 50%; }
 .timer-dial[data-phase='focusing'] .timer-progress, .timer-dial[data-phase='complete'] .timer-progress { stroke: #82916d; }
 .timer-dial[data-phase='focusing'] .timer-seed, .timer-dial[data-phase='complete'] .timer-seed { fill: #82916d; }
 .timer-dial[data-phase='complete'] .timer-progress { stroke-dashoffset: 0 !important; }

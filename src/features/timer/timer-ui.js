@@ -1,4 +1,5 @@
-import { createSession, remainingAt, formatTime, spokenTime, sessionPhase, displayedRemaining } from '../../core/session.js';
+import { createSession, remainingAt, formatTime, spokenTime, sessionPhase, displayedRemaining, DIAL_MINUTES } from '../../core/session.js';
+import { plantPhase } from '../../core/room-types.js';
 import { localDate } from '../../core/state.js';
 import { focusCoins, nextExpansion } from '../../core/house.js';
 import { $ } from '../../ui/dom.js';
@@ -13,7 +14,7 @@ export function createTimerUI(app) {
     const reward = focusCoins(state.session.duration / 60_000), next = nextExpansion(state.house);
     const name = next?.id === 'garden' ? 'garden wing' : 'upstairs hideaway';
     const progress = !next ? 'A little more saved for your home' : state.house.coins >= next.price ? `Your ${name} is ready to build` : `${next.price - state.house.coins} coins to your ${name}`;
-    $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>Your time grows your home</strong><span>+${reward} coins when you finish</span><small>${progress}</small></span>`;
+    $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>Your time grows your home</strong><span>${reward ? `+${reward} coins when you finish` : 'Coins start at 5 minutes'}</span><small>${progress}</small></span>`;
   }
 
   function renderJournal() {
@@ -82,7 +83,14 @@ export function createTimerUI(app) {
     document.title = state.session.running ? `${formatted} · Little Hours` : 'Little Hours — a little place to focus';
     $('#session-label').textContent = state.session.running ? 'IN YOUR OWN TIME' : ms < state.session.duration && ms > 0 ? 'A LITTLE BREATHER' : ms === 0 ? 'YOU DID THAT' : 'SETTLE IN';
     $('#timer-caption').textContent = state.session.running ? 'one thing at a time' : ms === 0 ? 'a little progress, made' : ms < state.session.duration ? 'ready when you are' : 'a small beginning';
-    $('#timer-progress').style.strokeDashoffset = String(100 * (1 - ms / state.session.duration));
+    const minutesSet = state.session.duration / 60_000, settable = !state.session.running && [0, state.session.duration].includes(remainingAt(state.session)) && !editingAvatar;
+    $('#timer-progress').style.strokeDashoffset = String(100 * (1 - (settable ? minutesSet / 120 : ms / state.session.duration)));
+    $('.timer-seed').style.transform = settable ? `rotate(${90 + minutesSet * 3}deg)` : '';
+    $('#timer-dial').toggleAttribute('data-settable', settable);
+    const ring = $('#timer-ring');
+    ring.setAttribute('aria-valuenow', minutesSet); ring.setAttribute('aria-valuetext', `${minutesSet} minutes`);
+    ring.setAttribute('aria-disabled', String(!settable)); ring.tabIndex = settable ? 0 : -1;
+    app.room?.setPlantPhase(plantPhase(state.session.duration, remainingAt(state.session)));
     $('#timer-dial').dataset.phase = state.session.running ? 'focusing' : ms === 0 ? 'complete' : presence;
     const actionIcon = state.session.running ? 'pause' : 'arrow';
     if ($('#start-button').dataset.icon !== actionIcon) {
@@ -157,6 +165,34 @@ export function createTimerUI(app) {
       if (!draft.session.running && (minutes * 60_000 !== draft.session.duration || draft.session.remaining === 0)) draft.session = createSession(minutes);
     }));
   }));
+  function setMinutes(minutes) {
+    app.acceptUpdate(app.store.update(draft => {
+      if (!draft.session.running && (minutes * 60_000 !== draft.session.duration || draft.session.remaining === 0)) draft.session = createSession(minutes);
+    }));
+  }
+  const nearestMinutes = raw => DIAL_MINUTES.reduce((best, value) => Math.abs(value - raw) < Math.abs(best - raw) ? value : best);
+  let dragging = false;
+  function dragTo(event) {
+    const box = $('#timer-ring').getBoundingClientRect(), turn = (Math.atan2(event.clientX - box.left - box.width / 2, box.top + box.height / 2 - event.clientY) / (Math.PI * 2) + 1) % 1;
+    const current = app.state.session.duration / 60_000;
+    let minutes = nearestMinutes(Math.max(1, turn * 120));
+    if (Math.abs(minutes - current) > 60) minutes = current > 60 ? 120 : 1;
+    if (minutes !== current) setMinutes(minutes);
+  }
+  $('#timer-ring').addEventListener('pointerdown', event => {
+    if (!$('#timer-dial').hasAttribute('data-settable')) return;
+    dragging = true; $('#timer-ring').setPointerCapture(event.pointerId); dragTo(event);
+  });
+  $('#timer-ring').addEventListener('pointermove', event => { if (dragging) dragTo(event); });
+  for (const type of ['pointerup', 'pointercancel']) $('#timer-ring').addEventListener(type, () => { dragging = false; });
+  $('#timer-ring').addEventListener('keydown', event => {
+    if (!$('#timer-dial').hasAttribute('data-settable')) return;
+    const at = DIAL_MINUTES.indexOf(app.state.session.duration / 60_000);
+    const step = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 3, PageDown: -3 }[event.key];
+    const index = event.key === 'Home' ? 0 : event.key === 'End' ? DIAL_MINUTES.length - 1 : step ? Math.min(DIAL_MINUTES.length - 1, Math.max(0, at + step)) : null;
+    if (index === null) return;
+    event.preventDefault(); setMinutes(DIAL_MINUTES[index]);
+  });
   $('#task').addEventListener('input', event => {
     const task = event.target.value;
     app.acceptUpdate(app.store.update(draft => { draft.task = task; }));

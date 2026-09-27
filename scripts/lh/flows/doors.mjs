@@ -57,7 +57,7 @@ export default {
     check('one room: the unbuilt garden door is on screen', walk.spot?.visible, walk.spot);
     check('one room: the companion walks to the unbuilt door first', walk.walked && walk.moved > .5 && walk.ms > 1500, { ms: walk.ms, moved: walk.moved });
     check('one room: the unbuilt door opens only ajar for a peek', walk.open > .4 && walk.open < 1 && walk.notes.includes('A little peek at what could be.'), { open: walk.open, notes: walk.notes });
-    check('one room: then the house page opens on the garden wing', walk.end?.house && !walk.end?.travelling && await app.text('#house-detail h2') === 'Garden wing', { end: walk.end, h2: await app.text('#house-detail h2') });
+    check('one room: then the house page opens on the garden wing', walk.end?.house && !walk.end?.travelling && await app.text('#house-detail h2') === 'Greenhouse', { end: walk.end, h2: await app.text('#house-detail h2') });
     await steps.backToRoom(app);
     check('one room: back in the room nothing is stuck', !await app.js(`document.body.classList.contains('is-travelling') || document.body.classList.contains('is-door-walking')`) && (await app.saved()).house.activeId === 'studio');
     walk = await tapDoor(app, 'garden', t.sleep);
@@ -67,7 +67,7 @@ export default {
     app = await t.open({ seed: 'two-rooms', label: 'two rooms' });
     await app.settle();
     walk = await tapDoor(app, 'loft', t.sleep);
-    check('two rooms: the unbuilt upstairs door walks, then plans the upstairs room', walk.walked && walk.end?.house && await app.text('#house-detail h2') === 'Upstairs hideaway', { walked: walk.walked, h2: await app.text('#house-detail h2') });
+    check('two rooms: the unbuilt upstairs door walks, then plans the upstairs room', walk.walked && walk.end?.house && await app.text('#house-detail h2') === 'Star attic', { walked: walk.walked, h2: await app.text('#house-detail h2') });
     await t.close(app);
 
     app = await t.open({ seed: 'two-rooms', reducedMotion: true, label: 'reduced motion' });
@@ -75,7 +75,7 @@ export default {
     walk = await tapDoor(app, 'garden', t.sleep);
     check('reduced motion: a built door takes you there at once', walk.end?.active === 'garden' && !walk.end?.travelling && walk.ms < 1500, { ms: walk.ms, end: walk.end });
     walk = await tapDoor(app, 'loft', t.sleep);
-    check('reduced motion: an unbuilt door opens the house page at once', walk.end?.house && !walk.walked && walk.ms < 1500 && await app.text('#house-detail h2') === 'Upstairs hideaway', { ms: walk.ms, walked: walk.walked });
+    check('reduced motion: an unbuilt door opens the house page at once', walk.end?.house && !walk.walked && walk.ms < 1500 && await app.text('#house-detail h2') === 'Star attic', { ms: walk.ms, walked: walk.walked });
     await t.close(app);
   },
 };
