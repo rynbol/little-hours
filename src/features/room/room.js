@@ -31,6 +31,7 @@ import { interactionFor, INTERACTION_NOTICES } from '../../core/item-interaction
 import { createArchitecture, styleFurniture, buildWallMesh } from '../../models/architecture.js';
 import { getFurniture } from '../../core/catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, footprintBounds, MAX_ITEMS, pieceCount, petBed, roomDesign, rugStack, rugTouches, groundAt, standHeight, FLOOR_Y, RUG_STEP, FLAT_RUG } from '../../core/layout.js';
+import { roomDisplayName } from '../../core/house.js';
 import { SHELLS, isWallPiece, snapWall, openings } from '../../core/walls.js';
 import { ARTWORKS, SLEEVES } from '../../core/art.js';
 import { tintPaint } from '../../core/tints.js';
@@ -537,7 +538,7 @@ export function createRoom(container, options = {}) {
   }
   function setHouse(house) {
     roofSessions = house.sessions; roof?.setSessions(house.sessions);
-    const key = JSON.stringify([house.activeId, house.coins, house.rooms.map(entry => [entry.id, entry.name, entry.type])]);
+    const key = JSON.stringify([house.activeId, house.coins, house.rooms.map(entry => [entry.id, roomDisplayName(entry), entry.type])]);
     if (key === houseKey) return;
     houseKey = key; setRoof(house.rooms.find(entry => entry.id === house.activeId)?.type || 'studio'); lockedDoor = null; openingDoor = null; houseHover = null; passages?.dispose(); passages = createRoomPassages(scene, house);
     passages.root.setEnabled(!editing); fitRoom(); requestRender();

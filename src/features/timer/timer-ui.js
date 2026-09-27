@@ -83,6 +83,9 @@ export function createTimerUI(app) {
     $('#coin-wallet').disabled = travelling;
     $('#mini-button').disabled = travelling;
     document.querySelectorAll('[data-house-go], .home-wide').forEach(button => { button.disabled = travelling; });
+    $('#rename-room').disabled = travelling;
+    $('#room-title-input').disabled = travelling;
+    $('#save-room-title').disabled = travelling || !$('#room-title-input').value.trim();
     if (renderKey === lastSessionRender) return;
     lastSessionRender = renderKey;
     $('#timer').textContent = formatted;

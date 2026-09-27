@@ -74,3 +74,7 @@ The isolated four-round comparison in `.lh/out/2026-09-27T22-01-21-perf/perf.jso
 The final screenshot comparison is `.lh/out/2026-09-27T22-02-33-shot/`. The lead inspected the final desktop and phone Friends layouts, the actual milestone portrait, and the shortened copy in the live preview. The final interaction reel is `.lh/out/2026-09-27T21-56-17-run/companion-reel.webp`.
 
 `lh doctor` passes on real Metal rendering (Apple M5 Pro). The final build retains Vite's existing large-chunk warning. No dependencies or generated bundles were added. The scoped implementation, review, repair, and verification phases are complete; online friendships, App Store packaging, and audience validation are separate product work.
+
+## Personal room follow-up
+
+The subsequent request adds inline room naming, illustrated destination cards, and doorway travel from temporary views. [Room navigation verification](room-navigation.md) records its design, independent reviews, all 18 passing browser journeys, 222 passing unit tests, 105 affected real-GPU checks, and the later four-round performance and 30-cycle room-switching memory comparisons. Those later measurements cover the combined pet and room changes.

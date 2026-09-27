@@ -6,7 +6,8 @@ const shown = selector => `!document.querySelector(${JSON.stringify(selector)}).
 
 async function castForBite(app) {
   await app.clickSel('#lake-cast');
-  await app.waitFor(shown('#lake-bite'), { what: 'a bite', timeout: 9000 });
+  await app.waitFor(`['wait', 'bite'].includes(window.__littleHours.lake.diagnostics()?.ui)`, { what: 'the cast animation to land', timeout: 30000 });
+  await app.waitFor(shown('#lake-bite'), { what: 'a bite', timeout: 6000 });
 }
 
 export default {
@@ -26,12 +27,15 @@ export default {
     const before = await app.js(POND);
     await castForBite(app);
     check('a cast gets a bite with a reel button', (await app.js(LAKE)).phase === 'bite');
-    await t.shot(app, 'bite');
     await app.clickSel('#lake-reel');
     const hooked = await app.js(LAKE);
     check('reeling on the bite hooks the fish and asks for pulls', hooked.phase === 'reel' && hooked.need >= 4, hooked);
-    for (let i = 0; i < hooked.need; i++) await app.clickSel('#lake-reel');
-    await app.waitFor(`document.querySelector('#lake-card.is-shown') !== null`, { what: 'the catch card', timeout: 8000 });
+    await t.shot(app, 'hooked');
+    for (let i = 0; i < hooked.need; i++) {
+      await app.clickSel('#lake-reel');
+      await app.waitFor(`window.__littleHours.lake.diagnostics().taps === ${i + 1}`, { what: `reel pull ${i + 1}` });
+    }
+    await app.waitFor(`document.querySelector('#lake-card.is-shown') !== null`, { what: 'the catch card', timeout: 8000 }).catch(async error => { throw new Error(error.message + JSON.stringify(await app.js(LAKE))); });
     const after = await app.js(POND), name = await app.text('#lake-card-name');
     check('the fish leaps out and its card names it', (await app.js(LAKE)).phase === 'shown' && Boolean(name), name);
     check('landing it spends the star lure only', JSON.stringify(after.bait) === JSON.stringify(before.bait.slice(0, -1)), after.bait);

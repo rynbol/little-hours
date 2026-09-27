@@ -20,7 +20,7 @@ export default {
     await steps.toggleHouse(app);
     check('a second click opens it again', (await app.house()).open === 1);
     await t.shot(app, 'open');
-    for (const [id, name] of [['garden', 'Garden wing'], ['loft', 'Upstairs hideaway'], ['studio', 'Your studio']]) {
+    for (const [id, name] of [['garden', 'Garden wing'], ['loft', 'Upstairs hideaway'], ['studio', 'Ember library']]) {
       const spot = await app.point({ houseRoom: id });
       check(`the ${id} is on screen in the open house`, spot?.visible, spot);
       if (!spot?.visible) continue;

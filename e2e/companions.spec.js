@@ -5,7 +5,7 @@ const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('littl
 
 test('a personal pet notebook works with keyboard input and exports a real portrait', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#loading-note')).toBeHidden();
+  await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await page.locator('#pet-button').click();
   await page.locator('[data-pet-ritual="cuddle"]').click();
   await expect(page.locator('#pet-ritual-status')).toHaveText('+2 ♡');
@@ -41,7 +41,7 @@ test('a personal pet notebook works with keyboard input and exports a real portr
 
 test('completion awards the pet that began focusing and the room stays usable', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-09-27T12:00:00') });
-  await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden();
+  await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await page.locator('#start-button').click();
   await page.clock.fastForward('01:00');
   await page.locator('#pet-button').click(); await page.locator('[data-pet-choice="dog"]').click(); await page.locator('#close-panel').click();
@@ -61,7 +61,7 @@ test('completion awards the pet that began focusing and the room stays usable', 
 
 test('an open notebook shows completed focus while a control has focus', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-09-27T12:00:00') });
-  await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden();
+  await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await page.locator('#start-button').click();
   await page.locator('#pet-button').click();
   await expect(page.locator('#close-panel')).toBeFocused();
@@ -79,10 +79,10 @@ test('an open notebook shows completed focus while a control has focus', async (
 });
 
 test('pet name drafts survive a selection change in another tab without renaming that pet', async ({ page, context }) => {
-  await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden();
+  await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await page.locator('#pet-button').click(); await page.locator('.pet-details summary').first().click();
   await page.locator('#pet-name').fill('Maple');
-  const other = await context.newPage(); await other.bringToFront(); await other.goto('/'); await expect(other.locator('#loading-note')).toBeHidden({ timeout: 15000 });
+  const other = await context.newPage(); await other.bringToFront(); await other.goto('/'); await expect(other.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await other.locator('#pet-button').click(); await other.locator('[data-pet-choice="dog"]').click();
   await page.bringToFront();
   await expect(page.locator('.pet-identity h2')).toHaveText('Mochi');

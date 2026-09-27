@@ -1348,6 +1348,12 @@ try {
     room.setHouse({ ...house, activeId: 'garden' }); advance(2);
     assert.ok(passage.root.isDisposed(), 'the old doors are disposed on room change');
     assert.deepEqual(diagnostics().passages.links.map(link => link.id), ['studio', 'loft']);
+    house.rooms[0].layout = createLayout('moonlit-greenhouse');
+    room.setHouse({ ...house, activeId: 'garden' }); advance(2);
+    assert.equal(diagnostics().passages.links.find(link => link.id === 'studio').name, 'Moonlit greenhouse', 'an automatic destination name follows its changed design without switching the active room');
+    house.rooms[0].name = 'Your studio';
+    room.setHouse({ ...house, activeId: 'garden' }); advance(2);
+    assert.equal(diagnostics().passages.links.find(link => link.id === 'studio').name, 'Your studio', 'a literal custom name replaces the design name on the door');
     console.log('PASS connected doors: hover, destination picking, avatar walking, stairs, camera-drag guard, edit-mode isolation and disposal.');
   }
   const beforeHouse = scene.getFrameId();

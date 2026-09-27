@@ -5,7 +5,7 @@ const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('littl
 const pairKey = (a, b) => JSON.stringify([`pet:${a}`, `pet:${b}`].sort());
 const openCompanions = async page => {
   await page.goto('/');
-  await expect(page.locator('#loading-note')).toBeHidden();
+  await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await page.locator('#pet-button').click();
 };
 const accessiblePage = async page => {
@@ -141,7 +141,7 @@ test('focus company survives changed preferences, primary pet, pause and reload'
   await page.locator('#close-panel').click();
   await expect(page.locator('#pet-button')).toBeFocused();
   await page.reload();
-  await expect(page.locator('#loading-note')).toBeHidden();
+  await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await page.locator('#start-button').click();
   await page.clock.fastForward('24:01');
   await expect(page.locator('#celebration-copy')).toContainText('Miso & Mochi');

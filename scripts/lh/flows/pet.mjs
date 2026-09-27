@@ -18,9 +18,9 @@ async function tapPet(app, sleep, slow) {
 const oneByOne = counts => counts.indexOf(1) >= 0 && counts.indexOf(1) < counts.indexOf(2);
 const PET_AGE = `window.__littleHours.room.diagnostics().pet.petAge`;
 
-async function petAgain(app, sleep, spot, times) {
+async function petAgain(app, sleep, spot, times, slow) {
   const ages = [];
-  for (let i = 0; i < times; i++) { await app.click(spot.x, spot.y); await sleep(120); ages.push(await app.js(PET_AGE)); }
+  for (let i = 0; i < times; i++) { await app.click(spot.x, spot.y); await sleep(120 / slow); ages.push(await app.js(PET_AGE)); }
   return { ages, hearts: await app.js(HEARTS) };
 }
 
@@ -35,7 +35,7 @@ export default {
     check('tapping the cat floats two hearts up one after another', oneByOne(tap.counts), tap.counts);
     check('petting shows no words', tap.said === null, tap.said);
     check('a room cuddle grows the saved bond once', await app.js('window.__littleHours.state.petBonds.cat.affection === 2'));
-    const again = await petAgain(app, sleep, tap.spot, 4);
+    const again = await petAgain(app, sleep, tap.spot, 4, t.slow);
     check('four more taps stack a heart each', again.hearts >= 5, again);
     check('more taps hold the lean instead of starting it over', again.ages.every(age => age >= .3 && age < 2.6), again.ages);
     await t.shot(app, 'cat-hearts');

@@ -1,5 +1,5 @@
 import { roomDesign } from '../../core/layout.js';
-import { activeHouseRoom } from '../../core/house.js';
+import { activeHouseRoom, roomDisplayName } from '../../core/house.js';
 import { petEntry } from '../../core/pets.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
@@ -11,12 +11,24 @@ const themeCopy = {
 };
 
 export function createRoomUI(app) {
-  let compact = false, quality = 'auto', performanceStats = null;
+  let compact = false, quality = 'auto', performanceStats = null, namingRoom = null, nameDraft = '';
+
+  function closeNameEditor(restoreFocus = true) {
+    namingRoom = null; nameDraft = '';
+    $('#room-title-form').hidden = true;
+    $('.room-title-row').hidden = false;
+    $('#rename-room').setAttribute('aria-expanded', 'false');
+    if (restoreFocus) (app.nav.connected ? $('#room-title') : $('#rename-room')).focus({ preventScroll: true });
+  }
 
   function renderHeading() {
     const { state } = app, connected = app.nav.connected;
     const design = roomDesign(state.layout), entry = activeHouseRoom(state.house);
-    $('#room-title').textContent = connected ? state.house.name : entry.name === 'Your studio' ? design.name : entry.name;
+    $('#room-title').textContent = connected ? state.house.name : roomDisplayName(entry);
+    $('#rename-room').hidden = Boolean(connected);
+    $('#rename-room').disabled = app.nav.travelling;
+    if (namingRoom && (namingRoom !== entry.id || connected)) closeNameEditor($('#room-title-form').contains(document.activeElement));
+    if (namingRoom && $('#room-title-input').value !== nameDraft) $('#room-title-input').value = nameDraft;
     $('#room-subtitle').textContent = connected ? 'Your rooms, together. Choose a corner to step inside.' : design.style ? ({ sakura: 'Soft light. Cherry blossoms. Room to breathe.', cloud: 'Head in the clouds. Feet on a soft little rug.', metro: 'The city hums. Your little corner is quiet.' })[design.style] : themeCopy[state.theme];
   }
 
@@ -90,6 +102,33 @@ export function createRoomUI(app) {
   }
 
   function onStats(stats) { performanceStats = stats; renderPerformance(); }
+
+  $('#rename-room').addEventListener('click', () => {
+    if (app.nav.travelling || app.nav.connected) return;
+    const entry = activeHouseRoom(app.state.house);
+    namingRoom = entry.id; nameDraft = roomDisplayName(entry);
+    $('#room-title-input').value = nameDraft;
+    $('#save-room-title').disabled = !nameDraft.trim();
+    $('.room-title-row').hidden = true; $('#room-title-form').hidden = false;
+    $('#rename-room').setAttribute('aria-expanded', 'true');
+    $('#room-title-input').focus({ preventScroll: true }); $('#room-title-input').select();
+  });
+  $('#room-title-input').addEventListener('input', event => {
+    nameDraft = event.target.value;
+    $('#save-room-title').disabled = !nameDraft.trim();
+  });
+  $('#room-title-form').addEventListener('submit', event => {
+    event.preventDefault();
+    if (!namingRoom || !nameDraft.trim() || app.nav.travelling) return;
+    if (namingRoom !== app.state.house.activeId || app.nav.connected) { closeNameEditor(); return; }
+    const id = namingRoom, value = nameDraft.trim();
+    closeNameEditor(false); app.acceptUpdate(app.store.renameRoom(id, value));
+    $('#rename-room').focus({ preventScroll: true });
+  });
+  $('#room-title-form').addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !event.isComposing) { event.preventDefault(); event.stopPropagation(); closeNameEditor(); }
+  });
+  $('#cancel-room-title').addEventListener('click', () => closeNameEditor());
 
   $('#time-toggle').addEventListener('click', () => {
     app.acceptUpdate(app.store.update(draft => { draft.theme = draft.theme === 'day' ? 'dusk' : 'day'; }));
