@@ -14,6 +14,7 @@ import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import '@babylonjs/core/Culling/ray.js';
 import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
+import { GARDEN_TAG } from './house-garden.js';
 import { createHousePostcard } from './house-postcard.js';
 import { houseFrame } from './house-framing.js';
 import { createHouseMotion } from './house-motion.js';
@@ -155,8 +156,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   function positionTags() {
     const width = container.clientWidth, height = container.clientHeight, matrix = camera.getTransformationMatrix();
     for (const button of tags.children) {
-      const id = button.dataset.room, base = HOUSE_POSITIONS[id], offset = model.levels[id].position;
-      tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : 0), base[2] + offset.z + 2.08);
+      const id = button.dataset.room, base = HOUSE_POSITIONS[id], offset = model.levels[id]?.position;
+      if (!base) tagPoint.set(...GARDEN_TAG);
+      else tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : id === 'loft' ? .7 : 0), base[2] + offset.z + 2.08);
       Vector3.TransformCoordinatesToRef(tagPoint, matrix, tagProjection);
       const half = Math.min(90, width / 4);
       button.style.left = `${Math.max(half, Math.min(width - half, (tagProjection.x + 1) * width / 2))}px`;
@@ -205,6 +207,8 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       const level = document.createElement('small'); level.textContent = entry.id === 'loft' ? 'Upstairs' : entry.id === house.activeId ? 'You’re here' : 'Ground floor';
       const name = document.createElement('strong'); name.textContent = entry.name; button.append(level, name); tags.appendChild(button);
     }
+    const garden = document.createElement('span'); garden.className = 'house-room-tag is-garden'; garden.dataset.room = 'orchard';
+    const days = document.createElement('strong'); days.textContent = 'Garden'; garden.append(days); tags.appendChild(garden);
     // The blueprint's tag: what grows next and how close it is.
     const site = nextExpansion(house);
     if (site && container.id === 'house-canvas') {

@@ -55,6 +55,9 @@ export default {
     await steps.openHouse(app);
     const garden = await app.house();
     check('the garden has one tree per study day, full grown at an hour', garden.trees?.length === 14 && garden.trees[2] === 1 && Math.abs(garden.trees[0] - 10 / 60) < 1e-9, garden.trees);
+    check('the garden is named on screen', await app.visible('.house-room-tag.is-garden') && await app.text('.house-room-tag.is-garden') === 'Garden');
+    const hinged = await app.js(`window.__littleHours.house.diagnostics().scene.transformNodes.filter(node => node.name.startsWith('house-hinge-')).map(node => node.name.slice(12))`);
+    check('only fronts and roof lids open; side walls stay shut', hinged.length > 0 && hinged.every(name => /-(front|lid)$/.test(name)), hinged);
     const box = await app.box('#house-canvas canvas');
     const left = { x: box.x - box.width / 3, y: box.y - 60 }, right = { x: box.x + box.width / 3, y: box.y + 60 };
     await app.drag(left, { x: left.x + 420, y: left.y + 150 }, 24); await app.settle();

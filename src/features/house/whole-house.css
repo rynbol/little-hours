@@ -46,3 +46,5 @@ body.is-connected:not(.is-avatar-editing):not(.is-decorating) .stage { height: c
 @media (max-width: 640px) {
   body.is-connected:not(.is-avatar-editing) .stage-presence { top: auto; bottom: 7px; left: 7px; }
 }
+.house-room-tag.is-garden { pointer-events: none; }
+.house-canvas .house-room-tag.is-garden, .house-room-tag.is-garden { background: #dfe8cfef; color: #3f5238; border-color: #f4f8e8a0; }

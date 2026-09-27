@@ -2,12 +2,12 @@
 // roofs that run on from room to room, and a stair hall up to the loft.
 // Each part is built in room coordinates. Moving parts hang on hinges, so the
 // house opens by turning hinges, never by rebuilding geometry.
-export const WALL_TOP = 2.95, FRONT = 2.2, BACK = -2.2, HALF = 2.55, RISE = 1.75, BAY = .7;
+export const STAIR_TOP = -1.03, WALL_TOP = 2.95, FRONT = 2.2, BACK = -2.2, HALF = 2.55, RISE = 1.75, BAY = .7;
 const plaster = '#f8ecd6', stone = '#cdbb9f', timber = '#76553f', cream = '#f6ecd6';
 const shutter = '#8fa487', door = '#8b5d44', slate = ['#5a746c', '#526a62'], ceiling = '#c9a47c', brick = '#ae8b70';
 const EAVE = .32, END = .25, slope = RISE / FRONT;
 // How far each moving part turns when the house is fully open (radians).
-export const OPEN_TURN = { front: 1.95, side: 1.6, lid: -2.25 };
+export const OPEN_TURN = { front: 1.95, lid: -2.25 };
 // The front roof also rises this far as it tips up.
 export const LID_LIFT = .35;
 
@@ -19,7 +19,7 @@ export function exteriorPlan(house, id) {
     bay: loft && id !== 'garden' ? BAY : 0, hingeRight: id === 'garden', under: id === 'studio' && loft,
     leftEnd: id !== 'garden', rightEnd: id !== 'studio' || !garden, chimney: id === 'garden' || house.rooms.length === 1,
   };
-  const parts = ['front', 'roof'];
+  const parts = ['front', 'roof', 'back'];
   if (!options.under) parts.push('lid');
   if (id !== 'studio' || !garden) parts.push('side');
   return { parts, options };
@@ -28,15 +28,13 @@ export function exteriorPlan(house, id) {
 // Where each moving part turns, in room coordinates.
 export function hingeOf(part, options) {
   if (part === 'front') return [options.hingeRight ? HALF : -HALF - options.bay, 0, FRONT];
-  if (part === 'side') return [HALF, 0, BACK];
   return [0, WALL_TOP + RISE, 0];
 }
 
 // The pose of a moving part at `eased` open (0 closed, 1 open).
 export function hingePose(part, options, eased) {
   if (part === 'lid') return { rotation: [OPEN_TURN.lid * eased, 0, 0], lift: LID_LIFT * eased };
-  const turn = part === 'front' ? (options.hingeRight ? OPEN_TURN.front : -OPEN_TURN.front) : OPEN_TURN.side;
-  return { rotation: [0, turn * eased, 0], lift: 0 };
+  return { rotation: [0, (options.hingeRight ? OPEN_TURN.front : -OPEN_TURN.front) * eased, 0], lift: 0 };
 }
 
 const windowGlass = theme => theme === 'dusk' ? ['#ffd88f', 2.1] : theme === 'rain' ? ['#e9d6a8', 1.35] : ['#b9cfc8', 1];
@@ -119,18 +117,21 @@ export function buildExteriorPart(api, part, id, theme, options) {
     api.box(HALF + .04, WALL_TOP - .07, 0, .16, .14, FRONT - BACK, timber);
     api.box(HALF + .04, WALL_TOP / 2, BACK + .06, .16, WALL_TOP, .14, timber);
     windowAt(api, HALF, 1.5, 0, 1.1, 1.1, theme, 'side');
+  } else if (part === 'back') {
+    api.box((x0 + x1) / 2, WALL_TOP / 2, BACK - .07, x1 - x0 + .14, WALL_TOP, .14, plaster);
+    api.box((x0 + x1) / 2, .17, BACK - .1, x1 - x0 + .14, .34, .12, stone);
+    api.box(0, -.03, 0, 2 * HALF, .06, FRONT - BACK, ceiling);
+    const landing = options.under ? FRONT : STAIR_TOP;
+    if (options.bay) api.box(x0 + options.bay / 2, -.03, (BACK + landing) / 2, options.bay, .06, landing - BACK, ceiling);
   } else if (part === 'lid') {
     // The front roof slope: it tips up from the ridge to show the rooms.
     const l = x0 - (options.leftEnd ? END : 0), r = x1 + (options.rightEnd ? END : 0);
     slopeRows(api, l, r, 1);
     api.box((l + r) / 2, WALL_TOP - EAVE * slope + .02, FRONT + EAVE, r - l, .16, .1, timber);
   } else if (options.under) {
-    // The loft sits on the studio: a short pent roof covers the ledge, and the
-    // stair hall's outer wall climbs both floors.
-    api.box((x0 + x1) / 2, WALL_TOP + .12, FRONT - .12, x1 - x0 + .1, .12, .9, slate[0], [Math.atan(.35), 0, 0]);
-    api.box((x0 + x1) / 2, WALL_TOP + .02, FRONT + .03, x1 - x0 + .1, .12, .18, timber);
+    api.box((x0 + x1) / 2, WALL_TOP + .02, FRONT + .05, x1 - x0 + .1, .12, .2, timber);
     api.box(x0 - .07, WALL_TOP / 2, 0, .14, WALL_TOP, FRONT - BACK, plaster);
-    api.box(x0 - .07, WALL_TOP * 1.5, -.45, .14, WALL_TOP, FRONT - BACK, plaster);
+    api.box(x0 - .07, WALL_TOP * 1.5, 0, .14, WALL_TOP, FRONT - BACK, plaster);
     api.box(x0 - .1, .17, 0, .12, .34, FRONT - BACK, stone);
   } else {
     // The back slope, the ridge, the gable ends and the chimney stay put.

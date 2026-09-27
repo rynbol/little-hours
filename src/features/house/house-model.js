@@ -10,11 +10,12 @@ import { roomDesign, rugStack, standHeight, FLOOR_Y } from '../../core/layout.js
 import { getFurniture } from '../../core/catalog.js';
 import { surfaceChoices } from '../../core/surfaces.js';
 import { houseFurniture, houseArchitecture } from './house-furniture.js';
+import { buildGarden } from './house-garden.js';
 import { buildExteriorPart, buildBlueprint, exteriorPlan, hingeOf, hingePose, CHIMNEY_TOP } from './house-exterior.js';
 
 // Reuse authored room geometry, batched per room. Only the occupied desk
 // keeps its animated rig; window views retain their illustrated materials.
-export const HOUSE_POSITIONS = { studio: [-2.55, 0, 0], garden: [2.55, 0, 0], loft: [-2.55, 2.95, -0.45] };
+export const HOUSE_POSITIONS = { studio: [-2.55, 0, 0], garden: [2.55, 0, 0], loft: [-2.55, 2.95, 0] };
 // Pass the previous model to rebuild only the batches whose inputs changed.
 // Unchanged batches move to the new model, and the previous dispose() skips them.
 export function createHouseModel(scene, house, selectedId, theme = 'day', avatar, previous = null) {
@@ -130,22 +131,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   }
   });
   const trees = house.garden || [];
-  batch('orchard', JSON.stringify(trees.map(tree => [tree.date, Math.round(tree.growth * 20)])), () => {
-    box(8.75, -.52, 0, 5.5, .48, 6.4, '#63765e'); box(8.75, -.25, 0, 5.3, .15, 6.2, '#a9b98f');
-    for (let i = 0; i < 7; i++) box(6.45 + i * .78, .04, -2.86, .1, .58, .1, '#c6b99b');
-    box(8.75, .07, -2.86, 4.8, .07, .08, '#c6b99b'); box(8.75, .3, -2.86, 4.8, .07, .08, '#c6b99b');
-    trees.forEach((tree, index) => {
-      const row = Math.floor(index / 6), col = index % 6, seed = [...tree.date].reduce((sum, char) => sum * 31 + char.charCodeAt(0), 7) >>> 0;
-      const x = 6.75 + col * .8 + (row % 2) * .38 + (seed % 7 - 3) * .025, z = -2.25 + row * 1.08 + (seed % 5 - 2) * .04, g = tree.growth;
-      const tall = .28 + 1.35 * g, crown = .3 + .55 * g, blossom = g >= 1 && seed % 3 === 0;
-      box(x, -.17 + tall / 2, z, .05 + .06 * g, tall, .05 + .06 * g, '#7a5a42');
-      const leaves = blossom ? ['#e3b7bd', '#f0d3cf'] : [['#6f8a62', '#8fa77c'], ['#7c946a', '#a2b584'], ['#5f7d5c', '#86a077']][seed % 3];
-      for (let i = 0; i < (g < .3 ? 2 : 4); i++) {
-        const a = i * 2.4 + seed % 6;
-        ball(x + Math.cos(a) * crown * .28, -.17 + tall + (i % 2) * crown * .22, z + Math.sin(a) * crown * .24, crown, crown * .82, crown, leaves[i % 2]);
-      }
-    });
-  });
+  batch('orchard', JSON.stringify([theme, trees.map(tree => [tree.date, Math.round(tree.growth * 20)])]), () => buildGarden({ ...outside, cylinder }, trees, theme));
   for (const entry of house.rooms) batch(entry.id, JSON.stringify([entry.layout, theme, entry.id === house.activeId && avatar, house.rooms.length === 1]), () => {
     origin = HOUSE_POSITIONS[entry.id];
     const style = roomDesign(entry.layout).style || 'retreat';
@@ -194,7 +180,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   for (const entry of house.rooms) {
     const { parts, options } = exteriorPlan(house, entry.id);
     for (const part of parts) {
-      const key = `${entry.id}-${part}`, hinged = part !== 'roof', at = hingeOf(part, options);
+      const key = `${entry.id}-${part}`, hinged = part === 'front' || part === 'lid', at = hinged ? hingeOf(part, options) : null;
       if (hinged && !hinges[key]) { hinges[key] = new TransformNode(`house-hinge-${key}`, scene); hinges[key].parent = levels[entry.id]; }
       if (hinged) { hinges[key].position.set(...HOUSE_POSITIONS[entry.id].map((v, i) => v + at[i])); moving.push({ key, part, options, at }); }
       if (part === 'roof' && options.chimney && !chimney) chimney = { node: levels[entry.id], point: HOUSE_POSITIONS[entry.id].map((v, i) => v + CHIMNEY_TOP[i]) };

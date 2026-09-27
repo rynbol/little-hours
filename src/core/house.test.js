@@ -12,6 +12,7 @@ import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { createHouseModel } from '../features/house/house-model.js';
+import { treeSpot } from '../features/house/house-garden.js';
 
 function fixture(initial) {
   let raw = initial ? JSON.stringify(initial) : null, now = 1000;
@@ -137,7 +138,7 @@ test('house uses real furniture and architecture, batches static paint and relea
   try {
     for (let count = 1; count <= 3; count++) {
       const model = createHouseModel(scene, f.store.state.house, 'studio');
-      assert.ok(model.meshes.length <= 5 + count * 5, 'grounds, the garden, the site, its blueprint, the selection edge, and per room its batch and up to four outside parts');
+      assert.ok(model.meshes.length <= 5 + count * 6, 'grounds, the garden, the site, its blueprint, the selection edge, and per room its batch and up to five outside parts');
       const vertices = model.meshes.reduce((total, mesh) => total + mesh.getTotalVertices(), 0);
       assert.ok(vertices > 10_000 && vertices < 1_000_000);
       for (const mesh of model.meshes) assert.ok(mesh.getVerticesData('position').every(Number.isFinite));
@@ -230,7 +231,12 @@ test('the garden grows one tree per study day and a new day rebuilds only the ga
     assert.equal(b['house-studio'], a['house-studio'], 'a new tree leaves the rooms alone');
     assert.notEqual(b['house-orchard'], a['house-orchard']); assert.ok(a['house-orchard'].isDisposed());
     assert.ok(b['house-orchard'].getTotalVertices() > sprout);
-    const tops = model => model.meshes.find(mesh => mesh.name === 'house-orchard').getBoundingInfo().boundingBox.maximumWorld.y;
+    const [tx, tz] = treeSpot(0), tops = model => {
+      const points = model.meshes.find(mesh => mesh.name === 'house-orchard').getVerticesData('position');
+      let top = -Infinity;
+      for (let i = 0; i < points.length; i += 3) if (Math.hypot(points[i] - tx, points[i + 2] - tz) < .35) top = Math.max(top, points[i + 1]);
+      return top;
+    };
     const short = createHouseModel(scene, days([.1]), 'studio'), tall = createHouseModel(scene, days([1]), 'studio');
     assert.ok(tops(tall) > tops(short) + .8, 'an hour grows a much taller tree than a few minutes');
     for (const model of [two, short, tall]) model.dispose();

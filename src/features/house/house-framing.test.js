@@ -58,7 +58,7 @@ test('the opening dollhouse keeps all authored geometry framed, picking follows 
     model.setOpen(0); const shut = front.getBoundingInfo().boundingBox.maximumWorld.z;
     model.setOpen(1);
     assert.ok(front.getBoundingInfo().boundingBox.maximumWorld.z > shut + 3, 'the garden front swings out');
-    const hit = scene.pickWithRay(new Ray(new Vector3(-2.55, 12, -.45), new Vector3(0, -1, 0)), mesh => mesh.metadata?.houseSlot === 'loft');
+    const hit = scene.pickWithRay(new Ray(new Vector3(-2.55, 12, 0), new Vector3(0, -1, 0)), mesh => mesh.metadata?.houseSlot === 'loft');
     assert.equal(hit.pickedMesh?.metadata.houseSlot, 'loft', 'picking finds the upper floor of the open house');
     model.setOpen(0);
     assert.ok(Math.abs(front.getBoundingInfo().boundingBox.maximumWorld.z - shut) < 1e-6, 'closing restores the front');
@@ -86,7 +86,7 @@ test('the opening dollhouse keeps all authored geometry framed, picking follows 
       }
     }
     motion.stop(); model.setOpen(1); motion.trigger('loft', 'select', 0); motion.update(340);
-    assert.equal(scene.pickWithRay(new Ray(new Vector3(-2.55, 12, -.45), new Vector3(0, -1, 0)), mesh => mesh === loft).pickedMesh, loft, 'picking follows a bouncing room');
+    assert.equal(scene.pickWithRay(new Ray(new Vector3(-2.55, 12, 0), new Vector3(0, -1, 0)), mesh => mesh === loft).pickedMesh, loft, 'picking follows a bouncing room');
     motion.dispose();
     assert.equal(JSON.stringify(house), saved);
   } finally { model.dispose(); scene.dispose(); engine.dispose(); globalThis.document = oldDocument; }
