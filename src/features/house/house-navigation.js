@@ -5,12 +5,12 @@ import { createHouseView } from './house-view.js';
 import { studyTrees } from '../../core/garden.js';
 
 export function createHouseNavigation(app) {
-  let houseOpen = false, connectedView = null, connectionsKey = '', travelTimer = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
+  let houseOpen = false, connectedView = null, connectionsKey = '', travelTimer = 0, peekFrame = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
 
   function cancelDoorTravel(message) {
     if (!doorWalking) return false;
     doorWalking = false; travelling = false;
-    clearTimeout(travelTimer); travelTimer = 0;
+    clearTimeout(travelTimer); travelTimer = 0; cancelAnimationFrame(peekFrame); peekFrame = 0;
     $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking');
     app.room?.setDoorActive?.(null);
     app.room?.setDoorOpen?.(null);
@@ -132,7 +132,14 @@ export function createHouseNavigation(app) {
       app.room?.setDoorOpen?.(id);
       if (entry) { $('#room-travel small').textContent = 'Opening the door. Make yourself at home.'; return; }
       $('#room-travel small').textContent = 'A little peek at what could be.';
-      travelTimer = setTimeout(() => { if (doorWalking) { $('#journey-progress-fill').style.transform = 'scaleX(1)'; planRoom(); } }, DOOR_OPEN_SECONDS * 1000);
+      let peeked = 0, last = performance.now();
+      const peek = now => {
+        if (!doorWalking) return;
+        peeked += Math.min(.1, Math.max(0, now - last) / 1000); last = now;
+        if (peeked < DOOR_OPEN_SECONDS) { peekFrame = requestAnimationFrame(peek); return; }
+        $('#journey-progress-fill').style.transform = 'scaleX(1)'; planRoom();
+      };
+      peekFrame = requestAnimationFrame(peek);
     });
     if (!started) {
       cancelDoorTravel();
@@ -157,6 +164,6 @@ export function createHouseNavigation(app) {
     get connected() { return connectedView; },
     get travelling() { return travelling; },
     setHouseOpen, setConnectedView, renderConnections, visitRoom, visitDoor, onStateChange, onDoorProgress,
-    dispose() { clearTimeout(travelTimer); clearTimeout(arrivalTimer); connectedView?.dispose(); },
+    dispose() { clearTimeout(travelTimer); cancelAnimationFrame(peekFrame); clearTimeout(arrivalTimer); connectedView?.dispose(); },
   };
 }
