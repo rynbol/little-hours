@@ -98,7 +98,7 @@ export function createHouseNavigation(app) {
   const withGarden = () => ({ ...app.state.house, pet: app.state.pet, garden: studyTrees(app.state.history) });
   function setConnectedView(open) {
     if (travelling || open === Boolean(connectedView)) return;
-    if (open && app.panels.current === 'avatar') app.panels.close();
+    if (open && app.panels.current) app.panels.close();
     if (open && app.decorate.active) app.decorate.setEditMode(false);
     if (open) {
       $('#house-in-room').hidden = false;

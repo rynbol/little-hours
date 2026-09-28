@@ -7,7 +7,7 @@ export default defineConfig({
   timeout: 120_000,
   fullyParallel: true,
   // Software WebGL is CPU-heavy; more workers only slow every room down.
-  workers: 2,
+  workers: process.env.CI ? 1 : 2,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',

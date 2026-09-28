@@ -1,3 +1,5 @@
+Historical record of PR #1. The current pet design and verification plan are in [Pets at home](pet-care.md).
+
 # A little life, shared
 
 Pets now have a relationship with the person focusing. The full companion page combines an illustrated character, a personal name, a bond, little rituals, wearable keepsakes, and a memory of the time spent together. Together, Friends, and Keepsakes separate daily interactions, pair relationships, and saved mementos. The page suspends the covered room renderer and returns keyboard focus when closed. Adoption keeps the existing coin prices and gives each pet a personality and a savings wish visible on the focus card.

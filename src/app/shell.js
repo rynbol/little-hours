@@ -77,7 +77,7 @@ export const shellMarkup = (audioPrefs) => `
     <div class="room-picker-footer"><div id="room-grow"></div><button id="room-picker-house">My house ${icon('arrow')}</button></div>
   </dialog>
   <dialog id="session-celebration" class="session-celebration" aria-labelledby="celebration-title" aria-describedby="celebration-copy">
-    <form method="dialog"><button class="celebration-close" aria-label="Close session celebration">${icon('close')}</button><div class="celebration-flower" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="m24 0 5.6 17.7L48 24l-18.4 6.3L24 48l-5.6-17.7L0 24l18.4-6.3Z"/></svg></div><h2 id="celebration-title">You did it.</h2><p id="celebration-copy"></p><div class="celebration-coins">${coinArt()}<strong id="celebration-earned"></strong></div><p class="celebration-bond" id="celebration-bond"></p><p class="celebration-bond" id="celebration-friendship" hidden></p><button class="start-button" autofocus>Lovely ${icon('heart')}</button></form>
+    <form method="dialog"><button class="celebration-close" aria-label="Close session celebration">${icon('close')}</button><div class="celebration-flower" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="m24 0 5.6 17.7L48 24l-18.4 6.3L24 48l-5.6-17.7L0 24l18.4-6.3Z"/></svg></div><h2 id="celebration-title">You did it.</h2><p id="celebration-copy"></p><div class="celebration-coins">${coinArt()}<strong id="celebration-earned"></strong></div><p class="celebration-bond" id="celebration-bond"></p><button class="start-button" autofocus>Lovely ${icon('heart')}</button></form>
   </dialog>
   <div id="drag-return-preview" class="drag-return-preview" aria-hidden="true" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>`;

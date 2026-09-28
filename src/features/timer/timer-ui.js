@@ -2,12 +2,12 @@ import { createSession, remainingAt, formatTime, spokenTime, sessionPhase, displ
 import { plantPhase } from '../../core/room-types.js';
 import { petName, focusPetId } from '../../core/pet-bonds.js';
 import { petEntry } from '../../core/pets.js';
-import { petEntity, pairMembers } from '../../core/friendships.js';
 import { localDate } from '../../core/state.js';
 import { focusCoins } from '../../core/house.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 import { sproutArt } from '../../ui/ui-art.js';
+import { petGiftArt } from '../pet/index.js';
 
 export function createTimerUI(app) {
   let lastSessionRender = '', journalSignature = '', lastDay = '', focusCollapsed = false;
@@ -17,8 +17,7 @@ export function createTimerUI(app) {
     const reward = focusCoins(state.session.duration / 60_000);
     const together = focusPetId(state);
     const wish = petEntry(state.petWish);
-    const owner = petEntity(together), pair = sessionStarted(state.session) ? state.session.friendPair : pairMembers(owner, state.friendships.focusBuddies[owner], state.pets.map(petEntity));
-    const company = pair ? pair.map(member => petName(state, member.slice(4))).join(' & ') : petName(state, together);
+    const company = petName(state, together);
     const progress = wish ? (state.house.coins >= wish.price ? `${wish.name} is ready to come home` : `${wish.price - state.house.coins} coins to welcome ${wish.name}`) : reward ? `+${Math.floor(reward / 5)} ♡ · ${company}` : '♡ from 5 min';
     $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>${reward ? `+${reward} coins` : 'Coins from 5 min'}</strong><small></small></span>`;
     $('#focus-reward small').textContent = progress;
@@ -52,12 +51,17 @@ export function createTimerUI(app) {
 
   function showCelebration(completion) {
     const modal = $('#session-celebration');
-    const { minutes, coins, pet, friendship } = completion;
-    $('#celebration-copy').textContent = `${minutes} minutes with ${friendship ? friendship.names.join(' & ') : pet.name}.`;
+    const { minutes, coins, pet } = completion;
+    $('#celebration-copy').textContent = `${minutes} minutes with ${pet.name}.`;
     $('#celebration-bond').textContent = pet.hearts ? `+${pet.hearts} ♡ · ${pet.name} · ${pet.bondTitle}` : '♡';
     $('#celebration-earned').textContent = `+${coins} coins`;
-    $('#celebration-friendship').textContent = friendship ? `+${friendship.hearts} ♡ · ${friendship.names.join(' & ')} · ${friendship.bondTitle}` : '';
-    $('#celebration-friendship').hidden = !friendship;
+    $('#celebration-gift')?.remove();
+    if (pet.gifts?.length) {
+      const gift = pet.gifts.at(-1), reveal = document.createElement('div'); reveal.id = 'celebration-gift'; reveal.className = 'pet-gift-reveal';
+      reveal.innerHTML = `${petGiftArt(gift.id)}<strong></strong><span></span>`;
+      reveal.querySelector('strong').textContent = gift.label; reveal.querySelector('span').textContent = `From ${pet.name} ♡`;
+      $('#celebration-bond').after(reveal);
+    }
     if (!modal.open) modal.show();
     app.feedback.celebrate($('.celebration-flower'));
   }
@@ -67,7 +71,7 @@ export function createTimerUI(app) {
     app.moments?.refresh();
     const ms = displayedRemaining(state.session);
     const formatted = formatTime(ms);
-    const pageClock = $('#pet-page-clock'); if (pageClock && pageClock.textContent !== formatted) pageClock.textContent = formatted;
+    app.pet?.refreshCare();
     const presence = sessionPhase(state.session);
     app.companion.syncIntent();
     const today = localDate();
@@ -151,9 +155,9 @@ export function createTimerUI(app) {
     card.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
   }
 
-  function expand() { focusCollapsed = false; syncDock(); revealDock(); }
+  function expand() { if (app.panels.current === 'pet') app.panels.close(); focusCollapsed = false; syncDock(); revealDock(); }
 
-  $('#start-button').addEventListener('click', () => {
+  function toggleRunning() {
     const { state } = app;
     if (app.nav.travelling) { app.toast('Please wait until you arrive before starting a focus session.', true); return; }
     const resuming = !state.session.running && remainingAt(state.session) > 0 && remainingAt(state.session) < state.session.duration;
@@ -163,7 +167,8 @@ export function createTimerUI(app) {
     app.acceptUpdate(app.store.setRunning(!state.session.running));
     if (app.state.session.running) { app.companion.say(resuming ? 'resume' : 'start', { force: true }); app.delights?.show('start'); if (!resuming) app.room?.invitePet(); }
     else if (remainingAt(app.state.session) > 0) app.companion.say('pause', { force: true });
-  });
+  }
+  $('#start-button').addEventListener('click', toggleRunning);
   $('#reset-session').addEventListener('click', () => {
     app.acceptUpdate(app.store.update(draft => { draft.session = createSession(draft.session.duration / 60000); }));
     // Reset hides itself; keep keyboard and screen-reader focus on the timer.
@@ -209,6 +214,7 @@ export function createTimerUI(app) {
     app.acceptUpdate(app.store.update(draft => { draft.task = task; }));
   });
   $('#focus-toggle').addEventListener('click', () => {
+    if (app.panels.current === 'pet') { app.panels.close(); expand(); return; }
     if (app.panels.current) app.panels.close();
     // On a phone the timer lives below the room. A tap should take you there,
     // not hide an already off-screen card and require a second tap.
@@ -237,5 +243,5 @@ export function createTimerUI(app) {
   });
   window.addEventListener('resize', syncDock, { signal: app.signal });
 
-  return { renderFocusReward, showCelebration, render, tick, syncDock, expand };
+  return { renderFocusReward, showCelebration, render, tick, syncDock, expand, toggleRunning };
 }

@@ -16,7 +16,7 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
   lh flows                          list the flows
   lh run <flow...|all>              run flows with real input; exits 1 on any failure
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
-  lh perf [--view house|room|decorate]
+  lh perf [--view house|room|decorate|pet]
                                     idle cost, frame gaps, click-to-paint, GPU time, draw calls
   lh trace <cycle>                  Chrome performance trace of one cycle
   lh heap <cycle> [--repeat 30]     leak check: heap growth and Babylon object counts over repeated cycles
@@ -144,6 +144,7 @@ async function perfOnce(url, view) {
     const result = { readyMs: app.readyMs };
     await watchEvents(app);
     if (view === 'house') { await app.clickSel('#rooms-button'); result.openMs = await takeEvents(app, 4000); }
+    if (view === 'pet') { await views.pet.go(app); result.openMs = await takeEvents(app, 1500); }
     if (view === 'decorate') { await app.clickSel('#decorate-button'); result.openMs = await takeEvents(app, 3000); }
     Object.assign(result, await idle(app, Number(options.seconds || 5)));
     if (view === 'house') {
