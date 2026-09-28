@@ -12,6 +12,7 @@ export function createPanels(app) {
     panel.dataset.panelKind = current || '';
     const nextPetCard = current === 'pet';
     if (petCard !== nextPetCard) {
+      if (!nextPetCard) app.pet.close();
       petCard = nextPetCard; document.body.classList.toggle('is-pet-care', petCard);
       if (petCard) $('#focus-card').before(panel);
       else $('#room-section').append(panel);

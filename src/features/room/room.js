@@ -512,7 +512,7 @@ export function createRoom(container, options = {}) {
   let avatarAppearance = { ...AVATAR_DEFAULT }, avatarKey = avatarAppearanceKey(avatarAppearance);
   let hoveredId = null, drag = null, outlineKey = '';
   let companionRoutine, mobileCompanion, companionTime = 0, companionLayoutKey = '', companionY = null;
-  let celebrationAge = Infinity, petRibbon = 0, petCare = { fabric: 'linen', food: 'supper' }, petBond = 0;
+  let celebrationAge = Infinity, petRibbon = 0, petCare = { fabric: 'linen', food: 'supper' }, petBond = 0, petGift = null;
   const petBelongings = createPetBelongings(scene, world);
   let petRoutine, petModel = null, petSpecies = PETS[options.pet] ? options.pet : 'cat', petY = null, petCasts = null, petMoving = false, petKey = '', petTime = 0, petWake = 0, petShadowAt = 0;
   const outlinedMeshes = [];
@@ -1585,7 +1585,7 @@ export function createRoom(container, options = {}) {
   petRoutine.setCompanion(companionRoutine.pose); companionRoutine.setContext({ pet: petRoutine.pose });
   function buildPet() {
     petModel?.dispose(); petModel = createPetModel(scene, petSpecies, petRibbon); petModel.root.parent = world;
-    petRoutine.setSpecies(petSpecies); petBelongings.setStyle(petCare, petSpecies); petY = null; petCasts = null; updatePetShadow();
+    petRoutine.setSpecies(petSpecies); petBelongings.setStyle(petCare, petSpecies, petGift); petY = null; petCasts = null; updatePetShadow();
   }
   // A still pet casts into the cached sun shadow, which then redraws once
   // for each new resting place. A walking or carried pet keeps only its soft
@@ -1777,13 +1777,13 @@ export function createRoom(container, options = {}) {
     canPetCare() { return Boolean(!editing && !avatarCameraEditing && !suspended && !petRoutine.pose.held && !petRoutine.pose.care && petRoutine.diningSpot()); },
     petRitual(kind, food) {
       if (editing || avatarCameraEditing || suspended) return false;
-      if (food) { petCare = { ...petCare, food }; petBelongings.setStyle(petCare, petSpecies); }
+      if (food) { petCare = { ...petCare, food }; petBelongings.setStyle(petCare, petSpecies, petGift); }
       const ok = petRoutine.ritual(kind, reducedMotion);
       if (ok) { petTime = petStart = performance.now(); if (reducedMotion) { clearTimeout(petWake); petWake = setTimeout(requestRender, 9000); } requestRender(); }
       return ok;
     },
     invitePet(kind = 'sit') { if (editing || avatarCameraEditing || suspended) return false; const ok = petRoutine.invite(reducedMotion, kind); if (ok) { petTime = performance.now(); if (reducedMotion) { clearTimeout(petWake); petWake = setTimeout(requestRender, petRoutine.diagnostics().timer * 1000 + 50); } requestRender(); } return ok; },
-    setPetCare(care, bond) { const changed = care.fabric !== petCare.fabric || care.food !== petCare.food || bond !== petBond; petCare = care; petBond = bond; petRoutine.setBond(bond); petBelongings.setStyle(care, petSpecies); if (changed) requestRender(); },
+    setPetCare(care, bond, gift = null) { const changed = care.fabric !== petCare.fabric || care.food !== petCare.food || bond !== petBond || gift !== petGift; petCare = care; petBond = bond; petGift = gift; petRoutine.setBond(bond); petBelongings.setStyle(care, petSpecies, gift); if (changed) requestRender(); },
     setPetRibbon(value) { const next = Number.isInteger(value) && value >= 0 && value <= 3 ? value : 0; if (next === petRibbon) return; petRibbon = next; buildPet(); requestRender(); },
     setDoorActive(id) { lockedDoor = id || null; hoverPlay(null); requestRender(); },
     setDoorOpen(id) { openingDoor = id || null; requestRender(); },

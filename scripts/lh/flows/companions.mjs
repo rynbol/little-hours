@@ -67,6 +67,7 @@ export default {
     await finish.waitFor(`document.querySelector('#session-celebration').open`, { timeout: 12000, what: 'the focus celebration' });
     t.check('focus grows the starting pet’s bond and unlocks its ribbon', await finish.js(`${bond('cat')}.affection === 8 && ${bond('cat')}.ribbon === 1`));
     t.check('completion keeps the room interactive and celebrates overhead', await finish.js(`!document.querySelector('#session-celebration').matches(':modal') && ${diagnostics}.celebrationAge < 3.2 && Boolean(document.querySelector('.room-delight[data-kind="finish"]'))`));
+    t.check('completed study gives a daisy to the pet and displays its physical gift', await finish.js(`document.querySelector('#celebration-gift')?.textContent.includes('A daisy for you') && ${bond('cat')}.gift === 'daisy' && ${diagnostics}.petBelongings.gift.selected === 'daisy'`));
     await t.shot(finish, 'finish'); await finish.clickSel('#session-celebration .start-button'); await finish.clickSel('#pet-button');
     t.check('the unlocked ribbon is visible on the room pet', await finish.js(`${diagnostics}.petModel.ribbon === 1`));
     await t.shot(finish, 'bond'); await t.close(finish);
@@ -79,6 +80,27 @@ export default {
     await bonded.clickSel('#pet-friendship > summary'); await bonded.clickSel('#pet-dance');
     t.check('the final friendship unlock performs its room dance', await bonded.js(`${diagnostics}.pet.care?.kind === 'dance' && document.querySelectorAll('.pet-milestones .is-unlocked').length === 3`));
     await t.shot(bonded, 'friendship'); await t.close(bonded);
+
+    const family = await t.open({ seed: 'pet-family', reducedMotion: true });
+    await family.clickSel('#pet-button'); await family.clickSel('#pet-collection > summary');
+    for (const id of ['cat', 'dog', 'bunny', 'fox', 'panda']) {
+      await family.clickSel(`[data-pet-choice="${id}"]`);
+      t.check(`${id} uses a live close-up without accumulating renderers`, await family.js(`window.__littleHours.petCloseup.species === '${id}' && window.__littleHours.counts().engines === 2`));
+      await family.clickSel('#pet-collection > summary'); await t.shot(family, `closeup-${id}`); await family.clickSel('#pet-collection > summary');
+    }
+    await family.clickSel('[data-pet-choice="cat"]'); await family.clickSel('#pet-collection > summary'); await family.clickSel('#pet-gifts > summary');
+    for (const gift of ['daisy', 'star', 'moon']) {
+      await family.clickSel(`#pet-gift-${gift}`);
+      t.check(`${gift} can be displayed freely in the room`, await family.js(`${diagnostics}.petBelongings.gift.selected === '${gift}' && window.__littleHours.state.house.coins === 0`));
+      await t.shot(family, `gift-${gift}`);
+    }
+    await family.clickSel('#pet-gifts > summary'); await family.clickSel('#pet-closeup');
+    t.check('touching the live face gives immediate affection', await family.js(`document.querySelector('#pet-closeup').dataset.reaction === 'cuddle' && ${bond('cat')}.affection === 62`));
+    await family.clickSel('#pet-study');
+    t.check('study together starts focus and settles the close-up to sleep', await family.js(`window.__littleHours.state.session.running && window.__littleHours.petCloseup.studying`));
+    await t.shot(family, 'study-together'); await family.clickSel('#pet-study'); await family.clickSel('#close-panel');
+    t.check('closing care releases its renderer', await family.js(`window.__littleHours.counts().engines === 1 && window.__littleHours.petCloseup === null`));
+    await t.close(family);
 
     const mobile = await t.open({ seed: 'pet-shop', width: 390, height: 844, reducedMotion: true });
     await mobile.clickSel('#pet-button'); await mobile.clickSel('#pet-play');

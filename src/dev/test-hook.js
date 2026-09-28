@@ -128,6 +128,7 @@ export function installTestHook(app) {
   window.__littleHours = {
     version: 1,
     get room() { return app.room; },
+    get petCloseup() { return app.pet.diagnostics(); },
     get state() { return app.state; },
     get speech() { return app.speech; },
     get house() { return app.house; },

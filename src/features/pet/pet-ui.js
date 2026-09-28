@@ -1,15 +1,17 @@
 import { PETS } from './pet.js';
 import { PET_LINES } from '../companion/index.js';
-import { bondLevel, petName } from '../../core/pet-bonds.js';
+import { bondLevel, petName, focusPetId } from '../../core/pet-bonds.js';
 import { petCareStatus, MEAL_COST } from '../../core/pet-care.js';
 import { clockNow } from '../../core/test-pins.js';
 import { localDate } from '../../core/state.js';
 import { $ } from '../../ui/dom.js';
 import { petCardMarkup, escapePetText } from './pet-card.js';
+import { createPetCloseup } from './pet-closeup.js';
+import { remainingAt, formatTime, sessionStarted } from '../../core/session.js';
 
 export function createPetUI(app) {
   const name = () => petName(app.state), drafts = new Map();
-  let offered = null, signature = '', careSignature = '';
+  let offered = null, signature = '', careSignature = '', closeup = null, closeupHost = null;
   const available = () => !app.nav.travelling && !app.nav.houseOpen && !app.nav.connected && !app.roomUI.compact && !app.decorate.active && !app.avatar.active;
   function feedback({ species = app.state.pet, by = 'you' } = {}) {
     const bond = app.state.petBonds[species];
@@ -33,11 +35,22 @@ export function createPetUI(app) {
     renderName();
     const bond = app.state.petBonds[app.state.pet];
     app.room?.setPetRibbon?.(bond.ribbon);
-    app.room?.setPetCare?.(bond.care, bondLevel(bond).index);
+    app.room?.setPetCare?.(bond.care, bondLevel(bond).index, bond.gift);
     if (app.panels.current === 'pet' && signature !== mark()) renderPanelContent($('#room-panel'));
+    refreshStudy();
   }
+  function refreshStudy() {
+    if (app.panels?.current !== 'pet' || !closeup) return;
+    const state = app.state, id = state.pet, bond = state.petBonds[id], together = focusPetId(state);
+    closeup.update({ id, name: name(), ribbon: bond.ribbon, care: bond.care, gift: bond.gift, focusing: state.session.running && together === id });
+    const button = $('#pet-study'), remaining = remainingAt(state.session);
+    if (button) { button.textContent = state.session.running ? `Pause · ${formatTime(remaining)}` : sessionStarted(state.session) ? `Continue with ${petName(state, together)}` : `Study with ${name()}`; button.disabled = app.nav.travelling || app.avatar.active; }
+  }
+  function close() { closeup?.dispose(); closeup = null; closeupHost?.remove(); closeupHost = null; }
+  app.signal.addEventListener('abort', close, { once: true });
   function refreshCare() {
     if (app.panels?.current !== 'pet') return;
+    refreshStudy();
     const care = petCareStatus(app.state.petBonds[app.state.pet], clockNow()), next = JSON.stringify(care);
     if (careSignature === next) return;
     careSignature = next;
@@ -63,7 +76,7 @@ export function createPetUI(app) {
     if (kind === 'play' && !app.room?.canPetCare()) { receipt('Make a little space to play.'); return; }
     const result = app.store.petRitual(id, kind); app.acceptUpdate(result);
     if (!result.ritual.ok) return;
-    if (app.state.pet === id) app.room?.petRitual(kind);
+    if (app.state.pet === id) { app.room?.petRitual(kind); closeup?.react(kind); }
     app.delights?.show(result.ritual.unlocked ? 'bond' : kind, 'pet');
     receipt(result.ritual.earned ? `+${result.ritual.earned} ♡` : '♡');
   }
@@ -76,7 +89,12 @@ export function createPetUI(app) {
     const naming = previous && !$('#pet-name-form').hidden, meals = previous && !$('#pet-meals').hidden, scroll = panel.scrollTop;
     const { state } = app, id = state.pet;
     const markup = petCardMarkup(state, clockNow());
+    closeupHost?.remove();
     if (previous) previous.outerHTML = markup; else panel.insertAdjacentHTML('beforeend', markup);
+    const slot = $('#pet-closeup');
+    if (closeupHost) slot.replaceWith(closeupHost);
+    else { closeupHost = slot; closeup = createPetCloseup(closeupHost, { onPet: chosen => ritual(chosen, 'cuddle') }); }
+    refreshStudy();
     for (const key of details) panel.querySelector(`#${key}`)?.setAttribute('open', '');
     $('#pet-name-form').hidden = !naming; $('#pet-meals').hidden = !meals; $('#pet-feed').setAttribute('aria-expanded', String(Boolean(meals)));
     signature = mark(); careSignature = JSON.stringify(petCareStatus(state.petBonds[id], clockNow()));
@@ -97,18 +115,20 @@ export function createPetUI(app) {
       if (!app.room?.canPetCare()) { receipt('Make a little space for the bowl.'); return; }
       const food = button.dataset.petMeal, result = app.store.feedPet(id, food); app.acceptUpdate(result);
       if (!result.meal.ok) { receipt(result.meal.reason); return; }
-      if (app.state.pet === id) app.room?.petRitual('treat', food);
+      if (app.state.pet === id) { app.room?.petRitual('treat', food); closeup?.react('treat'); }
       $('#pet-meals').hidden = true; $('#pet-feed').setAttribute('aria-expanded', 'false'); $('#pet-feed').focus({ preventScroll: true });
       receipt('+1 ♡');
     }));
     $('#pet-invite').addEventListener('click', () => { if (ready() && !app.room?.invitePet()) receipt('Make a little space beside your seat.'); });
+    $('#pet-study').addEventListener('click', () => app.timer.toggleRunning());
     $('#pet-nap')?.addEventListener('click', () => { if (ready() && !app.room?.invitePet('nap')) receipt('Make a little space beside your seat.'); });
-    $('#pet-dance')?.addEventListener('click', () => { if (ready()) app.room?.petRitual('dance'); });
+    $('#pet-dance')?.addEventListener('click', () => { if (ready()) { app.room?.petRitual('dance'); closeup?.react('dance'); } });
     panel.querySelectorAll('[data-pet-fabric]').forEach(button => button.addEventListener('click', () => {
       const result = app.store.choosePetFabric(id, button.dataset.petFabric); app.acceptUpdate(result);
       if (!result.fabric.ok) receipt(result.fabric.reason);
     }));
     panel.querySelectorAll('[data-pet-ribbon]').forEach(button => button.addEventListener('click', () => app.acceptUpdate(app.store.setPetRibbon(id, Number(button.dataset.petRibbon)))));
+    panel.querySelectorAll('[data-pet-gift]').forEach(button => button.addEventListener('click', () => { app.acceptUpdate(app.store.selectPetGift(id, button.dataset.petGift)); if (app.state.pet === id) closeup?.react('cuddle'); }));
     panel.querySelectorAll('[data-pet-choice]').forEach(button => button.addEventListener('click', () => {
       const chosen = button.dataset.petChoice;
       if (!app.state.pets.includes(chosen)) { offered = chosen; offer(chosen); return; }
@@ -136,5 +156,5 @@ export function createPetUI(app) {
     if (focus) { $('#pet-adopt-name').focus({ preventScroll: true }); box.scrollIntoView({ block: 'nearest', behavior: 'instant' }); }
   }
   function welcome() { if (bondLevel(app.state.petBonds[app.state.pet]).index >= 1 && available()) app.room?.invitePet(); }
-  return { name, feedback, renderName, onPetCarry, renderPanel, sync, refreshCare, welcome };
+  return { name, feedback, renderName, onPetCarry, renderPanel, sync, refreshCare, welcome, close, diagnostics: () => closeup?.diagnostics() || null };
 }

@@ -5,6 +5,7 @@ import { CreateSphereVertexData } from '@babylonjs/core/Meshes/Builders/sphereBu
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { PET_BELONGINGS, PET_FOODS } from '../../core/pet-care.js';
+import { createPetGift } from './pet-gift-model.js';
 
 function geometry() {
   const positions = [], normals = [], colors = [], indices = [];
@@ -44,10 +45,12 @@ export function createPetBelongings(scene, parent) {
     mesh.metadata = { castShadow: false }; return mesh;
   };
   const blanket = make('pet-blanket'), bowl = make('pet-bowl'), food = make('pet-meal'), toy = make('pet-play-ball');
+  const gift = createPetGift(scene, parent);
   const cylinder = CreateCylinderVertexData({ height: 1, diameterTop: 1, diameterBottom: .8, tessellation: 28 });
   const sphere = CreateSphereVertexData({ diameter: 2, segments: 8 });
   let signature = '', currentFabric = 'linen';
-  function setStyle(care, species) {
+  function setStyle(care, species, selectedGift = null) {
+    gift.select(selectedGift);
     const key = `${care.fabric}:${care.food}:${species}`;
     if (key === signature) return; signature = key; currentFabric = care.fabric;
     const fabric = PET_BELONGINGS.find(item => item.id === care.fabric) || PET_BELONGINGS[0], meal = PET_FOODS[species].find(item => item.id === care.food);
@@ -70,6 +73,8 @@ export function createPetBelongings(scene, parent) {
   function update(pose, bed, dining, bedY, floorY, reducedMotion, editing) {
     blanket.setEnabled(Boolean(bed));
     if (bed) { blanket.position.set(bed.x, bedY, bed.z); blanket.rotation.y = bed.rotation * Math.PI / 2; }
+    gift.mesh.setEnabled(Boolean(bed && gift.selected));
+    if (bed) { const yaw = bed.rotation * Math.PI / 2; gift.mesh.position.set(bed.x + Math.cos(yaw) * .42 + Math.sin(yaw) * .22, bedY + .035, bed.z - Math.sin(yaw) * .42 + Math.cos(yaw) * .22); gift.mesh.rotation.y = yaw; }
     const care = pose.care, at = care?.prop || dining?.prop;
     bowl.setEnabled(Boolean(at) && (!care || care.kind === 'treat') && !editing);
     food.setEnabled(Boolean(care?.kind === 'treat' && care.phase !== 'content') && !editing);
@@ -83,5 +88,5 @@ export function createPetBelongings(scene, parent) {
       toy.rotation.z = -side * 7;
     }
   }
-  return { blanket, bowl, food, toy, get fabric() { return currentFabric; }, setStyle, update, dispose() { for (const mesh of [blanket, bowl, food, toy]) mesh.dispose(); material.dispose(); } };
+  return { blanket, bowl, food, toy, gift, get fabric() { return currentFabric; }, setStyle, update, dispose() { for (const mesh of [blanket, bowl, food, toy]) mesh.dispose(); gift.dispose(); material.dispose(); } };
 }

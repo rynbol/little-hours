@@ -8,6 +8,7 @@ import { emptyPond, normalizePond, addBait, landCatch } from './fishing.js';
 import { normalizeOwnedPets, adoptionVerdict, FREE_PETS } from './pets.js';
 import { normalizePetBonds, normalizePetWish, recordPetFocus, shareRitual, feedPet, choosePetFabric, welcomePet, cleanPetName, bondLevel, petName, focusPetId } from './pet-bonds.js';
 import { archivePetFriendships } from './pet-legacy.js';
+import { petGifts } from './pet-gifts.js';
 
 export const storageKey = 'little-hours-v1';
 // The save as it was just before a backup replaced it.
@@ -86,7 +87,8 @@ function completeDueSession(state, now) {
   recordSession(state.house, { at: endsAt, minutes: duration / 60_000 });
   addBait(state.pond, duration / 60_000, endsAt);
   const reward = recordPetFocus(state, duration / 60_000, endsAt), id = reward.id || state.session.petId || state.pet;
-  return { at: endsAt, minutes: duration / 60_000, coins: focusCoins(duration / 60_000), pet: { id, name: petName(state, id), hearts: reward.earned, bondTitle: bondLevel(state.petBonds[id]).title } };
+  const gifts = Object.freeze(reward.gifts.map(({ id: giftId, label }) => Object.freeze({ id: giftId, label })));
+  return { at: endsAt, minutes: duration / 60_000, coins: focusCoins(duration / 60_000), pet: { id, name: petName(state, id), hearts: reward.earned, bondTitle: bondLevel(state.petBonds[id]).title, gifts } };
 }
 
 export function createStateStore(storage, now = clockNow) {
@@ -181,6 +183,13 @@ export function createStateStore(storage, now = clockNow) {
     },
     renamePet(id, name) { return update(draft => { if (!draft.pets.includes(id)) return; const bond = draft.petBonds[id]; bond.name = cleanPetName(name, bond.name); }); },
     setPetRibbon(id, ribbon) { return update(draft => { if (!draft.pets.includes(id)) return; const bond = draft.petBonds[id]; if (Number.isInteger(ribbon) && ribbon >= 0 && ribbon <= bondLevel(bond).index) bond.ribbon = ribbon; }); },
+    selectPetGift(id, gift) {
+      return update(draft => {
+        if (!draft.pets.includes(id)) return;
+        const bond = draft.petBonds[id];
+        if (petGifts(bond).earned.some(entry => entry.id === gift)) bond.gift = gift;
+      });
+    },
     feedPet(id, food) {
       let meal;
       const result = update((draft, { now: at }) => { meal = feedPet(draft, id, food, at); });

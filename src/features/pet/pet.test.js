@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { PRESETS, createLayout, petBed } from '../../core/layout.js';
 import { seatsFor, walkable, findWalkingPath } from '../companion/companion.js';
 import { createPetRoutine, petSpots, petObstacles, petHome, insideBed, PET_REACTION, PET_HOLD, HEART_LIFE, MAX_HEARTS, PETS } from './pet.js';
@@ -263,4 +264,17 @@ test('an invitation prefers the seated player over an empty study desk', () => {
     assert.ok(distance(routine.pose, companion) < 1.5);
     assert.equal(routine.pose.action, kind === 'nap' ? 'sleep' : 'sit');
   }
+});
+
+
+test('a close-up gaze follows horizontal input and stays still with reduced motion', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), model = createPetModel(scene);
+  const pose = { action: 'sit', moving: false, walked: 0, petAge: Infinity, hearts: [], ritual: null, ritualAge: Infinity, look: { x: -1, y: 0 } };
+  model.animate(pose, 1, 1, false); const left = model.headPoint(new Vector3()).x;
+  pose.look.x = 1; model.animate(pose, 1, 1, false); const right = model.headPoint(new Vector3()).x;
+  assert.ok(right > left + .05);
+  model.animate(pose, 1, 1, true); const still = model.headPoint(new Vector3()).clone();
+  pose.look = { x: -1, y: 1 }; model.animate(pose, 1, 1, true);
+  assert.deepEqual(model.headPoint(new Vector3()), still);
+  model.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose();
 });

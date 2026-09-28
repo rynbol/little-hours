@@ -3,6 +3,8 @@ import { petArt } from './pet-art.js';
 import { BOND_LEVELS, bondLevel, petName } from '../../core/pet-bonds.js';
 import { MEAL_COST, PET_FOODS, PET_BELONGINGS, petCareStatus } from '../../core/pet-care.js';
 import { icon } from '../../ui/icons.js';
+import { PET_GIFTS, petGifts } from '../../core/pet-gifts.js';
+import { petGiftArt } from './pet-gift-art.js';
 
 export const escapePetText = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const careIcon = kind => `<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${kind === 'food' ? '<path d="M4 16h24l-3 9H7z"/><path d="M3 16h26M10 10c-3-3 3-3 0-6m7 6c-3-3 3-3 0-6m7 6c-3-3 3-3 0-6"/><path d="M13 20h6"/>' : kind === 'ball' ? '<circle cx="16" cy="16" r="11"/><path d="M6 12c8 3 12 8 14 14M12 6c3 8 8 12 14 14M8 24 24 8"/>' : '<path d="M8 17c-4-6 4-11 8-5 4-6 12-1 8 5l-8 8z"/><path d="M7 4v4M5 6h4m15-2v4m-2-2h4"/>'}</svg>`;
@@ -12,9 +14,11 @@ export function foodArt(food, fabric) {
 export function petCardMarkup(state, now) {
   const id = state.pet, pet = PETS[id], bond = state.petBonds[id], level = bondLevel(bond), care = petCareStatus(bond, now);
   const fabric = PET_BELONGINGS.find(item => item.id === bond.care.fabric), petLabel = escapePetText(petName(state));
+  const gifts = petGifts(bond), giftPreview = gifts.next || gifts.selected;
   return `<div class="pet-card" data-pet-id="${id}">
-    <header class="pet-card-identity"><div class="pet-avatar-mark">${petArt(id)}</div><div><h2>${petLabel}</h2><button id="pet-edit-name" aria-label="Rename ${petLabel}">${icon('build')}</button><span class="pet-bond-title">${level.title}</span></div></header>
+    <header class="pet-card-identity"><div><h2>${petLabel}</h2><button id="pet-edit-name" aria-label="Rename ${petLabel}">${icon('build')}</button><span class="pet-bond-title">${level.title}</span></div></header>
     <form id="pet-name-form" hidden><label class="sr-only" for="pet-name">Pet name</label><input id="pet-name" maxlength="24" value="${petLabel}" autocomplete="off" required><button type="submit">Save</button></form>
+    <button type="button" id="pet-closeup" class="pet-closeup" aria-label="Pet ${petLabel}"></button>
     <div class="pet-bond-heading"><span aria-label="${bond.affection} hearts">${icon('heart')} ${bond.affection}</span><span>${bond.minutes ? `${bond.minutes} min together` : pet.kind}</span></div>
     <div class="pet-bond-track" role="progressbar" aria-label="Bond with ${petLabel}" aria-valuemin="${level.next ? level.at : 0}" aria-valuemax="${level.next?.at || Math.max(60, bond.affection)}" aria-valuenow="${bond.affection}"><i style="width:${level.progress * 100}%"></i></div>
     <div class="pet-care-actions">
@@ -24,6 +28,8 @@ export function petCardMarkup(state, now) {
     </div>
     <div id="pet-meals" class="pet-meals" hidden>${PET_FOODS[id].map(food => `<button id="pet-meal-${food.id}" data-pet-meal="${food.id}" ${care.full || state.house.coins < MEAL_COST ? 'disabled' : ''}>${foodArt(food, fabric)}<span>${food.name}</span><small>${care.full ? `${care.mealMinutes}m` : `${MEAL_COST} ◉ · +1 ♡`}</small></button>`).join('')}<span class="pet-meal-note">${care.full ? `Full for ${care.mealMinutes} min` : state.house.coins < MEAL_COST ? `${MEAL_COST - state.house.coins} more coins` : `${state.house.coins} ◉`}</span></div>
     <p id="pet-ritual-status" class="pet-care-receipt" role="status"></p>
+    <button type="button" id="pet-study" class="pet-study">Study with ${petLabel}</button>
+    <details class="pet-gifts" id="pet-gifts"><summary>${petGiftArt(giftPreview.id)}<span><strong>${gifts.next ? giftPreview.label : `Gifts from ${petLabel}`}</strong><small>${gifts.next ? `${gifts.remaining} min to go` : `${gifts.earned.length} gifts`}</small>${gifts.next ? `<i class="pet-gift-progress"><i style="width:${Math.min(100, bond.minutes / gifts.next.at * 100)}%"></i></i>` : ''}</span><span class="pet-gift-chevron">${icon('arrow')}</span></summary><div class="pet-gift-options">${PET_GIFTS.map(gift => `<button id="pet-gift-${gift.id}" data-pet-gift="${gift.id}" ${bond.minutes < gift.at ? 'disabled' : ''} aria-pressed="${gifts.selected?.id === gift.id}" aria-label="${gift.label}${bond.minutes < gift.at ? `, ${gift.at} minutes together` : ', display beside your pet'}">${petGiftArt(gift.id)}<span>${gift.label}</span><small>${bond.minutes < gift.at ? `${gift.at} min` : gifts.selected?.id === gift.id ? 'In your room ♡' : 'Place in room'}</small></button>`).join('')}</div></details>
     <button class="pet-invite" id="pet-invite">${icon('cat')} Sit with me ${icon('arrow')}</button>
     ${level.index >= 2 ? `<button class="pet-invite pet-nap" id="pet-nap">${icon('moon')} Nap beside me ${icon('arrow')}</button>` : ''}
     <details class="pet-details" id="pet-belongings"><summary>Little belongings <span>＋</span></summary><div class="pet-fabric-preview" style="--fabric:${fabric.color};--fabric-dark:${fabric.dark}"><div class="pet-quilt"><i>♡</i></div><span>Blanket & bowl</span></div><div class="pet-fabrics">${PET_BELONGINGS.map(item => `<button id="pet-fabric-${item.id}" data-pet-fabric="${item.id}" style="--fabric:${item.color};--fabric-dark:${item.dark}" aria-label="${item.name}${bond.care.belongings.includes(item.id) ? '' : `, ${item.price} coins`}" aria-pressed="${bond.care.fabric === item.id}"><i></i><small>${bond.care.belongings.includes(item.id) ? bond.care.fabric === item.id ? '✓' : '◦' : `${item.price} ◉`}</small></button>`).join('')}</div><div class="pet-ribbons" aria-label="Ribbon color">${BOND_LEVELS.map((item, index) => `<button id="pet-ribbon-${index}" data-pet-ribbon="${index}" aria-label="${item.keepsake}" aria-pressed="${bond.ribbon === index}" ${index > level.index ? 'disabled' : ''} style="--ribbon:${item.color}"><i>🎀</i><small>${index > level.index ? `${item.at} ♡` : item.keepsake.split(' ')[0]}</small></button>`).join('')}</div></details>

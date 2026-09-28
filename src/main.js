@@ -175,7 +175,7 @@ document.addEventListener('visibilitychange', () => {
 }, { signal: listeners.signal });
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
-if (import.meta.env.DEV) installTestHook({ get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get connected() { return app.nav.connected; } });
+if (import.meta.env.DEV) installTestHook({ get pet() { return app.pet; }, get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get connected() { return app.nav.connected; } });
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');

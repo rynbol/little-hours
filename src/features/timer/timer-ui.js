@@ -7,6 +7,7 @@ import { focusCoins } from '../../core/house.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 import { sproutArt } from '../../ui/ui-art.js';
+import { petGiftArt } from '../pet/index.js';
 
 export function createTimerUI(app) {
   let lastSessionRender = '', journalSignature = '', lastDay = '', focusCollapsed = false;
@@ -54,6 +55,13 @@ export function createTimerUI(app) {
     $('#celebration-copy').textContent = `${minutes} minutes with ${pet.name}.`;
     $('#celebration-bond').textContent = pet.hearts ? `+${pet.hearts} ♡ · ${pet.name} · ${pet.bondTitle}` : '♡';
     $('#celebration-earned').textContent = `+${coins} coins`;
+    $('#celebration-gift')?.remove();
+    if (pet.gifts?.length) {
+      const gift = pet.gifts.at(-1), reveal = document.createElement('div'); reveal.id = 'celebration-gift'; reveal.className = 'pet-gift-reveal';
+      reveal.innerHTML = `${petGiftArt(gift.id)}<strong></strong><span></span>`;
+      reveal.querySelector('strong').textContent = gift.label; reveal.querySelector('span').textContent = `From ${pet.name} ♡`;
+      $('#celebration-bond').after(reveal);
+    }
     if (!modal.open) modal.show();
     app.feedback.celebrate($('.celebration-flower'));
   }
@@ -149,7 +157,7 @@ export function createTimerUI(app) {
 
   function expand() { if (app.panels.current === 'pet') app.panels.close(); focusCollapsed = false; syncDock(); revealDock(); }
 
-  $('#start-button').addEventListener('click', () => {
+  function toggleRunning() {
     const { state } = app;
     if (app.nav.travelling) { app.toast('Please wait until you arrive before starting a focus session.', true); return; }
     const resuming = !state.session.running && remainingAt(state.session) > 0 && remainingAt(state.session) < state.session.duration;
@@ -159,7 +167,8 @@ export function createTimerUI(app) {
     app.acceptUpdate(app.store.setRunning(!state.session.running));
     if (app.state.session.running) { app.companion.say(resuming ? 'resume' : 'start', { force: true }); app.delights?.show('start'); if (!resuming) app.room?.invitePet(); }
     else if (remainingAt(app.state.session) > 0) app.companion.say('pause', { force: true });
-  });
+  }
+  $('#start-button').addEventListener('click', toggleRunning);
   $('#reset-session').addEventListener('click', () => {
     app.acceptUpdate(app.store.update(draft => { draft.session = createSession(draft.session.duration / 60000); }));
     // Reset hides itself; keep keyboard and screen-reader focus on the timer.
@@ -234,5 +243,5 @@ export function createTimerUI(app) {
   });
   window.addEventListener('resize', syncDock, { signal: app.signal });
 
-  return { renderFocusReward, showCelebration, render, tick, syncDock, expand };
+  return { renderFocusReward, showCelebration, render, tick, syncDock, expand, toggleRunning };
 }

@@ -1,6 +1,7 @@
 import { PET_SHOP, petEntry } from './pets.js';
 import { sessionStarted } from './session.js';
 import { normalizePetCare, mealVerdict, MEAL_COST, MEAL_WAIT, PLAY_WAIT, PET_BELONGINGS } from './pet-care.js';
+import { petGifts } from './pet-gifts.js';
 
 export const PET_PERSONALITIES = Object.freeze({
   cat: { trait: 'Quiet company', loves: 'Warm windows & slow mornings', favorite: 'window', ritual: 'cuddle', color: '#cf966a' },
@@ -27,7 +28,7 @@ export function bondLevel(bond) {
   return { ...level, index, next, progress: next ? (points - level.at) / (next.at - level.at) : 1, points };
 }
 export function newPetBond(id) {
-  return { name: petEntry(id)?.name || 'Miso', affection: 0, minutes: 0, sessions: 0, ribbon: 0, ritualDay: '', rituals: [], memories: [], care: normalizePetCare(null) };
+  return { name: petEntry(id)?.name || 'Miso', affection: 0, minutes: 0, sessions: 0, ribbon: 0, gift: null, ritualDay: '', rituals: [], memories: [], care: normalizePetCare(null) };
 }
 export function normalizePetBonds(raw, owned) {
   return Object.fromEntries(owned.map(id => {
@@ -36,6 +37,7 @@ export function normalizePetBonds(raw, owned) {
       bond.name = cleanPetName(value.name, bond.name);
       for (const key of ['affection', 'minutes', 'sessions']) bond[key] = count(value[key]);
       bond.ribbon = Math.min(count(value.ribbon), bondLevel(bond).index);
+      bond.gift = petGifts({ minutes: bond.minutes, gift: value.gift }).selected?.id || null;
       bond.care = normalizePetCare(value.care);
       bond.ritualDay = typeof value.ritualDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.ritualDay) ? value.ritualDay : '';
       bond.rituals = Object.keys(PET_RITUALS).filter(key => Array.isArray(value.rituals) && value.rituals.includes(key));
@@ -88,13 +90,15 @@ export function choosePetFabric(state, id, fabric) {
   return { ok: true, price };
 }
 export function recordPetFocus(state, minutes, at) {
-  if (minutes < 5) return { earned: 0 };
+  if (minutes < 5) return { earned: 0, gifts: [] };
   const id = state.pets.includes(state.session.petId) ? state.session.petId : state.pet;
-  const bond = state.petBonds[id], earned = Math.floor(minutes / 5);
+  const bond = state.petBonds[id], earned = Math.floor(minutes / 5), previousGifts = petGifts(bond).earned.length;
   bond.minutes = Math.min(1_000_000_000, bond.minutes + minutes); bond.sessions = Math.min(1_000_000_000, bond.sessions + 1);
+  const gifts = petGifts(bond).earned.slice(previousGifts);
+  if (gifts.length) bond.gift = gifts.at(-1).id;
   memory(bond, 'focus', at, minutes);
   const unlocked = growBond(bond, earned, at);
-  return { id, earned, unlocked };
+  return { id, earned, unlocked, gifts };
 }
 export function welcomePet(state, id, name, at) {
   state.petBonds[id] = newPetBond(id);

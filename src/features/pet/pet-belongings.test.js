@@ -11,7 +11,7 @@ test('pet belongings keep finite geometry and reuse their mesh and material budg
   const start = [scene.meshes.length, scene.materials.length], props = createPetBelongings(scene, parent);
   for (const species of Object.keys(PET_FOODS)) for (const fabric of PET_BELONGINGS) for (const food of ['supper', 'crunch']) {
     props.setStyle({ fabric: fabric.id, food }, species);
-    assert.deepEqual([scene.meshes.length, scene.materials.length], [start[0] + 4, start[1] + 1]);
+    assert.deepEqual([scene.meshes.length, scene.materials.length], [start[0] + 5, start[1] + 2]);
     for (const mesh of [props.blanket, props.bowl, props.food, props.toy]) {
       assert.equal(mesh.parent, parent); assert.equal(mesh.isPickable, false);
       const positions = mesh.getVerticesData('position'), normals = mesh.getVerticesData('normal'), colors = mesh.getVerticesData('color');
@@ -43,5 +43,18 @@ test('a meal stays in its floor bowl, empties visibly, and leaves an owned blank
   show({ ...meal, kind: 'play', age: 1 }, true); const still = props.toy.position.asArray();
   show({ ...meal, kind: 'play', age: 2 }, true); assert.deepEqual(props.toy.position.asArray(), still);
   show(meal, false, true); assert.equal(props.food.isEnabled(), false); assert.equal(props.bowl.isEnabled(), false);
+  props.dispose(); scene.dispose(); engine.dispose();
+});
+
+test('a selected study gift follows the bed and disappears when the bed is removed', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), props = createPetBelongings(scene);
+  const bed = { x: 1, z: 2, rotation: 1 };
+  props.setStyle({ fabric: 'rose', food: 'supper' }, 'cat', 'daisy');
+  props.update({ care: null }, bed, null, .2, .08, true, false);
+  assert.equal(props.gift.selected, 'daisy'); assert.equal(props.gift.mesh.isEnabled(), true);
+  assert.ok(Math.abs(props.gift.mesh.position.x - bed.x) < .5 && Math.abs(props.gift.mesh.position.z - bed.z) < .5);
+  const before = props.gift.mesh.position.clone(); bed.x += 2;
+  props.update({ care: null }, bed, null, .2, .08, true, false); assert.ok(Math.abs(props.gift.mesh.position.x - before.x - 2) < 1e-8);
+  props.update({ care: null }, null, null, .2, .08, true, false); assert.equal(props.gift.mesh.isEnabled(), false);
   props.dispose(); scene.dispose(); engine.dispose();
 });
