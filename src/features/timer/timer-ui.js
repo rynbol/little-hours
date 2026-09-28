@@ -8,9 +8,61 @@ import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 import { sproutArt } from '../../ui/ui-art.js';
 import { petGiftArt } from '../pet/index.js';
+import './focus-mode.css';
 
 export function createTimerUI(app) {
   let lastSessionRender = '', journalSignature = '', lastDay = '', focusCollapsed = false;
+  let focusMode = false, focusReturn = null, focusRoom = '';
+
+  const focusRoomSignature = () => JSON.stringify([app.state.house.activeId, app.state.layout, app.state.theme, app.state.pet, app.state.avatar, app.state.decor]);
+  const focusUnavailable = () => !app.roomReady || app.nav.travelling || app.avatar.active || app.decorate.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.lake.isOpen || $('#room-picker').open || $('#session-celebration').open;
+
+  function leaveFocusMode({ restoreFocus = true } = {}) {
+    if (!focusMode) return false;
+    focusMode = false; focusRoom = '';
+    document.body.classList.remove('is-focus-mode');
+    $('#focus-mode-hud').hidden = true;
+    $('#focus-mode-enter').setAttribute('aria-expanded', 'false');
+    app.room?.resize?.();
+    if (restoreFocus) {
+      const target = [focusReturn, $('#focus-mode-enter'), $('#start-button')].find(node => node?.isConnected && !node.disabled && node.getClientRects().length);
+      target?.focus({ preventScroll: true });
+    }
+    focusReturn = null;
+    return true;
+  }
+
+  function syncFocusMode() {
+    const unavailable = focusUnavailable();
+    if (focusMode && (unavailable || !app.state.session.running || focusRoom !== focusRoomSignature())) leaveFocusMode({ restoreFocus: !unavailable });
+    $('#focus-mode-enter').disabled = unavailable;
+  }
+
+  function enterFocusMode() {
+    if (focusMode || focusUnavailable()) return;
+    const returnFocus = document.activeElement, refreshed = app.store.update(); app.acceptUpdate(refreshed);
+    if (refreshed.completion || focusUnavailable()) return;
+    const wasRunning = app.state.session.running, resuming = sessionStarted(app.state.session);
+    if (app.panels.current) app.panels.close();
+    app.roomUI.leaveMini();
+    app.audio.unlock();
+    if (!wasRunning) {
+      const result = app.store.setRunning(true); app.acceptUpdate(result);
+      if (result.completion || focusUnavailable() || !app.state.session.running) return;
+      app.companion.say(resuming ? 'resume' : 'start', { force: true }); app.delights?.show('start');
+      if (!resuming) app.room?.invitePet();
+    }
+    focusReturn = returnFocus; focusRoom = focusRoomSignature(); focusMode = true;
+    document.body.classList.add('is-focus-mode');
+    $('#focus-mode-hud').hidden = false;
+    $('#focus-mode-enter').setAttribute('aria-expanded', 'true');
+    app.room?.resize?.();
+    $('#focus-mode-exit').focus({ preventScroll: true });
+  }
+
+  $('#focus-mode-enter').addEventListener('click', enterFocusMode);
+  $('#focus-mode-exit').addEventListener('click', () => leaveFocusMode());
+  app.signal.addEventListener('abort', () => leaveFocusMode({ restoreFocus: false }), { once: true });
 
   function renderFocusReward() {
     const { state } = app;
@@ -50,6 +102,7 @@ export function createTimerUI(app) {
   }
 
   function showCelebration(completion) {
+    leaveFocusMode({ restoreFocus: false });
     const modal = $('#session-celebration');
     const { minutes, coins, pet } = completion;
     $('#celebration-copy').textContent = `${minutes} minutes with ${pet.name}.`;
@@ -67,6 +120,7 @@ export function createTimerUI(app) {
   }
 
   function render() {
+    syncFocusMode();
     const { state } = app, travelling = app.nav.travelling, editingAvatar = app.avatar.active;
     app.moments?.refresh();
     const ms = displayedRemaining(state.session);
@@ -93,8 +147,10 @@ export function createTimerUI(app) {
     if (renderKey === lastSessionRender) return;
     lastSessionRender = renderKey;
     $('#timer').textContent = formatted;
+    $('#focus-mode-timer').textContent = formatted;
     $('#dock-timer').textContent = formatted;
     $('#timer').setAttribute('aria-label', `${spokenTime(ms)} remaining`);
+    $('#focus-mode-timer').setAttribute('aria-label', `${spokenTime(ms)} remaining`);
     document.title = state.session.running ? `${formatted} · Little Hours` : 'Little Hours — a little place to focus';
     $('#session-label').textContent = state.session.running ? 'IN YOUR OWN TIME' : ms < state.session.duration && ms > 0 ? 'A LITTLE BREATHER' : ms === 0 ? 'YOU DID THAT' : 'SETTLE IN';
     $('#timer-caption').textContent = state.session.running ? 'one thing at a time' : ms === 0 ? 'a little progress, made' : ms < state.session.duration ? 'ready when you are' : 'a small beginning';
@@ -140,6 +196,7 @@ export function createTimerUI(app) {
   }
 
   function syncDock() {
+    syncFocusMode();
     const visible = !app.nav.houseOpen && !app.nav.connected && !app.decorate.active && !focusCollapsed;
     $('#focus-card').hidden = !visible;
     document.body.classList.toggle('focus-collapsed', focusCollapsed);
@@ -243,5 +300,5 @@ export function createTimerUI(app) {
   });
   window.addEventListener('resize', syncDock, { signal: app.signal });
 
-  return { renderFocusReward, showCelebration, render, tick, syncDock, expand, toggleRunning };
+  return { renderFocusReward, showCelebration, render, tick, syncDock, expand, toggleRunning, enterFocusMode, leaveFocusMode, syncFocusMode };
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rollCatch, baitRange, startFight, stepFight, SPECIES, TIERS, BAIT_RANGES, stockBait } from './fishing.js';
+import { rollCatch, baitRange, startFight, stepFight, SPECIES, TIERS, BAIT_RANGES, BAIT_LIMIT, stockBait } from './fishing.js';
 import { createStateStore, restoreState, freshState } from './state.js';
 
 const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
@@ -116,4 +116,17 @@ test('stocking tops every bait up to the count and keeps the bait already there'
   stockBait(pond, 3, 9);
   const counts = pond.bait.reduce((all, { minutes }) => ({ ...all, [minutes]: (all[minutes] || 0) + 1 }), {});
   assert.deepEqual(counts, { 5: 3, 15: 1, 20: 1, 25: 1, 40: 1, 41: 1, 42: 1, 43: 1, 50: 3, 90: 3 });
+});
+
+
+test('development stocking never displaces earned bait from a full or nearly full inventory', () => {
+  for (const count of [BAIT_LIMIT, BAIT_LIMIT - 1, BAIT_LIMIT - 6]) {
+    const state = freshState();
+    state.pond.bait = Array.from({ length: count }, (_, at) => ({ minutes: 10, at }));
+    const earned = structuredClone(state.pond.bait);
+    stockBait(state.pond, 3, 1000);
+    assert.equal(state.pond.bait.length, BAIT_LIMIT);
+    assert.deepEqual(state.pond.bait.slice(0, count), earned);
+    assert.deepEqual(restoreState(JSON.stringify(state)).pond.bait, state.pond.bait);
+  }
 });

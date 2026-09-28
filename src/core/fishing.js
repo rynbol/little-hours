@@ -115,6 +115,6 @@ export function stepFight(fight, dt, reeling, random) {
 export function stockBait(pond, each, at) {
   for (const range of BAIT_RANGES) {
     const have = pond.bait.filter(bait => baitRange(bait.minutes) === range).length;
-    for (let i = have; i < each; i++) pond.bait.push({ minutes: range.from, at });
+    for (let i = have; i < each && pond.bait.length < BAIT_LIMIT; i++) pond.bait.push({ minutes: range.from, at });
   }
 }

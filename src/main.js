@@ -30,7 +30,6 @@ const deviceStorage = pinnedStorage || {
   setItem: (key, value) => localStorage.setItem(key, value),
 };
 const store = createStateStore(deviceStorage);
-if (import.meta.env.DEV && !isPinned) store.update((draft, { now }) => stockBait(draft.pond, 3, now));
 const audio = createAudio(deviceStorage);
 const listeners = new AbortController();
 let hiddenSince = 0;
@@ -40,7 +39,7 @@ $('#task').value = store.state.task;
 
 const toast = createToast();
 const app = {
-  state: store.state, store, audio, room: null, speech: null, moments: null, houseUI: null,
+  state: store.state, store, audio, room: null, roomReady: false, speech: null, moments: null, houseUI: null,
   signal: listeners.signal, storageWarningShown: false,
   feedback: createUIFeedback(document, { signal: listeners.signal }),
   toast: toast.show, hideToast: toast.hide, acceptUpdate,
@@ -60,6 +59,7 @@ wireSoundControls(app);
 function applyState(next, force = false) {
   const previous = app.state;
   const state = app.state = next;
+  app.timer.syncFocusMode();
   app.nav.onStateChange(previous);
   const design = roomDesign(state.layout);
   document.body.dataset.design = design.style || 'retreat';
@@ -104,6 +104,7 @@ try {
   setDecorEntry(false);
   app.room = createRoom($('#room-canvas'), {
     onReady() {
+      app.roomReady = true; app.timer.render();
       $('#loading-note').hidden = true;
       setDecorEntry(true);
       // Back after half an hour or more: a small hello.
@@ -145,6 +146,7 @@ app.houseUI = createHouseUI($('#house-page'), {
   onPond: () => app.lake.open(),
 });
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !event.isComposing && app.timer.leaveFocusMode()) { event.preventDefault(); return; }
   if (event.key === 'Escape' && app.nav.houseOpen && !event.target.closest('input')) { app.nav.setHouseOpen(false); return; }
   if (event.key === 'Escape' && app.room?.cancelDrag?.()) { event.preventDefault(); return; }
   // Escape while typing (or composing) belongs to the text field, not the panel.
@@ -156,6 +158,7 @@ document.addEventListener('keydown', event => {
 app.timer.syncDock();
 app.companion.syncIntent();
 app.timer.tick();
+if (import.meta.env.DEV && !isPinned) app.acceptUpdate(store.update((draft, { now }) => stockBait(draft.pond, 3, now)));
 const tickInterval = setInterval(app.timer.tick, 500);
 function refreshState() {
   const before = JSON.stringify(app.state.layout);

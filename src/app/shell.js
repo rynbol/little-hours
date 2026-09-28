@@ -27,6 +27,10 @@ export const shellMarkup = (audioPrefs) => `
           <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
           <div class="mini-caption" id="mini-caption" hidden>Mini view preview · inside this page</div>
           <div class="room-hint" id="room-hint">Drag to look around<span>·</span>Tap a plant, bookcase or tea table</div>
+          <div class="focus-mode-hud" id="focus-mode-hud" hidden>
+            <time class="focus-mode-timer" id="focus-mode-timer" role="timer" aria-label="25 minutes remaining">25:00</time>
+            <button class="focus-mode-exit" id="focus-mode-exit" aria-label="Leave focus mode" title="Leave focus mode">${icon('close')}</button>
+          </div>
         </div>
         <div class="room-bottom">
           <div class="room-company">${icon('cat')}<span id="pet-company">You & Miso</span></div>
@@ -61,6 +65,7 @@ export const shellMarkup = (audioPrefs) => `
           <div class="durations" role="group" aria-label="Focus duration"><button data-minutes="25" aria-pressed="true">25 <span>min</span></button><button data-minutes="50" aria-pressed="false">50 <span>min</span></button><button data-minutes="90" aria-pressed="false">90 <span>min</span></button></div>
         </div>
         <button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
+        <button class="focus-mode-button" id="focus-mode-enter" aria-expanded="false" aria-controls="focus-mode-hud" disabled>${icon('avatar')}<span>Focus mode</span>${icon('arrow')}</button>
         <button class="reset-session" id="reset-session" hidden>Start over</button>
         <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="${audioPrefs.volume}" aria-label="Rain volume" disabled /><label class="chime-toggle"><span>Chime at the end</span><input type="checkbox" id="chime-toggle" ${audioPrefs.chime ? 'checked' : ''} /></label></div>
         <div id="focus-reward" class="focus-reward"></div>
