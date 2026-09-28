@@ -18,9 +18,9 @@ async function tapPet(app, sleep, slow) {
 const oneByOne = counts => counts.indexOf(1) >= 0 && counts.indexOf(1) < counts.indexOf(2);
 const PET_AGE = `window.__littleHours.room.diagnostics().pet.petAge`;
 
-async function petAgain(app, sleep, spot, times) {
+async function petAgain(app, sleep, spot, times, slow) {
   const ages = [];
-  for (let i = 0; i < times; i++) { await app.click(spot.x, spot.y); await sleep(120); ages.push(await app.js(PET_AGE)); }
+  for (let i = 0; i < times; i++) { await app.click(spot.x, spot.y); await sleep(120 / slow); ages.push(await app.js(PET_AGE)); }
   return { ages, hearts: await app.js(HEARTS) };
 }
 
@@ -34,7 +34,8 @@ export default {
     let tap = await tapPet(app, sleep, t.slow);
     check('tapping the cat floats two hearts up one after another', oneByOne(tap.counts), tap.counts);
     check('petting shows no words', tap.said === null, tap.said);
-    const again = await petAgain(app, sleep, tap.spot, 4);
+    check('a room cuddle grows the saved bond once', await app.js('window.__littleHours.state.petBonds.cat.affection === 2'));
+    const again = await petAgain(app, sleep, tap.spot, 4, t.slow);
     check('four more taps stack a heart each', again.hearts >= 5, again);
     check('more taps hold the lean instead of starting it over', again.ages.every(age => age >= .3 && age < 2.6), again.ages);
     await t.shot(app, 'cat-hearts');
@@ -59,7 +60,7 @@ export default {
     await t.shot(app, 'dog-hearts');
     await app.clickSel('#pet-button');
     await app.waitFor(`document.getElementById('pet-now') !== null`, { what: 'the pet panel' });
-    check('the panel button offers to pet Mochi', (await app.text('#pet-now'))?.includes('Give Mochi a pet'), await app.text('#pet-now'));
+    check('the panel button offers to pet Mochi', (await app.attr('#pet-now', 'aria-label')).startsWith('Give Mochi a pet'), await app.attr('#pet-now', 'aria-label'));
     await app.clickSel('[data-pet-choice="cat"]');
     await app.waitFor(`document.querySelector('[data-pet-choice="cat"]')?.getAttribute('aria-pressed') === 'true'`, { what: 'the cat to be chosen' });
     check('switching back to the cat is saved too', (await app.saved())?.pet === 'cat' && await app.text('#pet-button-label') === 'Miso');
@@ -81,8 +82,11 @@ export default {
     check('adopting Hoshi spends 90 coins', await shop.text('#coin-balance') === '30', await shop.text('#coin-balance'));
     check('the fox is in the room and named', await shop.js('window.__littleHours.room.diagnostics().petSpecies') === 'fox' && await shop.text('#pet-button-label') === 'Hoshi');
     check('the fox now lives with you and the save knows it', JSON.stringify((await shop.saved())?.pets) === '["cat","dog","fox"]' && !(await shop.js(`document.querySelector('[data-pet-choice="fox"]').classList.contains('is-locked')`)));
+    await shop.clickSel('#close-panel');
+    await shop.waitFor(`(() => { const pet = window.__littleHours.room.diagnostics().pet; return pet.petAge === Infinity && pet.hearts.length === 0 && pet.ritual === null; })()`, { what: 'the welcome play to finish' });
     const foxTap = await tapPet(shop, sleep, t.slow);
     check('tapping the fox gets hearts too', oneByOne(foxTap.counts), foxTap.counts);
+    check('the fox remembers the cuddle after welcome play', (await shop.saved())?.petBonds.fox.affection === 1);
     await t.shot(shop, 'fox-hearts');
     await t.close(shop);
   },

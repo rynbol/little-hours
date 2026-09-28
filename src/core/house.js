@@ -1,4 +1,4 @@
-import { createLayout, normalizeLayout, PRESETS } from './layout.js';
+import { createLayout, normalizeLayout, PRESETS, roomDesign } from './layout.js';
 import { fitRoomType, isRoomType } from './room-types.js';
 import { isDuration } from './session.js';
 
@@ -12,6 +12,7 @@ export const HOUSE_SLOTS = [
 export const HOUSE_NAME = 'Littlewood cottage';
 const validDesign = id => PRESETS.some(preset => preset.id === id);
 export const cleanName = (value, fallback) => typeof value === 'string' && value.trim() ? value.trim().slice(0, 40) : fallback;
+export const roomDisplayName = room => room.name ?? roomDesign(room.layout).name;
 export const focusCoins = minutes => isDuration(minutes) && minutes >= 5 ? minutes : 0;
 
 export const MAX_SESSIONS = 1000;
@@ -25,22 +26,25 @@ export function recordSession(house, { at, minutes }) {
 
 export function createHouse(layout = createLayout(), history = []) {
   return {
-    version: 2, name: HOUSE_NAME, coins: history.reduce((sum, entry) => sum + focusCoins(entry.minutes), 0),
+    version: 3, name: HOUSE_NAME, coins: history.reduce((sum, entry) => sum + focusCoins(entry.minutes), 0),
     activeId: 'studio', sessions: [],
-    rooms: [{ id: 'studio', type: 'studio', name: 'Your studio', layout: structuredClone(layout) }],
+    rooms: [{ id: 'studio', type: 'studio', name: null, layout: structuredClone(layout) }],
   };
 }
 
 export function normalizeHouse(raw, layout, history = []) {
   if (!raw || typeof raw !== 'object') return createHouse(layout, history);
   const house = createHouse(layout);
+  const explicitNames = Number.isSafeInteger(raw.version) && raw.version >= 3;
   house.name = cleanName(raw.name, HOUSE_NAME);
   house.coins = Number.isSafeInteger(raw.coins) && raw.coins >= 0 ? Math.min(raw.coins, 1_000_000_000) : 0;
   for (const slot of HOUSE_SLOTS) {
     const saved = Array.isArray(raw.rooms) && raw.rooms.find(room => room?.id === slot.id);
     if (!saved || !saved.layout || !validDesign(saved.layout.presetId)) break;
     const type = isRoomType(saved.type) ? saved.type : slot.type;
-    const entry = { id: slot.id, type, name: cleanName(saved.name, slot.label), layout: fitRoomType(normalizeLayout(saved.layout), type) };
+    let name = explicitNames && saved.name === null ? null : cleanName(saved.name, slot.id === 'studio' ? null : slot.label);
+    if (!explicitNames && slot.id === 'studio' && name === 'Your studio') name = null;
+    const entry = { id: slot.id, type, name, layout: fitRoomType(normalizeLayout(saved.layout), type) };
     if (slot.id === 'studio') house.rooms[0] = entry;
     else house.rooms.push(entry);
   }
@@ -55,7 +59,7 @@ export function houseConnections(house) {
   const next = nextExpansion(house);
   return HOUSE_SLOTS.filter(slot => slot.id !== house.activeId).map(slot => {
     const room = house.rooms.find(entry => entry.id === slot.id);
-    return { id: slot.id, name: room?.name || slot.label, built: Boolean(room), upstairs: slot.id === 'loft', price: slot.price, ready: !room && next?.id === slot.id && house.coins >= slot.price, next: next?.id === slot.id };
+    return { id: slot.id, name: room ? roomDisplayName(room) : slot.label, built: Boolean(room), upstairs: slot.id === 'loft', price: slot.price, ready: !room && next?.id === slot.id && house.coins >= slot.price, next: next?.id === slot.id };
   });
 }
 export function expansionVerdict(house, slotId, presetId) {

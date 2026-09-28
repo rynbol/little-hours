@@ -2,6 +2,7 @@ import { getFurniture } from '../../core/catalog.js';
 import { petBed, ROOM_BOUNDS } from '../../core/layout.js';
 import { navigationObstacles, walkable, clearSegment, findWalkingPath, localPoint, seatsFor, reachableFloor, reaches, cellPoint } from '../companion/index.js';
 import { clockRandom } from '../../core/test-pins.js';
+import { PET_PERSONALITIES } from '../../core/pet-bonds.js';
 import { PET_SHOP } from '../../core/pets.js';
 
 // The pet's own day: it naps in its bed, wakes with a stretch, strolls to a
@@ -81,7 +82,7 @@ export function petSpots(layout, { windowX = -2.7, companion = null } = {}) {
 
 export function createPetRoutine({ random = clockRandom, onChange = () => {} } = {}) {
   // `to` is where a walk ends, so the companion keeps out of the way.
-  const pose = { state: 'sleeping', action: 'sleep', x: 0, z: 0, yaw: 0, onBed: true, moving: false, walked: 0, petAge: Infinity, fuss: 0, hearts: [], held: false, species: 'cat', to: null };
+  const pose = { state: 'sleeping', action: 'sleep', x: 0, z: 0, yaw: 0, onBed: true, moving: false, walked: 0, petAge: Infinity, fuss: 0, hearts: [], held: false, species: 'cat', to: null, ritual: null, ritualAge: Infinity };
   let layout = null, editing = false, windowX = -2.7, companion = null, speed = PETS.cat.speed;
   // The floor that leads home, found once per layout.
   let homeFloor = null;
@@ -132,7 +133,7 @@ export function createPetRoutine({ random = clockRandom, onChange = () => {} } =
     const { obstacles, reached } = homeFloor;
     const spots = petSpots(layout, { windowX, companion }).filter(spot => (!target || distance(spot, target) > 0.8) && reaches(reached, spot, obstacles));
     // Loved spots first, with a little chance so a visit is never the same.
-    const ordered = spots.map((spot, index) => ({ spot, score: index + random() * 3 })).sort((a, b) => a.score - b.score).map(entry => entry.spot);
+    const ordered = spots.map((spot, index) => ({ spot, score: index + random() * 3 - (spot.kind === PET_PERSONALITIES[pose.species].favorite ? 6 : 0) })).sort((a, b) => a.score - b.score).map(entry => entry.spot);
     for (const spot of ordered) if (walkTo(spot, spot.kind)) { visits++; return; }
     // Nowhere else to go: away from home, the pet walks back.
     if (pose.onBed) sleepAtHome(); else goHomeNow();
@@ -163,7 +164,7 @@ export function createPetRoutine({ random = clockRandom, onChange = () => {} } =
       if (trip) { if (!walkTo(trip.end, trip.kind)) goHomeNow(); }
     },
     setCompanion(value) { companion = value; },
-    setEditing(value) { if (editing === Boolean(value)) return; editing = Boolean(value); if (editing && layout) { pose.held = false; pose.petAge = Infinity; pose.fuss = 0; pose.hearts = []; sleepAtHome(); } },
+    setEditing(value) { if (editing === Boolean(value)) return; editing = Boolean(value); if (editing && layout) { pose.held = false; pose.petAge = Infinity; pose.fuss = 0; pose.hearts = []; pose.ritual = null; pose.ritualAge = Infinity; sleepAtHome(); } },
     pet() {
       const first = pose.petAge === Infinity;
       pose.petAge = first ? 0 : Math.min(pose.petAge, PET_HOLD);
@@ -174,9 +175,21 @@ export function createPetRoutine({ random = clockRandom, onChange = () => {} } =
       // A walking pet stops for the fuss, then carries on.
       if (trip && !pose.held) { pose.moving = false; stall = PET_REACTION; }
     },
+    ritual(kind) {
+      if (!layout || editing || pose.held || !['cuddle', 'play', 'treat'].includes(kind)) return false;
+      pose.ritual = kind; pose.ritualAge = 0;
+      this.pet();
+      return true;
+    },
+    invite(reducedMotion = false) {
+      if (!layout || editing || pose.held) return false;
+      const spots = petSpots(layout, { windowX, companion }).filter(spot => ['desk', 'friend'].includes(spot.kind));
+      for (const spot of spots) if (walkTo(spot, spot.kind)) { pose.ritual = null; pose.ritualAge = Infinity; goHome = false; visits = 2; if (reducedMotion) arrive(); return true; }
+      return false;
+    },
     pickUp() {
       if (!layout || editing) return false;
-      trip = null; target = null; stall = 0; pose.held = true; pose.moving = false; pose.onBed = false; pose.to = null; status('held', 'held'); return true;
+      pose.ritual = null; pose.ritualAge = Infinity; trip = null; target = null; stall = 0; pose.held = true; pose.moving = false; pose.onBed = false; pose.to = null; status('held', 'held'); return true;
     },
     moveHeld(x, z) {
       if (!pose.held) return;
@@ -201,6 +214,7 @@ export function createPetRoutine({ random = clockRandom, onChange = () => {} } =
       // A pet given in Decorate still ends its heart.
       if (pose.petAge < PET_REACTION) pose.petAge += dt; else { pose.petAge = Infinity; pose.fuss = 0; }
       if (pose.hearts.length) { for (const heart of pose.hearts) heart.age += dt; pose.hearts = pose.hearts.filter(heart => heart.age < HEART_LIFE); }
+      if (pose.ritual) { pose.ritualAge += dt; if (pose.ritualAge >= 3) { pose.ritual = null; pose.ritualAge = Infinity; } else if (!editing && !pose.held) return pose; }
       if (editing || pose.held) return pose;
       if (reducedMotion) {
         // No strolls: the pet stays asleep at home, or snaps home after a drop.

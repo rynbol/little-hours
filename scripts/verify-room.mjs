@@ -493,6 +493,24 @@ try {
     assert.ok(shadowMap.renderList !== casters && shadowMap.renderList.includes(model.body) && frames.size === 0, 'its shadow redraws at the bed, then the room is idle');
   }
   room.setEditMode(decorating); advance(3);
+  {
+    room.setEditMode(false); room.setLayout(createLayout('writers-loft')); advance(3);
+    const realTimeout = globalThis.setTimeout, timers = [];
+    globalThis.setTimeout = (callback, ms) => { timers.push({ callback, ms }); return 0; };
+    try {
+      time += 30000;
+      assert.equal(room.petRitual('play'), true); advance(2);
+      assert.equal(diagnostics().pet.ritual, 'play', 'idle time before play does not consume the ritual');
+      time += 3100; timers.at(-1).callback(); advance(200);
+      assert.equal(diagnostics().pet.ritual, null, 'the ritual ends on its own deadline');
+      time += 30000;
+      assert.equal(room.invitePet(), true); advance(2);
+      assert.equal(diagnostics().pet.state, 'sitting', 'idle time before an invitation does not send the pet home');
+      const wake = timers.at(-1); time += wake.ms; wake.callback(); advance(200);
+      assert.equal(diagnostics().pet.state, 'sleeping', 'the invited pet settles home after its visit');
+    } finally { globalThis.setTimeout = realTimeout; }
+    room.setEditMode(decorating); advance(3);
+  }
   console.log('PASS animations: the pet naps in its bed and breathes, a pet brings a heart that ends, a carry sets it down and it walks home; settling keeps the saved layout; reduced motion holds still and sends a dropped pet home.');
   const savedRoutineLayout = diagnostics().layout;
   motion.matches = false; motion.emit('change', { matches: false });
@@ -1330,6 +1348,12 @@ try {
     room.setHouse({ ...house, activeId: 'garden' }); advance(2);
     assert.ok(passage.root.isDisposed(), 'the old doors are disposed on room change');
     assert.deepEqual(diagnostics().passages.links.map(link => link.id), ['studio', 'loft']);
+    house.rooms[0].layout = createLayout('moonlit-greenhouse');
+    room.setHouse({ ...house, activeId: 'garden' }); advance(2);
+    assert.equal(diagnostics().passages.links.find(link => link.id === 'studio').name, 'Moonlit greenhouse', 'an automatic destination name follows its changed design without switching the active room');
+    house.rooms[0].name = 'Your studio';
+    room.setHouse({ ...house, activeId: 'garden' }); advance(2);
+    assert.equal(diagnostics().passages.links.find(link => link.id === 'studio').name, 'Your studio', 'a literal custom name replaces the design name on the door');
     console.log('PASS connected doors: hover, destination picking, avatar walking, stairs, camera-drag guard, edit-mode isolation and disposal.');
   }
   const beforeHouse = scene.getFrameId();

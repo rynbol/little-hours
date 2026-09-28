@@ -1,20 +1,27 @@
-import { createSession, remainingAt, formatTime, spokenTime, sessionPhase, displayedRemaining, DIAL_MINUTES } from '../../core/session.js';
+import { createSession, remainingAt, formatTime, spokenTime, sessionPhase, displayedRemaining, DIAL_MINUTES, sessionStarted } from '../../core/session.js';
 import { plantPhase } from '../../core/room-types.js';
+import { petName, focusPetId } from '../../core/pet-bonds.js';
+import { petEntry } from '../../core/pets.js';
+import { petEntity, pairMembers } from '../../core/friendships.js';
 import { localDate } from '../../core/state.js';
-import { focusCoins, nextExpansion } from '../../core/house.js';
+import { focusCoins } from '../../core/house.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 import { sproutArt } from '../../ui/ui-art.js';
 
 export function createTimerUI(app) {
-  let lastSessionRender = '', journalSignature = '', focusCollapsed = false;
+  let lastSessionRender = '', journalSignature = '', lastDay = '', focusCollapsed = false;
 
   function renderFocusReward() {
     const { state } = app;
-    const reward = focusCoins(state.session.duration / 60_000), next = nextExpansion(state.house);
-    const name = next?.id === 'garden' ? 'garden wing' : 'upstairs hideaway';
-    const progress = !next ? 'A little more saved for your home' : state.house.coins >= next.price ? `Your ${name} is ready to build` : `${next.price - state.house.coins} coins to your ${name}`;
-    $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>${reward ? `+${reward} coins` : 'Coins from 5 min'}</strong><small>${progress}</small></span>`;
+    const reward = focusCoins(state.session.duration / 60_000);
+    const together = focusPetId(state);
+    const wish = petEntry(state.petWish);
+    const owner = petEntity(together), pair = sessionStarted(state.session) ? state.session.friendPair : pairMembers(owner, state.friendships.focusBuddies[owner], state.pets.map(petEntity));
+    const company = pair ? pair.map(member => petName(state, member.slice(4))).join(' & ') : petName(state, together);
+    const progress = wish ? (state.house.coins >= wish.price ? `${wish.name} is ready to come home` : `${wish.price - state.house.coins} coins to welcome ${wish.name}`) : reward ? `+${Math.floor(reward / 5)} ♡ · ${company}` : '♡ from 5 min';
+    $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>${reward ? `+${reward} coins` : 'Coins from 5 min'}</strong><small></small></span>`;
+    $('#focus-reward small').textContent = progress;
   }
 
   function renderJournal() {
@@ -43,11 +50,15 @@ export function createTimerUI(app) {
     }
   }
 
-  function showCelebration(earned) {
+  function showCelebration(completion) {
     const modal = $('#session-celebration');
-    $('#celebration-copy').textContent = `${earned} quiet minutes, just for you. Small beginnings add up to something good.`;
-    $('#celebration-earned').textContent = `+${earned} coins`;
-    if (!modal.open) modal.showModal();
+    const { minutes, coins, pet, friendship } = completion;
+    $('#celebration-copy').textContent = `${minutes} minutes with ${friendship ? friendship.names.join(' & ') : pet.name}.`;
+    $('#celebration-bond').textContent = pet.hearts ? `+${pet.hearts} ♡ · ${pet.name} · ${pet.bondTitle}` : '♡';
+    $('#celebration-earned').textContent = `+${coins} coins`;
+    $('#celebration-friendship').textContent = friendship ? `+${friendship.hearts} ♡ · ${friendship.names.join(' & ')} · ${friendship.bondTitle}` : '';
+    $('#celebration-friendship').hidden = !friendship;
+    if (!modal.open) modal.show();
     app.feedback.celebrate($('.celebration-flower'));
   }
 
@@ -56,9 +67,11 @@ export function createTimerUI(app) {
     app.moments?.refresh();
     const ms = displayedRemaining(state.session);
     const formatted = formatTime(ms);
+    const pageClock = $('#pet-page-clock'); if (pageClock && pageClock.textContent !== formatted) pageClock.textContent = formatted;
     const presence = sessionPhase(state.session);
     app.companion.syncIntent();
     const today = localDate();
+    if (today !== lastDay) { lastDay = today; app.pet?.sync(); }
     const minutes = state.history.filter(h => h.date === today).reduce((sum, h) => sum + h.minutes, 0);
     const renderKey = `${formatted}:${presence}:${state.session.duration}:${today}:${minutes}:${editingAvatar}:${travelling}`;
     // The clock polls for deadlines twice a second, but idle rooms and unchanged
@@ -70,6 +83,9 @@ export function createTimerUI(app) {
     $('#coin-wallet').disabled = travelling;
     $('#mini-button').disabled = travelling;
     document.querySelectorAll('[data-house-go], .home-wide').forEach(button => { button.disabled = travelling; });
+    $('#rename-room').disabled = travelling;
+    $('#room-title-input').disabled = travelling;
+    $('#save-room-title').disabled = travelling || !$('#room-title-input').value.trim();
     if (renderKey === lastSessionRender) return;
     lastSessionRender = renderKey;
     $('#timer').textContent = formatted;
@@ -145,7 +161,7 @@ export function createTimerUI(app) {
     if (!state.session.running) app.audio.unlock();
     // Preserve the action shown on the button if the deadline just passed.
     app.acceptUpdate(app.store.setRunning(!state.session.running));
-    if (app.state.session.running) app.companion.say(resuming ? 'resume' : 'start', { force: true });
+    if (app.state.session.running) { app.companion.say(resuming ? 'resume' : 'start', { force: true }); app.delights?.show('start'); if (!resuming) app.room?.invitePet(); }
     else if (remainingAt(app.state.session) > 0) app.companion.say('pause', { force: true });
   });
   $('#reset-session').addEventListener('click', () => {

@@ -21,7 +21,7 @@ import { createHousePostcard } from './house-postcard.js';
 import { houseFrame } from './house-framing.js';
 import { createHouseMotion } from './house-motion.js';
 import { createIslandWater } from './house-water.js';
-import { nextExpansion } from '../../core/house.js';
+import { nextExpansion, roomDisplayName } from '../../core/house.js';
 import './whole-house.css';
 
 const PIN_ICONS = {
@@ -222,8 +222,8 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     tags.replaceChildren();
     for (const entry of house.rooms) {
       const here = entry.id === house.activeId;
-      const button = pin('button', entry.id === 'loft' ? 'loft' : 'room', entry.id, entry.name, here ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor');
-      button.setAttribute('aria-label', `Visit ${entry.name}`); button.setAttribute('aria-current', here ? 'location' : 'false');
+      const button = pin('button', entry.id === 'loft' ? 'loft' : 'room', entry.id, roomDisplayName(entry), here ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor');
+      button.setAttribute('aria-label', `Visit ${roomDisplayName(entry)}`); button.setAttribute('aria-current', here ? 'location' : 'false');
     }
     pin('span', 'garden', 'orchard', 'Garden').classList.add('is-garden');
     const pond = pin('button', 'pond', 'pond', 'Willow Pond', 'Go fishing'); pond.classList.add('is-pond'); pond.setAttribute('aria-label', 'Go fishing at Willow Pond');
@@ -273,7 +273,8 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     lastPick = performance.now(); const id = pick(event);
     if (id === hovering) return;
     hovering = id; canvas.style.cursor = id ? 'pointer' : 'grab';
-    canvas.title = id === 'pond' ? 'Willow Pond' : id ? house.rooms.find(room => room.id === id)?.name || 'A little room to grow' : '';
+    const room = house.rooms.find(room => room.id === id);
+    canvas.title = id === 'pond' ? 'Willow Pond' : id ? room ? roomDisplayName(room) : 'A little room to grow' : '';
   };
   const onVisibility = () => { if (document.hidden) { onCancel(); roomMotion.stop(); shadows.getShadowMap().resetRefreshCounter(); cancelAnimationFrame(frame); frame = 0; } else requestRender(); };
   window.addEventListener('blur', onCancel); canvas.addEventListener('lostpointercapture', onCancel); canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointerup', onUp); canvas.addEventListener('pointercancel', onCancel); canvas.addEventListener('pointerleave', onLeave); canvas.addEventListener('pointermove', onMove);

@@ -1,4 +1,4 @@
-import { createSession, remainingAt, startSession, pauseSession, isDuration } from './session.js';
+import { createSession, remainingAt, startSession, pauseSession, isDuration, sessionStarted } from './session.js';
 import { createLayout, normalizeLayout, PRESETS } from './layout.js';
 import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCoins, cleanName, recordSession } from './house.js';
 import { fitRoomType } from './room-types.js';
@@ -6,6 +6,8 @@ import { AVATAR_DEFAULT, normalizeAvatarAppearance } from './avatar.js';
 import { clockNow, clockRandom } from './test-pins.js';
 import { emptyPond, normalizePond, addBait, landCatch } from './fishing.js';
 import { normalizeOwnedPets, adoptionVerdict, FREE_PETS } from './pets.js';
+import { normalizePetBonds, normalizePetWish, recordPetFocus, shareRitual, welcomePet, cleanPetName, bondLevel, petName, focusPetId } from './pet-bonds.js';
+import { normalizeFriendships, petEntity, pairMembers, shareFriendshipMoment, recordFriendshipFocus, FRIENDSHIP_LEVELS } from './friendships.js';
 
 export const storageKey = 'little-hours-v1';
 // The save as it was just before a backup replaced it.
@@ -13,7 +15,7 @@ export const recoveryKey = 'little-hours-v1-before-restore';
 
 export function freshState() {
   const layout = createLayout();
-  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [], pond: emptyPond() };
+  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], petBonds: normalizePetBonds(null, FREE_PETS), petWish: null, petFamily: '', friendships: normalizeFriendships(null, FREE_PETS.map(petEntity)), avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [], pond: emptyPond() };
 }
 
 export function localDate(timestamp = clockNow()) {
@@ -30,6 +32,10 @@ export function restoreState(raw) {
   if (typeof saved.task === 'string') initial.task = saved.task.slice(0, 180);
   initial.avatar = normalizeAvatarAppearance(saved.avatar);
   initial.pets = normalizeOwnedPets(saved.pets);
+  initial.petBonds = normalizePetBonds(saved.petBonds, initial.pets);
+  initial.petWish = normalizePetWish(saved.petWish, initial.pets);
+  initial.petFamily = cleanPetName(saved.petFamily, '');
+  initial.friendships = normalizeFriendships(saved.friendships, initial.pets.map(petEntity));
   initial.pond = normalizePond(saved.pond);
   if (initial.pets.includes(saved.pet)) initial.pet = saved.pet;
   if (Number.isSafeInteger(saved.seenAt) && saved.seenAt > 0) initial.seenAt = saved.seenAt;
@@ -53,6 +59,9 @@ export function restoreState(raw) {
       duration: session.duration, remaining: Math.min(session.remaining, session.duration), running: session.running,
       endsAt: session.running ? session.endsAt : null,
     };
+    if (initial.pets.includes(session.petId)) initial.session.petId = session.petId;
+    const pair = Array.isArray(session.friendPair) && session.friendPair.length === 2 ? pairMembers(...session.friendPair, initial.pets.map(petEntity)) : null;
+    initial.session.friendPair = pair?.includes(petEntity(initial.session.petId)) ? pair : null;
     if (!session.running && session.remaining === 0 && Number.isSafeInteger(session.completedAt) && session.completedAt >= 0) initial.session.completedAt = session.completedAt;
   }
   if (Array.isArray(saved.history)) {
@@ -69,7 +78,7 @@ export function restoreState(raw) {
 }
 
 function completeDueSession(state, now) {
-  if (!state.session.running || remainingAt(state.session, now) > 0) return false;
+  if (!state.session.running || remainingAt(state.session, now) > 0) return null;
   // A browser reopened tomorrow still credits the day this session ended.
   const { endsAt, duration } = state.session;
   state.session = { ...state.session, remaining: 0, running: false, endsAt: null, completedAt: endsAt };
@@ -78,7 +87,9 @@ function completeDueSession(state, now) {
   state.house.coins = Math.min(1_000_000_000, state.house.coins + focusCoins(duration / 60_000));
   recordSession(state.house, { at: endsAt, minutes: duration / 60_000 });
   addBait(state.pond, duration / 60_000, endsAt);
-  return true;
+  const reward = recordPetFocus(state, duration / 60_000, endsAt), id = reward.id || state.session.petId || state.pet;
+  const friendship = recordFriendshipFocus(state.friendships, state.session.friendPair, duration / 60_000, endsAt, state.pets.map(petEntity));
+  return { at: endsAt, minutes: duration / 60_000, coins: focusCoins(duration / 60_000), pet: { id, name: petName(state, id), hearts: reward.earned, bondTitle: bondLevel(state.petBonds[id]).title }, friendship: friendship ? { members: friendship.members, names: friendship.members.map(member => petName(state, member.slice(4))), hearts: friendship.earned, bondTitle: FRIENDSHIP_LEVELS[friendship.level].title } : null };
 }
 
 export function createStateStore(storage, now = clockNow) {
@@ -100,8 +111,7 @@ export function createStateStore(storage, now = clockNow) {
   function update(mutate = () => {}) {
     const timestamp = now();
     const next = structuredClone(readLatest());
-    const completed = completeDueSession(next, timestamp);
-    const earned = completed ? focusCoins(next.session.duration / 60_000) : 0;
+    const completion = completeDueSession(next, timestamp);
     next.rooms ||= {};
     if (next.layout.presetId) next.rooms[next.layout.presetId] = structuredClone(next.layout);
     activeHouseRoom(next.house).layout = structuredClone(next.layout);
@@ -117,7 +127,7 @@ export function createStateStore(storage, now = clockNow) {
       lastPersisted = raw;
       persisted = true;
     } catch { /* The current visit remains usable without storage. */ }
-    return { state, completed, earned, persisted };
+    return { state, completion, persisted };
   }
 
   return {
@@ -155,16 +165,36 @@ export function createStateStore(storage, now = clockNow) {
       });
       return { ...result, built: verdict.ok, reason: verdict.reason };
     },
-    adoptPet(id) {
+    adoptPet(id, name) {
       let verdict;
-      const result = update(draft => {
+      const result = update((draft, { now: at }) => {
         verdict = adoptionVerdict(draft, id);
         if (!verdict.ok) return;
         draft.house.coins -= verdict.pet.price;
         draft.pets = [...draft.pets, id];
         draft.pet = id;
+        welcomePet(draft, id, name, at);
       });
       return { ...result, adopted: verdict.ok, reason: verdict.reason };
+    },
+    petRitual(id, kind) {
+      let ritual;
+      const result = update((draft, { now: at }) => { ritual = shareRitual(draft, id, kind, localDate(at), at); });
+      return { ...result, ritual };
+    },
+    renamePet(id, name) { return update(draft => { if (!draft.pets.includes(id)) return; const bond = draft.petBonds[id]; bond.name = cleanPetName(name, bond.name); }); },
+    setPetRibbon(id, ribbon) { return update(draft => { if (!draft.pets.includes(id)) return; const bond = draft.petBonds[id]; if (Number.isInteger(ribbon) && ribbon >= 0 && ribbon <= bondLevel(bond).index) bond.ribbon = ribbon; }); },
+    setFocusBuddy(owner, buddy) {
+      return update(draft => {
+        const allowed = draft.pets.map(petEntity);
+        if (buddy === null && allowed.includes(owner)) delete draft.friendships.focusBuddies[owner];
+        else if (pairMembers(owner, buddy, allowed)) draft.friendships.focusBuddies[owner] = buddy;
+      });
+    },
+    shareFriendshipMoment(a, b, kind) {
+      let friendship;
+      const result = update((draft, { now: at }) => { friendship = shareFriendshipMoment(draft.friendships, a, b, kind, localDate(at), at, draft.pets.map(petEntity)); });
+      return { ...result, friendship };
     },
     landFish(baitIndex, rolled = null) {
       let caught = null;
@@ -192,7 +222,9 @@ export function createStateStore(storage, now = clockNow) {
     },
     setRunning(running) {
       return update((draft, { now: timestamp }) => {
-        draft.session = running ? startSession(draft.session, timestamp) : pauseSession(draft.session, timestamp);
+        const petId = focusPetId(draft);
+        const owner = petEntity(petId), friendPair = sessionStarted(draft.session) ? draft.session.friendPair || null : pairMembers(owner, draft.friendships.focusBuddies[owner], draft.pets.map(petEntity));
+        draft.session = running ? { ...startSession(draft.session, timestamp), petId, friendPair } : pauseSession(draft.session, timestamp);
       });
     },
   };

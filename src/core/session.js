@@ -4,6 +4,7 @@ export const isDuration = minutes => DIAL_MINUTES.includes(minutes);
 export function createSession(minutes = 25) {
   return { duration: minutes * 60_000, remaining: minutes * 60_000, endsAt: null, running: false };
 }
+export const sessionStarted = session => session.running || (session.remaining > 0 && (Boolean(session.petId) || session.remaining < session.duration));
 
 // Capped at the duration, so a clock moved backwards cannot add time.
 export function remainingAt(session, now = clockNow()) {

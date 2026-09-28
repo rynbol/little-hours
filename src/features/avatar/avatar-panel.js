@@ -13,7 +13,7 @@ export function createAvatarPanel(app) {
       resumeTimer = app.state.session.running;
       if (resumeTimer) {
         const result = app.store.setRunning(false);
-        resumeTimer = !result.completed;
+        resumeTimer = !result.completion;
         app.acceptUpdate(result);
       } else app.timer.render();
       app.companion.say('customize', { force: true });

@@ -4,6 +4,10 @@ A browser-first cozy room-decorating study game, built with Babylon.js and proce
 
 ![Little Hours: the room changes design, a focus session runs at night, a pouf is dragged to a new spot, the cat is petted, and daylight returns](docs/media/little-hours-film.webp)
 
+## Personal companions
+
+Pets now have custom names, favorite rituals, a lasting bond, and a memory of your focus time together. Cuddle, play with a little ball, offer a treat, invite them beside your desk, and earn wearable ribbons at bond milestones. Set an adoption wish and save a personal portrait with your name or both of your names. A finished session brings an avatar cheer and warm stars inside the room, with a small completion card that leaves the game visible. See [the companion design and verification notes](docs/pet-companions.md).
+
 ## Run
 
 Use Node.js 24.

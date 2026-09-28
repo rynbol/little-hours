@@ -114,7 +114,7 @@ test('cat and dog models: one mesh, finite poses, paws on the floor, eyes that c
   try {
     for (const species of Object.keys(PETS)) {
       const model = createPetModel(scene, species), meshes = scene.meshes.length, geometry = model.body.geometry;
-      const pose = { action: 'sleep', moving: false, walked: 0, petAge: Infinity, hearts: [] };
+      const pose = { action: 'sleep', moving: false, walked: 0, petAge: Infinity, hearts: [], ritual: null, ritualAge: Infinity };
       // The skeleton recomputes its matrices once per render; without a
       // render, force it, or every read sees the first pose.
       const positions = () => { model.body.skeleton.prepare(true); return model.body.getPositionData(true); };
@@ -171,4 +171,66 @@ test('petting again holds the lean and stacks hearts: two for the first pet, the
   advance(routine, HEART_LIFE + 0.1); assert.equal(routine.pose.hearts.length, 0, 'every heart floats away');
   advance(routine, PET_REACTION); assert.equal(routine.pose.petAge, Infinity); assert.equal(routine.pose.fuss, 0, 'a new fuss starts from two hearts again');
   routine.pet(); advance(routine, 0.3); assert.equal(shown(), 2);
+});
+
+test('rituals pause roaming briefly and cancel cleanly for carry and editing', () => {
+  const routine = createPetRoutine(); routine.setLayout(createLayout());
+  for (const kind of ['play', 'treat', 'cuddle']) {
+    const start = { x: routine.pose.x, z: routine.pose.z };
+    assert.equal(routine.ritual(kind), true);
+    advance(routine, 1);
+    assert.equal(routine.pose.ritual, kind);
+    assert.deepEqual({ x: routine.pose.x, z: routine.pose.z }, start);
+    advance(routine, 3);
+    assert.equal(routine.pose.ritual, null);
+  }
+  routine.ritual('play'); routine.pickUp(); assert.equal(routine.pose.ritual, null);
+  assert.equal(routine.ritual('play'), false);
+  routine.drop(); routine.ritual('treat'); routine.setEditing(true);
+  assert.equal(routine.pose.ritual, null); assert.equal(routine.ritual('cuddle'), false);
+});
+
+test('invited pets take a reachable route to keep company and do not cross furniture', () => {
+  for (const preset of PRESETS) {
+    const routine = createPetRoutine(); const layout = createLayout(preset.id); routine.setLayout(layout);
+    const invited = routine.invite();
+    if (!invited) continue;
+    assert.equal(routine.pose.state, 'walking');
+    const obstacles = petObstacles(layout);
+    for (let i = 0; i < 1800 && routine.pose.state === 'walking'; i++) {
+      routine.update(1 / 30, false);
+      assert.ok(insideBed(layout, routine.pose) || walkable(routine.pose, obstacles));
+    }
+    assert.equal(routine.pose.state, 'sitting');
+  }
+});
+
+test('all pets have finite ritual poses with reusable toy and treat geometry', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    for (const species of Object.keys(PETS)) {
+      const model = createPetModel(scene, species, 2), count = scene.meshes.length;
+      const pose = { action: 'sleep', moving: false, walked: 0, petAge: Infinity, hearts: [], ritual: null, ritualAge: Infinity };
+      for (const ritual of ['play', 'treat', 'cuddle', null]) {
+        Object.assign(pose, { ritual, ritualAge: ritual ? .7 : Infinity });
+        model.animate(pose, .1, 1, false);
+        model.body.skeleton.prepare(true);
+        assert.ok(model.body.getPositionData(true).every(Number.isFinite));
+        const toy = model.body.skeleton.bones.find(b => b.name === 'toy#play').getLocalMatrix();
+        assert.equal(toy.m[0] > .5, ritual === 'play');
+        const snack = model.body.skeleton.bones.find(b => b.name === 'snack#treat').getLocalMatrix();
+        assert.equal(snack.m[0] > .5, ritual === 'treat');
+      }
+      assert.equal(scene.meshes.length, count);
+      model.dispose();
+    }
+  } finally { scene.dispose(); engine.dispose(); }
+});
+
+test('reduced motion invitations settle directly beside the desk without walking', () => {
+  const routine = createPetRoutine(); routine.setLayout(createLayout());
+  assert.equal(routine.invite(true), true);
+  assert.equal(routine.pose.state, 'sitting'); assert.equal(routine.pose.moving, false);
+  routine.ritual('treat'); routine.update(3.1, true);
+  assert.equal(routine.pose.ritual, null);
 });

@@ -4,7 +4,8 @@ import { createStateStore, restoreState, freshState } from './state.js';
 import { createLayout } from './layout.js';
 import { fitRoomType } from './room-types.js';
 import { createSession } from './session.js';
-import { activeHouseRoom, nextExpansion, houseConnections } from './house.js';
+import { activeHouseRoom, nextExpansion, houseConnections, roomDisplayName } from './house.js';
+import { createBackup, readBackup } from '../features/backup/backup.js';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
@@ -31,6 +32,111 @@ test('a new home starts furnished, with one room and no coins', () => {
   assert.equal(store.state.house.rooms.length, 1);
   assert.equal(store.state.house.coins, 0);
   assert.equal(nextExpansion(store.state.house).id, 'garden');
+  assert.equal(store.state.house.version, 3);
+  assert.equal(activeHouseRoom(store.state.house).name, null);
+  assert.equal(roomDisplayName(activeHouseRoom(store.state.house)), 'Ember library');
+});
+
+test('legacy studio placeholders become design names while existing custom names survive migration', () => {
+  for (const version of [undefined, 1, 2]) {
+    const saved = freshState();
+    saved.house.version = version;
+    saved.house.rooms[0].name = 'Your studio';
+    saved.layout = createLayout('sakura-studio');
+    const restored = restoreState(JSON.stringify(saved));
+    assert.equal(restored.house.version, 3);
+    assert.equal(restored.house.rooms[0].name, null);
+    assert.equal(roomDisplayName(restored.house.rooms[0]), 'Sakura studio');
+    assert.deepEqual(restoreState(JSON.stringify(restored)).house, restored.house);
+    saved.house.rooms[0].name = '  Our reading nook  ';
+    assert.equal(restoreState(JSON.stringify(saved)).house.rooms[0].name, 'Our reading nook');
+  }
+});
+
+test('a literal Your studio custom name stays distinct from an automatic design name', () => {
+  const f = fixture();
+  f.store.renameRoom('studio', 'Your studio');
+  f.store.useRoom('sakura-studio');
+  const reopened = f.reopen();
+  assert.equal(reopened.state.house.rooms[0].name, 'Your studio');
+  assert.equal(roomDisplayName(reopened.state.house.rooms[0]), 'Your studio');
+  assert.equal(reopened.state.house.rooms[0].layout.presetId, 'sakura-studio');
+});
+
+test('room names trim and bound custom input while blank or invalid renames preserve the current name', () => {
+  const f = fixture();
+  for (const invalid of ['', '  ', null, 7]) {
+    f.store.renameRoom('studio', invalid);
+    assert.equal(f.store.state.house.rooms[0].name, null);
+  }
+  f.store.renameRoom('studio', '  Our quiet corner  ');
+  assert.equal(f.store.state.house.rooms[0].name, 'Our quiet corner');
+  for (const invalid of ['', '\n\t', undefined, {}]) {
+    f.store.renameRoom('studio', invalid);
+    assert.equal(f.store.state.house.rooms[0].name, 'Our quiet corner');
+  }
+  f.store.renameRoom('studio', `  ${'x'.repeat(70)}  `);
+  assert.equal(f.reopen().state.house.rooms[0].name, 'x'.repeat(40));
+  const before = structuredClone(f.store.state.house);
+  f.store.renameRoom('missing', 'Another name');
+  assert.deepEqual(f.store.state.house, before);
+});
+
+test('automatic room names and door destinations follow styles while custom names remain personal', () => {
+  const f = fixture(); finish(f); f.store.buildRoom('garden', 'cloud-loft');
+  f.store.useRoom('moonlit-greenhouse');
+  f.store.enterHouseRoom('garden');
+  assert.equal(houseConnections(f.store.state.house).find(link => link.id === 'studio').name, 'Moonlit greenhouse');
+  const studio = f.store.state.house.rooms[0];
+  assert.equal(studio.name, null);
+  assert.equal(roomDisplayName(studio), 'Moonlit greenhouse');
+  f.store.renameRoom('studio', 'Our home');
+  f.store.enterHouseRoom('studio');
+  f.store.useRoom('sakura-studio');
+  f.store.enterHouseRoom('garden');
+  assert.equal(houseConnections(f.reopen().state.house).find(link => link.id === 'studio').name, 'Our home');
+  assert.equal(f.reopen().state.house.rooms[1].name, 'Greenhouse');
+});
+
+test('backups preserve automatic and literal names and migrate legacy house names without a new backup format', () => {
+  const f = fixture(); finish(f); f.store.buildRoom('garden', 'cloud-loft');
+  const automatic = readBackup(createBackup(f.store.state, 2_000_000));
+  assert.equal(automatic.ok, true);
+  assert.equal(automatic.state.house.rooms[0].name, null);
+  assert.equal(roomDisplayName(automatic.state.house.rooms[0]), 'Ember library');
+  assert.equal(automatic.state.house.rooms[1].name, 'Greenhouse');
+  f.store.renameRoom('studio', 'Your studio');
+  f.store.renameRoom('garden', '  Sunday together  ');
+  const literal = readBackup(createBackup(f.store.state, 2_000_000));
+  assert.equal(literal.ok, true);
+  assert.equal(literal.state.house.rooms[0].name, 'Your studio');
+  assert.equal(literal.state.house.rooms[1].name, 'Sunday together');
+  const legacy = JSON.parse(createBackup(f.store.state, 2_000_000));
+  legacy.save.house.version = 2;
+  assert.equal(legacy.format, 1);
+  const migrated = readBackup(JSON.stringify(legacy));
+  assert.equal(migrated.state.house.version, 3);
+  assert.equal(migrated.state.house.rooms[0].name, null);
+  assert.equal(migrated.state.house.rooms[1].name, 'Sunday together');
+});
+
+test('a stale room rename targets its captured id and preserves the fresh active layout and session', () => {
+  const f = fixture(); finish(f); f.store.buildRoom('garden', 'cloud-loft');
+  const stale = f.reopen();
+  f.store.enterHouseRoom('garden');
+  f.store.useRoom('moonlit-greenhouse');
+  f.store.setRunning(true);
+  const current = structuredClone(f.reopen().state);
+  stale.renameRoom('studio', 'Our old corner');
+  const restored = f.reopen().state;
+  assert.equal(restored.house.activeId, 'garden');
+  assert.equal(restored.house.rooms[0].name, 'Our old corner');
+  assert.equal(restored.house.rooms[1].name, 'Greenhouse');
+  assert.equal(restored.layout.presetId, 'moonlit-greenhouse');
+  assert.deepEqual(restored.layout, current.layout);
+  assert.deepEqual(restored.house.rooms[1].layout, current.house.rooms[1].layout);
+  assert.deepEqual(restored.session, current.session);
+  assert.equal(restored.house.coins, current.house.coins);
 });
 
 test('old rooms, their saved designs and completed focus history migrate once', () => {
@@ -53,8 +159,8 @@ test('focus earns coins once across expiry, reload and a second tab; paused/rese
   f.store.update(s => { s.session = createSession(); });
   assert.equal(f.store.state.house.coins, 0);
   const result = finish(f, 50);
-  assert.equal(result.earned, 50); assert.equal(result.state.house.coins, 50);
-  assert.equal(second.update().earned, 0); assert.equal(f.reopen().update().earned, 0);
+  assert.equal((result.completion?.coins || 0), 50); assert.equal(result.state.house.coins, 50);
+  assert.equal(second.update().completion, null); assert.equal(f.reopen().update().completion, null);
   assert.equal(f.reopen().state.house.coins, 50);
 });
 
@@ -80,7 +186,7 @@ test('building enforces the next site, valid design, price and one purchase', ()
 test('a session that expires at purchase is awarded before checking affordability', () => {
   const f = fixture(); f.store.setRunning(true); f.advance(25 * 60_000);
   const result = f.store.buildRoom('garden', 'cloud-loft');
-  assert.equal(result.completed, true); assert.equal(result.built, true); assert.equal(result.state.house.coins, 0);
+  assert.equal(Boolean(result.completion), true); assert.equal(result.built, true); assert.equal(result.state.house.coins, 0);
 });
 
 test('two rooms with the same design keep independent furniture, colors and names', () => {
@@ -210,7 +316,7 @@ test('building saves an optional bounded room name in the same purchase and pres
 test('blank names at purchase use the room name, including a session expiring during purchase', () => {
   const f = fixture(); f.store.setRunning(true); f.advance(25 * 60_000);
   const result = f.store.buildRoom('garden', 'cloud-loft', '   ');
-  assert.equal(result.built, true); assert.equal(result.completed, true);
+  assert.equal(result.built, true); assert.equal(Boolean(result.completion), true);
   assert.equal(f.reopen().state.house.rooms[1].name, 'Greenhouse');
 });
 

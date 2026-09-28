@@ -1,7 +1,7 @@
 // A home you can keep: a versioned JSON copy of this browser's save, and a
 // careful way to bring one back.
 import { restoreState } from '../../core/state.js';
-import { remainingAt } from '../../core/session.js';
+import { remainingAt, createSession } from '../../core/session.js';
 import { clockNow } from '../../core/test-pins.js';
 
 export const BACKUP_FORMAT = 1;
@@ -30,7 +30,7 @@ export function readBackup(text) {
   // that moment, so restoring an old copy cannot complete it a second time.
   if (state.session.running) {
     const remaining = Number.isFinite(exportedAt) ? remainingAt(state.session, exportedAt) : state.session.remaining;
-    state.session = { duration: state.session.duration, remaining: remaining > 0 ? remaining : state.session.duration, endsAt: null, running: false };
+    state.session = remaining > 0 ? { ...(state.session.petId ? { petId: state.session.petId } : {}), friendPair: state.session.friendPair || null, duration: state.session.duration, remaining, endsAt: null, running: false } : createSession(state.session.duration / 60_000);
   }
   return {
     ok: true,

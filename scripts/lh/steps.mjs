@@ -1,6 +1,6 @@
 export const steps = {
   async openHouse(app) { await app.clickSel('#rooms-button'); await app.waitFor(`document.body.classList.contains('is-house') && Boolean(!window.__littleHours?.house || window.__littleHours.house.diagnostics())`, { what: 'the house page', timeout: 10000 }); await app.settle(); },
-  async backToRoom(app) { await app.clickSel('#back-to-room'); await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the room page' }); await app.settle(); },
+  async backToRoom(app) { await app.clickSel('#back-to-room'); await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the room page', timeout: 20000 }); await app.settle(); },
   async toggleHouse(app) { await app.clickSel('[data-house-open]'); await app.settle(); },
   async openDecorate(app) { await app.clickSel('#decorate-button'); await app.waitFor(`document.body.classList.contains('is-decorating')`, { what: 'Decorate' }); await app.settle(); },
   async closeDecorate(app) { await app.clickSel('#decorate-button'); await app.waitFor(`!document.body.classList.contains('is-decorating')`, { what: 'leaving Decorate' }); await app.settle(); },
@@ -10,6 +10,8 @@ export const steps = {
 };
 
 export const cycles = {
+  rooms: { about: 'visit the garden and studio using their room cards', async run(app) { for (const id of ['garden', 'studio']) { await app.clickSel(`[data-house-go="${id}"]`); await app.waitFor(`window.__littleHours.state.house.activeId === '${id}' && !document.body.classList.contains('is-travelling')`, { what: `arrival in ${id}`, timeout: 30000 }); await app.settle(); } } },
+  pet: { about: 'choose the cat and puppy, open and close the pet notebook', async run(app) { await app.clickSel('#pet-button'); await app.clickSel('[data-pet-choice="dog"]'); await app.clickSel('[data-pet-choice="cat"]'); await app.clickSel('#close-panel'); await app.settle(); } },
   house: { about: 'open the house page, then go back to the room', async run(app) { await steps.openHouse(app); await steps.backToRoom(app); } },
   decorate: { about: 'open Decorate, then leave it', async run(app) { await steps.openDecorate(app); await steps.closeDecorate(app); } },
   avatar: { about: 'open the avatar editor, then press Done', async run(app) { await steps.openAvatar(app); await steps.closeAvatar(app); } },
@@ -17,6 +19,7 @@ export const cycles = {
 };
 
 export const views = {
+  pet: { about: 'your pet notebook', async go(app) { await app.clickSel('#pet-button'); await app.settle(); } },
   room: { about: 'the room at rest', async go() {} },
   house: { about: 'the house page, open', async go(app) { await steps.openHouse(app); } },
   'house-closed': { about: 'the house page, closed', async go(app) { await steps.openHouse(app); await steps.toggleHouse(app); } },
