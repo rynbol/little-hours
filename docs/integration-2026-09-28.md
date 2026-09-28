@@ -16,19 +16,11 @@ The integration starts from main at `bf3159d`. It preserves the current room, is
 
 The pet-pair friendship UI and Memory display are intentionally retired by PR 3. Player-pet hearts, names and progress remain, and legacy pair data is archived. They must not return through conflict resolution.
 
-## Shipping checklist
+## Shipping sequence
 
-- [x] Resolve the forge and independently verify PRs 2 and 3. GitHub CLI is available; Origin is not. Two independent same-model reviewers cover the two open PRs.
-- [ ] Land only the contiguous verified run rooted at the bottom.
-- [ ] Re-check that each verdict still describes the patch.
-- [ ] Prepare only the bottom PR.
-- [ ] Land one PR at a time.
-- [ ] Do not read GitHub autoMergeRequest as stack readiness.
-- [ ] Recompute after every merge.
-- [ ] Watch the current frontier until it merges or fails. Do not mutate the queue around it.
-- [ ] Stop at the ceiling.
+Land PR 3, then PR 2, then PR 4. Fetch main after each merge, reconcile the next branch against that exact tip, compare the patch and require fresh green checks before landing. GitHub CLI is available; Origin is not.
 
-The root agent owns the combined code review, merge resolutions, feature inventory and full regression run. Reviewers own bounded independent PR verdicts. GPU tests run one lane at a time. CPU checks can run alongside code review. Existing worktrees and user preview data remain intact.
+Independent reviews passed the pet implementation at `782a155`, room navigation at `c368ab6`, and the combined production boundaries at `2494dc8`. The user subsequently requested no subagents. The root agent owns all later review and verification, including the performance-panel fix, and does not represent those later changes as independently reviewed. GPU tests run one lane at a time. Existing worktrees and user preview data remain intact.
 
 ## Merge decisions
 
@@ -46,4 +38,6 @@ Focus Mode is ported into the current timer module. It preserves the whole cutaw
 
 Cross-feature store tests cover room building and personal names, wardrobe, fish records, paid care, selected gifts, archived legacy pair data, backup/restore/undo and once-only completion across stale tabs. Production browser checks explicitly verify bait boundaries and Focus Mode using persisted saves rather than development-only state access.
 
-The original PR 2 controls CI job intermittently reported Adaptive after clicking Save energy, while its duplicate at the same commit passed. This remains a disclosed harness/input concern; it is not attributed to the room-navigation changes without evidence.
+The original controls CI job intermittently reported Adaptive after clicking Save energy, while its duplicate at the same commit passed. A controlled readout fixture demonstrated a real layout weakness: changing 16.7 ms to 1000.0 ms during a pointer press wrapped the reading and moved the button by 28 pixels. Timing values now stay on one line at a smaller size. The durable real-pointer test fails without the CSS fix and passes with it. This demonstrates the input failure mechanism without claiming that a captured CI trace proved the same cause.
+
+The combined baseline passed 235 unit tests, the room harness, build and guard, all 332 real-input flow checks, and eight production browser cases. Two accessibility scans initially caught panels mid-fade; the tests now wait for finite animations before scanning, without disabling accessibility rules. CI splits the complete browser suite into two single-worker shards. Final exact-head CI and merge evidence is recorded on each PR.
