@@ -3,20 +3,22 @@ import { icon } from '../ui/icons.js';
 
 export function createPanels(app) {
   let current = null;
-  let petPage = false;
+  let petCard = false;
 
   function render() {
     const panel = $('#room-panel');
     const leavingAvatar = app.avatar.syncEditing(current);
     panel.hidden = !current;
     panel.dataset.panelKind = current || '';
-    const nextPetPage = current === 'pet';
-    if (petPage !== nextPetPage) {
-      petPage = nextPetPage; document.body.classList.toggle('is-pet-page', petPage);
-      document.querySelectorAll('.app-header, .app-footer, .skip-link, #focus-card, #room-section > :not(#room-panel)').forEach(node => { node.inert = petPage; });
-      app.room?.setSuspended(petPage || app.nav.houseOpen || Boolean(app.nav.connected));
+    const nextPetCard = current === 'pet';
+    if (petCard !== nextPetCard) {
+      if (!nextPetCard) app.pet.close();
+      petCard = nextPetCard; document.body.classList.toggle('is-pet-care', petCard);
+      if (petCard) $('#focus-card').before(panel);
+      else $('#room-section').append(panel);
+      app.room?.resize?.();
     }
-    if (petPage) { panel.setAttribute('role', 'region'); panel.setAttribute('aria-label', 'Companions'); }
+    if (petCard) { panel.setAttribute('role', 'region'); panel.setAttribute('aria-label', 'Pet care'); }
     else { panel.removeAttribute('role'); panel.removeAttribute('aria-label'); }
     document.querySelectorAll('[data-panel]').forEach(button => button.setAttribute('aria-expanded', button.dataset.panel === current));
     // Reconcile the new canvas bounds before the next frame, not one frame
@@ -24,11 +26,6 @@ export function createPanels(app) {
     if (leavingAvatar) app.room?.resize?.();
     if (!current) return;
     panel.innerHTML = `<div class="panel-heading"><span>${({ atmosphere: 'Find your kind of quiet', pet: 'Your little companion', avatar: 'Meet your avatar', saves: 'Keep your home safe' })[current] || 'A smoother little room'}</span><button class="icon-button" id="close-panel" aria-label="Close room controls">${icon('close')}</button></div>`;
-    if (petPage) {
-      panel.querySelector('.panel-heading > span').textContent = 'little hours.';
-      panel.querySelector('.panel-heading').insertAdjacentHTML('beforeend', `<span class="pet-page-timer">${icon('clock')}<span id="pet-page-clock"></span></span>`);
-      const closeButton = $('#close-panel'); closeButton.innerHTML = '<span aria-hidden="true">←</span> Back to room'; closeButton.setAttribute('aria-label', 'Back to room'); closeButton.before($('.pet-page-timer'));
-    }
     if (current === 'atmosphere') app.roomUI.renderAtmosphere(panel);
     else if (current === 'pet') app.pet.renderPanel(panel);
     else if (current === 'avatar') app.avatar.renderPanel(panel);
@@ -36,7 +33,7 @@ export function createPanels(app) {
     else app.roomUI.renderQuality(panel);
     $('#close-panel').addEventListener('click', close);
     if (current !== 'avatar') $('#close-panel').focus({ preventScroll: true });
-    if (petPage) app.timer.render();
+    if (petCard) app.timer.render();
   }
 
   function open(name) { current = name; render(); }

@@ -1,5 +1,7 @@
 import { PET_SHOP, petEntry } from './pets.js';
 import { sessionStarted } from './session.js';
+import { normalizePetCare, mealVerdict, MEAL_COST, MEAL_WAIT, PLAY_WAIT, PET_BELONGINGS } from './pet-care.js';
+import { petGifts } from './pet-gifts.js';
 
 export const PET_PERSONALITIES = Object.freeze({
   cat: { trait: 'Quiet company', loves: 'Warm windows & slow mornings', favorite: 'window', ritual: 'cuddle', color: '#cf966a' },
@@ -26,7 +28,7 @@ export function bondLevel(bond) {
   return { ...level, index, next, progress: next ? (points - level.at) / (next.at - level.at) : 1, points };
 }
 export function newPetBond(id) {
-  return { name: petEntry(id)?.name || 'Miso', affection: 0, minutes: 0, sessions: 0, ribbon: 0, ritualDay: '', rituals: [], memories: [] };
+  return { name: petEntry(id)?.name || 'Miso', affection: 0, minutes: 0, sessions: 0, ribbon: 0, gift: null, ritualDay: '', rituals: [], memories: [], care: normalizePetCare(null) };
 }
 export function normalizePetBonds(raw, owned) {
   return Object.fromEntries(owned.map(id => {
@@ -35,6 +37,8 @@ export function normalizePetBonds(raw, owned) {
       bond.name = cleanPetName(value.name, bond.name);
       for (const key of ['affection', 'minutes', 'sessions']) bond[key] = count(value[key]);
       bond.ribbon = Math.min(count(value.ribbon), bondLevel(bond).index);
+      bond.gift = petGifts({ minutes: bond.minutes, gift: value.gift }).selected?.id || null;
+      bond.care = normalizePetCare(value.care);
       bond.ritualDay = typeof value.ritualDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.ritualDay) ? value.ritualDay : '';
       bond.rituals = Object.keys(PET_RITUALS).filter(key => Array.isArray(value.rituals) && value.rituals.includes(key));
       bond.memories = Array.isArray(value.memories) ? value.memories.filter(m => m && ['welcome', 'focus', 'bond'].includes(m.kind) && Number.isSafeInteger(m.at) && m.at >= 0 && m.at <= 8.64e15).slice(-12).map(m => ({ kind: m.kind, at: m.at, value: count(m.value) })) : [];
@@ -51,8 +55,13 @@ function growBond(bond, amount, at) {
   return after > before;
 }
 export function shareRitual(state, id, kind, day, at) {
-  if (!Object.hasOwn(PET_RITUALS, kind) || !state.pets.includes(id)) return { id, ok: false, earned: 0 };
+  if (!['cuddle', 'play'].includes(kind) || !state.pets.includes(id)) return { id, ok: false, earned: 0 };
   const bond = state.petBonds[id];
+  if (kind === 'play') {
+    const earned = at >= bond.care.playedUntil ? 1 : 0;
+    if (earned) bond.care.playedUntil = at + PLAY_WAIT;
+    return { id, ok: true, earned, unlocked: growBond(bond, earned, at) };
+  }
   if (day > bond.ritualDay) { bond.ritualDay = day; bond.rituals = []; }
   const fresh = day === bond.ritualDay && !bond.rituals.includes(kind);
   const earned = fresh ? (PET_PERSONALITIES[id].ritual === kind ? 2 : 1) : 0;
@@ -60,14 +69,36 @@ export function shareRitual(state, id, kind, day, at) {
   const unlocked = growBond(bond, earned, at);
   return { id, ok: true, earned, unlocked };
 }
+export function feedPet(state, id, food, at) {
+  const verdict = mealVerdict(state, id, food, at);
+  if (!verdict.ok) return { ...verdict, id, earned: 0 };
+  const bond = state.petBonds[id], care = bond.care;
+  state.house.coins -= MEAL_COST;
+  care.fedUntil = at + MEAL_WAIT; care.food = food; care.meals = Math.min(1_000_000_000, care.meals + 1);
+  const discovered = !care.foods.includes(food);
+  if (discovered) care.foods.push(food);
+  return { ok: true, id, food, earned: 1, discovered, unlocked: growBond(bond, 1, at) };
+}
+export function choosePetFabric(state, id, fabric) {
+  const item = PET_BELONGINGS.find(entry => entry.id === fabric);
+  if (!state.pets.includes(id) || !item) return { ok: false, reason: 'Choose a pet blanket.' };
+  const care = state.petBonds[id].care, price = care.belongings.includes(fabric) ? 0 : item.price;
+  if (state.house.coins < price) return { ok: false, reason: `${price - state.house.coins} more coins` };
+  state.house.coins -= price;
+  if (!care.belongings.includes(fabric)) care.belongings.push(fabric);
+  care.fabric = fabric;
+  return { ok: true, price };
+}
 export function recordPetFocus(state, minutes, at) {
-  if (minutes < 5) return { earned: 0 };
+  if (minutes < 5) return { earned: 0, gifts: [] };
   const id = state.pets.includes(state.session.petId) ? state.session.petId : state.pet;
-  const bond = state.petBonds[id], earned = Math.floor(minutes / 5);
+  const bond = state.petBonds[id], earned = Math.floor(minutes / 5), previousGifts = petGifts(bond).earned.length;
   bond.minutes = Math.min(1_000_000_000, bond.minutes + minutes); bond.sessions = Math.min(1_000_000_000, bond.sessions + 1);
+  const gifts = petGifts(bond).earned.slice(previousGifts);
+  if (gifts.length) bond.gift = gifts.at(-1).id;
   memory(bond, 'focus', at, minutes);
   const unlocked = growBond(bond, earned, at);
-  return { id, earned, unlocked };
+  return { id, earned, unlocked, gifts };
 }
 export function welcomePet(state, id, name, at) {
   state.petBonds[id] = newPetBond(id);

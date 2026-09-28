@@ -25,6 +25,8 @@ export const SEEDS = {
   attic: { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft' } },
   ...Object.fromEntries(['bunny', 'fox', 'panda'].map(pet => [`pet-${pet}`, { ...house(1), pet, pets: ['cat', 'dog', pet] }])),
   'pet-shop': house(1, 120),
+  'pet-family': { ...house(1), pets: ['cat', 'dog', 'bunny', 'fox', 'panda'], petBonds: Object.fromEntries(['cat', 'dog', 'bunny', 'fox', 'panda'].map(id => [id, { minutes: 150, affection: 60, gift: 'daisy' }])) },
+  'pet-bonded': { ...house(1, 25), seenAt: new Date('2026-01-10T15:50:00').getTime(), petBonds: { cat: { affection: 60, minutes: 300, ribbon: 3, care: { fabric: 'rose', belongings: ['linen', 'rose'] } } } },
   'pet-finish': { ...house(1), petBonds: { cat: { affection: 3 } }, session: { duration: 1500000, remaining: 1500000, running: true, endsAt: new Date('2026-01-10T16:30:00').getTime() + 6000, petId: 'cat' } },
   pond: { ...house(3), history: studyDays, pond: { bait: [{ minutes: 10, at: 1 }, { minutes: 20, at: 2 }, { minutes: 35, at: 3 }, { minutes: 35, at: 4 }, { minutes: 60, at: 5 }, { minutes: 95, at: 6 }], journal: { minnow: { count: 3, best: 7.4, first: 1 }, perch: { count: 1, best: 18.2, first: 2 }, koi: { count: 1, best: 41, first: 3 } }, log: [] } },
   'pond-empty': { ...house(3), pond: { bait: [], journal: {}, log: [] } },

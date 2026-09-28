@@ -157,7 +157,7 @@ export function createUIFeedback(root, { signal } = {}) {
       if (record.type === 'childList') {
         if (target.id === 'collection-content') collectionDirty = true;
         if (target.id === 'selection-inspector') inspectorDirty = true;
-        if (target.id === 'room-panel') panels.add(target);
+        if (target.id === 'room-panel' && target.dataset.panelKind !== 'pet') panels.add(target);
         if (target.id === 'coin-balance') pop(target);
       } else if (target.matches(watchedPanels) && !target.hidden && (!target.matches('dialog') || target.open)) panels.add(target);
     }

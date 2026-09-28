@@ -19,7 +19,6 @@ import { createHouseUI, createHouseNavigation } from './features/house/index.js'
 import { createAvatarPanel } from './features/avatar/index.js';
 import './features/avatar/wardrobe.css';
 import './features/pet/pet.css';
-import './features/pet/pet-scenes.css';
 import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
@@ -85,7 +84,7 @@ function applyState(next, force = false) {
 function acceptUpdate(result) {
   applyState(result.state);
   if (result.completion) {
-    app.room?.celebrate(); app.room?.petRitual('play'); app.delights?.show('finish'); app.delights?.show('play', 'pet');
+    app.room?.celebrate(); app.room?.petRitual('cuddle'); app.delights?.show('finish'); app.delights?.show('bond', 'pet');
     app.timer.showCelebration(result.completion);
     // Ring for a session that just ended, not one found finished long ago.
     if (clockNow() - result.completion.at < 90_000) audio.chime();
@@ -106,7 +105,7 @@ try {
       $('#loading-note').hidden = true;
       setDecorEntry(true);
       // Back after half an hour or more: a small hello.
-      if (app.state.seenAt && clockNow() - app.state.seenAt > 30 * 60_000) setTimeout(app.companion.welcome, 1200);
+      if (app.state.seenAt && clockNow() - app.state.seenAt > 30 * 60_000) setTimeout(() => { app.companion.welcome(); app.pet.welcome(); }, 1200);
     },
     onItemInteraction: app.companion.onItemInteraction,
     onCompanionTap: app.companion.onCompanionTap,
@@ -128,7 +127,7 @@ try {
   const speechLayer = document.createElement('div'); speechLayer.className = 'speech-layer';
   $('#room-canvas').appendChild(speechLayer);
   app.speech = createSpeech(speechLayer, { anchor: who => app.room?.anchor(who), reducedMotion: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
-  app.delights = createDelights($('#room-canvas'), { room: app.room, signal: listeners.signal, unavailable: () => app.panels.current === 'pet' || app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact });
+  app.delights = createDelights($('#room-canvas'), { room: app.room, signal: listeners.signal, unavailable: () => app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact });
   app.moments = createMomentsUI($('#stage'), { room: app.room, signal: listeners.signal, getState: () => ({ items: app.state.layout.items, focusing: app.state.session.running, unavailable: app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact }) });
 } catch (error) {
   $('#loading-note').textContent = 'The room couldn’t load. Try reloading; your focus timer is still ready.';
@@ -176,7 +175,7 @@ document.addEventListener('visibilitychange', () => {
 }, { signal: listeners.signal });
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
-if (import.meta.env.DEV) installTestHook({ get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get connected() { return app.nav.connected; } });
+if (import.meta.env.DEV) installTestHook({ get pet() { return app.pet; }, get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get connected() { return app.nav.connected; } });
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');

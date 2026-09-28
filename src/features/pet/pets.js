@@ -24,7 +24,7 @@ const smooth = t => { const x = Math.max(0, Math.min(1, t)); return x * x * (3 -
 const SPECIES = {
   cat: {
     scale: 1.5, stride: 0.2, spineHalf: 0.12, chest: [0.15, 0.15, 0.19], hips: [0.145, 0.14, 0.17],
-    neck: [0, 0.07, -0.16], head: [0, 0.09, -0.07], headRadii: [0.165, 0.148, 0.15],
+    neck: [0, 0.07, -0.16], head: [0, 0.09, -0.07], headRadii: [0.18, 0.157, 0.158],
     front: { anchor: [0.085, -0.07, -0.05], lengths: [0.12, 0.12], radii: [0.045, 0.04] },
     hind: { anchor: [0.09, -0.05, 0.06], lengths: [0.13, 0.13], radii: [0.05, 0.042] },
     tail: { anchor: [0, 0.05, 0.17], count: 7, length: 0.066, radii: [0.043, 0.035] },
@@ -36,7 +36,7 @@ const SPECIES = {
   },
   dog: {
     scale: 1.45, stride: 0.23, spineHalf: 0.13, chest: [0.155, 0.15, 0.2], hips: [0.15, 0.142, 0.18],
-    neck: [0, 0.07, -0.17], head: [0, 0.09, -0.07], headRadii: [0.16, 0.142, 0.15],
+    neck: [0, 0.07, -0.17], head: [0, 0.09, -0.07], headRadii: [0.18, 0.157, 0.16],
     front: { anchor: [0.09, -0.07, -0.05], lengths: [0.12, 0.12], radii: [0.047, 0.043] },
     hind: { anchor: [0.095, -0.05, 0.06], lengths: [0.13, 0.13], radii: [0.052, 0.045] },
     tail: { anchor: [0, 0.08, 0.16], count: 4, length: 0.058, radii: [0.047, 0.036] },
@@ -47,7 +47,7 @@ const SPECIES = {
   },
   bunny: {
     scale: 1.4, stride: 0.17, spineHalf: 0.1, chest: [0.15, 0.14, 0.17], hips: [0.17, 0.165, 0.19],
-    neck: [0, 0.07, -0.14], head: [0, 0.085, -0.06], headRadii: [0.162, 0.148, 0.148],
+    neck: [0, 0.07, -0.14], head: [0, 0.085, -0.06], headRadii: [0.181, 0.161, 0.159],
     front: { anchor: [0.08, -0.07, -0.05], lengths: [0.1, 0.1], radii: [0.04, 0.036] },
     hind: { anchor: [0.1, -0.06, 0.05], lengths: [0.12, 0.12], radii: [0.058, 0.048] },
     tail: { anchor: [0, 0.1, 0.19], count: 1, length: 0.03, radii: [0.07, 0.072] },
@@ -57,7 +57,7 @@ const SPECIES = {
   },
   fox: {
     scale: 1.45, stride: 0.22, spineHalf: 0.125, chest: [0.14, 0.14, 0.19], hips: [0.135, 0.13, 0.17],
-    neck: [0, 0.075, -0.16], head: [0, 0.09, -0.07], headRadii: [0.155, 0.138, 0.15],
+    neck: [0, 0.075, -0.16], head: [0, 0.09, -0.07], headRadii: [0.174, 0.15, 0.16],
     front: { anchor: [0.08, -0.07, -0.05], lengths: [0.13, 0.13], radii: [0.04, 0.034] },
     hind: { anchor: [0.085, -0.05, 0.06], lengths: [0.14, 0.14], radii: [0.046, 0.037] },
     tail: { anchor: [0, 0.06, 0.17], count: 6, length: 0.074, radii: [0.062, 0.078] },
@@ -67,7 +67,7 @@ const SPECIES = {
   },
   panda: {
     scale: 1.42, stride: 0.19, spineHalf: 0.12, chest: [0.155, 0.14, 0.19], hips: [0.15, 0.142, 0.18],
-    neck: [0, 0.07, -0.16], head: [0, 0.09, -0.07], headRadii: [0.172, 0.15, 0.152],
+    neck: [0, 0.07, -0.16], head: [0, 0.09, -0.07], headRadii: [0.188, 0.162, 0.162],
     front: { anchor: [0.085, -0.07, -0.05], lengths: [0.11, 0.11], radii: [0.048, 0.044] },
     hind: { anchor: [0.09, -0.05, 0.06], lengths: [0.12, 0.12], radii: [0.053, 0.046] },
     tail: { anchor: [0, 0.06, 0.17], count: 7, length: 0.068, radii: [0.06, 0.056] },
@@ -91,6 +91,7 @@ const standing = { fl: [-0.075, 0.035, -0.13], fr: [0.075, 0.035, -0.13], bl: [-
 const base = { spineY: 0.31, pitch: 0, chestPitch: 0, curl: 0, roll: 0, neckLift: 0, headPitch: -0.05, headYaw: 0, headRoll: 0, earBack: 0, eyes: 1, mouth: 0, tailPitch: 1.1, tailYaw: 0, tailBend: -0.2, tailWrap: 0, dangle: 0 };
 const POSES = {
   stand: { ...base, ...standing },
+  eat: { ...base, ...standing, neckLift: -.1, headPitch: -.3, eyes: .8, tailPitch: .4 },
   walk: { ...base, ...standing },
   settle: { ...base, ...standing, spineY: 0.29, headPitch: -0.2 },
   sit: { ...base, spineY: 0.22, pitch: 0.72, chestPitch: -0.1, headPitch: 0.02, tailPitch: -0.75, tailBend: 0.12, tailWrap: 0.42, fl: [-0.06, 0.035, -0.16], fr: [0.06, 0.035, -0.16], bl: [-0.11, 0.035, -0.03], br: [0.11, 0.035, -0.03] },
@@ -188,8 +189,9 @@ function buildFace(rig, spec, c) {
   const [hx, hy, hz] = spec.headRadii, ez = -hz * 0.9;
   for (const side of [-1, 1]) {
     const x = side * 0.066;
-    rig.ellipsoid('head', [0.027, 0.035, 0.013], [x, 0.012, ez], c.eye, { segments: 6, show: 'open' });
-    rig.ellipsoid('head', [0.009, 0.01, 0.006], [x - side * 0.007, 0.026, ez - 0.01], c.shine, { segments: 4, show: 'open' });
+    rig.ellipsoid('head', [0.033, 0.037, 0.016], [x, 0.007, ez - .004], c.eye, { segments: 10, show: 'open' });
+    rig.ellipsoid('head', [0.009, 0.011, 0.006], [x - .008, 0.021, ez - 0.019], c.shine, { segments: 6, show: 'open' });
+    rig.ellipsoid('head', [.0035, .004, .003], [x + .01, -.003, ez - .021], c.shine, { segments: 4, show: 'open' });
     rig.tube('head', Array.from({ length: 7 }, (_, i) => { const t = i / 3 - 1; return [x + t * 0.024, 0.004 + t * t * 0.01, ez - 0.006]; }), 0.0055, c.eye, { show: 'closed' });
     const bx = side * 0.088, by = -0.036;
     rig.ellipsoid('head', [0.026, 0.013, 0.004], [bx, by, -hz * Math.sqrt(Math.max(0, 1 - (bx / hx) ** 2 - (by / hy) ** 2)) + 0.001], c.blush, { rot: [0.2, side * 0.55, 0], segments: 5 });
@@ -214,7 +216,7 @@ function buildFace(rig, spec, c) {
     const surface = (x, y) => -hz * Math.sqrt(Math.max(0, 1 - (x / hx) ** 2 - (y / hy) ** 2)) - 0.002;
     if (spec.coat === 'tabby') for (const [x, y, h] of [[0, 0.098, 0.034], [-0.036, 0.09, 0.026], [0.036, 0.09, 0.026]]) rig.ellipsoid('head', [0.009, h, 0.005], [x, y, surface(x, y) + 0.002], c.stripe, { rot: [-0.75, -x * 5, x * 4], segments: 4 });
   }
-  rig.ellipsoid('head', [hx, hy, hz], [0, 0, 0], c.fur, { segments: 10 });
+  rig.ellipsoid('head', [hx, hy, hz], [0, 0, 0], c.fur, { segments: 18 });
 }
 
 function buildPet(species, ribbon) {
@@ -240,10 +242,7 @@ function buildPet(species, ribbon) {
   const ribbonColor = BOND_LEVELS[ribbon]?.color || BOND_LEVELS[0].color;
   for (const side of [-1, 1]) rig.ellipsoid('head', [.048, .027, .017], [side * .038, -.125, -.11], ribbonColor, { rot: [0, 0, side * -.3], segments: 3 });
   rig.ellipsoid('head', [.023, .023, .022], [0, -.125, -.125], ribbonColor, { segments: 3 });
-  rig.ellipsoid('toy', [.062, .062, .062], [0, .063, 0], '#a9bca0', { segments: 4, show: 'play' });
-  rig.ellipsoid('toy', [.063, .015, .063], [0, .063, 0], '#e8d4a6', { segments: 3, show: 'play' });
-  rig.ellipsoid('snack', [.055, .022, .04], [0, .023, 0], '#dfb071', { segments: 3, show: 'treat' });
-  for (const x of [-.021, .021]) rig.ellipsoid('snack', [.006, .003, .006], [x, .044, 0], '#bd8752', { segments: 3, show: 'treat' });
+
   buildFace(rig, spec, c);
   for (const side of [-1, 1]) {
     const bone = side < 0 ? 'earL' : 'earR';
@@ -265,7 +264,7 @@ function buildPet(species, ribbon) {
     rig.segment(`${leg}-lower`, (limb.radii[0] + limb.radii[1]) / 2, limb.radii[1], legTone);
     const knee = (limb.radii[0] + limb.radii[1]) / 2;
     rig.ellipsoid(`${leg}-knee`, [knee, knee, knee], [0, 0, 0], legTone, { segments: 6 });
-    rig.ellipsoid(`${leg}-paw`, [limb.radii[1] * 1.1, 0.035, limb.radii[1] * 1.35], [0, 0, -0.01], c.paw || c.cream, { segments: 6 });
+    rig.ellipsoid(`${leg}-paw`, [limb.radii[1] * 1.25, 0.036, limb.radii[1] * 1.45], [0, 0, -0.01], c.paw || c.cream, { segments: 9 });
   }
   const tail = spec.tail;
   for (let i = 0; i < tail.count; i++) {
@@ -385,10 +384,10 @@ export function createPetModel(scene, species = 'cat', ribbon = 0) {
     root, body, contact, heart, hearts, sleepLetters, species, ribbon, headPoint, hitTest,
     animate(pose, dt, seconds, reducedMotion) {
       const ritual = pose.ritual, ritualAge = ritual && Number.isFinite(pose.ritualAge) ? pose.ritualAge : 0;
-      const ritualWeight = ritual && !reducedMotion ? Math.min(1, ritualAge / .4, (3 - ritualAge) / .6) : 0;
-      const playful = ritual === 'play' ? ritualWeight : 0, nibble = ritual === 'treat' ? ritualWeight : 0;
-      const hop = playful * Math.max(0, Math.sin(ritualAge * Math.PI * 2.3)) * (species === 'bunny' ? .13 : .07);
-      const action = ritual && ritual !== 'cuddle' ? 'stand' : goals[pose.action] ? pose.action : 'sleep';
+      const ritualWeight = ritual && !reducedMotion ? Math.max(0, Math.min(1, ritualAge / .4, ((ritual === 'treat' ? 5 : 6) - ritualAge) / .6)) : 0;
+      const playful = ['play', 'dance'].includes(ritual) ? ritualWeight : 0, nibble = ritual === 'treat' ? ritualWeight : 0;
+      const hop = playful * (ritual === 'dance' ? 1.6 : 1) * Math.max(0, Math.sin(ritualAge * Math.PI * 2.3)) * (species === 'bunny' ? .13 : .07);
+      const action = ritual === 'treat' ? 'eat' : ritual && ritual !== 'cuddle' ? 'stand' : goals[pose.action] ? pose.action : 'sleep';
       // A settled nap only breathes, slowly: the rig updates at half rate
       // and keeps its bones (and the GPU's copy) in between.
       const napping = action === 'sleep' && !pose.moving && pose.petAge === Infinity && !reducedMotion && current.eyes < 0.02;
@@ -407,7 +406,7 @@ export function createPetModel(scene, species = 'cat', ribbon = 0) {
       const breath = still * (awake ? Math.sin(seconds * 2.2) * 0.5 + 0.5 : ((seconds % 4.6) < 1.6 ? (1 - Math.cos((seconds % 4.6) / 1.6 * Math.PI)) / 2 : (1 + Math.cos(((seconds % 4.6) - 1.6) / 3 * Math.PI)) / 2));
       const breathe = awake ? 0.018 : 0.045;
       breathChest.set(1 + breath * breathe * 0.3, 1 + breath * breathe, 1 + breath * breathe * 0.35); breathHips.set(1 + breath * breathe * 0.2, 1 + breath * breathe * 0.8, 1);
-      const look = still * (action === 'sit' || action === 'loaf' ? Math.sin(seconds * 0.37) * 0.45 + Math.sin(seconds * 0.93 + 1) * 0.14 : action === 'stand' ? Math.sin(seconds * 0.6) * 0.3 : 0);
+      const look = still * (pose.look ? pose.look.x * -.42 : action === 'sit' || action === 'loaf' ? Math.sin(seconds * 0.37) * 0.3 + Math.sin(seconds * 0.93 + 1) * 0.1 : action === 'stand' ? Math.sin(seconds * 0.6) * 0.3 : 0);
       const bob = walking * Math.sin(gait * 2) * 0.008, wag = spec.wag ? (0.14 * still + reaction * 0.5 + walking * 0.2) * Math.sin(seconds * (reaction ? 17 : 9)) : still * Math.sin(seconds * 1.1) * 0.07;
       const sway = walking * Math.sin(gait) * 0.14 + (action === 'held' ? still * Math.sin(seconds * 2.1) * 0.2 : 0);
       const lifted = action === 'sleep' ? 0.11 : 0.04;
@@ -420,11 +419,9 @@ export function createPetModel(scene, species = 'cat', ribbon = 0) {
       w.copyFrom(spine); w.y += spec.chest[1] * (breathChest.y - 1); place('chest', qChest, w, breathChest);
       w.copyFrom(spine); w.y += spec.hips[1] * (breathHips.y - 1); place('hips', qHips, w, breathHips);
       Vector3.FromArrayToRef(spec.neck, 0, v); v.rotateByQuaternionToRef(qChest, neck); neck.addInPlace(chest); neck.y += current.neckLift + reaction * lifted - bob * 0.5;
-      Quaternion.RotationYawPitchRollToRef(curl + current.headYaw + look * (1 - reaction), current.headPitch + reaction * 0.3 - nibble * (.35 + Math.sin(ritualAge * 19) * .06), current.headRoll + reaction * 0.3 + playful * Math.sin(ritualAge * 5) * .2, qHead);
+      Quaternion.RotationYawPitchRollToRef(curl + current.headYaw + look * (1 - reaction), current.headPitch + reaction * 0.3 - nibble * (.35 + Math.sin(ritualAge * 19) * .06) + still * (pose.look?.y || 0) * .18, current.headRoll + reaction * 0.3 + playful * Math.sin(ritualAge * 5) * .2, qHead);
       Vector3.FromArrayToRef(spec.head, 0, v); v.rotateByQuaternionToRef(qHead, head); head.addInPlace(neck);
       place('head', qHead, head);
-      v.set(reducedMotion ? 0 : Math.sin(ritualAge * 5) * .1, 0, -.47); place('toy', IDENTITY, v);
-      v.set(0, 0, -.48); place('snack', IDENTITY, v);
       // The collar rings the neck, from the chest toward the head.
       if (bones.has('collar')) { head.subtractToRef(neck, dir); dir.normalize(); Quaternion.FromUnitVectorsToRef(UP, dir, qLocal); dir.scaleInPlace(0.02).addInPlace(neck); place('collar', qLocal, dir); }
       // Ears flick now and then, and fold back while being petted.
@@ -464,7 +461,7 @@ export function createPetModel(scene, species = 'cat', ribbon = 0) {
       eyesShown = current.eyes < 0.5 || reaction > 0.3 || blinking ? 'closed' : 'open';
       mouthShown = spec.look === 'dog' && (current.mouth > 0.5 || reaction > 0.3 || walking > 0);
       for (const entry of skin) {
-        const hidden = entry.show === 'open' ? eyesShown !== 'open' : entry.show === 'closed' ? eyesShown !== 'closed' : entry.show === 'tongue' ? !mouthShown : entry.show === 'play' ? ritual !== 'play' : entry.show === 'treat' ? ritual !== 'treat' : false;
+        const hidden = entry.show === 'open' ? eyesShown !== 'open' : entry.show === 'closed' ? eyesShown !== 'closed' : entry.show === 'tongue' ? !mouthShown : false;
         // A hidden part shrinks to a speck inside its bone, so normals stay valid.
         if (hidden) shrink.multiplyToRef(bones.get(entry.source), entry.bone.getLocalMatrix());
         else entry.bone.getLocalMatrix().copyFrom(bones.get(entry.source));
