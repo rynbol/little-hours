@@ -212,7 +212,7 @@ export function createPetRoutine({ random = clockRandom, onChange = () => {} } =
     },
     invite(reducedMotion = false, kind = 'sit') {
       if (!layout || editing || pose.held || pose.care || kind === 'nap' && bond < 2) return false;
-      const spots = petSpots(layout, { windowX, companion }).filter(spot => ['desk', 'friend'].includes(spot.kind));
+      const spots = petSpots(layout, { windowX, companion }).filter(spot => ['desk', 'friend'].includes(spot.kind)).sort((a, b) => Number(b.kind === 'friend') - Number(a.kind === 'friend'));
       for (const spot of spots) if (walkTo(spot, kind === 'nap' ? 'nap' : spot.kind)) { pose.ritual = null; pose.ritualAge = Infinity; goHome = false; visits = 2; if (reducedMotion) arrive(); return true; }
       return false;
     },

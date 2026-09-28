@@ -1,7 +1,7 @@
 import { PETS } from './pet.js';
 import { PET_LINES } from '../companion/index.js';
 import { bondLevel, petName } from '../../core/pet-bonds.js';
-import { petCareStatus } from '../../core/pet-care.js';
+import { petCareStatus, MEAL_COST } from '../../core/pet-care.js';
 import { clockNow } from '../../core/test-pins.js';
 import { localDate } from '../../core/state.js';
 import { $ } from '../../ui/dom.js';
@@ -28,7 +28,7 @@ export function createPetUI(app) {
     $('#pet-button').setAttribute('aria-label', `${name()}: open pet care`);
   }
   function onPetCarry({ species, held }) { if (held) app.speech?.say('pet', (PET_LINES[species] || PET_LINES.cat).carry); }
-  function mark() { return JSON.stringify([app.state.pet, app.state.petBonds, app.state.pets, app.state.petWish, app.state.house.coins, localDate()]); }
+  function mark() { return JSON.stringify([app.state.pet, app.state.petBonds, app.state.pets, app.state.petWish, app.state.house.coins]); }
   function sync() {
     renderName();
     const bond = app.state.petBonds[app.state.pet];
@@ -38,8 +38,19 @@ export function createPetUI(app) {
   }
   function refreshCare() {
     if (app.panels?.current !== 'pet') return;
-    const next = JSON.stringify(petCareStatus(app.state.petBonds[app.state.pet], clockNow()));
-    if (careSignature !== next) renderPanelContent($('#room-panel'));
+    const care = petCareStatus(app.state.petBonds[app.state.pet], clockNow()), next = JSON.stringify(care);
+    if (careSignature === next) return;
+    careSignature = next;
+    const play = $('#pet-play'), feed = $('#pet-feed');
+    if (!play || !feed) return;
+    play.querySelector('small').textContent = care.playReady ? '+1 ♡' : `${care.playMinutes}m ♡`;
+    play.setAttribute('aria-label', `Play with ${name()}${care.playReady ? ', earn one heart' : `, heart in ${care.playMinutes} minutes`}`);
+    feed.querySelector('small').textContent = care.full ? 'Full ♡' : `${MEAL_COST} ◉`;
+    document.querySelectorAll('[data-pet-meal]').forEach(button => {
+      button.disabled = care.full || app.state.house.coins < MEAL_COST;
+      button.querySelector('small').textContent = care.full ? `${care.mealMinutes}m` : `${MEAL_COST} ◉ · +1 ♡`;
+    });
+    $('.pet-meal-note').textContent = care.full ? `Full for ${care.mealMinutes} min` : app.state.house.coins < MEAL_COST ? `${MEAL_COST - app.state.house.coins} more coins` : `${app.state.house.coins} ◉`;
   }
   function receipt(text) { const node = $('#pet-ritual-status'); if (node) node.textContent = text; }
   function ready() {

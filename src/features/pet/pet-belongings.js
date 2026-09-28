@@ -31,7 +31,7 @@ function cloth(fabric) {
       data.positions.push((px - .5) * .78, .101 + Math.sin(px * Math.PI) * .005 - Math.max(0, pz - .7) * .2 + Math.sin(px * 28) * Math.max(0, pz - .7) * .013, (pz - .5) * .55 + .13);
       data.colors.push(color.r, color.g, color.b, 1);
     }
-    data.indices.push(first, first + 2, first + 1, first + 1, first + 2, first + 3);
+    data.indices.push(first, first + 1, first + 2, first + 1, first + 3, first + 2);
   }
   VertexData.ComputeNormals(data.positions, data.indices, data.normals);
   return data;

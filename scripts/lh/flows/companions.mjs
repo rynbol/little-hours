@@ -71,6 +71,15 @@ export default {
     t.check('the unlocked ribbon is visible on the room pet', await finish.js(`${diagnostics}.petModel.ribbon === 1`));
     await t.shot(finish, 'bond'); await t.close(finish);
 
+    const bonded = await t.open({ seed: 'pet-bonded', reducedMotion: true });
+    await bonded.waitFor(`${diagnostics}.pet.state === 'sitting'`, { timeout: 10000, what: 'a bonded pet welcoming its returning player' });
+    t.check('a returning player gets a pet welcome without losing hearts', await bonded.js(`${bond('cat')}.affection === 60 && ${diagnostics}.pet.action !== 'sleep'`));
+    await bonded.clickSel('#pet-button'); await bonded.clickSel('#pet-nap');
+    t.check('friendship unlocks a nap near the player, away from the pet bed', await bonded.js(`${diagnostics}.pet.action === 'sleep' && !${diagnostics}.pet.onBed`));
+    await bonded.clickSel('#pet-friendship > summary'); await bonded.clickSel('#pet-dance');
+    t.check('the final friendship unlock performs its room dance', await bonded.js(`${diagnostics}.pet.care?.kind === 'dance' && document.querySelectorAll('.pet-milestones .is-unlocked').length === 3`));
+    await t.shot(bonded, 'friendship'); await t.close(bonded);
+
     const mobile = await t.open({ seed: 'pet-shop', width: 390, height: 844, reducedMotion: true });
     await mobile.clickSel('#pet-button'); await mobile.clickSel('#pet-play');
     t.check('reduced motion shows play without particles or a walk', await mobile.js(`document.querySelectorAll('.room-delight i').length === 0 && ${diagnostics}.pet.care?.phase === 'active' && !${diagnostics}.pet.moving`));

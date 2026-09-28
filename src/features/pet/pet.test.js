@@ -251,3 +251,16 @@ test('enabling reduced motion during the walk to a meal completes care and permi
   routine.update(9, true); assert.equal(routine.pose.care, null);
   assert.equal(routine.ritual('play', true), true);
 });
+
+test('an invitation prefers the seated player over an empty study desk', () => {
+  const layout = createLayout('ember-library'), seat = seatsFor(layout.items.find(item => item.type === 'daybed'))[0];
+  const companion = { ...seat.seat, yaw: seat.yaw, portal: seat.portal, seated: true, moving: false };
+  for (const kind of ['sit', 'nap']) {
+    const routine = createPetRoutine(); routine.setLayout(layout); routine.setCompanion(companion); routine.setBond(2);
+    assert.ok(petSpots(layout, { companion }).some(spot => spot.kind === 'friend'));
+    assert.equal(routine.invite(true, kind), true);
+    assert.equal(routine.diagnostics().target.kind, 'friend');
+    assert.ok(distance(routine.pose, companion) < 1.5);
+    assert.equal(routine.pose.action, kind === 'nap' ? 'sleep' : 'sit');
+  }
+});

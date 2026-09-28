@@ -18,6 +18,7 @@ test('pet belongings keep finite geometry and reuse their mesh and material budg
       assert.ok(positions.length > 0 && positions.every(Number.isFinite));
       assert.equal(normals.length, positions.length); assert.equal(colors.length, positions.length / 3 * 4);
       assert.ok(mesh.getIndices().every(i => i >= 0 && i < positions.length / 3));
+      if (mesh === props.blanket) assert.ok(normals.filter((_, i) => i % 3 === 1).every(y => y > 0), 'the cloth catches light from above');
       for (let i = 0; i < normals.length; i += 3) assert.ok(Math.abs(Math.hypot(normals[i], normals[i + 1], normals[i + 2]) - 1) < .001);
     }
   }

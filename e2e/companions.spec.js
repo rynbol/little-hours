@@ -154,3 +154,16 @@ test('care keeps its room column with a collapsed timer and closes for room view
   await page.locator('.home-wide').click(); await page.locator('#pet-button').click(); await page.locator('#mini-button').click();
   await expect(page.locator('#room-panel')).toBeHidden(); await expect(page.locator('#stage')).toHaveClass(/is-mini/);
 });
+
+test('a cooldown tick does not replace a control during a click or discard a name draft', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.clock.install({ time: new Date('2026-09-27T12:00:00') });
+  await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
+  await page.locator('#pet-button').click(); await page.locator('#pet-play').click();
+  await page.locator('#pet-edit-name').click(); await page.locator('#pet-name').fill('Maple');
+  const summary = page.locator('#pet-belongings > summary'); await summary.hover();
+  await page.mouse.down(); await page.clock.fastForward('01:01'); await page.mouse.up();
+  await expect(page.locator('#pet-belongings')).toHaveAttribute('open', '');
+  await expect(page.locator('#pet-name')).toHaveValue('Maple');
+  await expect(page.locator('#pet-play small')).toHaveText('24m ♡');
+});
