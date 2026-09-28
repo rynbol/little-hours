@@ -184,6 +184,7 @@ body:not(.is-avatar-editing) .room-panel .quiet-button { min-height: 40px; backg
 .quality-options button[aria-pressed='true'] { background: #e0e7d4; border-color: #889775; color: #566748; }
 .performance-metrics { gap: 10px; }
 .performance-metrics div { border-color: #e0d3cd; }
+.performance-metrics dd { white-space: nowrap; font-size: 18px; }
 
 /* The collection is a toy box: calm surfaces and obvious selected pieces. */
 .is-decorating .builder-panel { background: var(--ui-paper); border-color: #fff5e9; border-radius: 22px; max-width: 1616px; }
