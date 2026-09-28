@@ -8,7 +8,7 @@ import { shellMarkup } from './app/shell.js';
 import { createPanels } from './app/panels.js';
 import { createStateStore, storageKey } from './core/state.js';
 import { roomDesign } from './core/layout.js';
-import { clockNow, pinnedStorage } from './core/test-pins.js';
+import { clockNow, isPinned, pinnedStorage } from './core/test-pins.js';
 import { createRoom, createRoomUI } from './features/room/index.js';
 import { createAudio, wireSoundControls } from './features/audio/index.js';
 import { createSavesPanel } from './features/backup/index.js';
@@ -31,7 +31,7 @@ const deviceStorage = pinnedStorage || {
   setItem: (key, value) => localStorage.setItem(key, value),
 };
 const store = createStateStore(deviceStorage);
-if (import.meta.env.DEV && !pinnedStorage) store.update((draft, { now }) => stockBait(draft.pond, 3, now));
+if (import.meta.env.DEV && !isPinned) store.update((draft, { now }) => stockBait(draft.pond, 3, now));
 const audio = createAudio(deviceStorage);
 const listeners = new AbortController();
 let hiddenSince = 0;
