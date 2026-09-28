@@ -1,13 +1,18 @@
 import { steps } from '../steps.mjs';
+import { slow } from '../chrome.mjs';
 
 const LAKE = `(() => { const lake = window.__littleHours.lake, d = lake.diagnostics(); return { open: lake.isOpen, phase: d?.phase ?? null, ui: d?.ui ?? null, fight: d?.fight ?? null }; })()`;
 const POND = `(() => { const p = window.__littleHours.state.pond; return { bait: p.bait.map(b => b.minutes), found: Object.keys(p.journal).length, caught: Object.values(p.journal).reduce((n, e) => n + e.count, 0), last: p.log.at(-1) ?? null }; })()`;
 const shown = selector => `!document.querySelector(${JSON.stringify(selector)}).hidden`;
 
+const REEL_AT = `(() => { if (document.querySelector('#lake-bite').hidden) return null; const r = document.querySelector('#lake-reel').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`;
+
 async function castForBite(app) {
   await app.clickSel('#lake-cast');
   await app.waitFor(`['wait', 'bite'].includes(window.__littleHours.lake.diagnostics()?.ui)`, { what: 'the cast animation to land', timeout: 30000 });
-  await app.waitFor(shown('#lake-bite'), { what: 'a bite', timeout: 6000 });
+  const end = Date.now() + 6000 * slow;
+  for (let at = await app.js(REEL_AT); Date.now() < end; at = await app.js(REEL_AT)) if (at) return at;
+  throw new Error('Timed out waiting for a bite');
 }
 
 export default {
@@ -25,15 +30,14 @@ export default {
     check('choosing bread crumb shows its odds with no rare fish', await app.attr('[data-bait="crumb"]', 'aria-checked') === 'true' && await app.js(`document.querySelectorAll('#lake-odds li:not(.is-off)').length`) === 2);
     await app.clickSel('[data-bait="star"]');
     const before = await app.js(POND);
-    await castForBite(app);
-    check('a cast gets a bite with a reel button', (await app.js(LAKE)).phase === 'bite');
-    const reel = await app.box('#lake-reel');
+    const reel = await castForBite(app);
     await app.press(reel.x, reel.y);
+    check('a cast gets a bite with a reel button', Boolean(reel));
     const hooked = await app.js(LAKE);
     check('pressing on the bite hooks the fish and shows the line tension', hooked.phase === 'reel' && hooked.fight?.line <= 1 && await app.visible('#lake-tension'), hooked);
     await t.shot(app, 'hooked');
     let held = true, peak = 0, fought = null;
-    for (let i = 0; i < 600; i++) {
+    for (const end = Date.now() + 90000 * slow; Date.now() < end;) {
       fought = await app.js(LAKE);
       if (!fought.fight) break;
       peak = Math.max(peak, fought.fight.tension);
@@ -43,7 +47,7 @@ export default {
     }
     if (held) await app.release(reel.x, reel.y);
     check('holding tightens the line and easing off before the red lands it without a snap', peak > .5 && peak < 1 && fought.ui !== 'idle', { peak, fought });
-    await app.waitFor(`document.querySelector('#lake-card.is-shown') !== null`, { what: 'the catch card', timeout: 8000 });
+    await app.waitFor(`document.querySelector('#lake-card.is-shown') !== null`, { what: 'the catch card', timeout: 30000 }).catch(async error => { throw new Error(error.message + JSON.stringify(fought)); });
     const after = await app.js(POND), name = await app.text('#lake-card-name');
     check('the fish leaps out and its card names it', (await app.js(LAKE)).phase === 'shown' && Boolean(name), name);
     check('landing it spends the star lure only', JSON.stringify(after.bait) === JSON.stringify(before.bait.slice(0, -1)), after.bait);

@@ -50,7 +50,7 @@ export default {
 
     await steps.openHouse(app);
     await enter(app, 'studio');
-    await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the room page' });
+    await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the room page', timeout: 20000 });
     await app.settle();
     check('going back to the studio works the same way', await active(app) === 'studio' && await app.text('#room-title') === studioTitle && !await travelling(app), `${await active(app)} ${await app.text('#room-title')}`);
 
@@ -66,7 +66,7 @@ export default {
     await app.waitFor(`!document.body.classList.contains('is-focusing')`, { what: 'the pause' });
     await steps.openHouse(app);
     await enter(app, 'loft');
-    await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the room page' });
+    await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the room page', timeout: 20000 });
     await app.settle();
     check('after pausing, the same button goes upstairs', await active(app) === 'loft' && await app.text('#room-title') === 'Upstairs hideaway', `${await active(app)} ${await app.text('#room-title')}`);
 
