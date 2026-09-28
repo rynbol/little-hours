@@ -1,0 +1,7 @@
+ts	phase	decision	why	evidence	result
+2026-09-28T00:00:00Z	frame	Use a room-side pet card and one player-pet relationship	The user chose care in the room and rejected pet-pair friendship and Memory	docs/pet-care.md	open
+2026-09-28T08:02:23Z	record correction	The first frame timestamp was a placeholder, not measured event time	Preserve the append-only record honestly	initial frame row	corrected here
+2026-09-28T08:02:23Z	implementation	Keep purchases in the existing pet bond and store transaction	Coins, ownership and hearts must settle together	src/core/pet-care.test.js	eight care domain checks pass
+2026-09-28T08:02:23Z	review	Accept both independent review findings	Motion changes must not stall care; paid meals take precedence over celebration	src/features/pet/pet.test.js; e2e/companions.spec.js	fixes implemented and regressions pass
+2026-09-28T08:02:23Z	browser preference	Use the in-app browser visibly and run automation headless	User explicitly requested this and asked to remember it	global AGENTS.md	preference saved; all subsequent automation headless
+2026-09-28T08:02:23Z	verification	Darken low contrast card text and remove repeated panel entrance on updates	Automated contrast checks and real-input naming flow exposed problems	e2e/companions.spec.js; scripts/lh/flows/companions.mjs	focused browser suite and care flow pass

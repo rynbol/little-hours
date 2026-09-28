@@ -24,7 +24,7 @@ import '@babylonjs/core/Rendering/outlineRenderer.js';
 import { createFurniture, createRoundedBox, createContactShadow, createMobileCompanion, disposeAvatarTemplates, disposeFurnitureAssets, WINDOW_VIEW_DEPTH, PET_BED_SURFACE } from '../../models/furniture.js';
 import { celebrationWeight } from '../../core/delight.js';
 import { AVATAR_DEFAULT, avatarAppearanceKey, normalizeAvatarAppearance } from '../../core/avatar.js';
-import { createPetModel } from '../pet/index.js';
+import { createPetModel, createPetBelongings } from '../pet/index.js';
 import { createPetRoutine, insideBed, PETS, PET_REACTION } from '../pet/index.js';
 import { createCompanionRoutine } from '../companion/index.js';
 import { interactionFor, INTERACTION_NOTICES } from '../../core/item-interactions.js';
@@ -512,7 +512,8 @@ export function createRoom(container, options = {}) {
   let avatarAppearance = { ...AVATAR_DEFAULT }, avatarKey = avatarAppearanceKey(avatarAppearance);
   let hoveredId = null, drag = null, outlineKey = '';
   let companionRoutine, mobileCompanion, companionTime = 0, companionLayoutKey = '', companionY = null;
-  let celebrationAge = Infinity, petRibbon = 0;
+  let celebrationAge = Infinity, petRibbon = 0, petCare = { fabric: 'linen', food: 'supper' }, petBond = 0;
+  const petBelongings = createPetBelongings(scene, world);
   let petRoutine, petModel = null, petSpecies = PETS[options.pet] ? options.pet : 'cat', petY = null, petCasts = null, petMoving = false, petKey = '', petTime = 0, petWake = 0, petShadowAt = 0;
   const outlinedMeshes = [];
   const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782'), playOutline = color('#d9b98a');
@@ -1584,7 +1585,7 @@ export function createRoom(container, options = {}) {
   petRoutine.setCompanion(companionRoutine.pose); companionRoutine.setContext({ pet: petRoutine.pose });
   function buildPet() {
     petModel?.dispose(); petModel = createPetModel(scene, petSpecies, petRibbon); petModel.root.parent = world;
-    petRoutine.setSpecies(petSpecies); petY = null; petCasts = null; updatePetShadow();
+    petRoutine.setSpecies(petSpecies); petBelongings.setStyle(petCare, petSpecies); petY = null; petCasts = null; updatePetShadow();
   }
   // A still pet casts into the cached sun shadow, which then redraws once
   // for each new resting place. A walking or carried pet keeps only its soft
@@ -1702,6 +1703,8 @@ export function createRoom(container, options = {}) {
     else petModel.root.position.set(pose.x, petY, pose.z), petModel.root.rotation.y = pose.yaw;
     petModel.contact.position.set(petModel.root.position.x, (bed && (onBed || carriedBed) ? bedTop + 0.002 : surfaceBelow(pointArea)), petModel.root.position.z); petModel.contact.rotation.y = petModel.root.rotation.y;
     petModel.animate(pose, companionDelta, seconds, reducedMotion);
+    const dining = petRoutine.diningSpot(), prop = pose.care?.prop || dining?.prop;
+    petBelongings.update(pose, bed, dining, bedTop - PET_BED_SURFACE, prop ? groundAt(rugSurfaces, prop.x, prop.z, floorTop) : floorTop, reducedMotion, editing);
     for (const [id, reaction] of reactions) {
       const object = placedObjects.get(id), t = (now - reaction.start) / 1000 / reactionSeconds[reaction.kind];
       if (object) react(object, reaction.kind, reducedMotion ? 1 : t);
@@ -1760,7 +1763,7 @@ export function createRoom(container, options = {}) {
     // the two asks, and a still room would stop before it reports.
     if (!reducedMotion || !readyReported || !scene.isReady() || downPosition || Math.abs(camera.inertialAlphaOffset) + Math.abs(camera.inertialBetaOffset) > 0.0001 || now - petStart < PET_REACTION * 1000 + 50 || outlinesPending()) if (!frame) frame = requestAnimationFrame(tick);
   }
-  const onMotionChange = event => { reducedMotion = event.matches; if (reducedMotion) { celebrationAge = Infinity; if (avatarCameraTransition) avatarCameraTransition.duration = 0; if (avatarPoseTransition) avatarPoseTransition.duration = 0; } requestRender(); wakeForClock(); }; motionQuery.addEventListener('change', onMotionChange);
+  const onMotionChange = event => { reducedMotion = event.matches; if (reducedMotion) { celebrationAge = Infinity; if (avatarCameraTransition) avatarCameraTransition.duration = 0; if (avatarPoseTransition) avatarPoseTransition.duration = 0; if (petRoutine.pose.care) { clearTimeout(petWake); petWake = setTimeout(requestRender, 9000); } } requestRender(); wakeForClock(); }; motionQuery.addEventListener('change', onMotionChange);
   // Restart timing from scratch after a pause, so the gap never reads as a slow frame.
   function resumeFrames() { companionTime = 0; lastFrame = 0; lastRenderedAt = 0; statsStart = 0; sampleFrames = 0; rafCalls = 0; lastRafAt = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0; requestRender(); }
   const onVisibility = () => { visible = !document.hidden; companionTime = 0; if (visible) resumeFrames(); else { cancelDrag(); hoverItem(null); cancelAnimationFrame(frame); frame = 0; } wakeForClock(); };
@@ -1770,8 +1773,17 @@ export function createRoom(container, options = {}) {
   return {
     setHouse, setPlantPhase,
     celebrate() { if (!editing && !avatarCameraEditing && !suspended && !reducedMotion) { celebrationAge = 0; requestRender(); } },
-    petRitual(kind) { if (editing || avatarCameraEditing || suspended) return false; const ok = petRoutine.ritual(kind); if (ok) { petTime = petStart = performance.now(); if (reducedMotion) { clearTimeout(petWake); petWake = setTimeout(requestRender, 3050); } requestRender(); } return ok; },
-    invitePet() { if (editing || avatarCameraEditing || suspended) return false; const ok = petRoutine.invite(reducedMotion); if (ok) { petTime = performance.now(); if (reducedMotion) { clearTimeout(petWake); petWake = setTimeout(requestRender, petRoutine.diagnostics().timer * 1000 + 50); } requestRender(); } return ok; },
+    petCareBusy() { return Boolean(editing || avatarCameraEditing || suspended || petRoutine.pose.held || petRoutine.pose.care); },
+    canPetCare() { return Boolean(!editing && !avatarCameraEditing && !suspended && !petRoutine.pose.held && !petRoutine.pose.care && petRoutine.diningSpot()); },
+    petRitual(kind, food) {
+      if (editing || avatarCameraEditing || suspended) return false;
+      if (food) { petCare = { ...petCare, food }; petBelongings.setStyle(petCare, petSpecies); }
+      const ok = petRoutine.ritual(kind, reducedMotion);
+      if (ok) { petTime = petStart = performance.now(); if (reducedMotion) { clearTimeout(petWake); petWake = setTimeout(requestRender, 9000); } requestRender(); }
+      return ok;
+    },
+    invitePet(kind = 'sit') { if (editing || avatarCameraEditing || suspended) return false; const ok = petRoutine.invite(reducedMotion, kind); if (ok) { petTime = performance.now(); if (reducedMotion) { clearTimeout(petWake); petWake = setTimeout(requestRender, petRoutine.diagnostics().timer * 1000 + 50); } requestRender(); } return ok; },
+    setPetCare(care, bond) { const changed = care.fabric !== petCare.fabric || care.food !== petCare.food || bond !== petBond; petCare = care; petBond = bond; petRoutine.setBond(bond); petBelongings.setStyle(care, petSpecies); if (changed) requestRender(); },
     setPetRibbon(value) { const next = Number.isInteger(value) && value >= 0 && value <= 3 ? value : 0; if (next === petRibbon) return; petRibbon = next; buildPet(); requestRender(); },
     setDoorActive(id) { lockedDoor = id || null; hoverPlay(null); requestRender(); },
     setDoorOpen(id) { openingDoor = id || null; requestRender(); },
@@ -1792,7 +1804,7 @@ export function createRoom(container, options = {}) {
     anchor,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { if (avatarCameraEditing) return; camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
-    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    diagnostics() { return { scene, engine, camera, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, petBelongings, petBond, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); petBelongings.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

@@ -35,13 +35,14 @@ export default {
     check('tapping the cat floats two hearts up one after another', oneByOne(tap.counts), tap.counts);
     check('petting shows no words', tap.said === null, tap.said);
     check('a room cuddle grows the saved bond once', await app.js('window.__littleHours.state.petBonds.cat.affection === 2'));
-    const again = await petAgain(app, sleep, tap.spot, 4, t.slow);
+    const again = await petAgain(app, sleep, await app.point('pet'), 4, t.slow);
     check('four more taps stack a heart each', again.hearts >= 5, again);
     check('more taps hold the lean instead of starting it over', again.ages.every(age => age >= .3 && age < 2.6), again.ages);
     await t.shot(app, 'cat-hearts');
-    await app.clickSel('#pet-button');
+    if (await app.js(`document.getElementById('room-panel').hidden`)) await app.clickSel('#pet-button');
+    await app.clickSel('#pet-collection > summary');
     await app.waitFor(`document.querySelectorAll('[data-pet-choice]').length === 5`, { what: 'the pet panel' });
-    check('the bunny, fox and red panda wait behind prices', (await app.js(`[...document.querySelectorAll('.pet-option.is-locked')].map(b => b.dataset.petChoice + ':' + b.querySelector('.pet-tag').textContent.trim()).join()`)) === 'bunny:40,fox:90,panda:160');
+    check('the bunny, fox and red panda wait behind prices', (await app.js(`[...document.querySelectorAll('[data-pet-choice]')].filter(b => ['bunny', 'fox', 'panda'].includes(b.dataset.petChoice)).map(b => b.dataset.petChoice + ':' + b.querySelector('small').textContent.trim()).join()`)) === 'bunny:40 ◉,fox:90 ◉,panda:160 ◉');
     check('the pet panel offers the cat and the dog, with the cat chosen', await app.attr('[data-pet-choice="cat"]', 'aria-pressed') === 'true' && await app.attr('[data-pet-choice="dog"]', 'aria-pressed') === 'false');
     await app.clickSel('[data-pet-choice="dog"]');
     await app.waitFor(`document.querySelector('[data-pet-choice="dog"]')?.getAttribute('aria-pressed') === 'true'`, { what: 'the dog to be chosen' });
@@ -58,9 +59,10 @@ export default {
     tap = await tapPet(app, sleep, t.slow);
     check('tapping the dog after the reload gets hearts too, without words', oneByOne(tap.counts) && tap.said === null, tap);
     await t.shot(app, 'dog-hearts');
-    await app.clickSel('#pet-button');
+    if (await app.js(`document.getElementById('room-panel').hidden`)) await app.clickSel('#pet-button');
+    await app.clickSel('#pet-collection > summary');
     await app.waitFor(`document.getElementById('pet-now') !== null`, { what: 'the pet panel' });
-    check('the panel button offers to pet Mochi', (await app.attr('#pet-now', 'aria-label')).startsWith('Give Mochi a pet'), await app.attr('#pet-now', 'aria-label'));
+    check('the panel button offers to pet Mochi', (await app.attr('#pet-now', 'aria-label')).startsWith('Pet Mochi'), await app.attr('#pet-now', 'aria-label'));
     await app.clickSel('[data-pet-choice="cat"]');
     await app.waitFor(`document.querySelector('[data-pet-choice="cat"]')?.getAttribute('aria-pressed') === 'true'`, { what: 'the cat to be chosen' });
     check('switching back to the cat is saved too', (await app.saved())?.pet === 'cat' && await app.text('#pet-button-label') === 'Miso');
@@ -68,14 +70,14 @@ export default {
 
     const shop = await t.open({ seed: 'pet-shop' });
     await shop.settle();
-    await shop.clickSel('#pet-button');
+    await shop.clickSel('#pet-button'); await shop.clickSel('#pet-collection > summary');
     await shop.waitFor(`document.querySelectorAll('[data-pet-choice]').length === 5`, { what: 'the pet panel' });
     await shop.clickSel('[data-pet-choice="panda"]');
     await shop.waitFor(`!document.getElementById('pet-adopt').hidden`, { what: 'the adoption card' });
     check('the red panda card says how many coins are missing and cannot be bought yet', (await shop.text('.pet-adopt-note'))?.startsWith('40 more coins') && await shop.js(`document.getElementById('pet-adopt-button').disabled`), await shop.text('.pet-adopt-note'));
     check('looking at a pet you cannot afford changes nothing', (await shop.saved())?.pet !== 'panda' && await shop.text('#coin-balance') === '120');
     await shop.clickSel('[data-pet-choice="fox"]');
-    await shop.waitFor(`document.querySelector('.pet-adopt strong')?.textContent.includes('Hoshi')`, { what: 'the fox card' });
+    await shop.waitFor(`document.querySelector('.pet-adopt h3')?.textContent.includes('Hoshi')`, { what: 'the fox card' });
     await t.shot(shop, 'fox-offer');
     await shop.clickSel('#pet-adopt-button');
     await shop.waitFor(`document.querySelector('[data-pet-choice="fox"]')?.getAttribute('aria-pressed') === 'true'`, { what: 'the fox to come home' });

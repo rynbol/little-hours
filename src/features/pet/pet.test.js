@@ -173,21 +173,24 @@ test('petting again holds the lean and stacks hearts: two for the first pet, the
   routine.pet(); advance(routine, 0.3); assert.equal(shown(), 2);
 });
 
-test('rituals pause roaming briefly and cancel cleanly for carry and editing', () => {
-  const routine = createPetRoutine(); routine.setLayout(createLayout());
-  for (const kind of ['play', 'treat', 'cuddle']) {
-    const start = { x: routine.pose.x, z: routine.pose.z };
-    assert.equal(routine.ritual(kind), true);
-    advance(routine, 1);
+test('care walks to a stationary prop, finishes, and cancels cleanly for carry and editing', () => {
+  for (const preset of PRESETS) for (const kind of ['play', 'treat']) {
+    const routine = createPetRoutine(); routine.setLayout(createLayout(preset.id));
+    assert.equal(routine.ritual(kind), true, `${preset.id} ${kind}`);
+    assert.equal(routine.pose.care.phase, 'approach');
+    const prop = { ...routine.pose.care.prop };
+    for (let i = 0; i < 1200 && routine.pose.care.phase === 'approach'; i++) routine.update(1 / 30, false);
+    assert.equal(routine.pose.care.phase, 'active');
     assert.equal(routine.pose.ritual, kind);
-    assert.deepEqual({ x: routine.pose.x, z: routine.pose.z }, start);
-    advance(routine, 3);
-    assert.equal(routine.pose.ritual, null);
+    assert.equal(routine.ritual(kind), false, 'another meal cannot interrupt the active one');
+    assert.equal(routine.ritual('cuddle'), true, 'comfort stays available');
+    assert.deepEqual(routine.pose.care.prop, prop);
+    advance(routine, 10);
+    assert.equal(routine.pose.care, null);
+    routine.ritual(kind); routine.pickUp(); assert.equal(routine.pose.care, null);
+    routine.drop(); routine.ritual(kind); routine.setEditing(true);
+    assert.equal(routine.pose.care, null); assert.equal(routine.ritual(kind), false);
   }
-  routine.ritual('play'); routine.pickUp(); assert.equal(routine.pose.ritual, null);
-  assert.equal(routine.ritual('play'), false);
-  routine.drop(); routine.ritual('treat'); routine.setEditing(true);
-  assert.equal(routine.pose.ritual, null); assert.equal(routine.ritual('cuddle'), false);
 });
 
 test('invited pets take a reachable route to keep company and do not cross furniture', () => {
@@ -205,7 +208,7 @@ test('invited pets take a reachable route to keep company and do not cross furni
   }
 });
 
-test('all pets have finite ritual poses with reusable toy and treat geometry', () => {
+test('all pets have finite care poses without rebuilding the rig', () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   try {
     for (const species of Object.keys(PETS)) {
@@ -216,10 +219,7 @@ test('all pets have finite ritual poses with reusable toy and treat geometry', (
         model.animate(pose, .1, 1, false);
         model.body.skeleton.prepare(true);
         assert.ok(model.body.getPositionData(true).every(Number.isFinite));
-        const toy = model.body.skeleton.bones.find(b => b.name === 'toy#play').getLocalMatrix();
-        assert.equal(toy.m[0] > .5, ritual === 'play');
-        const snack = model.body.skeleton.bones.find(b => b.name === 'snack#treat').getLocalMatrix();
-        assert.equal(snack.m[0] > .5, ritual === 'treat');
+
       }
       assert.equal(scene.meshes.length, count);
       model.dispose();
@@ -231,6 +231,23 @@ test('reduced motion invitations settle directly beside the desk without walking
   const routine = createPetRoutine(); routine.setLayout(createLayout());
   assert.equal(routine.invite(true), true);
   assert.equal(routine.pose.state, 'sitting'); assert.equal(routine.pose.moving, false);
-  routine.ritual('treat'); routine.update(3.1, true);
-  assert.equal(routine.pose.ritual, null);
+  routine.ritual('treat', true); routine.update(9, true);
+  assert.equal(routine.pose.ritual, null); assert.equal(routine.pose.care, null);
+});
+
+test('friendship unlocks a nap beside the avatar and a happy dance', () => {
+  const routine = createPetRoutine(); routine.setLayout(createLayout());
+  assert.equal(routine.invite(true, 'nap'), false); assert.equal(routine.ritual('dance'), false);
+  routine.setBond(2); assert.equal(routine.invite(true, 'nap'), true); assert.equal(routine.pose.action, 'sleep'); assert.equal(routine.pose.onBed, false);
+  routine.setBond(3); assert.equal(routine.ritual('dance', true), true);
+  advance(routine, 10, true); assert.equal(routine.pose.care, null);
+});
+
+test('enabling reduced motion during the walk to a meal completes care and permits another interaction', () => {
+  const routine = createPetRoutine(); routine.setLayout(createLayout('ember-library'));
+  assert.equal(routine.ritual('treat'), true); assert.equal(routine.pose.care.phase, 'approach');
+  routine.update(.016, true);
+  assert.equal(routine.pose.care.phase, 'active'); assert.equal(routine.pose.action, 'eat'); assert.equal(routine.pose.moving, false);
+  routine.update(9, true); assert.equal(routine.pose.care, null);
+  assert.equal(routine.ritual('play', true), true);
 });

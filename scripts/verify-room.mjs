@@ -501,13 +501,24 @@ try {
       time += 30000;
       assert.equal(room.petRitual('play'), true); advance(2);
       assert.equal(diagnostics().pet.ritual, 'play', 'idle time before play does not consume the ritual');
-      time += 3100; timers.at(-1).callback(); advance(200);
+      const mealWake = timers.at(-1); assert.equal(mealWake.ms, 9000);
+      time += mealWake.ms; mealWake.callback(); advance(200);
       assert.equal(diagnostics().pet.ritual, null, 'the ritual ends on its own deadline');
       time += 30000;
       assert.equal(room.invitePet(), true); advance(2);
       assert.equal(diagnostics().pet.state, 'sitting', 'idle time before an invitation does not send the pet home');
       const wake = timers.at(-1); time += wake.ms; wake.callback(); advance(200);
       assert.equal(diagnostics().pet.state, 'sleeping', 'the invited pet settles home after its visit');
+      motion.matches = false; motion.emit('change', { matches: false }); advance(2);
+      assert.equal(room.petRitual('treat', 'supper'), true); advance(2);
+      assert.equal(diagnostics().pet.care.phase, 'approach');
+      const beforeMotion = timers.length;
+      motion.matches = true; motion.emit('change', { matches: true }); advance(2);
+      assert.equal(diagnostics().pet.care.phase, 'active');
+      const careWake = timers.slice(beforeMotion).find(timer => timer.ms === 9000); assert.ok(careWake);
+      time += careWake.ms; careWake.callback(); advance(200);
+      assert.equal(diagnostics().pet.care, null, 'changing motion preferences completes care and frees later interactions');
+
     } finally { globalThis.setTimeout = realTimeout; }
     room.setEditMode(decorating); advance(3);
   }

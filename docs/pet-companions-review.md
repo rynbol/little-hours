@@ -1,3 +1,5 @@
+Historical record of PR #1. The current pet design and verification plan are in [Pets at home](pet-care.md).
+
 # Companion redesign verification
 
 The user requested pstack after the implementation and first verification passes. This record starts at that checkpoint. Earlier test results below are observed artifacts, not claims that pstack guided the original implementation.

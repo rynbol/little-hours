@@ -19,17 +19,17 @@ test('legacy saves gain named bonds without inventing shared history', () => {
   assert.equal(state.petBonds.fox.affection, 0);
 });
 
-test('rituals reward once per day, favorites twice, and affection never decays', () => {
+test('petting rewards daily, play rewards on a cooldown, and affection never decays', () => {
   const f = fixture();
   assert.equal(f.store.petRitual('cat', 'cuddle').ritual.earned, 2);
   assert.equal(f.store.petRitual('cat', 'cuddle').ritual.earned, 0);
   assert.equal(f.store.petRitual('cat', 'play').ritual.earned, 1);
-  assert.equal(f.store.petRitual('cat', 'treat').ritual.earned, 1);
+  assert.equal(f.store.petRitual('cat', 'treat').ritual.ok, false);
   assert.equal(f.store.petRitual('cat', '__proto__').ritual.ok, false);
   f.advance(86400000 * 30);
-  assert.equal(f.open().state.petBonds.cat.affection, 4);
+  assert.equal(f.open().state.petBonds.cat.affection, 3);
   assert.equal(f.store.petRitual('cat', 'cuddle').ritual.earned, 2);
-  f.advance(-86400000);
+  f.store.petRitual('cat', 'play'); f.advance(-86400000);
   assert.equal(f.store.petRitual('cat', 'play').ritual.earned, 0, 'moving the clock backward cannot replay an earlier reward day');
 });
 
@@ -91,7 +91,7 @@ test('reasserting a running timer and restoring a running backup retain its pet'
 test('completion preserves its pet and minutes through a replacement transaction', () => {
   const f = fixture(); f.store.setRunning(true); f.advance(25 * 60000);
   const result = f.store.update(draft => { draft.pet = 'dog'; draft.session = createSession(50); draft.petBonds.cat.name = 'Maple'; });
-  assert.deepEqual(result.completion, { at: new Date('2026-09-27T10:25:00').getTime(), minutes: 25, coins: 25, pet: { id: 'cat', name: 'Miso', hearts: 5, bondTitle: 'Getting to know you' }, friendship: null });
+  assert.deepEqual(result.completion, { at: new Date('2026-09-27T10:25:00').getTime(), minutes: 25, coins: 25, pet: { id: 'cat', name: 'Miso', hearts: 5, bondTitle: 'Getting to know you' } });
   assert.equal(result.state.petBonds.cat.affection, 5);
   assert.equal(result.state.petBonds.dog.affection, 0);
   assert.equal(result.state.session.duration, 50 * 60000);

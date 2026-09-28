@@ -135,7 +135,7 @@ export function createRoomUI(app) {
   });
   $('#reset-view').addEventListener('click', () => app.room?.resetView());
   $('#mini-button').addEventListener('click', () => {
-    if (app.panels.current === 'avatar') app.panels.close();
+    if (app.panels.current) app.panels.close();
     if (app.decorate.active) app.decorate.setEditMode(false);
     compact = !compact;
     $('#stage').classList.toggle('is-mini', compact);

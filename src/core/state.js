@@ -1,4 +1,4 @@
-import { createSession, remainingAt, startSession, pauseSession, isDuration, sessionStarted } from './session.js';
+import { createSession, remainingAt, startSession, pauseSession, isDuration } from './session.js';
 import { createLayout, normalizeLayout, PRESETS } from './layout.js';
 import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCoins, cleanName, recordSession } from './house.js';
 import { fitRoomType } from './room-types.js';
@@ -6,8 +6,8 @@ import { AVATAR_DEFAULT, normalizeAvatarAppearance } from './avatar.js';
 import { clockNow, clockRandom } from './test-pins.js';
 import { emptyPond, normalizePond, addBait, landCatch } from './fishing.js';
 import { normalizeOwnedPets, adoptionVerdict, FREE_PETS } from './pets.js';
-import { normalizePetBonds, normalizePetWish, recordPetFocus, shareRitual, welcomePet, cleanPetName, bondLevel, petName, focusPetId } from './pet-bonds.js';
-import { normalizeFriendships, petEntity, pairMembers, shareFriendshipMoment, recordFriendshipFocus, FRIENDSHIP_LEVELS } from './friendships.js';
+import { normalizePetBonds, normalizePetWish, recordPetFocus, shareRitual, feedPet, choosePetFabric, welcomePet, cleanPetName, bondLevel, petName, focusPetId } from './pet-bonds.js';
+import { archivePetFriendships } from './pet-legacy.js';
 
 export const storageKey = 'little-hours-v1';
 // The save as it was just before a backup replaced it.
@@ -15,7 +15,7 @@ export const recoveryKey = 'little-hours-v1-before-restore';
 
 export function freshState() {
   const layout = createLayout();
-  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], petBonds: normalizePetBonds(null, FREE_PETS), petWish: null, petFamily: '', friendships: normalizeFriendships(null, FREE_PETS.map(petEntity)), avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [], pond: emptyPond() };
+  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], petBonds: normalizePetBonds(null, FREE_PETS), petWish: null, petFamily: '', avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [], pond: emptyPond() };
 }
 
 export function localDate(timestamp = clockNow()) {
@@ -35,7 +35,7 @@ export function restoreState(raw) {
   initial.petBonds = normalizePetBonds(saved.petBonds, initial.pets);
   initial.petWish = normalizePetWish(saved.petWish, initial.pets);
   initial.petFamily = cleanPetName(saved.petFamily, '');
-  initial.friendships = normalizeFriendships(saved.friendships, initial.pets.map(petEntity));
+  if (saved.friendships || saved.legacyPetFriendships) initial.legacyPetFriendships = archivePetFriendships(saved.legacyPetFriendships || saved.friendships, initial.pets.map(id => `pet:${id}`));
   initial.pond = normalizePond(saved.pond);
   if (initial.pets.includes(saved.pet)) initial.pet = saved.pet;
   if (Number.isSafeInteger(saved.seenAt) && saved.seenAt > 0) initial.seenAt = saved.seenAt;
@@ -60,8 +60,6 @@ export function restoreState(raw) {
       endsAt: session.running ? session.endsAt : null,
     };
     if (initial.pets.includes(session.petId)) initial.session.petId = session.petId;
-    const pair = Array.isArray(session.friendPair) && session.friendPair.length === 2 ? pairMembers(...session.friendPair, initial.pets.map(petEntity)) : null;
-    initial.session.friendPair = pair?.includes(petEntity(initial.session.petId)) ? pair : null;
     if (!session.running && session.remaining === 0 && Number.isSafeInteger(session.completedAt) && session.completedAt >= 0) initial.session.completedAt = session.completedAt;
   }
   if (Array.isArray(saved.history)) {
@@ -88,8 +86,7 @@ function completeDueSession(state, now) {
   recordSession(state.house, { at: endsAt, minutes: duration / 60_000 });
   addBait(state.pond, duration / 60_000, endsAt);
   const reward = recordPetFocus(state, duration / 60_000, endsAt), id = reward.id || state.session.petId || state.pet;
-  const friendship = recordFriendshipFocus(state.friendships, state.session.friendPair, duration / 60_000, endsAt, state.pets.map(petEntity));
-  return { at: endsAt, minutes: duration / 60_000, coins: focusCoins(duration / 60_000), pet: { id, name: petName(state, id), hearts: reward.earned, bondTitle: bondLevel(state.petBonds[id]).title }, friendship: friendship ? { members: friendship.members, names: friendship.members.map(member => petName(state, member.slice(4))), hearts: friendship.earned, bondTitle: FRIENDSHIP_LEVELS[friendship.level].title } : null };
+  return { at: endsAt, minutes: duration / 60_000, coins: focusCoins(duration / 60_000), pet: { id, name: petName(state, id), hearts: reward.earned, bondTitle: bondLevel(state.petBonds[id]).title } };
 }
 
 export function createStateStore(storage, now = clockNow) {
@@ -184,17 +181,15 @@ export function createStateStore(storage, now = clockNow) {
     },
     renamePet(id, name) { return update(draft => { if (!draft.pets.includes(id)) return; const bond = draft.petBonds[id]; bond.name = cleanPetName(name, bond.name); }); },
     setPetRibbon(id, ribbon) { return update(draft => { if (!draft.pets.includes(id)) return; const bond = draft.petBonds[id]; if (Number.isInteger(ribbon) && ribbon >= 0 && ribbon <= bondLevel(bond).index) bond.ribbon = ribbon; }); },
-    setFocusBuddy(owner, buddy) {
-      return update(draft => {
-        const allowed = draft.pets.map(petEntity);
-        if (buddy === null && allowed.includes(owner)) delete draft.friendships.focusBuddies[owner];
-        else if (pairMembers(owner, buddy, allowed)) draft.friendships.focusBuddies[owner] = buddy;
-      });
+    feedPet(id, food) {
+      let meal;
+      const result = update((draft, { now: at }) => { meal = feedPet(draft, id, food, at); });
+      return { ...result, meal };
     },
-    shareFriendshipMoment(a, b, kind) {
-      let friendship;
-      const result = update((draft, { now: at }) => { friendship = shareFriendshipMoment(draft.friendships, a, b, kind, localDate(at), at, draft.pets.map(petEntity)); });
-      return { ...result, friendship };
+    choosePetFabric(id, fabric) {
+      let fabricResult;
+      const result = update(draft => { fabricResult = choosePetFabric(draft, id, fabric); });
+      return { ...result, fabric: fabricResult };
     },
     landFish(baitIndex, rolled = null) {
       let caught = null;
@@ -223,8 +218,7 @@ export function createStateStore(storage, now = clockNow) {
     setRunning(running) {
       return update((draft, { now: timestamp }) => {
         const petId = focusPetId(draft);
-        const owner = petEntity(petId), friendPair = sessionStarted(draft.session) ? draft.session.friendPair || null : pairMembers(owner, draft.friendships.focusBuddies[owner], draft.pets.map(petEntity));
-        draft.session = running ? { ...startSession(draft.session, timestamp), petId, friendPair } : pauseSession(draft.session, timestamp);
+        draft.session = running ? { ...startSession(draft.session, timestamp), petId } : pauseSession(draft.session, timestamp);
       });
     },
   };
