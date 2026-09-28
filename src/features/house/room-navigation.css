@@ -29,7 +29,9 @@ body #home-connections #room-switcher-toggle { display: flex; align-items: cente
 body #home-connections .home-wide { display: flex; align-items: center; gap: 7px; flex: none; padding: 0 8px; font-size: 11px; text-decoration: none; }
 .home-wide svg { width: 17px; height: 17px; }
 body #home-connections button:focus-visible, body #rename-room:focus-visible, .room-title-form :focus-visible { outline: 2px solid #f1cad4; outline-offset: 3px; }
+body.is-decorating:not(.is-avatar-editing) { --room-navigation-height: 60px; }
 body.is-decorating:not(.is-avatar-editing) #home-connections { display: flex; }
+body.is-decorating:not(.is-avatar-editing) .stage { scroll-margin-top: 180px; }
 body.is-avatar-editing #home-connections { display: none; }
 .room-picker { position: fixed; inset: 0; margin: auto; width: min(660px, calc(100% - 40px)); max-height: calc(100svh - 48px); overflow: auto; padding: 28px; border: 1px solid #fff8ed; border-radius: 28px; background: #faf4e9; color: #4b3b40; box-shadow: 0 32px 100px #0f09185c, inset 0 0 0 5px #fffdf633; }
 body:has(#room-picker[open]) { overflow: hidden; }

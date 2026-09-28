@@ -148,6 +148,7 @@ export function createStateStore(storage, now = clockNow) {
     },
     enterHouseRoom(id) {
       return update(draft => {
+        if (draft.session.running) return;
         const destination = draft.house.rooms.find(room => room.id === id);
         if (!destination) return;
         draft.house.activeId = id;

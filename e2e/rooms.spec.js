@@ -112,3 +112,61 @@ test('a room change in another tab cancels the old heading draft', async ({ page
   expect(rooms[1].name).toBe('Garden wing');
   await other.close();
 });
+
+test('phone decorating keeps Done, Undo and collection uncovered', async ({ page }, testInfo) => {
+  await page.addInitScript(seed => localStorage.setItem('little-hours-v1', JSON.stringify(seed)), seedState('three-rooms'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('#loading-note')).toBeHidden({ timeout: 60000 });
+  await page.locator('#decorate-button').click();
+  await expect(page.locator('body')).toHaveClass(/is-decorating/);
+  await page.waitForFunction(() => ['#builder-panel', '#stage', '#room-canvas'].every(selector => !document.querySelector(selector).getAnimations({ subtree: true }).some(animation => animation.playState === 'running')));
+  const geometry = await page.evaluate(() => Object.fromEntries(['#decorate-button', '#undo-layout', '[data-furniture]'].map(selector => {
+    const r = document.querySelector(selector).getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return [selector, { rect: r.toJSON(), hit: hit?.outerHTML.slice(0, 400), clear: Boolean(hit?.closest(selector)), scrollY }];
+  })));
+  await testInfo.attach('controls', { body: JSON.stringify(geometry, null, 2), contentType: 'application/json' });
+  await page.screenshot({ path: testInfo.outputPath('phone-decorating.png') });
+  expect(geometry['#decorate-button'].clear).toBe(true);
+  expect(geometry['#undo-layout'].clear).toBe(true);
+  expect(geometry['[data-furniture]'].clear).toBe(true);
+});
+
+for (const route of ['card', 'arrow', 'house']) {
+  test(`${route}: focus started in another tab cancels pending travel`, async ({ page, context }, testInfo) => {
+    await page.addInitScript(seed => {
+      if (!localStorage.getItem('little-hours-v1')) localStorage.setItem('little-hours-v1', JSON.stringify(seed));
+    }, seedState('three-rooms'));
+    await page.goto('/');
+    await expect(page.locator('#loading-note')).toBeHidden({ timeout: 60000 });
+    const other = await context.newPage();
+    await other.goto('/');
+    await expect(other.locator('#loading-note')).toBeHidden({ timeout: 60000 });
+    let destination;
+    if (route === 'house') {
+      await page.locator('#rooms-button').click();
+      await page.locator('#house-slot-garden').click();
+      destination = page.locator('#enter-house-room');
+    } else if (route === 'arrow') {
+      destination = page.locator('#next-room');
+    } else {
+      if (await page.locator('#room-switcher-toggle').count()) await page.locator('#room-switcher-toggle').click();
+      destination = page.locator('[data-house-go="garden"]');
+    }
+    await page.clock.install();
+    await page.clock.pauseAt(new Date(Date.now() + 1000));
+    await destination.press('Enter');
+    await expect(page.locator('body')).toHaveClass(/is-travelling/);
+    await other.locator('#start-button').click();
+    await expect(other.locator('body')).toHaveClass(/is-focusing/);
+    await expect(page.locator('body')).toHaveClass(/is-focusing/);
+    await page.clock.runFor(300);
+    const actual = await page.evaluate(() => ({ save: JSON.parse(localStorage.getItem('little-hours-v1')), heading: document.querySelector('#room-title').textContent, body: document.body.className }));
+    await testInfo.attach('arrival-state', { body: JSON.stringify(actual, null, 2), contentType: 'application/json' });
+    await page.screenshot({ path: testInfo.outputPath(`${route}-focus-race.png`) });
+    expect(actual.save.session.running).toBe(true);
+    expect(actual.save.house.activeId).toBe('studio');
+    await other.close();
+  });
+}

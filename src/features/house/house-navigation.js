@@ -12,7 +12,7 @@ export function createHouseNavigation(app) {
   let houseOpen = false, connectedView = null, connectionsKey = '', travelTimer = 0, peekFrame = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
 
   function cancelDoorTravel(message) {
-    if (!doorWalking) return false;
+    if (!travelling) return false;
     doorWalking = false; travelling = false;
     clearTimeout(travelTimer); travelTimer = 0; cancelAnimationFrame(peekFrame); peekFrame = 0;
     $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking');
@@ -140,7 +140,12 @@ export function createHouseNavigation(app) {
     if (!fromDoor) setConnectedView(false);
     if (houseOpen) setHouseOpen(false);
     if (app.decorate.active) app.decorate.setEditMode(false);
+    const originId = app.state.house.activeId;
     const arrive = () => {
+      const wasTravelling = travelling;
+      app.acceptUpdate(app.store.update());
+      if (wasTravelling && !travelling) return;
+      if (app.state.session.running || app.state.house.activeId !== originId) { cancelDoorTravel(); return; }
       const moved = id !== app.state.house.activeId;
       app.decorate.resetForArrival();
       $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking'); travelling = false;
@@ -210,8 +215,8 @@ export function createHouseNavigation(app) {
   }
 
   function onStateChange(previous) {
-    if (!doorWalking) return;
-    if (app.state.session.running) cancelDoorTravel('Focusing started in another tab, so the walk to the door stopped.');
+    if (!travelling) return;
+    if (app.state.session.running) cancelDoorTravel('Focusing started in another tab, so room travel stopped.');
     else if (previous.house.activeId !== app.state.house.activeId || JSON.stringify(previous.layout) !== JSON.stringify(app.state.layout)) cancelDoorTravel('Your room changed. Tap the door again when you’re ready.');
   }
 
