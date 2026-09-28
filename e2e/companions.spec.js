@@ -4,6 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-v1')));
 
 test('pet care preserves personal names, keyboard focus and an interactive room', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await page.locator('#pet-button').click();
@@ -21,7 +22,7 @@ test('pet care preserves personal names, keyboard focus and an interactive room'
   await page.locator('#pet-friendship > summary').click();
   const accessibility = await new AxeBuilder({ page }).include('#room-panel').analyze();
   expect(accessibility.violations).toEqual([]);
-  await page.reload(); await page.locator('#pet-button').click();
+  await page.reload(); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 }); await page.locator('#pet-button').click();
   expect((await saved(page)).petBonds.cat.name).toBe('<Maple & Me>');
   await page.keyboard.press('Escape');
   await expect(page.locator('#pet-button')).toBeFocused();
@@ -29,6 +30,7 @@ test('pet care preserves personal names, keyboard focus and an interactive room'
 });
 
 test('meals and belongings spend earned coins once and fullness survives reload', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(() => {
     if (!localStorage.getItem('little-hours-v1')) localStorage.setItem('little-hours-v1', JSON.stringify({ house: { coins: 20 } }));
   });
@@ -45,7 +47,7 @@ test('meals and belongings spend earned coins once and fullness survives reload'
   await expect(page.locator('#coin-balance')).toHaveText('0');
   await page.locator('#pet-fabric-linen').click(); await page.locator('#pet-fabric-rose').click();
   await expect(page.locator('#coin-balance')).toHaveText('0');
-  await page.reload(); await page.locator('#pet-button').click();
+  await page.reload(); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 }); await page.locator('#pet-button').click();
   await expect(page.locator('#pet-feed')).toContainText('Full');
   const state = await saved(page);
   expect(state.petBonds.cat.care.meals).toBe(1);

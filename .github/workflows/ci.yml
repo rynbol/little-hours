@@ -39,6 +39,12 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-evidence
+          path: test-results
+          retention-days: 7
 
   flows:
     runs-on: ubuntu-latest

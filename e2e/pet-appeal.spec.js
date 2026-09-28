@@ -102,7 +102,8 @@ test('the close-up stops drawing after it scrolls out of the phone viewport', as
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/'); await ready(page); await page.locator('#pet-button').click();
   await page.locator('#pet-belongings > summary').click(); await page.locator('#pet-friendship > summary').click();
-  await page.locator('#pet-collection > summary').scrollIntoViewIfNeeded();
+  await page.locator('#pet-gifts > summary').click(); await page.locator('#pet-collection > summary').click();
+  await page.locator('#pet-choice-panda').hover(); await page.mouse.wheel(0, 1500);
   await expect.poll(() => page.locator('#pet-closeup').evaluate(el => el.getBoundingClientRect().bottom <= 0)).toBe(true);
   await page.waitForTimeout(100);
   const frames = await page.evaluate(() => window.__littleHours.petCloseup.frames);
