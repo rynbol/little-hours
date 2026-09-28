@@ -389,10 +389,10 @@ body.is-decorating:not(.is-avatar-editing) .workspace { padding-top: 10px; }
 body.is-decorating:not(.is-avatar-editing) .room-heading { min-height: 52px; }
 body.is-decorating:not(.is-avatar-editing) .room-heading h1 { font-size: 28px; }
 @media (min-width: 1000px) {
-  body.is-decorating:not(.is-avatar-editing) .stage { height: max(240px, calc(100svh - 420px)); }
+  body.is-decorating:not(.is-avatar-editing) .stage { height: max(240px, calc(100svh - 420px - var(--room-navigation-height, 0px))); }
 }
 @media (min-width: 1000px) and (max-height: 800px) {
-  body.is-decorating:not(.is-avatar-editing) .stage { height: max(220px, calc(100svh - 340px)); }
+  body.is-decorating:not(.is-avatar-editing) .stage { height: max(220px, calc(100svh - 340px - var(--room-navigation-height, 0px))); }
 }
 @media (max-width: 720px) {
   body.is-decorating:not(.is-avatar-editing) .room-heading { flex-wrap: nowrap; gap: 10px; }
@@ -400,7 +400,7 @@ body.is-decorating:not(.is-avatar-editing) .room-heading h1 { font-size: 28px; }
   body.is-decorating:not(.is-avatar-editing) .heading-actions { width: auto; }
   body.is-decorating:not(.is-avatar-editing) #rooms-button,
   body.is-decorating:not(.is-avatar-editing) #reset-view { display: none; }
-  body.is-decorating:not(.is-avatar-editing) .stage { height: max(220px, calc(100svh - 410px)); }
+  body.is-decorating:not(.is-avatar-editing) .stage { height: max(220px, calc(100svh - 410px - var(--room-navigation-height, 0px))); }
 }
 @media (max-height: 500px) {
   body.is-decorating:not(.is-avatar-editing) .stage { height: 360px; }
