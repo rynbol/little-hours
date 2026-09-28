@@ -194,7 +194,7 @@ test('two rooms with the same design keep independent furniture, colors and name
   f.store.renameRoom('studio', 'My quiet corner');
   f.store.update(s => { s.layout.items = s.layout.items.filter(i => i.type !== 'bookcase'); s.layout.walls = 'blue'; });
   const studio = structuredClone(f.store.state.layout);
-  f.store.setRunning(true); const timer = structuredClone(f.store.state.session);
+  f.store.setRunning(true); f.advance(60_000); f.store.setRunning(false); const timer = structuredClone(f.store.state.session);
   f.store.enterHouseRoom('garden');
   assert.deepEqual(f.store.state.layout, fitRoomType(createLayout('ember-library'), 'greenhouse'));
   f.store.update(s => { s.layout.floor = 'walnut'; });
@@ -347,4 +347,19 @@ test('the garden grows one tree per study day and a new day rebuilds only the ga
     assert.ok(tops(tall) > tops(short) + .8, 'an hour grows a much taller tree than a few minutes');
     for (const model of [two, short, tall]) model.dispose();
   } finally { scene.dispose(); engine.dispose(); globalThis.document = previousDocument; }
+});
+
+
+test('a stale arrival cannot change rooms after another tab starts focus', () => {
+  const f = fixture(); finish(f); f.store.buildRoom('garden', 'cloud-loft');
+  const stale = f.reopen(), originalLayout = structuredClone(f.store.state.layout);
+  f.store.setRunning(true);
+  const session = structuredClone(f.store.state.session);
+  stale.enterHouseRoom('garden');
+  assert.equal(stale.state.house.activeId, 'studio');
+  assert.deepEqual(stale.state.layout, originalLayout);
+  assert.deepEqual(stale.state.session, session);
+  f.store.setRunning(false);
+  stale.enterHouseRoom('garden');
+  assert.equal(stale.state.house.activeId, 'garden');
 });

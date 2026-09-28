@@ -12,13 +12,14 @@ export function createHouseNavigation(app) {
   let houseOpen = false, connectedView = null, connectionsKey = '', travelTimer = 0, peekFrame = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
 
   function cancelDoorTravel(message) {
-    if (!doorWalking) return false;
+    if (!travelling) return false;
     doorWalking = false; travelling = false;
     clearTimeout(travelTimer); travelTimer = 0; cancelAnimationFrame(peekFrame); peekFrame = 0;
     $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking');
     app.room?.setDoorActive?.(null);
     app.room?.setDoorOpen?.(null);
     app.room?.cancelDoorWalk?.({ returnToDesk: true });
+    syncTravelControls();
     app.timer.render();
     if (message) app.toast(message, true);
     return true;
@@ -27,6 +28,7 @@ export function createHouseNavigation(app) {
   function setHouseOpen(open, selectedId) {
     if (travelling || open === houseOpen) return;
     if (open) {
+      closePicker(false);
       setConnectedView(false);
       if (app.decorate.active) app.decorate.setEditMode(false);
       app.panels.open(null);
@@ -39,36 +41,59 @@ export function createHouseNavigation(app) {
     else { app.houseUI.hide(); $('#rooms-button').focus({ preventScroll: true }); }
     app.timer.syncDock();
   }
+  const picker = $('#room-picker'), switcher = $('#room-switcher-toggle');
+
+  function closePicker(restoreFocus = true) {
+    if (!picker.open) return;
+    picker.close();
+    switcher.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) switcher.focus({ preventScroll: true });
+  }
+
+  function syncTravelControls() {
+    const index = app.state.house.rooms.findIndex(room => room.id === app.state.house.activeId);
+    document.querySelectorAll('#home-connections button, #room-picker button').forEach(button => { button.disabled = travelling; });
+    $('#previous-room').disabled = travelling || index <= 0;
+    $('#next-room').disabled = travelling || index >= app.state.house.rooms.length - 1;
+    $('#rename-room').disabled = travelling;
+  }
+
   function renderConnections(updateModel = true) {
     connectedView?.setFocused(app.state.session.running);
-    const key = JSON.stringify([app.state.house, app.state.history.length, app.state.theme, app.state.avatar, Boolean(connectedView)]);
+    const key = JSON.stringify([app.state.house, app.state.history.length, app.state.theme, app.state.avatar, Boolean(connectedView), app.state.session.running]);
     if (connectionsKey === key) return;
     connectionsKey = key;
-    const nav = $('#home-connections'), focused = nav.contains(document.activeElement) ? document.activeElement : null;
-    const focusId = focused?.dataset.houseGo, focusWide = focused?.classList.contains('home-wide');
-    nav.replaceChildren();
-    const cards = document.createElement('div'); cards.className = 'room-cards'; nav.append(cards);
-    for (const entry of app.state.house.rooms) {
-      const button = document.createElement('button'), current = entry.id === app.state.house.activeId && !connectedView, name = roomDisplayName(entry);
-      button.className = 'room-card'; button.dataset.houseGo = entry.id; button.disabled = travelling;
-      button.setAttribute('aria-current', current ? 'location' : 'false'); button.setAttribute('aria-label', name); button.title = name;
-      button.innerHTML = `<span class="room-card-art">${roomDesignArt(roomDesign(entry.layout))}</span><span class="room-card-name"></span><span class="room-card-mark">${icon(current ? 'check' : 'arrow')}</span>`;
+    const focusedId = picker.contains(document.activeElement) ? document.activeElement.dataset.houseGo : null;
+    const cards = picker.querySelector('.room-cards'); cards.replaceChildren();
+    const rooms = app.state.house.rooms, index = rooms.findIndex(room => room.id === app.state.house.activeId);
+    $('#room-picker-title').textContent = app.state.house.name;
+    $('#room-route-count').textContent = `${index + 1} / ${rooms.length}`;
+    switcher.setAttribute('aria-label', `Choose a room, currently ${roomDisplayName(rooms[index])}`);
+    $('.room-route-map').innerHTML = rooms.map((room, i) => `<i class="${i === index ? 'is-current' : ''}"></i>`).join('');
+    $('#previous-room').setAttribute('aria-label', index > 0 ? `Go to ${roomDisplayName(rooms[index - 1])}` : 'Previous room');
+    $('#next-room').setAttribute('aria-label', index < rooms.length - 1 ? `Go to ${roomDisplayName(rooms[index + 1])}` : 'Next room');
+    for (const [i, entry] of rooms.entries()) {
+      const button = document.createElement('button'), current = entry.id === app.state.house.activeId, name = roomDisplayName(entry), design = roomDesign(entry.layout);
+      button.className = 'room-card'; button.dataset.houseGo = entry.id; button.dataset.roomStyle = design.style || 'retreat';
+      button.setAttribute('aria-current', current ? 'location' : 'false'); button.setAttribute('aria-label', `${name}${current ? ', you’re here' : ''}`);
+      button.innerHTML = `<span class="room-card-window"><span class="room-card-number" aria-hidden="true">0${i + 1}</span><span class="room-card-art">${roomDesignArt(design)}</span><span class="room-card-mark">${icon(current ? 'check' : 'arrow')}</span></span><span class="room-card-name"></span><span class="room-card-location">${current ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor'}</span>`;
       button.querySelector('.room-card-name').textContent = name;
       button.addEventListener('click', () => selectDestination(entry.id)); cards.append(button);
     }
-    const next = nextExpansion(app.state.house);
+    const next = nextExpansion(app.state.house), grow = $('#room-grow'); grow.replaceChildren();
     if (next) {
-      const button = document.createElement('button'); button.className = 'room-card home-next'; button.dataset.houseGo = next.id; button.disabled = travelling;
-      button.setAttribute('aria-current', 'false'); button.setAttribute('aria-label', `Plan ${next.short}, ${next.price} coins`);
-      button.innerHTML = `<span class="room-card-art">${roomDesignArt(roomDesign({ presetId: next.id === 'loft' ? 'cloud-loft' : 'sakura-studio' }))}</span><span class="room-card-name"></span><span class="room-card-price">${icon('sun')} ${Math.min(app.state.house.coins, next.price)}/${next.price}</span><span class="room-card-mark">${icon('plus')}</span>`;
-      button.querySelector('.room-card-name').textContent = next.short;
-      button.addEventListener('click', () => selectDestination(next.id)); cards.append(button);
+      const button = document.createElement('button'); button.className = 'room-grow-button'; button.dataset.houseGo = next.id;
+      button.setAttribute('aria-label', `Plan ${next.short}, ${next.price} coins`);
+      button.innerHTML = `<span class="room-grow-icon">${icon('plus')}</span><span class="room-grow-name"></span><span class="room-grow-price">${icon('sun')} ${next.price}</span>`;
+      button.querySelector('.room-grow-name').textContent = next.short;
+      button.addEventListener('click', () => { closePicker(false); setHouseOpen(true, next.id); }); grow.append(button);
     }
-    const wide = document.createElement('button'); wide.className = 'home-wide'; wide.disabled = travelling; wide.innerHTML = `${icon('home')}<span>${connectedView ? 'Back to room' : 'Whole house'}</span>`; wide.setAttribute('aria-pressed', String(Boolean(connectedView)));
-    wide.addEventListener('click', () => setConnectedView(!connectedView)); nav.append(wide);
+    const notice = $('#room-picker-notice'); notice.hidden = !app.state.session.running;
+    notice.textContent = app.state.session.running ? 'Pause your focus session to change rooms.' : '';
+    const wide = $('.home-wide'); wide.querySelector('span').textContent = connectedView ? 'Back to room' : 'Whole house'; wide.setAttribute('aria-pressed', String(Boolean(connectedView))); wide.setAttribute('aria-label', wide.querySelector('span').textContent);
     if (connectedView && updateModel) connectedView.update(withGarden(), app.state.house.activeId, app.state.theme, app.state.avatar);
-    const restored = focusId ? cards.querySelector(`[data-house-go="${focusId}"]`) : focusWide ? wide : null;
-    if (restored && !restored.disabled) restored.focus({ preventScroll: true });
+    syncTravelControls();
+    if (focusedId && picker.open) picker.querySelector(`[data-house-go="${focusedId}"]`)?.focus({ preventScroll: true });
   }
   const withGarden = () => ({ ...app.state.house, pet: app.state.pet, garden: studyTrees(app.state.history) });
   function setConnectedView(open) {
@@ -91,8 +116,15 @@ export function createHouseNavigation(app) {
   }
   function selectDestination(id) {
     if (travelling) return;
-    if (id !== app.state.house.activeId) { visitDoor(id); return; }
+    if (id !== app.state.house.activeId) {
+      if (app.panels.current === 'avatar') app.panels.close();
+      app.acceptUpdate(app.store.update());
+      if (app.state.session.running) { app.toast('Pause your focus session before walking to another room.', true); return; }
+    }
+    closePicker(false);
     leaveNavigationViews();
+    if (id !== app.state.house.activeId) visitRoom(id, false);
+    else switcher.focus({ preventScroll: true });
   }
   function visitRoom(id, decorate = app.decorate.active, fromDoor = false) {
     if (travelling && !fromDoor) return;
@@ -108,11 +140,17 @@ export function createHouseNavigation(app) {
     if (!fromDoor) setConnectedView(false);
     if (houseOpen) setHouseOpen(false);
     if (app.decorate.active) app.decorate.setEditMode(false);
+    const originId = app.state.house.activeId;
     const arrive = () => {
+      const wasTravelling = travelling;
+      app.acceptUpdate(app.store.update());
+      if (wasTravelling && !travelling) return;
+      if (app.state.session.running || app.state.house.activeId !== originId) { cancelDoorTravel(); return; }
       const moved = id !== app.state.house.activeId;
       app.decorate.resetForArrival();
-      app.acceptUpdate(app.store.enterHouseRoom(id));
       $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking'); travelling = false;
+      app.acceptUpdate(app.store.enterHouseRoom(id));
+      syncTravelControls();
       // Arrival must release the travel lock before opening the room editor.
       if (decorate) app.decorate.openCollection();
       app.timer.render();
@@ -121,8 +159,10 @@ export function createHouseNavigation(app) {
       clearTimeout(arrivalTimer); arrivalTimer = setTimeout(() => $('#stage').classList.remove('room-arrival'), 650);
     };
     if (id === app.state.house.activeId || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { arrive(); return; }
-    travelling = true; $('#travel-label').textContent = `On to ${roomDisplayName(entry)}`; $('#room-travel small').textContent = 'A different corner of home.'; $('#room-travel').hidden = false; document.body.classList.add('is-travelling'); app.timer.render();
-    travelTimer = setTimeout(arrive, 220);
+    const direction = app.state.house.rooms.findIndex(room => room.id === id) < app.state.house.rooms.findIndex(room => room.id === app.state.house.activeId) ? -1 : 1;
+    $('#stage').style.setProperty('--room-travel-direction', direction);
+    travelling = true; syncTravelControls(); $('#travel-label').textContent = `On to ${roomDisplayName(entry)}`; $('#room-travel small').textContent = 'A different corner of home.'; $('#room-travel').hidden = false; document.body.classList.add('is-travelling'); app.timer.render();
+    travelTimer = setTimeout(arrive, 240);
   }
   function visitDoor(id) {
     if (travelling) return;
@@ -136,7 +176,8 @@ export function createHouseNavigation(app) {
     const link = entry || houseConnections(app.state.house).find(slot => slot.id === id);
     if (!entry && (!link || window.matchMedia('(prefers-reduced-motion: reduce)').matches)) { setHouseOpen(true, id); return; }
     const planRoom = () => { cancelDoorTravel(); setHouseOpen(true, id); };
-    doorWalking = true; travelling = true;
+    closePicker(false);
+    doorWalking = true; travelling = true; syncTravelControls();
     app.hideToast();
     $('#journey-progress-fill').style.transform = 'scaleX(0)';
     $('#travel-label').textContent = `Walking to ${entry ? roomDisplayName(entry) : link.name}`;
@@ -174,12 +215,42 @@ export function createHouseNavigation(app) {
   }
 
   function onStateChange(previous) {
-    if (!doorWalking) return;
-    if (app.state.session.running) cancelDoorTravel('Focusing started in another tab, so the walk to the door stopped.');
+    if (!travelling) return;
+    if (app.state.session.running) cancelDoorTravel('Focusing started in another tab, so room travel stopped.');
     else if (previous.house.activeId !== app.state.house.activeId || JSON.stringify(previous.layout) !== JSON.stringify(app.state.layout)) cancelDoorTravel('Your room changed. Tap the door again when you’re ready.');
   }
 
   function onDoorProgress(progress) { if (doorWalking) $('#journey-progress-fill').style.transform = `scaleX(${progress})`; }
+
+  switcher.addEventListener('click', () => {
+    if (travelling) return;
+    renderConnections(); picker.showModal(); switcher.setAttribute('aria-expanded', 'true');
+    picker.querySelector('[aria-current="location"]')?.focus({ preventScroll: true });
+  });
+  $('#close-room-picker').addEventListener('click', () => closePicker());
+  picker.addEventListener('cancel', event => { event.preventDefault(); closePicker(); });
+  picker.addEventListener('keydown', event => {
+    if (event.key === 'Escape') event.stopPropagation();
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || !event.target.closest('.room-card')) return;
+    event.preventDefault();
+    const cards = [...picker.querySelectorAll('.room-card')], index = cards.indexOf(document.activeElement);
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? cards.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + cards.length) % cards.length;
+    cards[next]?.focus();
+  });
+  let backdropDown = false;
+  const outsidePicker = event => { const rect = picker.getBoundingClientRect(); return event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom; };
+  picker.addEventListener('pointerdown', event => { backdropDown = event.target === picker && outsidePicker(event); });
+  picker.addEventListener('click', event => { if (backdropDown && event.target === picker && outsidePicker(event)) closePicker(); backdropDown = false; });
+  $('#room-picker-house').addEventListener('click', () => { closePicker(false); setHouseOpen(true); });
+  $('.home-wide').addEventListener('click', () => setConnectedView(!connectedView));
+  for (const [selector, offset] of [['#previous-room', -1], ['#next-room', 1]]) $(selector).addEventListener('click', () => {
+    const index = app.state.house.rooms.findIndex(room => room.id === app.state.house.activeId), destination = app.state.house.rooms[index + offset];
+    if (destination) selectDestination(destination.id);
+  });
+  $('#cancel-room-travel').addEventListener('click', () => { if (cancelDoorTravel()) switcher.focus({ preventScroll: true }); });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && doorWalking && !event.isComposing) { event.preventDefault(); event.stopImmediatePropagation(); cancelDoorTravel(); switcher.focus({ preventScroll: true }); }
+  }, { signal: app.signal });
 
   $('#rooms-button').addEventListener('click', () => setHouseOpen(true));
   $('#coin-wallet').addEventListener('click', () => setHouseOpen(!houseOpen));
@@ -189,6 +260,6 @@ export function createHouseNavigation(app) {
     get connected() { return connectedView; },
     get travelling() { return travelling; },
     setHouseOpen, setConnectedView, renderConnections, visitRoom, visitDoor, onStateChange, onDoorProgress,
-    dispose() { clearTimeout(travelTimer); cancelAnimationFrame(peekFrame); clearTimeout(arrivalTimer); connectedView?.dispose(); },
+    dispose() { closePicker(false); clearTimeout(travelTimer); cancelAnimationFrame(peekFrame); clearTimeout(arrivalTimer); connectedView?.dispose(); },
   };
 }

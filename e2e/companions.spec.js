@@ -77,6 +77,7 @@ test('completion awards the pet that began focusing and the room stays usable', 
   await page.clock.fastForward('24:01');
   await expect(page.locator('#session-celebration')).toBeVisible();
   await expect(page.locator('#celebration-bond')).toContainText('+5 ♡ · Miso');
+  await page.waitForFunction(() => !document.querySelector('#session-celebration').getAnimations({ subtree: true }).some(animation => animation.playState === 'running' && Number.isFinite(animation.effect?.getComputedTiming().endTime)));
   const accessibility = await new AxeBuilder({ page }).include('#session-celebration').analyze();
   expect(accessibility.violations).toEqual([]);
   expect(await page.locator('#session-celebration').evaluate(el => el.matches(':modal'))).toBe(false);
