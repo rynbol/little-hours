@@ -14,7 +14,7 @@ The room and shared study presence are the core product. Make online availabilit
 
 The user requests commits and pushes at meaningful checkpoints. After a coherent change, run the relevant checks, review the diff, commit it, and push the current branch. Use `codex/` for feature branches. Keep credentials, local user paths, generated bundles, and dependencies out of Git.
 
-Use Node 24. Verification commands are `npm test`, `npm run verify:room`, and `npm run build`. For visual or interaction changes, also inspect the running app in the browser; the room harness uses Babylon NullEngine without a GPU and cannot prove visual correctness. Keep browser testing visible when appropriate, as the user requested.
+Use Node 24. Verification commands are `npm test`, `npm run verify:room`, and `npm run build`. For visual or interaction changes, also inspect the running app in the browser; the room harness uses Babylon NullEngine without a GPU and cannot prove visual correctness. Run browser testing headlessly by default; opening Chrome windows disrupts the user. Use `--headed` only when the user explicitly asks to watch.
 
 Verify browser behaviour with the `lh` CLI (`npm run lh -- help`) and follow `.claude/skills/verify-little-hours/SKILL.md`: `lh doctor`, then `lh run <flow>`, then `lh perf` / `lh shot` / `lh heap` with `--against main`, then `lh cleanup`. Add missing steps or flows under `scripts/lh/` instead of writing one-off driver scripts. Use `--headed` when the user wants to watch.
 

@@ -58,15 +58,19 @@ test('room cards respect focus and reduced motion, with readable phone controls'
   await page.locator('#room-title-input').fill('A very long name for our cozy room ♡♡♡♡♡♡');
   await page.locator('#room-title-input').press('Enter');
   await page.locator('#start-button').click();
+  await page.locator('#room-switcher-toggle').click();
   await page.locator('[data-house-go="garden"]').click();
   await expect(page.locator('#toast')).toHaveText('Pause your focus session before walking to another room.');
   expect((await saved(page)).house.activeId).toBe('studio');
+  await page.locator('#close-room-picker').click();
   await page.locator('#start-button').click();
+  await page.locator('#room-switcher-toggle').click();
   await page.locator('[data-house-go="garden"]').click();
   await expect(page.locator('#room-title')).toHaveText('Garden wing');
   await expect(page.locator('#room-travel')).toBeHidden();
   await expect(page.locator('[data-house-go="garden"]')).toHaveAttribute('aria-current', 'location');
-  const controls = await page.locator('[data-house-go], #rename-room').evaluateAll(nodes => nodes.map(node => {
+  await page.locator('#room-switcher-toggle').click();
+  const controls = await page.locator('[data-house-go], #close-room-picker').evaluateAll(nodes => nodes.map(node => {
     const rect = node.getBoundingClientRect();
     return { width: rect.width, height: rect.height, right: rect.right, left: rect.left };
   }));
@@ -78,9 +82,12 @@ test('room cards respect focus and reduced motion, with readable phone controls'
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).include('.room-heading').include('#home-connections').analyze()).violations).toEqual([]);
+  expect((await new AxeBuilder({ page }).include('#room-picker').analyze()).violations).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath('room-cards-phone.png') });
+  await page.locator('#close-room-picker').click();
   await page.locator('.home-wide').click();
   await expect(page.locator('#rename-room')).toBeHidden();
+  await page.locator('#room-switcher-toggle').click();
   await page.locator('[data-house-go="loft"]').click();
   await expect(page.locator('#room-title')).toHaveText('Upstairs hideaway');
   await expect(page.locator('body')).not.toHaveClass(/is-connected|is-travelling/);
@@ -95,6 +102,7 @@ test('a room change in another tab cancels the old heading draft', async ({ page
   await other.emulateMedia({ reducedMotion: 'reduce' });
   await other.goto('/');
   await expect(other.locator('#loading-note')).toBeHidden({ timeout: 60000 });
+  await other.locator('#room-switcher-toggle').click();
   await other.locator('[data-house-go="garden"]').click();
   await expect(other.locator('#room-title')).toHaveText('Garden wing');
   await expect(page.locator('#room-title')).toHaveText('Garden wing');

@@ -1,4 +1,5 @@
 export const steps = {
+  async openRoomPicker(app) { if (await app.visible('#room-switcher-toggle')) { await app.clickSel('#room-switcher-toggle'); await app.waitFor(`document.getElementById('room-picker').open`, { what: 'the room picker' }); await app.waitFor(`!document.getElementById('room-picker').getAnimations().some(animation => animation.playState === 'running')`, { what: 'the room picker animation' }); } },
   async openHouse(app) { await app.clickSel('#rooms-button'); await app.waitFor(`document.body.classList.contains('is-house') && Boolean(!window.__littleHours?.house || window.__littleHours.house.diagnostics())`, { what: 'the house page', timeout: 10000 }); await app.settle(); },
   async backToRoom(app) { await app.clickSel('#back-to-room'); await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the room page', timeout: 20000 }); await app.settle(); },
   async toggleHouse(app) { await app.clickSel('[data-house-open]'); await app.settle(); },
@@ -10,7 +11,7 @@ export const steps = {
 };
 
 export const cycles = {
-  rooms: { about: 'visit the garden and studio using their room cards', async run(app) { for (const id of ['garden', 'studio']) { await app.clickSel(`[data-house-go="${id}"]`); await app.waitFor(`window.__littleHours.state.house.activeId === '${id}' && !document.body.classList.contains('is-travelling')`, { what: `arrival in ${id}`, timeout: 30000 }); await app.settle(); } } },
+  rooms: { about: 'visit the garden and studio using their room cards', async run(app) { for (const id of ['garden', 'studio']) { await steps.openRoomPicker(app); await app.clickSel(`[data-house-go="${id}"]`); await app.waitFor(`window.__littleHours.state.house.activeId === '${id}' && !document.body.classList.contains('is-travelling')`, { what: `arrival in ${id}`, timeout: 30000 }); await app.settle(); } } },
   pet: { about: 'choose the cat and puppy, open and close the pet notebook', async run(app) { await app.clickSel('#pet-button'); await app.clickSel('[data-pet-choice="dog"]'); await app.clickSel('[data-pet-choice="cat"]'); await app.clickSel('#close-panel'); await app.settle(); } },
   house: { about: 'open the house page, then go back to the room', async run(app) { await steps.openHouse(app); await steps.backToRoom(app); } },
   decorate: { about: 'open Decorate, then leave it', async run(app) { await steps.openDecorate(app); await steps.closeDecorate(app); } },
@@ -19,6 +20,7 @@ export const cycles = {
 };
 
 export const views = {
+  'room-picker': { about: 'the illustrated room picker', async go(app) { await steps.openRoomPicker(app); } },
   pet: { about: 'your pet notebook', async go(app) { await app.clickSel('#pet-button'); await app.settle(); } },
   room: { about: 'the room at rest', async go() {} },
   house: { about: 'the house page, open', async go(app) { await steps.openHouse(app); } },

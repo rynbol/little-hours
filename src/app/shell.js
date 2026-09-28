@@ -11,14 +11,17 @@ export const shellMarkup = (audioPrefs) => `
     <main class="workspace">
       <section id="room-section" class="room-section" aria-labelledby="room-title">
         <div class="room-heading"><div class="room-heading-identity"><div class="room-title-row"><h1 id="room-title" tabindex="-1">The twilight retreat</h1><button class="icon-button" id="rename-room" aria-label="Rename room" aria-controls="room-title-form" aria-expanded="false">${icon('build')}</button></div><form class="room-title-form" id="room-title-form" hidden><label class="sr-only" for="room-title-input">Room name</label><input id="room-title-input" maxlength="40" autocomplete="off" required><button id="save-room-title" type="submit">Save</button><button id="cancel-room-title" type="button">Cancel</button></form><p class="room-subtitle" id="room-subtitle" hidden></p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Visit your house" aria-controls="house-page">${icon('home')}<span>My house</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
-        <nav id="home-connections" class="home-connections" aria-label="Move around your house"></nav>
+        <nav id="home-connections" class="home-connections" aria-label="Move around your house">
+          <div class="room-route"><button id="previous-room" class="room-step" aria-label="Previous room">${icon('arrow')}</button><button id="room-switcher-toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="room-picker"><span class="room-route-map" aria-hidden="true"></span><span>Rooms</span><span id="room-route-count"></span><svg class="room-route-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3 3 3-3"/></svg></button><button id="next-room" class="room-step" aria-label="Next room">${icon('arrow')}</button></div>
+          <button class="home-wide" aria-pressed="false">${icon('home')}<span>Whole house</span></button>
+        </nav>
         <div class="avatar-stage-heading"><span class="eyebrow">YOUR EVERYDAY KIND OF MAGIC</span><span class="avatar-pause-note" id="avatar-pause-note"></span></div>
         <div class="stage" id="stage">
           <div class="portrait-backdrop" aria-hidden="true"><span>✧</span><span>✦</span><span>✧</span></div>
           <div class="avatar-preview-controls" aria-label="Turn your avatar"><button id="avatar-turn-left" aria-label="Turn avatar left">${icon('rotate')}</button><span>Drag to turn</span><button id="avatar-turn-right" aria-label="Turn avatar right">${icon('rotate')}</button><button id="avatar-face-front">Face me</button></div>
           <div class="room-canvas" id="room-canvas" aria-label="Interactive 3D cutaway study room with a desk, bookshelf, plants and a pet. Drag to turn the room."></div>
           <div id="house-in-room" class="house-in-room" hidden></div>
-          <div id="room-travel" class="room-travel" role="status" hidden><span>${icon('leaf')}</span><div><strong id="travel-label"></strong><small>A different corner of home.</small></div><div class="journey-progress" aria-hidden="true"><i id="journey-progress-fill"></i></div></div>
+          <div id="room-travel" class="room-travel" role="status" hidden><span>${icon('leaf')}</span><div><strong id="travel-label"></strong><small>A different corner of home.</small></div><div class="journey-progress" aria-hidden="true"><i id="journey-progress-fill"></i></div><button id="cancel-room-travel" aria-label="Cancel walk">${icon('close')}</button></div>
           <div class="loading-note" id="loading-note">Making room for you…</div>
           <div class="stage-presence" id="stage-presence" data-presence="idle" role="status" aria-live="polite" aria-atomic="true" aria-label="Your local focus status: In your room" title="Your focus status in this browser."><span id="presence-icon" aria-hidden="true">${icon('home')}</span><span id="room-status">In your room</span></div>
           <div class="companion-status" id="companion-status" data-state="idle" role="status" aria-live="polite"><span aria-hidden="true">✧</span><span id="companion-status-text">Companion · Ready at the desk</span></div>
@@ -67,6 +70,12 @@ export const shellMarkup = (audioPrefs) => `
     </main>
     <footer class="app-footer"><span>A softer place to spend your hours.</span><button class="save-status" id="save-status" data-panel="saves" aria-expanded="false" aria-controls="room-panel"><span id="save-status-text">Saved on this device</span> <span aria-hidden="true">✧</span></button></footer>
   </div>
+  <dialog id="room-picker" class="room-picker" aria-labelledby="room-picker-title">
+    <div class="room-picker-heading"><span class="room-picker-home" aria-hidden="true">${icon('home')}</span><h2 id="room-picker-title">Your little house</h2><button id="close-room-picker" aria-label="Close room picker">${icon('close')}</button></div>
+    <div class="room-cards" role="group" aria-label="Choose a room"></div>
+    <p id="room-picker-notice" class="room-picker-notice" role="status" hidden></p>
+    <div class="room-picker-footer"><div id="room-grow"></div><button id="room-picker-house">My house ${icon('arrow')}</button></div>
+  </dialog>
   <dialog id="session-celebration" class="session-celebration" aria-labelledby="celebration-title" aria-describedby="celebration-copy">
     <form method="dialog"><button class="celebration-close" aria-label="Close session celebration">${icon('close')}</button><div class="celebration-flower" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="m24 0 5.6 17.7L48 24l-18.4 6.3L24 48l-5.6-17.7L0 24l18.4-6.3Z"/></svg></div><h2 id="celebration-title">You did it.</h2><p id="celebration-copy"></p><div class="celebration-coins">${coinArt()}<strong id="celebration-earned"></strong></div><p class="celebration-bond" id="celebration-bond"></p><p class="celebration-bond" id="celebration-friendship" hidden></p><button class="start-button" autofocus>Lovely ${icon('heart')}</button></form>
   </dialog>
