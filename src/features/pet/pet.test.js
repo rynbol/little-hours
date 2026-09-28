@@ -278,3 +278,34 @@ test('a close-up gaze follows horizontal input and stays still with reduced moti
   assert.deepEqual(model.headPoint(new Vector3()), still);
   model.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose();
 });
+
+
+test('an unreachable meal spot is cached until its layout or companion changes', () => {
+  const routine = createPetRoutine(), layout = createLayout('ember-library');
+  const items = [
+    { id: 'bed', type: 'pet-bed', x: 0, z: 0, rotation: 0 },
+    ...[[-1.25, 0, 1], [1.25, 0, 1], [0, -1.5, 0], [0, 1.5, 0]].map(([x, z, rotation], i) => ({ id: `shelf-${i}`, type: 'bookcase', x, z, rotation })),
+    { id: 'desk', type: 'writing-desk', x: -3, z: -3, rotation: 0 },
+  ];
+  let reads = 0;
+  Object.defineProperty(layout, 'items', { get() { reads++; return items; } });
+  routine.setLayout(layout);
+  assert.equal(routine.diningSpot(), null);
+  const searched = reads;
+  for (let frame = 0; frame < 120; frame++) assert.equal(routine.diningSpot(), null);
+  assert.equal(reads, searched, 'an unchanged blocked room does not run navigation searches each frame');
+  const companion = { x: 3, z: 3, yaw: 0, moving: false, seated: false };
+  routine.setCompanion(companion);
+  assert.equal(routine.diningSpot(), null);
+  assert.ok(reads > searched, 'a companion change permits another search');
+  const withCompanion = reads;
+  routine.diningSpot();
+  assert.equal(reads, withCompanion);
+  companion.x = 2;
+  routine.setCompanion(companion);
+  routine.diningSpot();
+  assert.ok(reads > withCompanion, 'mutating the live companion pose also invalidates a failed search');
+  routine.setLayout(createLayout('ember-library'));
+  assert.ok(routine.diningSpot(), 'opening the layout permits meals again');
+  assert.equal(routine.ritual('treat'), true);
+});

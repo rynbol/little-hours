@@ -85,7 +85,7 @@ export function createPetRoutine({ random = clockRandom, onChange = () => {} } =
   const pose = { state: 'sleeping', action: 'sleep', x: 0, z: 0, yaw: 0, onBed: true, moving: false, walked: 0, petAge: Infinity, fuss: 0, hearts: [], held: false, species: 'cat', to: null, ritual: null, ritualAge: Infinity, care: null };
   let layout = null, editing = false, windowX = -2.7, companion = null, speed = PETS.cat.speed;
   // The floor that leads home, found once per layout.
-  let homeFloor = null, dining = null, bond = 0;
+  let homeFloor = null, dining = null, diningContext, bond = 0;
   let timer = 0, trip = null, legIndex = 0, visits = 0, target = null, waited = 0, goHome = false, stall = 0, settleFrom = 0, passed = null;
   const wait = ([low, high]) => low + random() * (high - low);
   function status(next, action = next) {
@@ -140,6 +140,9 @@ export function createPetRoutine({ random = clockRandom, onChange = () => {} } =
   }
   function diningSpot() {
     if (dining) return dining;
+    const context = JSON.stringify([companion?.x, companion?.z, companion?.yaw, companion?.atDesk, companion?.moving, companion?.seated, companion?.to?.x, companion?.to?.z, companion?.portal?.x, companion?.portal?.z]);
+    if (diningContext === context) return null;
+    diningContext = context;
     const home = petHome(layout), obstacles = petObstacles(layout, companionBoxes());
     if (!home) return null;
     const candidates = [[0, 1], [.9, .3], [-.9, .3], [1, -.5], [-1, -.5]].map(([x, z]) => ({ x: home.x + x, z: home.z + z }));
@@ -170,7 +173,7 @@ export function createPetRoutine({ random = clockRandom, onChange = () => {} } =
     pose,
     setSpecies(id) { const next = PETS[id] ? id : 'cat'; if (next !== pose.species) { pose.care = null; pose.ritual = null; pose.ritualAge = Infinity; if (layout) sleepAtHome(); } pose.species = next; speed = PETS[next].speed; },
     setLayout(next, { windowX: nextWindow } = {}) {
-      const first = !layout; layout = next; homeFloor = null; dining = null; if (pose.care) { pose.care = null; pose.ritual = null; pose.ritualAge = Infinity; sleepAtHome(); } if (Number.isFinite(nextWindow)) windowX = nextWindow;
+      const first = !layout; layout = next; homeFloor = null; dining = null; diningContext = undefined; if (pose.care) { pose.care = null; pose.ritual = null; pose.ritualAge = Infinity; sleepAtHome(); } if (Number.isFinite(nextWindow)) windowX = nextWindow;
       const home = petHome(layout); if (!home) return;
       if (first) { sleepAtHome(true); return; }
       if (pose.held) return;
