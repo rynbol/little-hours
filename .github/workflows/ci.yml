@@ -43,6 +43,8 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e -- --shard=${{ matrix.shard }}/2
+      - if: matrix.shard == 1
+        run: npx playwright test --config playwright.production.config.js
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
@@ -56,7 +58,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flow: [avatar, companions, controls, decorate, doors, house, pet, pond, room-picker, rooms, timer]
+        flow: [avatar, companions, controls, decorate, doors, focus, house, pet, pond, room-picker, rooms, timer]
     name: flow (${{ matrix.flow }})
     steps:
       - uses: actions/checkout@v7

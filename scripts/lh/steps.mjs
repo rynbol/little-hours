@@ -1,4 +1,6 @@
 export const steps = {
+  async openFocus(app) { await app.clickSel('#focus-mode-enter'); await app.waitFor(`document.body.classList.contains('is-focus-mode')`, { what: 'Focus mode' }); await app.settle(); },
+  async closeFocus(app) { await app.clickSel('#focus-mode-exit'); await app.waitFor(`!document.body.classList.contains('is-focus-mode')`, { what: 'leaving Focus mode' }); await app.settle(); },
   async openRoomPicker(app) { if (await app.visible('#room-switcher-toggle')) { await app.clickSel('#room-switcher-toggle'); await app.waitFor(`document.getElementById('room-picker').open`, { what: 'the room picker' }); await app.waitFor(`!document.getElementById('room-picker').getAnimations().some(animation => animation.playState === 'running')`, { what: 'the room picker animation' }); } },
   async openHouse(app) { await app.clickSel('#rooms-button'); await app.waitFor(`document.body.classList.contains('is-house') && Boolean(!window.__littleHours?.house || window.__littleHours.house.diagnostics())`, { what: 'the house page', timeout: 10000 }); await app.settle(); },
   async backToRoom(app) { await app.clickSel('#back-to-room'); await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the room page', timeout: 20000 }); await app.settle(); },
@@ -11,6 +13,7 @@ export const steps = {
 };
 
 export const cycles = {
+  focus: { about: 'enter and leave whole-room Focus mode without pausing', async run(app) { await steps.openFocus(app); await steps.closeFocus(app); } },
   rooms: { about: 'visit the garden and studio using their room cards', async run(app) { for (const id of ['garden', 'studio']) { await steps.openRoomPicker(app); await app.clickSel(`[data-house-go="${id}"]`); await app.waitFor(`window.__littleHours.state.house.activeId === '${id}' && !document.body.classList.contains('is-travelling')`, { what: `arrival in ${id}`, timeout: 30000 }); await app.settle(); } } },
   pet: { about: 'choose the cat and puppy, open and close pet care', async run(app) { await app.clickSel('#pet-button'); if (await app.js(`Boolean(document.querySelector('#pet-collection'))`)) await app.clickSel('#pet-collection > summary'); await app.clickSel('[data-pet-choice="dog"]'); await app.clickSel('[data-pet-choice="cat"]'); await app.clickSel('#close-panel'); await app.settle(); } },
   house: { about: 'open the house page, then go back to the room', async run(app) { await steps.openHouse(app); await steps.backToRoom(app); } },
@@ -20,6 +23,7 @@ export const cycles = {
 };
 
 export const views = {
+  focus: { about: 'the whole room in Focus mode, or the room on older refs', async go(app) { if (await app.js(`Boolean(document.getElementById('focus-mode-enter'))`)) await steps.openFocus(app); } },
   'room-picker': { about: 'the illustrated room picker', async go(app) { await steps.openRoomPicker(app); } },
   pet: { about: 'your pet care card', async go(app) { await app.clickSel('#pet-button'); await app.settle(); } },
   room: { about: 'the room at rest', async go() {} },

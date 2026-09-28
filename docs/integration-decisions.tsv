@@ -1,0 +1,9 @@
+ts	phase	decision	why	evidence	result
+2026-09-28T10:27:00Z	inventory	Account for every local and remote branch beyond main	A clean PR list alone would miss unsubmitted work	bf3159d; b319fb2; d55e412; 539c57a; 995101a	three current changes and one older focus feature identified
+2026-09-28T10:27:00Z	integration	Keep room-picker CI coverage and remove retired pair-friendship coverage	The two PRs edit the same matrix for different valid reasons	68c8992	229 units, room checks, build and guard pass
+2026-09-28T10:27:00Z	integration	Preserve development bait stocking with its test exclusion	The extra Claude commits are absent from main and should not disappear	89ff853	230 units, build and guard pass
+2026-09-28T10:47:00Z	review	Fix confirmed room travel and phone controls failures before landing	Production parent/head reproduction showed real regressions	c07b4e1; PR2 independent verdict	9 production checks and 77 real-input navigation checks pass
+2026-09-28T10:47:00Z	review	Cache failed pet dining searches with relevant invalidation	Crowded layouts otherwise rerun pathfinding every frame	782a155; PR3 independent verdict	17 pet tests and fresh production care checks pass
+2026-09-28T10:47:00Z	integration	Keep development bait within capacity and after completion delivery	Preserve earned inventory and overdue reward reveals	fishing regressions; development.spec.js	unit and four production boundary cases pass
+2026-09-28T10:47:00Z	integration	Port whole-room Focus Mode into current timer lifecycle	Preserve older unique work without overwriting subsequent feature modules	focus-mode.spec.js; lh focus	10 targeted browser cases and eight real-input checks pass
+2026-09-28T11:10:00Z	verification	Keep performance readings on one line during live updates	Wrapped timing values move the quality button between pointer down and up	e2e/controls.spec.js; controlled 16.7-to-1000.0 ms fixture	regression fails before the CSS fix and passes after it

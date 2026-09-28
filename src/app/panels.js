@@ -36,7 +36,7 @@ export function createPanels(app) {
     if (petCard) app.timer.render();
   }
 
-  function open(name) { current = name; render(); }
+  function open(name) { if (name) app.timer.leaveFocusMode({ restoreFocus: false }); current = name; render(); }
 
   function close() {
     const previous = current; current = null; render();
