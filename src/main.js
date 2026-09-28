@@ -24,12 +24,14 @@ import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
 import { installTestHook } from './dev/test-hook.js';
+import { stockBait } from './core/fishing.js';
 
 const deviceStorage = pinnedStorage || {
   getItem: key => localStorage.getItem(key),
   setItem: (key, value) => localStorage.setItem(key, value),
 };
 const store = createStateStore(deviceStorage);
+if (import.meta.env.DEV && !pinnedStorage) store.update((draft, { now }) => stockBait(draft.pond, 3, now));
 const audio = createAudio(deviceStorage);
 const listeners = new AbortController();
 let hiddenSince = 0;

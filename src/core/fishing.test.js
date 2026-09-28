@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rollCatch, baitRange, startFight, stepFight, SPECIES, TIERS, BAIT_RANGES } from './fishing.js';
+import { rollCatch, baitRange, startFight, stepFight, SPECIES, TIERS, BAIT_RANGES, stockBait } from './fishing.js';
 import { createStateStore, restoreState, freshState } from './state.js';
 
 const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
@@ -109,4 +109,11 @@ test('landing a fish keeps the catch rolled when it was hooked', () => {
   assert.deepEqual([caught.species, caught.size, caught.isNew], ['koi', 41.5, true]);
   const saved = f.reopen().state.pond;
   assert.deepEqual([saved.journal.koi.count, saved.journal.koi.best, saved.bait.length], [1, 41.5, 0]);
+});
+
+test('stocking tops every bait up to the count and keeps the bait already there', () => {
+  const pond = { bait: [{ minutes: 20, at: 1 }, { minutes: 25, at: 2 }, { minutes: 40, at: 3 }, { minutes: 41, at: 4 }, { minutes: 42, at: 5 }, { minutes: 43, at: 6 }] };
+  stockBait(pond, 3, 9);
+  const counts = pond.bait.reduce((all, { minutes }) => ({ ...all, [minutes]: (all[minutes] || 0) + 1 }), {});
+  assert.deepEqual(counts, { 5: 3, 15: 1, 20: 1, 25: 1, 40: 1, 41: 1, 42: 1, 43: 1, 50: 3, 90: 3 });
 });
