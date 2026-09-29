@@ -3,8 +3,8 @@ body.is-garden { overflow: hidden; }
 body.is-garden > .app-footer, body.is-garden .app-header, body.is-garden #save-status, body.is-garden .skip-link { visibility: hidden; }
 .house-page.is-living-garden { --garden-paper: #fbf5ea; --garden-ink: #485840; position: fixed; inset: 0; width: 100%; height: 100svh; max-width: none; padding: 0; margin: 0; z-index: 50; overflow: hidden; background: #5b586a; color: var(--garden-ink); }
 .is-living-garden .house-layout, .is-living-garden .house-left, .is-living-garden .house-scene { display: contents; }
-.is-living-garden .house-world { position: absolute; inset: 0; border: 0; border-radius: 0; box-shadow: none; background: radial-gradient(ellipse at 35% 45%, #c8c0ad66, transparent 67%), linear-gradient(145deg, #555469, #a38e95 65%, #c8b59c); }
-.is-living-garden .house-world::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 50%, #29273533); pointer-events: none; }
+.is-living-garden .house-world { position: absolute; inset: 0; border: 0; border-radius: 0; box-shadow: none; background: radial-gradient(ellipse at 35% 30%, #fcf4dfaa, transparent 65%), linear-gradient(155deg, #bdcdb6, #d4d9bf 55%, #e8d8bf); }
+.is-living-garden .house-world::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, #70836422); pointer-events: none; }
 .is-living-garden .house-heading, .is-living-garden .house-world-caption, .is-living-garden .house-rooms, .is-living-garden .house-garden-link, .is-living-garden .house-preview-bar, .is-living-garden .house-camera-controls, .is-living-garden .house-sky-mark { display: none; }
 .is-living-garden #house-canvas { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; }
 .is-living-garden #house-canvas::before { display: none; }
@@ -85,7 +85,7 @@ button.house-room-tag.is-garden { cursor: pointer; }
 @keyframes garden-breathe { 0%,100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
 @keyframes garden-arrive { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
 @media (max-width: 1000px) and (min-width: 701px) { .garden-card { width: 245px; padding: 14px 18px; right: 16px; } .garden-heading h2 { font-size: 22px; } .garden-wallet { display: none; } }
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-width: 1000px) and (min-height: 651px) {
   .garden-heading { top: calc(env(safe-area-inset-top, 0px) + 12px); left: 12px; right: 12px; gap: 7px; }
   .garden-heading h2 { padding: 13px 20px; font-size: 19px; }
   .garden-heading h2::before { left: 7px; } .garden-heading h2::after { right: 7px; }
@@ -94,7 +94,7 @@ button.house-room-tag.is-garden { cursor: pointer; }
   #garden-collection-open { font-size: 0; gap: 0; }
   #garden-collection-open::before { content: '✿'; font-size: 21px; margin-right: 5px; }
   #garden-collection-open b { font-size: 11px; }
-  .garden-card { left: 12px; right: 12px; top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 99px); width: auto; max-height: 290px; overflow-y: auto; padding: 16px; display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 10px; align-items: center; border-radius: 22px; }
+  .garden-card { left: 12px; right: 12px; top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 99px); width: auto; max-width: 500px; margin-inline: auto; max-height: 290px; overflow-y: auto; padding: 16px; display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 10px; align-items: center; border-radius: 22px; }
   .garden-specimen { height: 134px; }
   .garden-specimen > svg { width: 108px; height: 126px; }
   .garden-halo { width: 106px; height: 106px; }
@@ -104,7 +104,7 @@ button.house-room-tag.is-garden { cursor: pointer; }
   .garden-text-button { font-size: 11px; }
   .garden-card:has(#garden-name-form:not([hidden])) { grid-template-columns: 1fr; }
   .garden-card:has(#garden-name-form:not([hidden])) .garden-specimen { display: none; }
-  .garden-tray { bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); max-width: calc(100% - 24px); width: calc(100% - 24px); padding: 12px; border-radius: 20px; }
+  .garden-tray { bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); max-width: calc(100% - 24px); width: min(500px, calc(100% - 24px)); padding: 12px; border-radius: 20px; }
   .garden-plot-row { justify-content: center; gap: 0; }
   .garden-plot-row > span { display: none; }
   .garden-plots { width: 100%; gap: 6px; justify-content: space-between; }

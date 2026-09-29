@@ -6,7 +6,7 @@ import './garden.css';
 
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
-export function createGardenUI(root, { store, acceptUpdate, onFocus, onBack, notice, celebrate }) {
+export function createGardenUI(root, { store, acceptUpdate, onFocus, onBack, onPlot, notice, celebrate }) {
   let slot = 0, choosing = false, selectedSpecies = 'cosmos', selectedPlant = null, collectionOpen = false;
   const $ = selector => root.querySelector(selector);
   function render() {
@@ -57,6 +57,7 @@ export function createGardenUI(root, { store, acceptUpdate, onFocus, onBack, not
     $('#garden-name-form')?.addEventListener('submit', event => { event.preventDefault(); acceptUpdate(store.renamePlant(plant.id, $('#garden-name-input').value)); render(); $('#garden-name-form').hidden = true; $('#garden-rename').focus(); });
     if (draftName?.id === plant?.id && $('#garden-name-input')) { $('#garden-name-form').hidden = false; $('#garden-name-input').value = draftName.value; $('#garden-name-input').setSelectionRange(draftName.start, draftName.end); }
     if (focusId) root.querySelector(`#${focusId}`)?.focus({ preventScroll: true });
+    onPlot?.(slot);
   }
   return { render, close() { collectionOpen = false; $('#garden-collection-dialog')?.close(); }, selectSlot(index) { slot = index; selectedPlant = null; choosing = false; render(); }, selectPlant(id) {
     const plant = store.state.garden.plants.find(item => item.id === id);

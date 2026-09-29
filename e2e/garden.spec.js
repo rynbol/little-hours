@@ -51,10 +51,35 @@ test('the garden reuses the house engine, keeps room batches and stops drawing w
   expect(await page.evaluate(() => window.__littleHours.house.diagnostics().scene.meshes.find(m => m.metadata?.houseSlot === 'studio')?.uniqueId)).toBe(initial.room);
   await page.waitForTimeout(1700); const before = await page.evaluate(() => window.__littleHours.house.diagnostics().renderCount);
   await page.waitForTimeout(700); expect(await page.evaluate(() => window.__littleHours.house.diagnostics().renderCount)).toBe(before);
-  await page.locator('#garden-back').click(); await page.locator('#back-to-room').click();
+  expect(await page.evaluate(() => window.__littleHours.house.diagnostics().scene.getMeshByName('house-retreat-grounds').isEnabled())).toBe(true);
+  expect(await page.evaluate(() => window.__littleHours.house.diagnostics().scene.getMeshByName('garden-butterfly-wings').isEnabled())).toBe(false);
+  await page.locator('#garden-back').click();
+  expect(await page.evaluate(() => window.__littleHours.house.diagnostics().scene.getMeshByName('house-retreat-grounds').isEnabled())).toBe(false);
+  await page.locator('#back-to-room').click();
   await page.locator('.home-wide').click(); await page.locator('#house-in-room [data-room="orchard"]').click();
   await expect(page.locator('#house-detail h2')).toHaveText('Your garden');
   expect(await page.evaluate(() => window.__littleHours.state.house.activeId)).toBe('studio');
+});
+
+test('garden butterflies animate and the selected bed follows real input without changing progress @dev-diagnostics', async ({ page }) => {
+  await page.goto('/'); await ready(page); await openGarden(page);
+  const before = await page.evaluate(() => window.__littleHours.state.garden);
+  const wings = () => page.evaluate(() => {
+    const mesh = window.__littleHours.house.diagnostics().scene.getMeshByName('garden-butterfly-wings');
+    return { visible: mesh.isEnabled(), position: Array.from(mesh._thinInstanceDataStorage.matrixData.slice(0, 16)) };
+  });
+  await expect.poll(async () => (await wings()).visible).toBe(true);
+  const first = (await wings()).position;
+  await expect.poll(async () => JSON.stringify((await wings()).position)).not.toBe(JSON.stringify(first));
+  await page.locator('#garden-spot-4').click();
+  expect(await page.evaluate(() => {
+    const d = window.__littleHours.house.diagnostics(), ring = d.scene.getMeshByName('garden-selected-bed');
+    return [ring.position.x, ring.position.z];
+  })).toEqual([-2.25, 2.35]);
+  expect(await page.evaluate(() => window.__littleHours.state.garden)).toEqual(before);
+  await page.locator('#garden-back').click();
+  await expect.poll(async () => (await wings()).visible).toBe(false);
+  expect(await page.evaluate(() => window.__littleHours.house.diagnostics().scene.getMeshByName('garden-selected-bed').isEnabled())).toBe(false);
 });
 
 test('a name draft stays with its plant when another tab replaces that garden spot', async ({ page, context }) => {

@@ -15,7 +15,9 @@ import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import '@babylonjs/core/Culling/ray.js';
 import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
 import { gardenPlantName } from '../../core/garden-plants.js';
-import { gardenBounds, PLANT_SPOTS, gardenPlotAt } from './garden-model.js';
+import { PLANT_SPOTS, gardenPlotAt } from './garden-model.js';
+import { RETREAT_SPOTS, RETREAT_BOUNDS } from './garden-retreat.js';
+import { createGardenButterflies } from './garden-butterflies.js';
 import { GARDEN_TAG } from './house-garden.js';
 import { POND_TAG } from './house-pond.js';
 import { createStroll } from './house-stroll.js';
@@ -54,6 +56,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   sun.position.set(0, 12, 6);
   const shadows = new ShadowGenerator(2048, sun); shadows.usePercentageCloserFiltering = true; shadows.bias = .002; shadows.normalBias = .02; shadows.darkness = .3;
   shadows.getShadowMap().refreshRate = 0;
+  const gardenRing = MeshBuilder.CreateTorus('garden-selected-bed', { diameter: 2.27, thickness: .04, tessellation: 64 }, scene);
+  const ringPaint = new StandardMaterial('garden-selected-bed-paint', scene); ringPaint.diffuseColor = Color3.FromHexString('#e7d6a1'); ringPaint.emissiveColor = Color3.FromHexString('#7e7d43'); ringPaint.specularColor.setAll(0); gardenRing.material = ringPaint; gardenRing.scaling.z = .82; gardenRing.isPickable = false; gardenRing.setEnabled(false);
+  let gardenPlot = 0;
   const instrumentation = new SceneInstrumentation(scene);
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const roomMotion = createHouseMotion(HOUSE_POSITIONS);
@@ -66,6 +71,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const smokeMatrices = new Float32Array(5 * 16), smokeAt = new Vector3(), smokeLocal = new Vector3();
   smoke.thinInstanceSetBuffer('matrix', smokeMatrices, 16, false); smoke.alwaysSelectAsActiveMesh = true;
   const water = createIslandWater(scene, theme);
+  const butterflies = createGardenButterflies(scene);
   const moteMatrices = new Float32Array(24 * 16);
   for (let i = 0; i < 24; i++) { const n = i * 16; moteMatrices[n] = moteMatrices[n + 5] = moteMatrices[n + 10] = moteMatrices[n + 15] = 1; }
   motes.thinInstanceSetBuffer('matrix', moteMatrices, 16, false); motes.alwaysSelectAsActiveMesh = true;
@@ -110,9 +116,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const seconds = motion.matches ? 0 : now / 1000;
     const wasReacting = roomMotion.activeCount > 0;
     roomMotion.restore();
-    model.animate(seconds, focused, motion.matches); water.animate(seconds);
+    model.animate(seconds, focused, motion.matches); water.animate(seconds); butterflies.animate(seconds, selectedId === 'orchard' && !motion.matches);
     for (const root of model.live) root.metadata.avatar?.setEnabled(focused);
-    stroll.setVisible(!focused);
+    stroll.setVisible(!focused && selectedId !== 'orchard');
     if (!focused) stroll.animate(seconds, motion.matches);
     const turning = Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001;
     if (turning) {
@@ -137,12 +143,12 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     motes.setEnabled(!motion.matches);
     for (let i = 0; i < 24; i++) {
       const n = i * 16;
-      moteMatrices[n + 12] = (selectedId === 'orchard' ? 6 + (i * .73 % 4.5) : -5 + (i * 1.73 % 10)) + Math.sin(seconds * .32 + i) * .18;
+      moteMatrices[n + 12] = (selectedId === 'orchard' ? -4.5 + (i * .73 % 9) : -5 + (i * 1.73 % 10)) + Math.sin(seconds * .32 + i) * .18;
       moteMatrices[n + 13] = .5 + (i * .71 % (house.rooms.length === 3 ? 5 : 2.5)) + Math.sin(seconds * .48 + i * 2) * .17;
-      moteMatrices[n + 14] = selectedId === 'orchard' ? -3.8 + (i * .43 % 2.8) : -1.4 + (i * .83 % 4);
+      moteMatrices[n + 14] = selectedId === 'orchard' ? -3.8 + (i * .43 % 7) : -1.4 + (i * .83 % 4);
     }
     motes.thinInstanceBufferUpdated('matrix');
-    smoke.setEnabled(Boolean(model.chimney) && !motion.matches);
+    smoke.setEnabled(Boolean(model.chimney) && !motion.matches && selectedId !== 'orchard');
     if (smoke.isEnabled()) {
       smokeLocal.fromArray(model.chimney.point); Vector3.TransformCoordinatesToRef(smokeLocal, model.chimney.node.getWorldMatrix(), smokeAt);
       for (let i = 0; i < 5; i++) {
@@ -166,11 +172,13 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   function fitCamera() {
     if (!model) return;
     const width = Math.max(1, container.clientWidth), height = Math.max(1, container.clientHeight);
-    const garden = selectedId === 'orchard', phone = width <= 700;
-    const left = garden && !phone ? 20 : 0, top = garden ? 90 : 0;
+    const garden = selectedId === 'orchard', phone = width <= 700 || (width <= 1000 && height > 650);
+    const overlay = container.closest('.is-living-garden'), tray = overlay?.querySelector('.garden-tray'), card = overlay?.querySelector('.garden-card');
+    const bottom = garden ? Math.max((tray?.offsetHeight || 200) + 38, phone && card?.offsetHeight ? height - card.offsetTop + 12 : 0) : 0;
+    const left = garden && !phone ? 20 : 0, top = garden ? phone ? 116 : 90 : 0;
     const usableWidth = Math.max(180, width - left - (garden && !phone ? width <= 1000 ? 285 : 335 : 0));
-    const usableHeight = Math.max(130, height - top - (garden ? phone ? Math.min(340, height * .47) : 240 : 0));
-    const frame = houseFrame(garden ? gardenBounds : model.framing, camera.getViewMatrix(true), usableWidth / usableHeight, garden ? .85 : .92);
+    const usableHeight = Math.max(130, height - top - bottom);
+    const frame = houseFrame(garden ? RETREAT_BOUNDS : model.framing, camera.getViewMatrix(true), usableWidth / usableHeight, garden ? .95 : .92);
     const scale = frame.height / usableHeight;
     camera.orthoLeft = frame.x - usableWidth * scale / 2 - left * scale; camera.orthoRight = camera.orthoLeft + width * scale;
     camera.orthoTop = frame.y + frame.height / 2 + top * scale; camera.orthoBottom = camera.orthoTop - height * scale;
@@ -180,7 +188,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const width = container.clientWidth, height = container.clientHeight, matrix = camera.getTransformationMatrix();
     for (const button of tags.children) {
       const id = button.dataset.room;
-      button.hidden = selectedId === 'orchard' && id !== 'orchard' && id !== 'pond';
+      button.hidden = selectedId === 'orchard';
       const base = HOUSE_POSITIONS[id], offset = model.levels[id]?.position;
       if (!base) tagPoint.set(...(id === 'pond' ? POND_TAG : GARDEN_TAG));
       else tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : id === 'loft' ? .7 : 0), base[2] + offset.z + 2.08);
@@ -208,9 +216,11 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   tags.addEventListener('click', event => { const button = event.target.closest('button'); if (button) onSelect(button.dataset.room); });
   function update(next, selected, atmosphere = theme, appearance = avatar) {
     const previousSelection = selectedId, hadModel = Boolean(model);
-    canvas.setAttribute('aria-label', selected === 'orchard' ? 'Your miniature flower garden. Tap a pot to choose a plant, or use the garden spots below.' : 'Your miniature cottage. Choose a room or building site. Use the room navigation to choose with a keyboard.');
+    canvas.setAttribute('aria-label', selected === 'orchard' ? 'Your miniature garden. Tap a flower bed to choose a plant, or use the garden spots below.' : 'Your miniature cottage. Choose a room or building site. Use the room navigation to choose with a keyboard.');
     roomMotion.stop();
     house = next; selectedId = selected; theme = atmosphere; avatar = appearance;
+    water.mesh.setEnabled(selectedId !== 'orchard');
+    gardenRing.setEnabled(selectedId === 'orchard'); gardenRing.position.set(RETREAT_SPOTS[gardenPlot][0], .18, RETREAT_SPOTS[gardenPlot][1]);
     sky.intensity = theme === 'dusk' ? .56 : .62; sun.intensity = theme === 'dusk' ? .8 : .95;
     sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9'); water.setTheme(theme);
     const previous = model;
@@ -245,7 +255,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     for (const mesh of model.meshes) mesh.receiveShadows = true;
     // Babylon removes disposed casters from this list. Keep it separate from
     // model.meshes so disposal cannot skip every other room batch.
-    shadows.getShadowMap().renderList = [...model.meshes];
+    shadows.getShadowMap().renderList = model.meshes.filter(mesh => mesh.isEnabled());
     shadows.getShadowMap().resetRefreshCounter(); resize();
   }
   function pin(tag, icon, id, title, note) {
@@ -261,7 +271,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     // Babylon converts CSS pixels to render pixels using hardware scaling.
     const hit = scene.pick(event.clientX - rect.left, event.clientY - rect.top);
     const slot = hit?.pickedMesh?.metadata?.houseSlot;
-    const plot = slot === 'orchard' && hit.pickedPoint ? gardenPlotAt(hit.pickedPoint.x, hit.pickedPoint.z) : -1;
+    const plot = slot === 'orchard' && hit.pickedPoint ? gardenPlotAt(hit.pickedPoint.x, hit.pickedPoint.z, selectedId === 'orchard' ? RETREAT_SPOTS : PLANT_SPOTS, selectedId === 'orchard' ? 1.05 : .6) : -1;
     return plot >= 0 ? `plot-${plot}` : slot;
   }
   const onDown = event => { if (event.button !== 0 || dragging) return; dragging = { id: event.pointerId, x: event.clientX, y: event.clientY, angle: targetAngle, tilt: targetTilt, moved: false }; };
@@ -298,7 +308,8 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   return {
     update,
     turn,
-    celebrate(id) { if (!motion.matches) roomMotion.trigger(id, 'build', performance.now()); burst = { start: performance.now(), origin: (HOUSE_POSITIONS[id] || (id === 'orchard' ? [8, 0, -2.5] : [0, 0, 0])).map((v, i) => v + (model.levels[id]?.position.asArray()[i] || 0)) }; requestRender(); },
+    selectGardenPlot(index) { gardenPlot = index; gardenRing.position.set(RETREAT_SPOTS[index][0], .18, RETREAT_SPOTS[index][1]); gardenRing.setEnabled(selectedId === 'orchard'); fitCamera(); requestRender(); },
+    celebrate(id) { if (!motion.matches) roomMotion.trigger(id, 'build', performance.now()); burst = { start: performance.now(), origin: (HOUSE_POSITIONS[id] || [0, 0, 0]).map((v, i) => v + (model.levels[id]?.position.asArray()[i] || 0)) }; requestRender(); },
     async createPostcard(name, caption) {
       // Copy immediately after rendering: WebGL's default buffer need not be
       // preserved between frames (which would cost memory on every visit).
@@ -316,7 +327,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       resize();
     },
     setFocused(value) { if (focused === Boolean(value)) return; focused = Boolean(value); requestRender(); },
-    diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, turning: Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001, trees: model.trees, plots: PLANT_SPOTS, stroll: focused ? null : stroll?.pose, strollPet: focused ? null : stroll?.pet, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
+    diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, turning: Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001, trees: model.trees, plots: selectedId === 'orchard' ? RETREAT_SPOTS : PLANT_SPOTS, stroll: focused ? null : stroll?.pose, strollPet: focused ? null : stroll?.pet, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
     dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); stroll?.dispose(); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); controls.remove(); tags.remove(); note.remove(); },
   };
 }
