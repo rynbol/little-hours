@@ -94,7 +94,6 @@ function acceptUpdate(result) {
   if (result.completion) {
     app.room?.celebrate(); app.room?.petRitual('cuddle'); app.delights?.show('finish'); app.delights?.show('bond', 'pet');
     app.timer.showCelebration(result.completion);
-    app.buddy?.onCompletion(result.completion);
     // Ring for a session that just ended, not one found finished long ago.
     if (clockNow() - result.completion.at < 90_000) audio.chime();
   }
@@ -114,6 +113,7 @@ try {
       app.roomReady = true; app.timer.render();
       $('#loading-note').hidden = true;
       setDecorEntry(true);
+      app.buddy?.start();
       // Back after half an hour or more: a small hello.
       if (app.state.seenAt && clockNow() - app.state.seenAt > 30 * 60_000) setTimeout(() => { app.companion.welcome(); app.pet.welcome(); }, 1200);
     },
@@ -122,7 +122,8 @@ try {
     pet: app.state.pet,
     onPet: app.pet.feedback,
     onPetCarry: app.pet.onPetCarry,
-    onFrame() { app.speech?.update(); app.delights?.update(); app.buddy?.follow(); },
+    onFrame() { app.speech?.update(); app.delights?.update(); },
+    onBuddy: event => app.buddy?.onRoom(event),
     onDoorProgress: app.nav.onDoorProgress,
     onCompanionState: app.companion.onCompanionState,
     ...app.decorate.roomEvents,
@@ -186,7 +187,7 @@ document.addEventListener('visibilitychange', () => {
 }, { signal: listeners.signal });
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
-if (import.meta.env.DEV) installTestHook({ get pet() { return app.pet; }, get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get connected() { return app.nav.connected; } });
+if (import.meta.env.DEV) installTestHook({ get pet() { return app.pet; }, get buddy() { return app.buddy; }, get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get connected() { return app.nav.connected; } });
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');

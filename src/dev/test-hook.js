@@ -139,6 +139,7 @@ export function installTestHook(app) {
     version: 1,
     get room() { return app.room; },
     get petCloseup() { return app.pet.diagnostics(); },
+    buddyCloseup: () => app.buddy.closeup(),
     get state() { return app.state; },
     get speech() { return app.speech; },
     get house() { return app.house; },

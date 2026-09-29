@@ -39,6 +39,8 @@ import { surfacePaint } from '../../core/surfaces.js';
 import { createRoomPassages } from './room-passages.js';
 import { createRoomRoof } from '../../models/room-roofs.js';
 import { clockNow, clockRandom } from '../../core/test-pins.js';
+import { createBuddyFlight } from '../../core/buddy-flight.js';
+import { createBuddyModel } from '../../models/buddy.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -166,6 +168,10 @@ export function createRoom(container, options = {}) {
   const windowGlow = new PointLight('window-lamplight', new Vector3(-2.7, 2.7, -3.3), scene); windowGlow.diffuse = color('#ffc178'); windowGlow.intensity = 1.0; windowGlow.range = 6;
   const hearthGlow = new PointLight('hearth-lamplight', new Vector3(3.25, 1.0, -2.9), scene); hearthGlow.diffuse = color('#ffa555'); hearthGlow.intensity = 1.0; hearthGlow.range = 6;
   const portraitFill = new PointLight('avatar-portrait-fill', new Vector3(0, 2.1, 3), scene);
+  portraitFill.renderPriority = -1;
+  const buddyLight = new PointLight('buddy-light', Vector3.Zero(), scene); buddyLight.diffuse = color('#fff4dc'); buddyLight.specular = Color3.Black(); buddyLight.intensity = 0; buddyLight.range = 1.6;
+  const moreLights = material => { if ('maxSimultaneousLights' in material && !material.disableLighting) material.maxSimultaneousLights = 5; };
+  scene.materials.forEach(moreLights); scene.onNewMaterialAddedObservable.add(moreLights);
   portraitFill.diffuse = color('#fff1e2'); portraitFill.specular = color('#fff1e2'); portraitFill.range = 8; portraitFill.intensity = 0;
   // The same in-room avatar gets a clear portrait, without furniture passing
   // in front of the face. A separate camera layer preserves every room object.
@@ -514,6 +520,9 @@ export function createRoom(container, options = {}) {
   let companionRoutine, mobileCompanion, companionTime = 0, companionLayoutKey = '', companionY = null;
   let celebrationAge = Infinity, petRibbon = 0, petCare = { fabric: 'linen', food: 'supper' }, petBond = 0, petGift = null;
   const petBelongings = createPetBelongings(scene, world);
+  let buddyModel = null, buddyPlan = null, buddyAge = 0, buddyArrived = Infinity, buddyWanted = 'away', buddyBooped = false, buddyHop = 0, buddyBoxesAt = -Infinity;
+  const buddyFlight = createBuddyFlight(), buddyGoal = new Vector3(), buddyLook = new Vector3(), buddySpot = new Vector3(), buddyArea = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+  const buddyBoxes = [], buddyFrame = { ghost: false, x: 0, y: 0, z: 0, visible: false, scale: 1, spin: 0, flying: 0, heading: 0, faceYaw: 0, squash: 0, trail: false, holding: false, activity: 'hover', activityAge: 0, ground: FLOOR_Y };
   let petRoutine, petModel = null, petSpecies = PETS[options.pet] ? options.pet : 'cat', petY = null, petCasts = null, petMoving = false, petKey = '', petTime = 0, petWake = 0, petShadowAt = 0;
   const outlinedMeshes = [];
   const hoverOutline = color('#ffe2a3'), selectedOutline = color('#e6b568'), invalidOutline = color('#e39782'), playOutline = color('#d9b98a');
@@ -1498,12 +1507,78 @@ export function createRoom(container, options = {}) {
   // reused from call to call.
   const anchorPoint = new Vector3(), projected = new Vector3(), anchorViewport = camera.viewport.clone(), anchored = { x: 0, y: 0, visible: false };
   let cssWidth = 1, cssHeight = 1;
+  function avatarHead() {
+    const head = companionRoutine.pose.atDesk ? placedObjects.get(layout.activeDeskId)?.metadata.avatarHead : mobileCompanion.head;
+    return head?.isEnabled() ? head : null;
+  }
+  function buddyExit() { const view = architecture?.window; return { x: view?.x ?? archCenter, y: (view?.y ?? 3.34) + 0.5, z: -6.4 }; }
+  function aimBuddy(plan, out, time = 0) {
+    const target = plan?.target ?? 'head';
+    if (typeof target === 'object') out.set(target.x, target.y, target.z);
+    else if (target === 'pet' && petModel?.root.isEnabled()) petModel.headPoint(out);
+    else { const head = avatarHead(); if (!head) return false; out.copyFrom(head.getAbsolutePosition()); }
+    let [right, up] = plan?.offset ?? [0.34, 0.06], depth = 0;
+    const motion = plan?.motion;
+    if (motion?.type === 'orbit') { const angle = time * motion.speed + Math.PI / 2; right += Math.sin(angle) * motion.radius; depth -= Math.cos(angle) * motion.radius; up += Math.max(0, Math.cos(angle)) * 0.44; }
+    else if (motion?.type === 'loop') { const angle = Math.min(time * motion.speed, Math.PI * 2); right += Math.sin(angle) * motion.radius; up += (1 - Math.cos(angle)) * motion.radius; }
+    else if (motion?.type === 'path') { const point = motion.points[Math.min(motion.points.length - 1, Math.floor(time / motion.hop))]; right += point[0]; up += point[1]; depth += point[2]; }
+    const dx = out.x - camera.position.x, dz = out.z - camera.position.z, length = Math.hypot(dx, dz) || 1;
+    out.x += (dx * depth - dz * right) / length; out.z += (dz * depth + dx * right) / length; out.y += up;
+    return true;
+  }
+  function keepOutOfAvatar(point) {
+    const head = avatarHead()?.getAbsolutePosition();
+    if (!head || point.y > head.y + 0.2) return;
+    const dx = point.x - head.x, dz = point.z - head.z, apart = Math.hypot(dx, dz), room = 0.3;
+    if (apart >= room) return;
+    const cx = camera.position.x - head.x, cz = camera.position.z - head.z, length = Math.hypot(cx, cz) || 1;
+    const [ox, oz] = apart > 1e-3 ? [dx / apart, dz / apart] : [-cz / length, cx / length];
+    point.x = head.x + ox * room; point.z = head.z + oz * room;
+  }
+  function insideFurniture(x, y, z) {
+    if (buddyAge - buddyBoxesAt > 1 || buddyAge < buddyBoxesAt) {
+      buddyBoxesAt = buddyAge; buddyBoxes.length = 0;
+      for (const object of placedObjects.values()) if (object.isEnabled()) { const { min, max } = object.getHierarchyBoundingVectors(true); buddyBoxes.push(min.x + .02, min.y, min.z + .02, max.x - .02, max.y - .02, max.z - .02); }
+    }
+    for (let i = 0; i < buddyBoxes.length; i += 6) if (x > buddyBoxes[i] && y > buddyBoxes[i + 1] && z > buddyBoxes[i + 2] && x < buddyBoxes[i + 3] && y < buddyBoxes[i + 4] && z < buddyBoxes[i + 5]) return true;
+    return false;
+  }
+  function animateBuddy(dt, seconds) {
+    const moving = buddyArrived !== Infinity ? buddyAge - buddyArrived : 0, hop = buddyPlan?.motion?.type === 'path' ? Math.floor(moving / buddyPlan.motion.hop) : 0;
+    const aimed = aimBuddy(buddyPlan, buddyGoal, moving);
+    if (aimed) keepOutOfAvatar(buddyGoal);
+    if (buddyWanted === 'here' && buddyFlight.mode === 'away' && aimed) buddyFlight.place(buddyGoal);
+    if (aimed && hop !== buddyHop) { buddyHop = hop; buddyFlight.go(buddyGoal); }
+    const pose = buddyFlight.update(dt, aimed ? buddyGoal : null, reducedMotion);
+    buddyAge += dt;
+    if (pose.landed) { buddyModel.burst(); options.onBuddy?.({ type: 'landed' }); }
+    if (pose.gone) options.onBuddy?.({ type: 'gone' });
+    const here = buddyFlight.mode === 'here', close = here && Math.hypot(pose.x - buddyGoal.x, pose.y - buddyGoal.y, pose.z - buddyGoal.z) < 0.12;
+    if (buddyPlan && close && buddyArrived === Infinity) { buddyArrived = buddyAge; options.onBuddy?.({ type: 'arrived', plan: buddyPlan }); }
+    const settled = buddyArrived !== Infinity ? buddyAge - buddyArrived : -1;
+    if (buddyPlan?.kind === 'boop' && !buddyBooped && settled > 0.45) { buddyBooped = true; pet({ by: 'buddy' }); }
+    const target = buddyPlan?.target;
+    if (settled >= 0 && target === 'head' && buddyPlan.kind === 'chat') buddyLook.copyFrom(avatarHead()?.getAbsolutePosition() ?? camera.position);
+    else if (settled >= 0 && target === 'pet' && petModel) petModel.headPoint(buddyLook);
+    else buddyLook.copyFrom(camera.position);
+    buddySpot.set(pose.x, pose.y, pose.z); if (buddyFlight.mode === 'here') keepOutOfAvatar(buddySpot);
+    Object.assign(buddyFrame, { x: buddySpot.x, y: buddySpot.y, z: buddySpot.z, scale: pose.scale, spin: pose.spin, flying: pose.flying, heading: pose.heading, squash: pose.squash, trail: pose.trail });
+    buddyFrame.visible = pose.visible && !editing && !avatarCameraEditing;
+    buddyFrame.faceYaw = Math.atan2(buddyLook.x - buddySpot.x, buddyLook.z - buddySpot.z);
+    buddyFrame.activity = settled >= 0 && buddyPlan ? buddyPlan.pose : 'hover'; buddyFrame.trail = pose.trail || (settled >= 0 && Boolean(buddyPlan?.motion)); buddyFrame.activityAge = Math.max(0, settled);
+    buddyArea.minX = buddyArea.maxX = buddySpot.x; buddyArea.minZ = buddyArea.maxZ = buddySpot.z; buddyFrame.ground = surfaceBelow(buddyArea);
+    buddyFrame.ghost = buddyFrame.visible && insideFurniture(buddySpot.x, buddySpot.y, buddySpot.z);
+    buddyModel.animate(buddyFrame, dt, seconds, reducedMotion);
+    buddyLight.intensity = buddyFrame.visible ? 0.45 * buddyFrame.scale : 0; if (buddyFrame.visible) buddyModel.headPoint(buddyLight.position);
+  }
   function anchor(who) {
-    if (who === 'pet') { if (!petModel) return null; petModel.headPoint(anchorPoint); anchorPoint.y += 0.42; }
+    if (typeof who === 'object') anchorPoint.set(who.x, who.y, who.z);
+    else if (who === 'pet') { if (!petModel?.root.isEnabled()) return null; petModel.headPoint(anchorPoint); anchorPoint.y += 0.42; }
+    else if (who === 'buddy') { if (!buddyFrame.visible) return null; buddyModel.headPoint(anchorPoint); anchorPoint.y += 0.24; }
     else {
       const head = companionRoutine.pose.atDesk ? placedObjects.get(layout.activeDeskId)?.metadata.avatarHead : mobileCompanion.head;
       if (!head?.isEnabled()) return null;
-      anchorPoint.copyFrom(head.getAbsolutePosition()); anchorPoint.y += who === 'buddy' ? 0.16 : avatarCameraEditing ? 0.28 : 0.5;
+      anchorPoint.copyFrom(head.getAbsolutePosition()); anchorPoint.y += avatarCameraEditing ? 0.28 : 0.5;
     }
     const width = engine.getRenderWidth(), height = engine.getRenderHeight();
     camera.viewport.toGlobalToRef(width, height, anchorViewport);
@@ -1511,6 +1586,20 @@ export function createRoom(container, options = {}) {
     anchored.x = projected.x / width * cssWidth; anchored.y = projected.y / height * cssHeight;
     anchored.visible = projected.z >= 0 && projected.z <= 1 && projected.x >= 0 && projected.x <= width && projected.y >= 0 && projected.y <= height;
     return anchored;
+  }
+  function buddyContext(types) {
+    const spots = [];
+    for (const item of layout.items) {
+      const object = types.has(item.type) ? placedObjects.get(item.id) : null;
+      if (!object?.isEnabled()) continue;
+      const { min, max } = object.getHierarchyBoundingVectors(true);
+      const x = (min.x + max.x) / 2, z = (min.z + max.z) / 2, out = Math.hypot(x, z) || 1, reach = Math.max(max.x - min.x, max.z - min.z) / 2 + 0.35;
+        spots.push({ type: item.type, itemId: item.id, off: Boolean(item.off), point: { x, y: max.y + 0.08, z }, front: { x: x - x / out * reach, y: Math.min(max.y, min.y + 0.75), z: z - z / out * reach } });
+    }
+    const window = architecture?.window;
+    spots.push({ type: 'room-window', itemId: null, off: false, point: { x: window?.x ?? archCenter, y: window ? window.y - window.height / 2 + 0.35 : windowBottom + 0.35, z: -4.3 } });
+    const petPose = petRoutine.pose, avatar = companionRoutine.pose;
+    return { spots, pet: petModel?.root.isEnabled() ? { state: petPose.state, moving: petPose.moving, held: petPose.held } : null, avatar: { state: avatar.state, moving: avatar.moving, atDesk: avatar.atDesk, activity: avatar.activity } };
   }
   function resize() {
     const width = Math.max(1, container.clientWidth), height = Math.max(1, container.clientHeight);
@@ -1691,6 +1780,7 @@ export function createRoom(container, options = {}) {
     else petModel.root.position.set(pose.x, petY, pose.z), petModel.root.rotation.y = pose.yaw;
     petModel.contact.position.set(petModel.root.position.x, (bed && (onBed || carriedBed) ? bedTop + 0.002 : surfaceBelow(pointArea)), petModel.root.position.z); petModel.contact.rotation.y = petModel.root.rotation.y;
     petModel.animate(pose, companionDelta, seconds, reducedMotion);
+    if (buddyModel) animateBuddy(companionDelta, seconds);
     const dining = petRoutine.diningSpot(), prop = pose.care?.prop || dining?.prop;
     petBelongings.update(pose, bed, dining, bedTop - PET_BED_SURFACE, prop ? groundAt(rugSurfaces, prop.x, prop.z, floorTop) : floorTop, reducedMotion, editing);
     for (const [id, reaction] of reactions) {
@@ -1789,10 +1879,20 @@ export function createRoom(container, options = {}) {
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { if (value === 'working') celebrationAge = Infinity; focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet, interactWithItem,
     setPet(species) { const next = PETS[species] ? species : 'cat'; if (next === petSpecies) return; if (petRoutine.pose.held) releasePet(); petSpecies = next; buildPet(); requestRender(); },
-    anchor,
+    anchor, buddyContext,
+    setBuddy({ colors, stage, holding }) {
+      if (!buddyModel) { buddyModel = createBuddyModel(scene, colors, stage); for (const node of [buddyModel.root, buddyModel.sparkle, buddyModel.contact]) node.parent = world; }
+      else buddyModel.setLook(colors, stage);
+      buddyFrame.holding = Boolean(holding); buddyLight.diffuse = Color3.FromHexString(colors.body).scale(0.35).add(color('#fff4dc').scale(0.65)); requestRender();
+    },
+    buddyPlace() { buddyWanted = 'here'; requestRender(); },
+    buddyDo(plan) { buddyPlan = plan; buddyAge = 0; buddyArrived = Infinity; buddyBooped = false; buddyHop = 0; if (aimBuddy(plan, buddyGoal)) buddyFlight.go(buddyGoal); requestRender(); },
+    buddyLeave() { buddyWanted = 'away'; buddyPlan = null; buddyFlight.leave(buddyExit()); requestRender(); },
+    buddyArrive() { buddyWanted = 'here'; buddyPlan = null; buddyFlight.arrive(buddyExit(), 1); requestRender(); },
+    buddyState() { return { mode: buddyFlight.mode, visible: buddyFrame.visible, activity: buddyFrame.activity, plan: buddyPlan?.kind ?? null, arrived: buddyArrived !== Infinity, holding: buddyFrame.holding, x: buddyFrame.x, y: buddyFrame.y, z: buddyFrame.z }; },
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { if (avatarCameraEditing) return; camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
     diagnostics() { return { scene, engine, camera, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, petBelongings, petBond, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
-    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); petBelongings.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); buddyModel?.dispose(); petBelongings.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }
