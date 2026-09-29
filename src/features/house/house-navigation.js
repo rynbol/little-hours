@@ -3,6 +3,7 @@ import { roomDesign } from '../../core/layout.js';
 import { DOOR_OPEN_SECONDS } from '../companion/index.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
+import { coinArt } from '../../ui/ui-art.js';
 import { roomDesignArt } from '../decorate/index.js';
 import { createHouseView } from './house-view.js';
 import { studyTrees } from '../../core/garden.js';
@@ -80,19 +81,19 @@ export function createHouseNavigation(app) {
     $('.room-route-map').innerHTML = rooms.map((room, i) => `<i class="${i === index ? 'is-current' : ''}"></i>`).join('');
     $('#previous-room').setAttribute('aria-label', index > 0 ? `Go to ${roomDisplayName(rooms[index - 1])}` : 'Previous room');
     $('#next-room').setAttribute('aria-label', index < rooms.length - 1 ? `Go to ${roomDisplayName(rooms[index + 1])}` : 'Next room');
-    for (const [i, entry] of rooms.entries()) {
+    for (const entry of rooms) {
       const button = document.createElement('button'), current = entry.id === app.state.house.activeId, name = roomDisplayName(entry), design = roomDesign(entry.layout);
       button.className = 'room-card'; button.dataset.houseGo = entry.id; button.dataset.roomStyle = design.style || 'retreat';
       button.setAttribute('aria-current', current ? 'location' : 'false'); button.setAttribute('aria-label', `${name}${current ? ', you’re here' : ''}`);
-      button.innerHTML = `<span class="room-card-window"><span class="room-card-number" aria-hidden="true">0${i + 1}</span><span class="room-card-art">${roomDesignArt(design)}</span><span class="room-card-mark">${icon(current ? 'check' : 'arrow')}</span></span><span class="room-card-name"></span><span class="room-card-location">${current ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor'}</span>`;
+      button.innerHTML = `<span class="room-card-art">${roomDesignArt(design)}</span><span class="room-card-copy"><span class="room-card-name"></span><span class="room-card-location">${current ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor'}</span></span><span class="room-card-mark" aria-hidden="true">${icon(current ? 'check' : 'arrow')}</span>`;
       button.querySelector('.room-card-name').textContent = name;
-      button.addEventListener('click', () => selectDestination(entry.id)); cards.append(button);
+      button.addEventListener('click', () => selectDestination(entry.id, true)); cards.append(button);
     }
     const next = nextExpansion(app.state.house), grow = $('#room-grow'); grow.replaceChildren();
     if (next) {
       const button = document.createElement('button'); button.className = 'room-grow-button'; button.dataset.houseGo = next.id;
       button.setAttribute('aria-label', `Plan ${next.short}, ${next.price} coins`);
-      button.innerHTML = `<span class="room-grow-icon">${icon('plus')}</span><span class="room-grow-name"></span><span class="room-grow-price">${icon('sun')} ${next.price}</span>`;
+      button.innerHTML = `<span class="room-grow-icon">${icon('plus')}</span><span class="room-grow-name"></span><span class="room-grow-price">${coinArt()} ${next.price}</span>`;
       button.querySelector('.room-grow-name').textContent = next.short;
       button.addEventListener('click', () => { closePicker(false); setHouseOpen(true, next.id); }); grow.append(button);
     }
@@ -122,7 +123,7 @@ export function createHouseNavigation(app) {
     app.roomUI.leaveMini();
     if (app.panels.current) app.panels.close();
   }
-  function selectDestination(id) {
+  function selectDestination(id, walk = false) {
     if (travelling) return;
     if (id !== app.state.house.activeId) {
       if (app.panels.current === 'avatar') app.panels.close();
@@ -131,7 +132,7 @@ export function createHouseNavigation(app) {
     }
     closePicker(false);
     leaveNavigationViews();
-    if (id !== app.state.house.activeId) visitRoom(id, false);
+    if (id !== app.state.house.activeId) { if (walk) visitDoor(id); else visitRoom(id, false); }
     else switcher.focus({ preventScroll: true });
   }
   function visitRoom(id, decorate = app.decorate.active, fromDoor = false) {
@@ -239,10 +240,10 @@ export function createHouseNavigation(app) {
   picker.addEventListener('cancel', event => { event.preventDefault(); closePicker(); });
   picker.addEventListener('keydown', event => {
     if (event.key === 'Escape') event.stopPropagation();
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || !event.target.closest('.room-card')) return;
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key) || !event.target.closest('.room-card')) return;
     event.preventDefault();
     const cards = [...picker.querySelectorAll('.room-card')], index = cards.indexOf(document.activeElement);
-    const next = event.key === 'Home' ? 0 : event.key === 'End' ? cards.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + cards.length) % cards.length;
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? cards.length - 1 : (index + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + cards.length) % cards.length;
     cards[next]?.focus();
   });
   let backdropDown = false;

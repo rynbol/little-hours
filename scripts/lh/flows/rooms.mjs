@@ -76,7 +76,7 @@ export default {
     check('a reload keeps you in the room you were in', await active(app) === 'loft' && await app.text('#room-title') === 'Upstairs hideaway', `${await active(app)} ${await app.text('#room-title')}`);
 
     let walk = await chooseRoom(app, 'studio', t);
-    check('a room card arrives without waiting for a door walk', !walk.walked && walk.active === 'studio' && !walk.travelling, walk);
+    check('a room card walks to the door before arriving', walk.walked && walk.moved > .2 && walk.doorOpen > .2 && walk.active === 'studio' && !walk.travelling, walk);
     check('arrival moves keyboard focus to the room heading', await app.js(`document.activeElement.id === 'room-title'`));
     await app.clickSel('#rename-room');
     await app.send('Input.insertText', { text: 'Our Sunday corner ♡' });
@@ -88,13 +88,13 @@ export default {
     await app.clickSel('.home-wide');
     await app.waitFor(`document.body.classList.contains('is-connected')`, { what: 'whole-house view' });
     walk = await chooseRoom(app, 'garden', t);
-    check('a room card leaves whole-house view and goes straight there', !walk.walked && walk.active === 'garden' && !await app.js(`document.body.classList.contains('is-connected')`), walk);
+    check('a room card leaves whole-house view and walks there', walk.walked && walk.active === 'garden' && !await app.js(`document.body.classList.contains('is-connected')`), walk);
     await t.steps.openMore(app); await app.clickSel('#mini-button');
     walk = await chooseRoom(app, 'loft', t);
-    check('choosing a room from mini view restores the room and goes upstairs', !walk.walked && walk.active === 'loft' && !await app.js(`document.getElementById('stage').classList.contains('is-mini')`), walk);
+    check('choosing a room from mini view restores the room and walks upstairs', walk.walked && walk.active === 'loft' && !await app.js(`document.getElementById('stage').classList.contains('is-mini')`), walk);
     await steps.openDecorate(app);
     walk = await chooseRoom(app, 'garden', t);
-    check('room cards leave decorating and arrive at the destination', !walk.walked && walk.active === 'garden' && !await app.js(`document.body.classList.contains('is-decorating')`), walk);
+    check('room cards leave decorating and walk to the destination', walk.walked && walk.active === 'garden' && !await app.js(`document.body.classList.contains('is-decorating')`), walk);
     await app.reload();
     check('the renamed room stays named after traveling and reloading', (await app.saved()).house.rooms[0].name === 'Our Sunday corner ♡' && (await app.text('[data-house-go="studio"]')).includes('Our Sunday corner ♡'));
     await t.close(app);

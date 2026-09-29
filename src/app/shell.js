@@ -81,10 +81,10 @@ export const shellMarkup = (audioPrefs) => `
     <footer class="app-footer"><span>A softer place to spend your hours.</span><button class="save-status" id="save-status" data-panel="saves" aria-expanded="false" aria-controls="room-panel"><span id="save-status-text">Saved on this device</span> <span aria-hidden="true">✧</span></button></footer>
   </div>
   <dialog id="room-picker" class="room-picker" aria-labelledby="room-picker-title">
-    <div class="room-picker-heading"><span class="room-picker-home" aria-hidden="true">${icon('home')}</span><h2 id="room-picker-title">Your little house</h2><button id="close-room-picker" aria-label="Close room picker">${icon('close')}</button></div>
+    <div class="room-picker-heading"><h2 id="room-picker-title">Your little house</h2><button id="close-room-picker" aria-label="Close room picker">${icon('close')}</button></div>
     <div class="room-cards" role="group" aria-label="Choose a room"></div>
     <p id="room-picker-notice" class="room-picker-notice" role="status" hidden></p>
-    <div class="room-picker-footer"><div id="room-grow"></div><button id="room-picker-house">My house ${icon('arrow')}</button></div>
+    <div class="room-picker-footer"><div id="room-grow"></div><button id="room-picker-house">Island ${icon('arrow')}</button></div>
   </dialog>
   <dialog id="session-celebration" class="session-celebration" aria-labelledby="celebration-title" aria-describedby="celebration-copy">
     <form method="dialog"><button class="celebration-close" aria-label="Close session celebration">${icon('close')}</button><div class="celebration-flower" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="m24 0 5.6 17.7L48 24l-18.4 6.3L24 48l-5.6-17.7L0 24l18.4-6.3Z"/></svg></div><h2 id="celebration-title">You did it.</h2><p id="celebration-copy"></p><div class="celebration-coins">${coinArt()}<strong id="celebration-earned"></strong></div><p class="celebration-bond" id="celebration-bond"></p><button class="start-button" autofocus>Lovely ${icon('heart')}</button></form>

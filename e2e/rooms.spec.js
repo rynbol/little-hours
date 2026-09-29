@@ -83,6 +83,8 @@ test('room cards respect focus and reduced motion, with readable phone controls'
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).include('.room-heading').include('#home-connections').analyze()).violations).toEqual([]);
   expect((await new AxeBuilder({ page }).include('#room-picker').analyze()).violations).toEqual([]);
+  await expect.poll(() => page.locator('.room-card-art img').evaluateAll(images => images.every(image => image.complete && image.naturalWidth === 720))).toBe(true);
+  expect(await page.locator('.room-card-art img').count()).toBe(3);
   await page.screenshot({ path: testInfo.outputPath('room-cards-phone.png') });
   await page.locator('#close-room-picker').click();
   await page.locator('.home-wide').click();
@@ -168,5 +170,28 @@ for (const route of ['card', 'arrow', 'house']) {
     expect(actual.save.session.running).toBe(true);
     expect(actual.save.house.activeId).toBe('studio');
     await other.close();
+  });
+}
+
+for (const motion of ['no-preference', 'reduce']) {
+  test(`room picker opens and closes cleanly with ${motion} motion`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: motion });
+    await openRooms(page);
+    const picker = page.locator('#room-picker');
+    await page.locator('#room-switcher-toggle').click();
+    await expect(picker).toBeVisible();
+    await expect(page.locator('[aria-current="location"]')).toBeFocused();
+    await page.waitForFunction(() => !document.querySelector('#room-picker').getAnimations().some(animation => animation.playState === 'running'));
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator('[data-house-go="garden"]')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(picker).not.toHaveAttribute('open');
+    await expect(page.locator('#room-switcher-toggle')).toBeFocused();
+    await page.locator('#room-switcher-toggle').press('Enter');
+    await expect(picker).toBeVisible();
+    await expect(page.locator('[aria-current="location"]')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(picker).toBeHidden();
+    expect(await page.evaluate(() => document.getAnimations().filter(animation => animation.effect?.target?.closest?.('#room-picker')).length)).toBe(0);
   });
 }

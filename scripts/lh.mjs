@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromePath, closeAll, gpuFlag, killAllNow, launch, sleep, slow } from './lh/chrome.mjs';
 import { openApp } from './lh/app.mjs';
@@ -13,6 +13,7 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
 
   lh doctor                         check this machine can run trustworthy checks
   lh serve [--ref <git ref>]        start a dev server and keep it running (Ctrl-C stops it)
+  lh art                            render room preview assets from the actual game scenes
   lh flows                          list the flows
   lh run <flow...|all>              run flows with real input; exits 1 on any failure
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
@@ -95,6 +96,31 @@ function table(rows, columns) {
   const widths = columns.map((column, i) => Math.max(column.length, ...rows.map(row => String(row[i]).length)));
   const line = row => row.map((cell, i) => String(cell).padEnd(widths[i])).join('  ');
   return [line(columns), line(widths.map(width => '-'.repeat(width))), ...rows.map(line)].join('\n');
+}
+
+async function roomArt() {
+  const server = await start(), browser = await launch({ width: 900, height: 750, scale: 2, reducedMotion: true });
+  const folder = join(repoRoot, 'public', 'rooms'); mkdirSync(folder, { recursive: true });
+  try {
+    await browser.navigate(`${server.url}/checks/room-art.html`);
+    for (let attempt = 0; attempt < 200 && !await browser.js(`Boolean(document.querySelector('[data-design]'))`); attempt++) await sleep(50);
+    const designs = await browser.js(`[...document.querySelectorAll('button[data-design]')].map(button => button.dataset.design)`);
+    if (designs.length !== 6) throw new Error('The room artwork controls did not load');
+    for (const design of designs) {
+      await browser.clickSel(`[data-design="${design}"]`);
+      let data;
+      for (let attempt = 0; attempt < 600; attempt++) {
+        data = await browser.js(`document.querySelector('#preview').dataset.design === ${JSON.stringify(design)} ? document.querySelector('#preview').src : null`);
+        if (data) break;
+        await sleep(50);
+      }
+      if (!data?.startsWith('data:image/webp;base64,')) throw new Error(`No rendered artwork for ${design}`);
+      const bytes = Buffer.from(data.split(',')[1], 'base64');
+      if (bytes.length < 10000) throw new Error(`Empty artwork for ${design}`);
+      writeFileSync(join(folder, `${design}.webp`), bytes);
+      console.log(`${design}: ${Math.round(bytes.length / 1024)} KB`);
+    }
+  } finally { await browser.close(); }
 }
 
 async function flowNames() {
@@ -314,7 +340,7 @@ const commands = {
   help: async () => { console.log(HELP); return 0; },
   flows: async () => { for (const name of await flowNames()) console.log(`${name.padEnd(12)} ${(await loadFlow(name)).about}`); return 0; },
   run: async () => runFlows(!positional.length || positional[0] === 'all' ? await flowNames() : positional),
-  shot: shots, perf, trace: traceCommand, heap, doctor, cleanup, serve: serveForever,
+  art: roomArt, shot: shots, perf, trace: traceCommand, heap, doctor, cleanup, serve: serveForever,
 };
 
 if (!commands[command]) { console.error(`Unknown command "${command}".\n\n${HELP}`); process.exit(2); }
