@@ -420,12 +420,10 @@ def outline(count):
     return json.loads(subprocess.run(['node', '--input-type=module', '-e', script], cwd=ROOT, capture_output=True, text=True, check=True).stdout)
 
 
-STRATA = [
-    (-.3, 1.02, '#9c7858'), (-.55, 1.03, '#b08662'), (-.95, .99, '#a37a5a'),
-    (-1.1, .95, '#e4c4a2'), (-1.55, .97, '#dcb898'), (-2.05, .87, '#d0a88e'),
-    (-2.2, .83, '#c49c8c'), (-2.65, .84, '#b9958f'), (-3.15, .69, '#a88a90'),
-    (-3.3, .64, '#9a8292'), (-3.8, .6, '#8c7a91'), (-4.4, .4, '#7d6f8c'),
-    (-5.0, .2, '#6a5e7e'), (-5.5, .07, '#5f5575'),
+CLIFF_PROFILE = [
+    (-.3, 1.018, '#a69777'), (-.65, 1.015, '#b7a486'), (-1.2, .98, '#c1ae94'),
+    (-1.9, .88, '#b7aa94'), (-2.7, .73, '#aaa397'), (-3.5, .53, '#9b9a95'),
+    (-4.2, .32, '#909393'), (-4.9, .12, '#87908e'), (-5.4, .035, '#808c88'),
 ]
 
 
@@ -435,14 +433,14 @@ def island_cliff():
     mesh = bpy.data.meshes.new('cliff')
     bm = bmesh.new()
     rows = []
-    for r, (y, scale, _) in enumerate(STRATA):
-        forward = rz * (1 - min(1, scale)) * .82
+    for r, (y, scale, _) in enumerate(CLIFF_PROFILE):
+        forward = rz * (1 - min(1, scale)) * .67
         rows.append([bm.verts.new((cx + (x - cx) * scale, cz + (z - cz) * scale + forward, y)) for x, z in data['points']])
     count = len(data['points'])
     for r in range(len(rows) - 1):
         for j in range(count):
             bm.faces.new((rows[r][j], rows[r][(j + 1) % count], rows[r + 1][(j + 1) % count], rows[r + 1][j]))
-    tip = bm.verts.new((cx + .4, cz + rz * .92, -6.1))
+    tip = bm.verts.new((cx + .2, cz + rz * .67, -5.55))
     for j in range(count):
         bm.faces.new((rows[-1][j], rows[-1][(j + 1) % count], tip))
     bm.normal_update()
@@ -456,27 +454,22 @@ def island_cliff():
     bpy.ops.object.mode_set(mode='OBJECT')
     fine = cliff.modifiers.new('fine', 'SUBSURF')
     fine.levels = 2
-    fine.subdivision_type = 'SIMPLE'
+    fine.subdivision_type = 'CATMULL_CLARK'
     apply_all(cliff)
-    spurs = [Vector((cx - 4.2, cz + rz * .55, 0)), Vector((cx + 4.6, cz + rz * .6, 0))]
     for v in cliff.data.vertices:
         fixed = max(0, min(1, (-.4 - v.co.z) / .45))
         if fixed:
             radial = Vector((v.co.x - cx, v.co.y - cz, 0)).normalized()
             cells = noise.voronoi(v.co * Vector((.8, .8, 1.3)), distance_metric='DISTANCE')[0]
-            push = .3 * noise.noise(v.co * Vector((.35, .35, .6))) + .3 * (.45 - cells[0]) + .06 * noise.noise(v.co * 1.6 + Vector((5, 1, 0)))
+            push = .22 * noise.noise(v.co * Vector((.35, .35, .6))) + .14 * (.45 - cells[0])
             v.co += radial * push * .6 * fixed
-            for spur in spurs:
-                d = Vector((v.co.x - spur.x, v.co.y - spur.y, 0)).length
-                if v.co.z < -2.6 and d < 2.2:
-                    v.co.z -= (1 - d / 2.2) ** 2 * 1.6 * min(1, (-2.6 - v.co.z) / 1.5)
     faces = len(cliff.data.polygons)
     budget = cliff.modifiers.new('facets', 'DECIMATE')
-    budget.ratio = 2600 / faces
+    budget.ratio = 3600 / faces
     apply_all(cliff)
-    cliff.data.polygons.foreach_set('use_smooth', [False] * len(cliff.data.polygons))
-    bands = [(y, hex_rgb(c)) for y, _, c in STRATA]
-    moss, grass = hex_rgb('#8ea477'), hex_rgb('#7a9368')
+    cliff.data.polygons.foreach_set('use_smooth', [True] * len(cliff.data.polygons))
+    bands = [(y, hex_rgb(c)) for y, _, c in CLIFF_PROFILE]
+    grass = hex_rgb('#7d986e')
     def colour(co, vertex):
         z = co.z + .08 * noise.noise(co * 2.2)
         for (y0, c0), (y1, c1) in zip(bands, bands[1:]):
@@ -485,17 +478,17 @@ def island_cliff():
                 break
         else:
             base = bands[-1][1]
-        if z > -.45:
-            return grass.lerp(base, max(0, min(1, (-.2 - z) / .25)))
-        return base.lerp(moss, .7) if vertex.normal.z > .55 else base
+        if z > -.7:
+            return grass.lerp(base, max(0, min(1, (-.3 - z) / .4)))
+        return base
     paint(cliff, colour)
     rng = random.Random(4)
     roots, vines = [], []
-    for i in range(24):
+    for i in range(16):
         x, z = data['points'][(i * 37 + rng.randrange(4)) % count]
         out = Vector((x - cx, z - cz, 0)).normalized()
         top = Vector((x, z, -.32)) + out * .06
-        long = rng.uniform(.5, 1.7)
+        long = rng.uniform(.4, 1.2)
         sway = Vector((rng.uniform(-.2, .2), rng.uniform(-.2, .2), 0))
         spine = [top, top + out * .14 + sway * .4 + Vector((0, 0, -long * .45)), top + out * .02 + sway + Vector((0, rz * .04, -long))]
         (vines if i % 3 == 0 else roots).append(branch(spine, .04 if i % 3 else .03, tip=.2, resolution=4))
@@ -582,7 +575,7 @@ BUILDS = {
     'cloud-b': lambda: cloud(7, 3),
 }
 
-FLAT = {'island-cliff', 'rock-a', 'rock-b'}
+FLAT = {'rock-a', 'rock-b'}
 
 if __name__ == '__main__':
     args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
@@ -591,7 +584,7 @@ if __name__ == '__main__':
     for name in names:
         reset()
         objects = BUILDS[name]()
-        bake_occlusion(objects, .45 if name.startswith('tree') else .2 if name.startswith('cloud') else .75)
+        bake_occlusion(objects, .45 if name.startswith('tree') else .2 if name.startswith('cloud') else .4 if name == 'island-cliff' else .75)
         export(objects, name, flat=name in FLAT)
         if shot:
             preview(os.path.join(shot, name + '.png'), -.2 if 'cliff' in name else .42)

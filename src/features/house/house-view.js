@@ -52,6 +52,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   camera.mode = Camera.ORTHOGRAPHIC_CAMERA; camera.minZ = .1; camera.maxZ = 100;
   scene.doNotHandleCursors = true;
   const sky = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene);
+  sky.groundColor = Color3.FromHexString('#a0a7a4');
   const sun = new DirectionalLight('afternoon', new Vector3(-1, -2, -1), scene);
   sun.position.set(0, 12, 6);
   const shadows = new ShadowGenerator(2048, sun); shadows.usePercentageCloserFiltering = true; shadows.bias = .002; shadows.normalBias = .02; shadows.darkness = .3;
