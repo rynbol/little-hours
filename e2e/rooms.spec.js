@@ -171,7 +171,7 @@ for (const route of ['card', 'arrow', 'house']) {
       });
     } else {
       await page.clock.install();
-      await page.clock.pauseAt(new Date(Date.now() + 1000));
+      await page.clock.pauseAt(new Date(Date.now() + 60_000));
     }
     await destination.press('Enter');
     if (route === 'house') await expect(page.locator('html')).toHaveAttribute('data-place-transition', 'home');

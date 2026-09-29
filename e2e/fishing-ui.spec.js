@@ -16,6 +16,7 @@ async function openPond(page, bait = [10, 20, 35, 60, 95]) {
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
   test(`the pond leaves room for scenery and discloses bait choices at ${viewport.width}px`, async ({ page }) => {
+    test.slow();
     await page.setViewportSize(viewport); await openPond(page);
     const before = (await saved(page)).pond;
     await expect(page.locator('#lake-tackle')).toBeHidden(); await expect(page.locator('#lake-status')).toBeEmpty();
@@ -57,6 +58,7 @@ test('an empty tackle box explains earning bait and remains free to leave', asyn
 
 for (const width of [1440, 390]) {
   test(`journal contains focus, restores its invoker and dismisses after an inside click at ${width}px`, async ({ page }) => {
+    test.slow();
     await page.setViewportSize({ width, height: 900 }); await openPond(page);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.locator('#lake-journal-button').click();

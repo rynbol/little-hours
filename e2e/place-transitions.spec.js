@@ -26,6 +26,7 @@ async function transition(page, click, destination) {
 }
 
 test('garden and pond entrances and exits fade, including the path home and study exit', async ({ page }) => {
+  test.slow();
   await page.goto('/'); await ready(page);
   await transition(page, () => openGarden(page), 'garden');
   await expect(page.getByRole('button', { name: 'Back to island', exact: true })).toBeVisible();

@@ -14,13 +14,19 @@ const settled = page => expect(page.locator('html')).not.toHaveAttribute('data-p
 test('travel gates keyboard input and replacement releases it @dev-diagnostics', async ({ page }) => {
   await ready(page);
   await page.locator('#start-button').focus();
-  await page.evaluate(() => { window.travelForTest('garden', () => window.arrivals.push('garden'), () => window.destinationReady); });
-  await expect.poll(() => page.evaluate(() => window.arrivals)).toEqual(['garden']);
+  await page.evaluate(() => {
+    window.travelForTest('garden', () => window.arrivals.push('garden'), () => window.destinationReady);
+    document.querySelector('.place-transition').getAnimations()[0].pause();
+  });
   for (const key of ['Enter', 'Space', 'Tab', 'Escape']) await page.keyboard.press(key);
   await expect(page.locator('#start-button')).toBeFocused();
   await expect(page.locator('#start-button')).toContainText('Start');
   await expect(page.locator('html')).toHaveAttribute('data-place-transition', 'garden');
-  await page.evaluate(() => { window.travelForTest('home', () => window.arrivals.push('home')); });
+  await page.evaluate(async () => {
+    const fade = document.querySelector('.place-transition').getAnimations()[0];
+    fade.finish(); await fade.finished;
+    window.travelForTest('home', () => window.arrivals.push('home'));
+  });
   await settled(page);
   expect(await page.evaluate(() => window.arrivals)).toEqual(['garden', 'home']);
   await page.keyboard.press('Enter');
