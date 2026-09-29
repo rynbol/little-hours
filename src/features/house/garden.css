@@ -1,0 +1,72 @@
+.house-garden-link { display: flex; align-items: center; justify-content: space-between; width: calc(100% - 32px); margin: 0 16px 16px; padding: 12px 16px; border: 1px solid #75896566; border-radius: 12px; background: #dce4cc; color: #465a3b; font-size: 13px; }
+.house-garden-link[aria-pressed='true'] { background: #718465; color: #fff9ee; }
+.is-living-garden .house-detail { background: #f5eddd; border-color: #d7cdb9; }
+.garden-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 18px; }
+.garden-heading h2 { margin: 0; font: 29px Georgia, serif; color: #4c5941; }
+.garden-wallet { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #6e604a; white-space: nowrap; }
+.garden-plots { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.garden-spot { position: relative; border: 1px solid #cfc5b0; background: #ebe4d2; color: #656a50; border-radius: 12px; min-height: 60px; padding: 0 0 4px; }
+.garden-spot > span { display: grid; place-items: center; height: 39px; font: 23px Georgia, serif; }
+.garden-spot svg { height: 42px; width: 42px; }
+.garden-spot small { display: block; font-size: 9px; }
+.garden-spot[aria-pressed='true'] { border-color: #637954; background: #dbe2c8; box-shadow: 0 0 0 1px #637954; }
+.garden-specimen { display: grid; place-items: center; position: relative; height: 206px; isolation: isolate; margin-top: 6px; }
+.garden-specimen > svg { height: 198px; width: 180px; z-index: 1; }
+.garden-halo { position: absolute; width: 165px; height: 165px; border-radius: 50% 50% 40% 40%; background: radial-gradient(ellipse at 45% 40%, #fffaf0 10%, color-mix(in srgb, var(--flower-color) 24%, #e6e8cf) 72%, transparent 73%); opacity: .9; }
+.garden-specimen-stage { position: absolute; bottom: 0; font-size: 10px; color: #5e6950; }
+.garden-foliage { transform-origin: 80px 149px; }
+.garden-specimen .garden-foliage { animation: garden-breathe 6s ease-in-out infinite; }
+.garden-plant-name { color: #4c5941; font: 24px Georgia, serif; text-align: center; overflow-wrap: anywhere; margin: 15px 0; }
+.garden-seeds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: 17px 0; }
+.garden-seeds button { padding: 4px 3px 9px; min-width: 0; border: 1px solid #d4c9b4; border-radius: 12px; background: #eee5d5; color: #545d46; }
+.garden-seeds button[aria-pressed='true'] { border-color: #6b7b5d; background: #e1e6cf; box-shadow: inset 0 0 0 1px #6b7b5d; }
+.garden-seeds svg { width: 100%; height: 62px; }
+.garden-seeds strong { display: block; font-size: 10px; line-height: 1.3; font-weight: 500; min-height: 26px; }
+.garden-seeds small { display: block; font-size: 9px; margin-top: 3px; }
+.is-living-garden .start-button { width: 100%; background: #647952; color: #fff9eb; border-color: #647952; font-size: 13px; min-height: 46px; }
+.is-living-garden .start-button:hover:not(:disabled) { background: #536644; }
+.garden-growth { margin: 0 0 20px; text-align: center; }
+.garden-growth > div { height: 7px; border-radius: 8px; overflow: hidden; background: #dbd6c4; }
+.garden-growth > div > span { display: block; height: 100%; border-radius: inherit; background: #809368; transition: width .7s ease; }
+.garden-growth > span { display: block; font-size: 10px; color: #647052; margin-top: 8px; }
+.garden-help, .garden-bloom-note { color: #606b51; font-size: 11px; line-height: 1.5; text-align: center; margin: 10px 0; }
+.garden-bloom-note { font-size: 13px; }
+.garden-actions { display: flex; justify-content: center; gap: 12px; margin-top: 12px; }
+.garden-text-button { border: 0; background: transparent; color: #5d694d; padding: 10px 4px; min-height: 40px; font-size: 12px; text-underline-offset: 4px; }
+.garden-text-button:hover { text-decoration: underline; }
+#garden-name-form label { display: block; color: #5d694d; font-size: 11px; margin-top: 12px; }
+#garden-name-form > div { display: flex; gap: 8px; }
+#garden-name-input { min-width: 0; width: 100%; border: 1px solid #b4bda3; background: #fff9ed; color: #4c5941; border-radius: 7px; padding: 8px; font-size: 14px; }
+.garden-collection { margin-top: 18px; padding-top: 16px; border-top: 1px solid #d7ceba; color: #536046; }
+.garden-collection summary { cursor: pointer; font-size: 12px; }
+.garden-collection summary span { float: right; }
+.garden-collection > div { max-height: 235px; overflow: auto; margin-top: 10px; }
+.garden-collection button { display: flex; align-items: center; text-align: left; gap: 10px; width: 100%; padding: 3px 8px; background: transparent; border: 1px solid transparent; border-radius: 10px; color: #536046; }
+.garden-collection button[aria-pressed='true'] { background: #e0e5cf; border-color: #a9b695; }
+.garden-collection svg { width: 44px; height: 54px; flex: none; }
+.garden-collection strong { display: block; font-weight: 500; font-size: 12px; overflow-wrap: anywhere; }
+.garden-collection small { display: block; font-size: 10px; margin-top: 4px; }
+#focus-garden { display: flex; align-items: center; gap: 10px; width: 100%; margin: 10px 0 0; padding: 6px 12px; border: 1px solid #83977455; border-radius: 14px; color: #485b3c; background: #e1e7d4; text-align: left; }
+#focus-garden:hover { background: #d6dfc5; }
+#focus-garden > svg { width: 39px; height: 48px; flex: none; }
+#focus-garden > span { flex: 1; min-width: 0; }
+#focus-garden strong { display: block; font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+#focus-garden small { display: block; font-size: 10px; color: #58684b; margin-top: 4px; }
+#focus-garden > b { font-weight: 400; font-size: 17px; }
+.garden-reveal { margin: 14px 0; padding: 10px 18px 14px; border-radius: 18px; background: #e3e8d4; color: #4c6041; display: flex; align-items: center; gap: 12px; text-align: left; animation: garden-arrive .65s ease both; }
+.garden-reveal > svg { width: 70px; height: 86px; flex: none; }
+.garden-reveal strong { display: block; font: 19px Georgia, serif; overflow-wrap: anywhere; }
+.garden-reveal small { display: block; font-size: 11px; margin: 5px 0; }
+.garden-reveal button { border: 0; padding: 6px 0; background: transparent; color: #405338; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+@keyframes garden-breathe { 0%,100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+@keyframes garden-arrive { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .garden-foliage, .garden-reveal { animation: none !important; } .garden-growth > div > span { transition: none; } }
+@media (max-width: 800px) { .is-living-garden .house-canvas { height: 300px; } .garden-specimen { height: 180px; } .garden-specimen > svg { height: 174px; } .garden-seeds svg { height: 74px; } }
+
+.is-living-garden .house-camera-controls, .is-living-garden .house-sky-mark { display: none; }
+.house-heading { scroll-margin-top: 88px; }
+
+#focus-garden { grid-column: 1; }
+button.house-room-tag.is-garden { cursor: pointer; }
+
+.garden-wallet svg { width: 18px; height: 18px; }

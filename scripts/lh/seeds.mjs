@@ -21,6 +21,7 @@ export const SEEDS = {
   ...Object.fromEntries(['seed', 'sprout', 'youngling', 'budding', 'bloom'].map((name, phase) => [`greenhouse-${name}`, { ...house(3), layout: undefined, session: growing(phase), house: { ...house(3).house, activeId: 'garden' } }])),
   ...Object.fromEntries(['cloud-loft', 'ember-library'].map(presetId => [`greenhouse-${presetId}`, { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'garden', rooms: rooms.map(entry => entry.id === 'garden' ? room('garden', presetId, 'Garden wing') : entry) } }])),
   'attic-stars': { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft', sessions: starLog } },
+  'garden-grown': { ...house(3, 60), garden: { nextId: 7, activeId: null, plants: ['cosmos', 'lavender', 'sunflower', 'moonflower', 'cosmos', 'lavender'].map((species, slot) => ({ id: `plant-${slot + 1}`, species, minutes: 150, slot, name: slot === 0 ? 'Sunday' : '' })) } },
   'garden-days': { ...house(3), history: studyDays },
   attic: { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft' } },
   ...Object.fromEntries(['bunny', 'fox', 'panda'].map(pet => [`pet-${pet}`, { ...house(1), pet, pets: ['cat', 'dog', pet] }])),

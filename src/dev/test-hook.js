@@ -72,6 +72,15 @@ export function installTestHook(app) {
       const { min, max } = pet.root.getHierarchyBoundingVectors(true);
       return scan(room.scene, min, max, (x, y) => pet.hitTest(room.scene.createPickingRay(x, y, null, room.camera)) !== null);
     }
+    if (Number.isInteger(target?.gardenPlot)) {
+      const house = view('house'), spot = house.plots[target.gardenPlot];
+      if (!spot) return null;
+      const [x, z] = spot;
+      return scan(house.scene, new Vector3(x - .42, -.1, z - .42), new Vector3(x + .42, .22, z + .42), (sx, sy) => {
+        const hit = house.scene.pick(sx, sy);
+        return hit?.pickedMesh?.metadata?.houseSlot === 'orchard' && hit.pickedPoint && Math.hypot(hit.pickedPoint.x - x, hit.pickedPoint.z - z) < .5;
+      });
+    }
     const { view: name, match } = matcher(target);
     const scene = view(name).scene;
     const meshes = scene.meshes.filter(mesh => mesh.isEnabled() && mesh.isVisible && match(mesh));

@@ -1,3 +1,5 @@
+import { focusGardenPlantId, gardenPlantName, gardenSpecies } from '../../core/garden-plants.js';
+import { gardenPlantArt } from '../house/index.js';
 import { createSession, remainingAt, formatTime, spokenTime, sessionPhase, displayedRemaining, DIAL_MINUTES, sessionStarted } from '../../core/session.js';
 import { plantPhase } from '../../core/room-types.js';
 import { petName, focusPetId } from '../../core/pet-bonds.js';
@@ -64,6 +66,15 @@ export function createTimerUI(app) {
   $('#focus-mode-exit').addEventListener('click', () => leaveFocusMode());
   app.signal.addEventListener('abort', () => leaveFocusMode({ restoreFocus: false }), { once: true });
 
+  const gardenButton = document.createElement('button'); gardenButton.id = 'focus-garden';
+  $('#focus-reward').after(gardenButton);
+  const openGarden = (plantId = focusGardenPlantId(app.state)) => {
+    if (app.nav.travelling || app.avatar.active) return;
+    if (app.panels.current) app.panels.close();
+    app.roomUI.leaveMini(); app.nav.setHouseOpen(true, 'orchard'); app.houseUI.selectGardenPlant(plantId);
+  };
+  gardenButton.addEventListener('click', () => openGarden());
+
   function renderFocusReward() {
     const { state } = app;
     const reward = focusCoins(state.session.duration / 60_000);
@@ -73,6 +84,10 @@ export function createTimerUI(app) {
     const progress = wish ? (state.house.coins >= wish.price ? `${wish.name} is ready to come home` : `${wish.price - state.house.coins} coins to welcome ${wish.name}`) : reward ? `+${Math.floor(reward / 5)} ♡ · ${company}` : '♡ from 5 min';
     $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>${reward ? `+${reward} coins` : 'Coins from 5 min'}</strong><small></small></span>`;
     $('#focus-reward small').textContent = progress;
+    const plant = state.garden.plants.find(item => item.id === focusGardenPlantId(state));
+    gardenButton.innerHTML = `${gardenPlantArt(plant)}<span><strong></strong><small></small></span><b aria-hidden="true">↗</b>`;
+    gardenButton.querySelector('strong').textContent = plant ? gardenPlantName(plant) : 'Grow a little garden';
+    gardenButton.querySelector('small').textContent = plant ? `${gardenSpecies(plant.species).minutes - plant.minutes} min to bloom` : state.garden.plants.length ? 'Choose what grows next' : 'Your first seed is free';
   }
 
   function renderJournal() {
@@ -115,6 +130,15 @@ export function createTimerUI(app) {
       reveal.querySelector('strong').textContent = gift.label; reveal.querySelector('span').textContent = `From ${pet.name} ♡`;
       $('#celebration-bond').after(reveal);
     }
+    $('#celebration-garden')?.remove();
+    if (completion.garden) {
+      const growth = completion.garden, reveal = document.createElement('div'); reveal.id = 'celebration-garden'; reveal.className = 'garden-reveal';
+      reveal.innerHTML = `${gardenPlantArt({ species: growth.species, minutes: growth.after })}<div><strong></strong><small></small><button>Visit garden ↗</button></div>`;
+      reveal.querySelector('strong').textContent = growth.bloomed ? `${growth.name} bloomed` : `${growth.name} is growing`;
+      reveal.querySelector('small').textContent = growth.bloomed ? 'Grown by you ♡' : `${growth.after} / ${growth.total} min`;
+      reveal.querySelector('button').addEventListener('click', () => { modal.close(); openGarden(growth.id); });
+      $('#celebration-earned').after(reveal);
+    }
     if (!modal.open) modal.show();
     app.feedback.celebrate($('.celebration-flower'));
   }
@@ -134,6 +158,7 @@ export function createTimerUI(app) {
     const renderKey = `${formatted}:${presence}:${state.session.duration}:${today}:${minutes}:${editingAvatar}:${travelling}`;
     // The clock polls for deadlines twice a second, but idle rooms and unchanged
     // displayed seconds do not need another set of DOM mutations.
+    gardenButton.disabled = travelling || editingAvatar;
     $('#start-button').disabled = travelling || editingAvatar;
     $('#avatar-button').disabled = travelling;
     $('#decorate-button').disabled = travelling || !app.room;
@@ -171,6 +196,7 @@ export function createTimerUI(app) {
     renderJournal();
     const label = state.session.running ? 'Pause a moment' : ms === 0 ? 'Begin another session' : ms < state.session.duration ? 'Keep going' : 'Start focusing';
     $('#start-button span').textContent = label;
+    gardenButton.disabled = travelling || editingAvatar;
     $('#start-button').disabled = travelling || editingAvatar;
     $('#reset-session').hidden = !state.session.running && ms === state.session.duration;
     $('#reset-session').disabled = editingAvatar;

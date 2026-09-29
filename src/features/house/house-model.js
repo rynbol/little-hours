@@ -10,6 +10,7 @@ import { roomDesign, rugStack, standHeight, FLOOR_Y } from '../../core/layout.js
 import { getFurniture } from '../../core/catalog.js';
 import { surfaceChoices } from '../../core/surfaces.js';
 import { houseFurniture, houseArchitecture } from './house-furniture.js';
+import { gardenGrowth } from '../../core/garden-plants.js';
 import { buildGarden } from './house-garden.js';
 import { buildPond } from './house-pond.js';
 import { buildIsland } from './house-island.js';
@@ -51,9 +52,9 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     const m = MeshBuilder.CreateBox('part', { width: w, height: h, depth: d }, scene);
     m.position.set(x, y, z); if (Array.isArray(tilt)) m.rotation.set(...tilt); else m.rotation.z = tilt; paint(m, hex, strength);
   }
-  function ball(x, y, z, w, h, d, hex, strength = 1) {
+  function ball(x, y, z, w, h, d, hex, strength = 1, tilt = 0) {
     const m = MeshBuilder.CreateSphere('part', { diameter: 1, segments: 4 }, scene);
-    m.position.set(x, y, z); m.scaling.set(w, h, d); paint(m, hex, strength);
+    m.position.set(x, y, z); m.scaling.set(w, h, d); m.rotation.z = tilt; paint(m, hex, strength);
   }
   // A gable end: a triangle `w` wide and `h` tall, standing on (x, y, z).
   // `sideways` turns it to face along x, for the ends of the house.
@@ -140,8 +141,8 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   });
   batch('island', 'island', () => buildIsland({ ...outside, cylinder }), 'grounds');
   batch('pond', 'pond', () => buildPond({ ...outside, cylinder }));
-  const trees = house.garden || [];
-  batch('orchard', JSON.stringify([theme, trees.map(tree => [tree.date, Math.round(tree.growth * 20)])]), () => buildGarden({ ...outside, cylinder }, trees, theme));
+  const trees = house.garden || [], plants = house.plants || [];
+  batch('orchard', JSON.stringify([theme, trees.map(tree => [tree.date, Math.round(tree.growth * 20)]), plants.map(plant => [plant.slot, plant.species, gardenGrowth(plant)])]), () => buildGarden({ ...outside, cylinder }, trees, theme, plants));
   for (const entry of house.rooms) batch(entry.id, JSON.stringify([entry.layout, theme, entry.id === house.activeId && avatar, house.rooms.length === 1]), () => {
     origin = HOUSE_POSITIONS[entry.id];
     const style = roomDesign(entry.layout).style || 'retreat';

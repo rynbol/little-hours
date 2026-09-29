@@ -26,7 +26,8 @@ export function createHouseNavigation(app) {
   }
 
   function setHouseOpen(open, selectedId) {
-    if (travelling || open === houseOpen) return;
+    if (travelling) return;
+    if (open === houseOpen) { if (open && selectedId) app.houseUI.show(selectedId); return; }
     if (open) {
       closePicker(false);
       setConnectedView(false);
@@ -60,7 +61,7 @@ export function createHouseNavigation(app) {
 
   function renderConnections(updateModel = true) {
     connectedView?.setFocused(app.state.session.running);
-    const key = JSON.stringify([app.state.house, app.state.history.length, app.state.theme, app.state.avatar, Boolean(connectedView), app.state.session.running]);
+    const key = JSON.stringify([app.state.house, app.state.history, app.state.garden, app.state.theme, app.state.avatar, Boolean(connectedView), app.state.session.running]);
     if (connectionsKey === key) return;
     connectionsKey = key;
     const focusedId = picker.contains(document.activeElement) ? document.activeElement.dataset.houseGo : null;
@@ -95,14 +96,14 @@ export function createHouseNavigation(app) {
     syncTravelControls();
     if (focusedId && picker.open) picker.querySelector(`[data-house-go="${focusedId}"]`)?.focus({ preventScroll: true });
   }
-  const withGarden = () => ({ ...app.state.house, pet: app.state.pet, garden: studyTrees(app.state.history) });
+  const withGarden = () => ({ ...app.state.house, pet: app.state.pet, garden: studyTrees(app.state.history), plants: app.state.garden.plants });
   function setConnectedView(open) {
     if (travelling || open === Boolean(connectedView)) return;
     if (open && app.panels.current) app.panels.close();
     if (open && app.decorate.active) app.decorate.setEditMode(false);
     if (open) {
       $('#house-in-room').hidden = false;
-      connectedView = createHouseView($('#house-in-room'), { house: withGarden(), selectedId: app.state.house.activeId, theme: app.state.theme, avatar: app.state.avatar, focused: app.state.session.running, onSelect: id => id === 'pond' ? app.lake?.open() : selectDestination(id) });
+      connectedView = createHouseView($('#house-in-room'), { house: withGarden(), selectedId: app.state.house.activeId, theme: app.state.theme, avatar: app.state.avatar, focused: app.state.session.running, onSelect: id => id === 'pond' ? app.lake?.open() : id === 'orchard' || /^plot-[0-5]$/.test(id) ? setHouseOpen(true, id) : selectDestination(id) });
     } else { connectedView.dispose(); connectedView = null; $('#house-in-room').hidden = true; }
     $('#room-canvas').hidden = open;
     document.body.classList.toggle('is-connected', open); app.roomUI.renderHeading();

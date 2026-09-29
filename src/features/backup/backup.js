@@ -30,7 +30,7 @@ export function readBackup(text) {
   // that moment, so restoring an old copy cannot complete it a second time.
   if (state.session.running) {
     const remaining = Number.isFinite(exportedAt) ? remainingAt(state.session, exportedAt) : state.session.remaining;
-    state.session = remaining > 0 ? { ...(state.session.petId ? { petId: state.session.petId } : {}), duration: state.session.duration, remaining, endsAt: null, running: false } : createSession(state.session.duration / 60_000);
+    state.session = remaining > 0 ? { ...(state.session.petId ? { petId: state.session.petId } : {}), ...(Object.hasOwn(state.session, 'plantId') ? { plantId: state.session.plantId } : {}), duration: state.session.duration, remaining, endsAt: null, running: false } : createSession(state.session.duration / 60_000);
   }
   return {
     ok: true,

@@ -9,6 +9,7 @@ import { normalizeOwnedPets, adoptionVerdict, FREE_PETS } from './pets.js';
 import { normalizePetBonds, normalizePetWish, recordPetFocus, shareRitual, feedPet, choosePetFabric, welcomePet, cleanPetName, bondLevel, petName, focusPetId } from './pet-bonds.js';
 import { archivePetFriendships } from './pet-legacy.js';
 import { petGifts } from './pet-gifts.js';
+import { emptyGarden, normalizeGarden, focusGardenPlantId, plantGardenSeed, placeGardenPlant, growGarden, gardenGrowth } from './garden-plants.js';
 
 export const storageKey = 'little-hours-v1';
 // The save as it was just before a backup replaced it.
@@ -16,7 +17,7 @@ export const recoveryKey = 'little-hours-v1-before-restore';
 
 export function freshState() {
   const layout = createLayout();
-  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], petBonds: normalizePetBonds(null, FREE_PETS), petWish: null, petFamily: '', avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [], pond: emptyPond() };
+  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], petBonds: normalizePetBonds(null, FREE_PETS), petWish: null, petFamily: '', avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [], pond: emptyPond(), garden: emptyGarden() };
 }
 
 export function localDate(timestamp = clockNow()) {
@@ -38,6 +39,7 @@ export function restoreState(raw) {
   initial.petFamily = cleanPetName(saved.petFamily, '');
   if (saved.friendships || saved.legacyPetFriendships) initial.legacyPetFriendships = archivePetFriendships(saved.legacyPetFriendships || saved.friendships, initial.pets.map(id => `pet:${id}`));
   initial.pond = normalizePond(saved.pond);
+  initial.garden = normalizeGarden(saved.garden);
   if (initial.pets.includes(saved.pet)) initial.pet = saved.pet;
   if (Number.isSafeInteger(saved.seenAt) && saved.seenAt > 0) initial.seenAt = saved.seenAt;
   for (const key of Object.keys(initial.decor)) {
@@ -61,6 +63,7 @@ export function restoreState(raw) {
       endsAt: session.running ? session.endsAt : null,
     };
     if (initial.pets.includes(session.petId)) initial.session.petId = session.petId;
+    if (Object.hasOwn(session, 'plantId')) initial.session.plantId = initial.garden.plants.some(plant => plant.id === session.plantId) ? session.plantId : null;
     if (!session.running && session.remaining === 0 && Number.isSafeInteger(session.completedAt) && session.completedAt >= 0) initial.session.completedAt = session.completedAt;
   }
   if (Array.isArray(saved.history)) {
@@ -88,7 +91,7 @@ function completeDueSession(state, now) {
   addBait(state.pond, duration / 60_000, endsAt);
   const reward = recordPetFocus(state, duration / 60_000, endsAt), id = reward.id || state.session.petId || state.pet;
   const gifts = Object.freeze(reward.gifts.map(({ id: giftId, label }) => Object.freeze({ id: giftId, label })));
-  return { at: endsAt, minutes: duration / 60_000, coins: focusCoins(duration / 60_000), pet: { id, name: petName(state, id), hearts: reward.earned, bondTitle: bondLevel(state.petBonds[id]).title, gifts } };
+  return { at: endsAt, minutes: duration / 60_000, coins: focusCoins(duration / 60_000), garden: growGarden(state, duration / 60_000), pet: { id, name: petName(state, id), hearts: reward.earned, bondTitle: bondLevel(state.petBonds[id]).title, gifts } };
 }
 
 export function createStateStore(storage, now = clockNow) {
@@ -207,6 +210,14 @@ export function createStateStore(storage, now = clockNow) {
       return { ...result, caught };
     },
     renameHouse(name) { return update(draft => { draft.house.name = cleanName(name, draft.house.name); }); },
+    plantSeed(species, slot, expectedId) {
+      let planted;
+      const result = update(draft => { planted = plantGardenSeed(draft, species, slot, expectedId); });
+      return { ...result, planted };
+    },
+    tendPlant(id) { return update(draft => { if (draft.garden.plants.some(plant => plant.id === id && gardenGrowth(plant) < 1)) draft.garden.activeId = id; }); },
+    placePlant(id, slot) { return update(draft => { placeGardenPlant(draft.garden, id, slot); }); },
+    renamePlant(id, name) { return update(draft => { const plant = draft.garden.plants.find(item => item.id === id); if (plant) plant.name = typeof name === 'string' ? name.trim().slice(0, 28) : plant.name; }); },
     renameRoom(id, name) { return update(draft => { const room = draft.house.rooms.find(entry => entry.id === id); if (room) room.name = cleanName(name, room.name); }); },
     // Replace the whole home with a restored copy, keeping the current save
     // aside first. Nothing changes if that copy cannot be kept.
@@ -228,7 +239,8 @@ export function createStateStore(storage, now = clockNow) {
     setRunning(running) {
       return update((draft, { now: timestamp }) => {
         const petId = focusPetId(draft);
-        draft.session = running ? { ...startSession(draft.session, timestamp), petId } : pauseSession(draft.session, timestamp);
+        const plantId = focusGardenPlantId(draft);
+        draft.session = running ? { ...startSession(draft.session, timestamp), petId, plantId } : pauseSession(draft.session, timestamp);
       });
     },
   };

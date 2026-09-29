@@ -14,6 +14,8 @@ import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import '@babylonjs/core/Culling/ray.js';
 import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
+import { gardenPlantName } from '../../core/garden-plants.js';
+import { gardenBounds, PLANT_SPOTS, gardenPlotAt } from './garden-model.js';
 import { GARDEN_TAG } from './house-garden.js';
 import { POND_TAG } from './house-pond.js';
 import { createStroll } from './house-stroll.js';
@@ -164,7 +166,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   function fitCamera() {
     if (!model) return;
     const width = Math.max(1, container.clientWidth), height = Math.max(1, container.clientHeight);
-    const frame = houseFrame(model.framing, camera.getViewMatrix(true), width / height, .92);
+    const frame = houseFrame(selectedId === 'orchard' ? gardenBounds : model.framing, camera.getViewMatrix(true), width / height, .92);
     const halfWidth = frame.height * width / height / 2;
     camera.orthoLeft = frame.x - halfWidth; camera.orthoRight = frame.x + halfWidth;
     camera.orthoTop = frame.y + frame.height / 2; camera.orthoBottom = frame.y - frame.height / 2;
@@ -173,7 +175,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   function positionTags() {
     const width = container.clientWidth, height = container.clientHeight, matrix = camera.getTransformationMatrix();
     for (const button of tags.children) {
-      const id = button.dataset.room, base = HOUSE_POSITIONS[id], offset = model.levels[id]?.position;
+      const id = button.dataset.room;
+      button.hidden = selectedId === 'orchard' && id !== 'orchard' && id !== 'pond';
+      const base = HOUSE_POSITIONS[id], offset = model.levels[id]?.position;
       if (!base) tagPoint.set(...(id === 'pond' ? POND_TAG : GARDEN_TAG));
       else tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : id === 'loft' ? .7 : 0), base[2] + offset.z + 2.08);
       Vector3.TransformCoordinatesToRef(tagPoint, matrix, tagProjection);
@@ -225,7 +229,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       const button = pin('button', entry.id === 'loft' ? 'loft' : 'room', entry.id, roomDisplayName(entry), here ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor');
       button.setAttribute('aria-label', `Visit ${roomDisplayName(entry)}`); button.setAttribute('aria-current', here ? 'location' : 'false');
     }
-    pin('span', 'garden', 'orchard', 'Garden').classList.add('is-garden');
+    pin('button', 'garden', 'orchard', 'Garden').classList.add('is-garden');
     const pond = pin('button', 'pond', 'pond', 'Willow Pond', 'Go fishing'); pond.classList.add('is-pond'); pond.setAttribute('aria-label', 'Go fishing at Willow Pond');
     // The blueprint's tag: what grows next and how close it is.
     const site = nextExpansion(house);
@@ -250,7 +254,10 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   function pick(event) {
     const rect = canvas.getBoundingClientRect();
     // Babylon converts CSS pixels to render pixels using hardware scaling.
-    return scene.pick(event.clientX - rect.left, event.clientY - rect.top)?.pickedMesh?.metadata?.houseSlot;
+    const hit = scene.pick(event.clientX - rect.left, event.clientY - rect.top);
+    const slot = hit?.pickedMesh?.metadata?.houseSlot;
+    const plot = slot === 'orchard' && hit.pickedPoint ? gardenPlotAt(hit.pickedPoint.x, hit.pickedPoint.z) : -1;
+    return plot >= 0 ? `plot-${plot}` : slot;
   }
   const onDown = event => { if (event.button !== 0 || dragging) return; dragging = { id: event.pointerId, x: event.clientX, y: event.clientY, angle: targetAngle, tilt: targetTilt, moved: false }; };
   const onUp = event => {
@@ -274,7 +281,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     if (id === hovering) return;
     hovering = id; canvas.style.cursor = id ? 'pointer' : 'grab';
     const room = house.rooms.find(room => room.id === id);
-    canvas.title = id === 'pond' ? 'Willow Pond' : id ? room ? roomDisplayName(room) : 'A little room to grow' : '';
+    canvas.title = id?.startsWith('plot-') ? gardenPlantName(house.plants?.find(plant => plant.slot === Number(id.slice(5)))) : id === 'orchard' ? 'Your garden' : id === 'pond' ? 'Willow Pond' : id ? room ? roomDisplayName(room) : 'A little room to grow' : '';
   };
   const onVisibility = () => { if (document.hidden) { onCancel(); roomMotion.stop(); shadows.getShadowMap().resetRefreshCounter(); cancelAnimationFrame(frame); frame = 0; } else requestRender(); };
   window.addEventListener('blur', onCancel); canvas.addEventListener('lostpointercapture', onCancel); canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointerup', onUp); canvas.addEventListener('pointercancel', onCancel); canvas.addEventListener('pointerleave', onLeave); canvas.addEventListener('pointermove', onMove);
@@ -286,7 +293,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   return {
     update,
     turn,
-    celebrate(id) { if (!motion.matches) roomMotion.trigger(id, 'build', performance.now()); burst = { start: performance.now(), origin: (HOUSE_POSITIONS[id] || [0, 0, 0]).map((v, i) => v + (model.levels[id]?.position.asArray()[i] || 0)) }; requestRender(); },
+    celebrate(id) { if (!motion.matches) roomMotion.trigger(id, 'build', performance.now()); burst = { start: performance.now(), origin: (HOUSE_POSITIONS[id] || (id === 'orchard' ? [8, 0, -2.5] : [0, 0, 0])).map((v, i) => v + (model.levels[id]?.position.asArray()[i] || 0)) }; requestRender(); },
     async createPostcard(name, caption) {
       // Copy immediately after rendering: WebGL's default buffer need not be
       // preserved between frames (which would cost memory on every visit).
@@ -304,7 +311,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       resize();
     },
     setFocused(value) { if (focused === Boolean(value)) return; focused = Boolean(value); requestRender(); },
-    diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, turning: Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001, trees: model.trees, stroll: focused ? null : stroll?.pose, strollPet: focused ? null : stroll?.pet, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
+    diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, turning: Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001, trees: model.trees, plots: PLANT_SPOTS, stroll: focused ? null : stroll?.pose, strollPet: focused ? null : stroll?.pet, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
     dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); stroll?.dispose(); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); controls.remove(); tags.remove(); note.remove(); },
   };
 }

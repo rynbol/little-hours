@@ -1,4 +1,5 @@
 import './house.css';
+import { createGardenUI } from './garden-ui.js';
 import { createHouseView } from './house-view.js';
 import { HOUSE_SLOTS, nextExpansion, roomDisplayName } from '../../core/house.js';
 import { PRESETS, roomDesign, createLayout } from '../../core/layout.js';
@@ -30,11 +31,13 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     <div class="house-layout"><div class="house-left"><div class="house-world"><div class="house-world-caption"><span class="house-address">${icon('home')} YOUR LITTLE PATCH OF THE WORLD</span><span id="house-count"></span></div>
       <div class="house-scene"><div class="house-sky-mark" aria-hidden="true">✧</div><div id="house-canvas" class="house-canvas"></div><div id="house-celebration" class="house-celebration" role="status" hidden></div><div class="house-view-tools"><button id="house-turn-left" aria-label="Turn house left">↶</button><button id="house-reset-view" aria-label="Reset house view">${icon('home')}</button><button id="house-turn-right" aria-label="Turn house right">↷</button></div><span class="house-scene-caption">a little life, well spent.</span></div>
       <div class="house-preview-bar"><span class="house-map-hint" aria-live="polite"></span><button id="house-preview-toggle" aria-pressed="true" hidden>Show before</button></div>
-      <nav id="house-rooms" class="house-rooms" aria-label="Rooms in your house"></nav></div>
+      <nav id="house-rooms" class="house-rooms" aria-label="Rooms in your house"></nav><button id="house-open-garden" class="house-garden-link">Your garden <span aria-hidden="true">↗</span></button></div>
       <div class="house-underworld"><p>${icon('leaf')} <span>Good things take a little time.<small>1 finished focus minute = 1 coin for your home.</small></span></p><button class="mode-button" id="house-postcard">${icon('mini')} Make a postcard</button></div>
       </div>
       <aside id="house-detail" class="house-detail" aria-label="Selected house room"></aside></div>
     <dialog id="house-postcard-dialog" class="house-postcard-dialog" aria-labelledby="postcard-title"><div class="house-postcard-heading"><div><p class="eyebrow">FROM MY LITTLE CORNER OF THE WORLD</p><h2 id="postcard-title">Wish you were here.</h2></div><button class="icon-button" id="close-postcard" aria-label="Close postcard">${icon('close')}</button></div><img id="house-postcard-image" alt="A postcard of your miniature house"><div class="house-postcard-actions"><p>A little piece of home to send to someone.<small>A PNG to share wherever you like.</small></p><a id="download-postcard" download="little-hours-postcard.png">Save image ${icon('arrow')}</a></div></dialog>`;
+  const gardenUI = createGardenUI($('#house-detail'), { store, acceptUpdate, onFocus, notice, celebrate: () => view?.celebrate('orchard') });
+  $('#house-open-garden').addEventListener('click', () => select('orchard'));
   $('#back-to-room').addEventListener('click', onClose);
   $('#rename-house').addEventListener('click', () => {
     $('#house-name-form').hidden = false; $('#house-name-input').value = store.state.house.name; $('#house-name-input').focus(); $('#house-name-input').select();
@@ -57,9 +60,10 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     exporting = true; $('#house-postcard').disabled = true;
     try {
       const isPreview = preview && !store.state.house.rooms.some(room => room.id === selectedId) && nextExpansion(store.state.house)?.id === selectedId;
-      const url = await view.createPostcard(store.state.house.name, isPreview ? 'A little daydream for my next room.' : `${store.state.house.rooms.length} cozy ${store.state.house.rooms.length === 1 ? 'room' : 'rooms'}. Grown with a little time.`);
+      const url = await view.createPostcard(store.state.house.name, selectedId === 'orchard' ? 'My Little Hours garden.' : isPreview ? 'A little daydream for my next room.' : `${store.state.house.rooms.length} cozy ${store.state.house.rooms.length === 1 ? 'room' : 'rooms'}. Grown with a little time.`);
       if (!shown) { URL.revokeObjectURL(url); return; }
       if (postcardUrl) URL.revokeObjectURL(postcardUrl);
+      $('#download-postcard').download = selectedId === 'orchard' ? 'little-hours-garden.png' : 'little-hours-postcard.png';
       postcardUrl = url; $('#house-postcard-image').src = url; $('#download-postcard').href = url;
       postcardDialog.showModal();
     } catch (error) { console.error('Postcard export failed:', error); notice('The postcard couldn’t be saved. Please try again.'); }
@@ -67,9 +71,11 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
   });
 
   function select(id) {
-    selectedId = id; preview = true; celebration = null; clearTimeout(celebrationTimer);
+    const plot = /^plot-[0-5]$/.test(id) ? Number(id.slice(5)) : null;
+    selectedId = plot === null ? id : 'orchard'; preview = true; celebration = null; clearTimeout(celebrationTimer);
     $('#house-celebration').hidden = true; root.classList.remove('house-just-built');
     signature = ''; render();
+    if (plot !== null) gardenUI.selectSlot(plot);
     $('#house-detail h2')?.focus({ preventScroll: true });
   }
   function celebrate(entry) {
@@ -84,7 +90,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     if (!shown) return;
     view?.setFocused(store.state.session.running);
     const house = store.state.house, next = nextExpansion(house), plan = planFor(selectedId);
-    const key = JSON.stringify([house, selectedId, plan.design, preview, celebration, store.state.theme, store.state.avatar]);
+    const key = JSON.stringify([house, selectedId, plan.design, preview, celebration, store.state.theme, store.state.avatar, store.state.garden, store.state.session, store.state.pet, store.state.history]);
     if (key === signature) return;
     signature = key;
     const activeControl = root.contains(document.activeElement) ? document.activeElement : null;
@@ -98,7 +104,11 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     }).join('');
     root.querySelectorAll('[data-house-slot]').forEach(button => button.addEventListener('click', () => select(button.dataset.houseSlot)));
     const entry = house.rooms.find(room => room.id === selectedId), slot = HOUSE_SLOTS.find(slot => slot.id === selectedId) || HOUSE_SLOTS[0];
-    if (entry) {
+    root.classList.toggle('is-living-garden', selectedId === 'orchard');
+    $('#house-open-garden').setAttribute('aria-pressed', String(selectedId === 'orchard'));
+    $('#house-detail').setAttribute('aria-label', selectedId === 'orchard' ? 'Your garden' : 'Selected house room');
+    if (selectedId === 'orchard') gardenUI.render();
+    else if (entry) {
       const design = roomDesign(entry.layout), newlyBuilt = celebration === entry.id;
       $('#house-detail').innerHTML = `<div class="house-paper-top"><p class="eyebrow">${newlyBuilt ? 'A LITTLE DREAM, MADE REAL' : 'THE PLACES WE MAKE OUR OWN'}</p><span aria-hidden="true">${newlyBuilt ? '✧' : '♡'}</span></div><h2 tabindex="-1">${escape(roomDisplayName(entry))}</h2><p class="house-description">${newlyBuilt ? 'You made time. You made space. Now make yourself at home.' : moods[design.id][0] + '. A little corner that feels like you.'}</p><div class="house-owned-art" style="--room-tint:${moods[design.id][1]}"><div aria-hidden="true">${art(design)}</div><span>${escape(design.name)}</span><small>${entry.layout.items.length} little comforts · ${entry.id === 'loft' ? 'Upstairs' : 'Ground floor'}</small></div><button class="start-button" id="enter-house-room">${newlyBuilt ? 'Step into your new room' : 'Come on in'} ${icon('arrow')}</button><button class="house-secondary" id="decorate-house-room">${icon('build')} Make it yours</button><form id="room-name-form" class="room-name-form"><label for="room-name-input">A name that feels like home</label><div><input id="room-name-input" maxlength="40" required value="${escape(roomDisplayName(entry))}"><button class="quiet-button" type="submit">Save</button></div></form><div class="house-next-note">${next ? `${icon('leaf')}<p><strong>There’s a little more to dream about.</strong>${next.label} · ${next.price} coins<button class="text-link" id="show-next-room">Dream up your next room ${icon('arrow')}</button></p>` : `${icon('home')}<p><strong>Every room has a little of you in it.</strong>Your cottage is complete. Keep rearranging, keep dreaming, keep making memories.</p>`}</div>`;
       $('#enter-house-room').addEventListener('click', () => onEnter(entry.id, false));
@@ -131,13 +141,13 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     }
     const canPreview = !entry && next?.id === selectedId, previewing = canPreview && preview;
     const previewLayout = previewing ? createLayout(plan.design) : null;
-    const modelHouse = { ...house, pet: store.state.pet, garden: studyTrees(store.state.history), rooms: previewing ? [...house.rooms, { id: selectedId, name: slot.label, layout: previewLayout }] : house.rooms };
+    const modelHouse = { ...house, pet: store.state.pet, garden: studyTrees(store.state.history), plants: store.state.garden.plants, rooms: previewing ? [...house.rooms, { id: selectedId, name: slot.label, layout: previewLayout }] : house.rooms };
     $('#house-canvas').setAttribute('aria-label', previewing ? `Preview of ${roomDesign(previewLayout).name} in your new ${slot.label}` : 'Your connected rooms');
     $('.house-map-hint').textContent = previewing ? `✧ Dreaming of ${roomDesign(previewLayout).name}` : canPreview ? 'Your home, before its next little chapter' : 'Tap a room to see what’s inside';
     $('#house-preview-toggle').hidden = !canPreview;
     $('#house-preview-toggle').textContent = preview ? 'Show before' : 'Show my dream';
     $('#house-preview-toggle').setAttribute('aria-pressed', String(preview));
-    const nextModel = JSON.stringify([modelHouse.rooms, modelHouse.garden, house.activeId, selectedId, store.state.theme, store.state.avatar, store.state.pet]);
+    const nextModel = JSON.stringify([modelHouse.rooms, modelHouse.garden, modelHouse.plants, house.activeId, selectedId, store.state.theme, store.state.avatar, store.state.pet]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
       const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: id => id === 'pond' ? onPond?.() : select(id) };
@@ -160,10 +170,11 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     else if (focusDesign) root.querySelector(`[data-house-design="${focusDesign}"]`)?.focus({ preventScroll: true });
   }
   return {
-    show(id = store.state.house.activeId) { shown = true; root.hidden = false; selectedId = id; preview = true; signature = ''; view?.setSuspended(false); render(); },
+    show(id = store.state.house.activeId) { shown = true; root.hidden = false; selectedId = /^plot-[0-5]$/.test(id) ? 'orchard' : id; preview = true; signature = ''; view?.setSuspended(false); render(); if (selectedId !== id) gardenUI.selectSlot(Number(id.slice(5))); },
     // The house stays built while away, so coming back is instant.
     hide() { shown = false; postcardDialog.close(); root.hidden = true; view?.setSuspended(true); if (!view) modelSignature = ''; signature = ''; celebration = null; clearTimeout(celebrationTimer); $('#house-celebration').hidden = true; root.classList.remove('house-just-built'); $('#house-name-form').hidden = true; },
     render,
+    selectGardenPlant(id) { if (shown && selectedId === 'orchard') gardenUI.selectPlant(id); },
     diagnostics: () => view?.diagnostics(),
     get view() { return view; },
     dispose() { cancelAnimationFrame(firstBuild); clearTimeout(firstBuild); clearTimeout(celebrationTimer); postcardDialog.close(); if (postcardUrl) URL.revokeObjectURL(postcardUrl); view?.dispose(); },

@@ -13,6 +13,7 @@ export const steps = {
 };
 
 export const cycles = {
+  garden: { about: 'visit the living garden and return to the room', async run(app) { await steps.openHouse(app); if (await app.visible('#house-open-garden')) await app.clickSel('#house-open-garden'); await app.settle(); await steps.backToRoom(app); } },
   focus: { about: 'enter and leave whole-room Focus mode without pausing', async run(app) { await steps.openFocus(app); await steps.closeFocus(app); } },
   rooms: { about: 'visit the garden and studio using their room cards', async run(app) { for (const id of ['garden', 'studio']) { await steps.openRoomPicker(app); await app.clickSel(`[data-house-go="${id}"]`); await app.waitFor(`window.__littleHours.state.house.activeId === '${id}' && !document.body.classList.contains('is-travelling')`, { what: `arrival in ${id}`, timeout: 30000 }); await app.settle(); } } },
   pet: { about: 'choose the cat and puppy, open and close pet care', async run(app) { await app.clickSel('#pet-button'); if (await app.js(`Boolean(document.querySelector('#pet-collection'))`)) await app.clickSel('#pet-collection > summary'); await app.clickSel('[data-pet-choice="dog"]'); await app.clickSel('[data-pet-choice="cat"]'); await app.clickSel('#close-panel'); await app.settle(); } },
@@ -23,6 +24,7 @@ export const cycles = {
 };
 
 export const views = {
+  garden: { about: 'the personal garden, or the whole house on older refs', async go(app) { await steps.openHouse(app); if (await app.visible('#house-open-garden')) await app.clickSel('#house-open-garden'); await app.settle(); } },
   focus: { about: 'the whole room in Focus mode, or the room on older refs', async go(app) { if (await app.js(`Boolean(document.getElementById('focus-mode-enter'))`)) await steps.openFocus(app); } },
   'room-picker': { about: 'the illustrated room picker', async go(app) { await steps.openRoomPicker(app); } },
   pet: { about: 'your pet care card', async go(app) { await app.clickSel('#pet-button'); await app.settle(); } },
