@@ -36,7 +36,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
       </div>
       <aside id="house-detail" class="house-detail" aria-label="Selected house room"></aside></div>
     <dialog id="house-postcard-dialog" class="house-postcard-dialog" aria-labelledby="postcard-title"><div class="house-postcard-heading"><div><p class="eyebrow">FROM MY LITTLE CORNER OF THE WORLD</p><h2 id="postcard-title">Wish you were here.</h2></div><button class="icon-button" id="close-postcard" aria-label="Close postcard">${icon('close')}</button></div><img id="house-postcard-image" alt="A postcard of your miniature house"><div class="house-postcard-actions"><p>A little piece of home to send to someone.<small>A PNG to share wherever you like.</small></p><a id="download-postcard" download="little-hours-postcard.png">Save image ${icon('arrow')}</a></div></dialog>`;
-  const gardenUI = createGardenUI($('#house-detail'), { store, acceptUpdate, onFocus, notice, celebrate: () => view?.celebrate('orchard') });
+  const gardenUI = createGardenUI($('#house-detail'), { store, acceptUpdate, onFocus, onBack: () => { select(store.state.house.activeId); $('#house-open-garden').focus({ preventScroll: true }); }, notice, celebrate: () => view?.celebrate('orchard') });
   $('#house-open-garden').addEventListener('click', () => select('orchard'));
   $('#back-to-room').addEventListener('click', onClose);
   $('#rename-house').addEventListener('click', () => {
@@ -70,8 +70,11 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     finally { exporting = false; $('#house-postcard').disabled = false; }
   });
 
+  root.addEventListener('keydown', event => { if (event.key === 'Escape' && selectedId === 'orchard' && !postcardDialog.open) { event.stopPropagation(); event.preventDefault(); select(store.state.house.activeId); $('#house-open-garden').focus({ preventScroll: true }); } });
+
   function select(id) {
     const plot = /^plot-[0-5]$/.test(id) ? Number(id.slice(5)) : null;
+    if (id !== 'orchard' && plot === null) gardenUI.close();
     selectedId = plot === null ? id : 'orchard'; preview = true; celebration = null; clearTimeout(celebrationTimer);
     $('#house-celebration').hidden = true; root.classList.remove('house-just-built');
     signature = ''; render();
@@ -105,6 +108,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     root.querySelectorAll('[data-house-slot]').forEach(button => button.addEventListener('click', () => select(button.dataset.houseSlot)));
     const entry = house.rooms.find(room => room.id === selectedId), slot = HOUSE_SLOTS.find(slot => slot.id === selectedId) || HOUSE_SLOTS[0];
     root.classList.toggle('is-living-garden', selectedId === 'orchard');
+    document.body.classList.toggle('is-garden', selectedId === 'orchard');
     $('#house-open-garden').setAttribute('aria-pressed', String(selectedId === 'orchard'));
     $('#house-detail').setAttribute('aria-label', selectedId === 'orchard' ? 'Your garden' : 'Selected house room');
     if (selectedId === 'orchard') gardenUI.render();
@@ -142,7 +146,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     const canPreview = !entry && next?.id === selectedId, previewing = canPreview && preview;
     const previewLayout = previewing ? createLayout(plan.design) : null;
     const modelHouse = { ...house, pet: store.state.pet, garden: studyTrees(store.state.history), plants: store.state.garden.plants, rooms: previewing ? [...house.rooms, { id: selectedId, name: slot.label, layout: previewLayout }] : house.rooms };
-    $('#house-canvas').setAttribute('aria-label', previewing ? `Preview of ${roomDesign(previewLayout).name} in your new ${slot.label}` : 'Your connected rooms');
+    $('#house-canvas').setAttribute('aria-label', previewing ? `Preview of ${roomDesign(previewLayout).name} in your new ${slot.label}` : selectedId === 'orchard' ? 'Your flower garden' : 'Your connected rooms');
     $('.house-map-hint').textContent = previewing ? `✧ Dreaming of ${roomDesign(previewLayout).name}` : canPreview ? 'Your home, before its next little chapter' : 'Tap a room to see what’s inside';
     $('#house-preview-toggle').hidden = !canPreview;
     $('#house-preview-toggle').textContent = preview ? 'Show before' : 'Show my dream';
@@ -172,11 +176,11 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
   return {
     show(id = store.state.house.activeId) { shown = true; root.hidden = false; selectedId = /^plot-[0-5]$/.test(id) ? 'orchard' : id; preview = true; signature = ''; view?.setSuspended(false); render(); if (selectedId !== id) gardenUI.selectSlot(Number(id.slice(5))); },
     // The house stays built while away, so coming back is instant.
-    hide() { shown = false; postcardDialog.close(); root.hidden = true; view?.setSuspended(true); if (!view) modelSignature = ''; signature = ''; celebration = null; clearTimeout(celebrationTimer); $('#house-celebration').hidden = true; root.classList.remove('house-just-built'); $('#house-name-form').hidden = true; },
+    hide() { gardenUI.close(); document.body.classList.remove('is-garden'); shown = false; postcardDialog.close(); root.hidden = true; view?.setSuspended(true); if (!view) modelSignature = ''; signature = ''; celebration = null; clearTimeout(celebrationTimer); $('#house-celebration').hidden = true; root.classList.remove('house-just-built'); $('#house-name-form').hidden = true; },
     render,
     selectGardenPlant(id) { if (shown && selectedId === 'orchard') gardenUI.selectPlant(id); },
     diagnostics: () => view?.diagnostics(),
     get view() { return view; },
-    dispose() { cancelAnimationFrame(firstBuild); clearTimeout(firstBuild); clearTimeout(celebrationTimer); postcardDialog.close(); if (postcardUrl) URL.revokeObjectURL(postcardUrl); view?.dispose(); },
+    dispose() { gardenUI.close(); document.body.classList.remove('is-garden'); cancelAnimationFrame(firstBuild); clearTimeout(firstBuild); clearTimeout(celebrationTimer); postcardDialog.close(); if (postcardUrl) URL.revokeObjectURL(postcardUrl); view?.dispose(); },
   };
 }

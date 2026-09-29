@@ -5,7 +5,7 @@ export default {
     const app = await t.open({ seed: 'one-room-rich' });
     await app.clickSel('#focus-garden'); await app.settle();
     check('the focus invitation opens the garden', await app.text('#house-detail h2') === 'Your garden');
-    await app.clickSel('#seed-moonflower'); await t.shot(app, 'seeds');
+    await app.clickSel('#seed-moonflower'); await sleep(400); await t.shot(app, 'seeds');
     await app.clickSel('#garden-plant-seed');
     let saved = await app.saved();
     check('the first seed is free and planted in spot one', saved.garden.plants[0]?.species === 'moonflower' && saved.garden.plants[0]?.slot === 0 && saved.house.coins === 300, saved.garden);
@@ -26,15 +26,15 @@ export default {
       await garden.clickSel('#focus-garden'); await garden.settle();
       check(`${phone ? 'phone' : 'desktop'}: mature plants stay in the garden`, await garden.visible('.garden-bloom-note'));
       check(`${phone ? 'phone' : 'desktop'}: no horizontal overflow`, await garden.js('document.documentElement.scrollWidth <= innerWidth'));
-      if (!phone) {
+      {
         for (let slot = 0; slot < 6; slot++) {
           const point = await garden.point({ gardenPlot: slot });
-          check(`spot ${slot + 1} is visible in the 3D garden`, point?.visible, point);
-          if (point?.visible) { await garden.click(point.x, point.y); check(`tapping pot ${slot + 1} selects its plant`, await garden.attr(`#garden-spot-${slot}`, 'aria-pressed') === 'true'); }
+          check(`${phone ? 'phone' : 'desktop'}: spot ${slot + 1} is visible in the 3D garden`, point?.visible, point);
+          if (point?.visible) { await garden.click(point.x, point.y); check(`${phone ? 'phone' : 'desktop'}: tapping pot ${slot + 1} selects its plant`, await garden.attr(`#garden-spot-${slot}`, 'aria-pressed') === 'true'); }
         }
         await garden.clickSel('#garden-spot-0');
       }
-      await t.shot(garden, phone ? 'phone-bloom' : 'bloom');
+      await sleep(400); await t.shot(garden, phone ? 'phone-bloom' : 'bloom');
       if (phone) {
         await sleep(1600); const before = (await garden.house()).renderCount; await sleep(700);
         check('reduced motion leaves the garden still', (await garden.house()).renderCount === before);

@@ -32,7 +32,7 @@ test('seeds, saved names, placement and the garden controls work on a phone', as
   await page.goto('/'); await ready(page); await openGarden(page); await page.locator('#garden-plant-seed').click();
   await page.locator('#garden-spot-1').click(); await page.locator('#seed-lavender').click(); await page.locator('#garden-plant-seed').click();
   await expect(page.locator('#coin-balance')).toHaveText('10');
-  await page.locator('#garden-spot-0').click(); await page.locator('.garden-collection > summary').click(); await page.locator('#garden-collection-plant-2').click(); await page.locator('#garden-place').click();
+  await page.locator('#garden-spot-0').click(); await page.locator('#garden-collection-open').click(); await page.locator('#garden-collection-plant-2').click(); await page.locator('#garden-place').click();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-v1')).garden.plants.map(p => p.slot))).toEqual([1, 0]);
   await expect(page.locator('#garden-spot-0')).toHaveAttribute('aria-label', 'Spot 1, Lavender');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -51,7 +51,7 @@ test('the garden reuses the house engine, keeps room batches and stops drawing w
   expect(await page.evaluate(() => window.__littleHours.house.diagnostics().scene.meshes.find(m => m.metadata?.houseSlot === 'studio')?.uniqueId)).toBe(initial.room);
   await page.waitForTimeout(1700); const before = await page.evaluate(() => window.__littleHours.house.diagnostics().renderCount);
   await page.waitForTimeout(700); expect(await page.evaluate(() => window.__littleHours.house.diagnostics().renderCount)).toBe(before);
-  await page.locator('#back-to-room').click();
+  await page.locator('#garden-back').click(); await page.locator('#back-to-room').click();
   await page.locator('.home-wide').click(); await page.locator('#house-in-room [data-room="orchard"]').click();
   await expect(page.locator('#house-detail h2')).toHaveText('Your garden');
   expect(await page.evaluate(() => window.__littleHours.state.house.activeId)).toBe('studio');
@@ -81,4 +81,28 @@ test('a garden postcard exports locally without spending coins or changing progr
   expect((await download).suggestedFilename()).toBe('little-hours-garden.png');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-v1')).garden)).toEqual(before);
   await expect(page.locator('#coin-balance')).toHaveText('0');
+});
+
+test('the immersive garden keeps its overlays, keyboard exits and name editor in order', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/'); await ready(page); await openGarden(page);
+  const viewport = page.viewportSize();
+  expect(await page.locator('#house-page').boundingBox()).toMatchObject({ x: 0, y: 0, ...viewport });
+  await page.locator('#garden-plant-seed').click();
+  await page.locator('#garden-rename').click();
+  await page.locator('#garden-name-input').click();
+  await page.locator('#garden-name-input').fill('A little sunshine');
+  await page.locator('#garden-name-input').press('Escape');
+  await expect(page.locator('#garden-name-form')).toBeHidden();
+  await expect(page.locator('#garden-rename')).toBeFocused();
+  await page.locator('#garden-collection-open').click();
+  await expect(page.locator('#garden-collection-dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#garden-collection-dialog')).toBeHidden();
+  await expect(page.locator('#garden-collection-open')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#house-open-garden')).toBeVisible();
+  await expect(page.locator('#house-open-garden')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#room-section')).toBeVisible();
+  await expect(page.locator('body')).not.toHaveClass(/is-garden/);
 });

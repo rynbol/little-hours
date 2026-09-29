@@ -38,7 +38,7 @@ export function createHouseNavigation(app) {
     document.body.classList.toggle('is-house', open);
     $('#room-section').hidden = open;
     app.room?.setSuspended(open);
-    if (open) { app.houseUI.show(selectedId); $('#back-to-room').focus({ preventScroll: true }); }
+    if (open) { app.houseUI.show(selectedId); (document.body.classList.contains('is-garden') ? $('#garden-back') : $('#back-to-room'))?.focus({ preventScroll: true }); }
     else { app.houseUI.hide(); $('#rooms-button').focus({ preventScroll: true }); }
     app.timer.syncDock();
   }

@@ -137,9 +137,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     motes.setEnabled(!motion.matches);
     for (let i = 0; i < 24; i++) {
       const n = i * 16;
-      moteMatrices[n + 12] = -5 + (i * 1.73 % 10) + Math.sin(seconds * .32 + i) * .18;
+      moteMatrices[n + 12] = (selectedId === 'orchard' ? 6 + (i * .73 % 4.5) : -5 + (i * 1.73 % 10)) + Math.sin(seconds * .32 + i) * .18;
       moteMatrices[n + 13] = .5 + (i * .71 % (house.rooms.length === 3 ? 5 : 2.5)) + Math.sin(seconds * .48 + i * 2) * .17;
-      moteMatrices[n + 14] = -1.4 + (i * .83 % 4);
+      moteMatrices[n + 14] = selectedId === 'orchard' ? -3.8 + (i * .43 % 2.8) : -1.4 + (i * .83 % 4);
     }
     motes.thinInstanceBufferUpdated('matrix');
     smoke.setEnabled(Boolean(model.chimney) && !motion.matches);
@@ -166,10 +166,14 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   function fitCamera() {
     if (!model) return;
     const width = Math.max(1, container.clientWidth), height = Math.max(1, container.clientHeight);
-    const frame = houseFrame(selectedId === 'orchard' ? gardenBounds : model.framing, camera.getViewMatrix(true), width / height, .92);
-    const halfWidth = frame.height * width / height / 2;
-    camera.orthoLeft = frame.x - halfWidth; camera.orthoRight = frame.x + halfWidth;
-    camera.orthoTop = frame.y + frame.height / 2; camera.orthoBottom = frame.y - frame.height / 2;
+    const garden = selectedId === 'orchard', phone = width <= 700;
+    const left = garden && !phone ? 20 : 0, top = garden ? 90 : 0;
+    const usableWidth = Math.max(180, width - left - (garden && !phone ? width <= 1000 ? 285 : 335 : 0));
+    const usableHeight = Math.max(130, height - top - (garden ? phone ? Math.min(340, height * .47) : 240 : 0));
+    const frame = houseFrame(garden ? gardenBounds : model.framing, camera.getViewMatrix(true), usableWidth / usableHeight, garden ? .85 : .92);
+    const scale = frame.height / usableHeight;
+    camera.orthoLeft = frame.x - usableWidth * scale / 2 - left * scale; camera.orthoRight = camera.orthoLeft + width * scale;
+    camera.orthoTop = frame.y + frame.height / 2 + top * scale; camera.orthoBottom = camera.orthoTop - height * scale;
     camera.getProjectionMatrix(true); positionTags();
   }
   function positionTags() {
@@ -204,6 +208,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   tags.addEventListener('click', event => { const button = event.target.closest('button'); if (button) onSelect(button.dataset.room); });
   function update(next, selected, atmosphere = theme, appearance = avatar) {
     const previousSelection = selectedId, hadModel = Boolean(model);
+    canvas.setAttribute('aria-label', selected === 'orchard' ? 'Your miniature flower garden. Tap a pot to choose a plant, or use the garden spots below.' : 'Your miniature cottage. Choose a room or building site. Use the room navigation to choose with a keyboard.');
     roomMotion.stop();
     house = next; selectedId = selected; theme = atmosphere; avatar = appearance;
     sky.intensity = theme === 'dusk' ? .56 : .62; sun.intensity = theme === 'dusk' ? .8 : .95;
