@@ -26,7 +26,9 @@ export default {
     check('the pond tag opens the lake with its own scene', (await app.js(LAKE)).phase === 'idle' && await app.js(`document.body.classList.contains('is-lake')`));
     check('bait is grouped into its five ranges', await app.js(`[...document.querySelectorAll('[data-bait]')].map(b => b.dataset.bait + b.querySelector('b').textContent).join()`) === 'crumb×1,worm×1,cricket×2,firefly×1,star×1');
     check('the journal shows 3 of 15 found', await app.text('#lake-found') === '3/15');
-    await app.clickSel('[data-bait="crumb"]');
+    check('arrival leaves the bait selector and catch chances tucked away', !await app.visible('#lake-tackle') && !await app.visible('#lake-odds') && await app.text('#lake-status') === '');
+    await app.clickSel('#lake-bait-toggle'); await app.clickSel('[data-bait="crumb"]');
+    await app.clickSel('#lake-chances > summary');
     check('choosing bread crumb shows its odds with no rare fish', await app.attr('[data-bait="crumb"]', 'aria-checked') === 'true' && await app.js(`document.querySelectorAll('#lake-odds li:not(.is-off)').length`) === 2);
     await app.clickSel('[data-bait="star"]');
     const before = await app.js(POND);
@@ -77,6 +79,7 @@ export default {
     const empty = await t.open({ seed: 'pond-empty' });
     await empty.settle();
     await steps.openLake(empty);
+    await empty.clickSel('#lake-bait-toggle');
     check('with no bait the cast waits and says how to earn some', await empty.js(`document.querySelector('#lake-cast').disabled`) && /Finish a focus session/.test(await empty.text('.lake-empty')));
     await empty.close();
   },

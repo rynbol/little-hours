@@ -28,7 +28,7 @@ body .room-tools > .tool { min-height: 44px; }
 body #room-more .tool { flex-direction: row; justify-content: flex-start; min-height: 48px; padding: 10px 13px; gap: 13px; font-size: 13px; color: #65535b; }
 body #room-more .tool svg { color: #806572; }
 body #room-more .tool:hover { background: #ede3d7; color: #4b3b40; }
-body:not(.is-avatar-editing):not(.is-decorating) h1 { font-size: clamp(23px, 2.2vw, 30px); letter-spacing: -.6px; }
+body:not(.is-avatar-editing):not(.is-decorating) .room-heading h1 { font-size: clamp(23px, 2.2vw, 30px); letter-spacing: -.6px; }
 body:not(.is-avatar-editing):not(.is-decorating) .room-heading { min-height: 50px; }
 body:not(.is-avatar-editing):not(.is-decorating) #decorate-button { background: transparent; box-shadow: none; color: var(--chrome-muted); border-color: var(--chrome-line); }
 body .room-route { background: transparent; border-color: transparent; box-shadow: none; }
@@ -63,7 +63,7 @@ body .app-header button:hover, body .app-header button:focus-visible { color: va
   body:not(.is-avatar-editing):not(.is-decorating) .heading-actions .mode-button { width: 40px; min-height: 44px; padding: 10px; border: 0; background: transparent; }
   body:not(.is-avatar-editing):not(.is-decorating) .heading-actions .mode-button span { display: none; }
   body:not(.is-avatar-editing):not(.is-decorating) .heading-actions #reset-view { width: 32px; }
-  body:not(.is-avatar-editing):not(.is-decorating) h1 { font-size: 22px; }
+  body:not(.is-avatar-editing):not(.is-decorating) .room-heading h1 { font-size: 22px; }
   body .room-tools > .tool { flex-direction: row; gap: 7px; }
 }
 
