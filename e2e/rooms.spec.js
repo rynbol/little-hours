@@ -161,14 +161,28 @@ for (const route of ['card', 'arrow', 'house']) {
       if (await page.locator('#room-switcher-toggle').count()) await page.locator('#room-switcher-toggle').click();
       destination = page.locator('[data-house-go="garden"]');
     }
-    await page.clock.install();
-    await page.clock.pauseAt(new Date(Date.now() + 1000));
+    if (route === 'house') {
+      await page.evaluate(() => {
+        const observer = new MutationObserver(() => {
+          const animation = document.querySelector('.place-transition')?.getAnimations()[0];
+          if (animation) { animation.pause(); observer.disconnect(); }
+        });
+        observer.observe(document.body, { childList: true });
+      });
+    } else {
+      await page.clock.install();
+      await page.clock.pauseAt(new Date(Date.now() + 1000));
+    }
     await destination.press('Enter');
-    await expect(page.locator('body')).toHaveClass(/is-travelling/);
+    if (route === 'house') await expect(page.locator('html')).toHaveAttribute('data-place-transition', 'home');
+    else await expect(page.locator('body')).toHaveClass(/is-travelling/);
     await other.locator('#start-button').click();
     await expect(other.locator('body')).toHaveClass(/is-focusing/);
     await expect(page.locator('body')).toHaveClass(/is-focusing/);
-    await page.clock.runFor(300);
+    if (route === 'house') {
+      await page.locator('.place-transition').evaluate(node => node.getAnimations().forEach(animation => animation.play()));
+      await expect(page.locator('html')).not.toHaveAttribute('data-place-transition');
+    } else await page.clock.runFor(300);
     const actual = await page.evaluate(() => ({ save: JSON.parse(localStorage.getItem('little-hours-v1')), heading: document.querySelector('#room-title').textContent, body: document.body.className }));
     await testInfo.attach('arrival-state', { body: JSON.stringify(actual, null, 2), contentType: 'application/json' });
     await page.screenshot({ path: testInfo.outputPath(`${route}-focus-race.png`) });

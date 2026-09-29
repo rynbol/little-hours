@@ -48,6 +48,7 @@ export default {
     await app.clickSel('#rooms-button');
     await app.waitFor('window.__littleHours.house.diagnostics()?.open === 1', { timeout: 6000, what: 'the house to open' }).catch(() => {});
     check('leaving before the first build still builds the house later', (await app.house())?.open === 1, await app.house());
+    await app.waitFor(`window.__littleHours.screenPoint({ houseRoom: 'garden' })?.visible`, { timeout: 10000, what: 'the unbuilt garden wing to render' });
     const site = await app.point({ houseRoom: 'garden' });
     check('the unbuilt garden wing shows on screen', site?.visible, site);
     await t.close(app);
