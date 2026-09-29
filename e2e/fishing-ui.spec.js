@@ -54,3 +54,29 @@ test('an empty tackle box explains earning bait and remains free to leave', asyn
   await expect(page.locator('#lake-tackle')).toBeHidden();
   expect((await saved(page)).pond.bait).toHaveLength(0);
 });
+
+for (const width of [1440, 390]) {
+  test(`journal contains focus, restores its invoker and dismisses after an inside click at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 }); await openPond(page);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.locator('#lake-journal-button').click();
+    const journal = page.locator('#lake-journal');
+    await expect(journal).toBeVisible();
+    expect(await journal.evaluate(node => node.matches(':modal'))).toBe(true);
+    for (let i = 0; i < 5; i++) {
+      await page.keyboard.press('Tab');
+      expect(await journal.evaluate(node => node.contains(document.activeElement) || document.activeElement === document.body)).toBe(true);
+    }
+    await page.keyboard.press('Escape');
+    await expect(journal).toBeHidden();
+    await expect(page.locator('#lake-journal-button')).toBeFocused();
+    await page.locator('#lake-journal-button').click();
+    await page.locator('.lake-bait-guide > summary').click();
+    expect((await new AxeBuilder({ page }).include('#lake-journal').withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze()).violations).toEqual([]);
+    await page.screenshot({ path: `.lh/evidence/journal-motion-${width}.png` });
+    await page.mouse.click(3, 3);
+    await expect(journal).toBeHidden();
+    await expect(page.locator('#lake-journal-button')).toBeFocused();
+    await expect(page.locator('#lake-page')).toBeVisible();
+  });
+}

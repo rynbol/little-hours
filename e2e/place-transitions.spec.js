@@ -32,14 +32,14 @@ test('garden and pond entrances and exits fade, including the path home and stud
   await transition(page, () => page.locator('#garden-back').click(), 'island');
   await transition(page, () => page.locator('#house-open-garden').click(), 'garden');
   await transition(page, () => page.getByRole('button', { name: 'Back to island', exact: true }).click(), 'island');
-  await page.locator('#back-to-room').click();
+  await transition(page, () => page.locator('#back-to-room').click(), 'home');
   await expect(page.locator('#room-section')).toBeVisible();
   await transition(page, () => openGarden(page), 'garden');
   await page.locator('#garden-spot-0').click();
   await page.locator('#garden-plant-seed').click();
   await transition(page, () => page.locator('#garden-study').click(), 'home');
   await expect(page.locator('#start-button')).toBeFocused();
-  await page.locator('#rooms-button').click();
+  await transition(page, () => page.locator('#rooms-button').click(), 'island');
   await transition(page, () => page.locator('#house-canvas [data-room="pond"]').click(), 'pond');
   await expect(page.locator('#lake-page')).toBeVisible();
   await transition(page, () => page.locator('#lake-back').click(), 'island');

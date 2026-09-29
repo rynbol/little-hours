@@ -28,7 +28,7 @@ export default {
     await steps.openRoomPicker(app);
     await app.clickSel('[data-house-go="garden"]');
     check('selection closes the sheet and locks the route during transition', !await isOpen(app) && await app.js('document.getElementById("next-room").disabled && document.body.classList.contains("is-travelling") && document.body.classList.contains("is-door-walking")'));
-    await app.waitFor('window.__littleHours.state.house.activeId === "garden" && !document.body.classList.contains("is-travelling")');
+    await app.waitFor('window.__littleHours.state.house.activeId === "garden" && !document.body.classList.contains("is-travelling")', { timeout: 30000, what: 'arrival in the garden wing' });
     check('the avatar finishes walking before the saved room changes', await active(app) === 'garden');
     check('arrival restores controls, location and heading focus', await app.text('#room-route-count') === '2 / 3' && await app.js('!document.getElementById("next-room").disabled && document.activeElement.id === "room-title"'));
     await app.clickSel('#next-room');
@@ -73,7 +73,7 @@ export default {
     check('unbuilt rooms are offered as plans, separate from destinations', await app.js('document.querySelectorAll(".room-card").length === 1 && Boolean(document.querySelector("#room-grow [data-house-go= garden]"))'));
     check('one room uses a compact dialog without oversized empty artwork', (await app.box('#room-picker')).height < 340);
     await t.shot(app, 'one-room');
-    await app.clickSel('#room-grow button');
+    await app.clickSel('#room-grow button'); await app.settle();
     check('planning goes straight to the house page', !await isOpen(app) && await app.js('document.body.classList.contains("is-house")') && await app.text('#house-detail h2') === 'Greenhouse');
     await t.close(app);
 

@@ -10,7 +10,8 @@ export function travelTo(place, arrive, ready = () => true) {
   const veil = document.createElement('div');
   veil.className = 'place-transition'; veil.dataset.place = place; veil.setAttribute('aria-hidden', 'true');
   document.body.appendChild(veil); document.documentElement.dataset.placeTransition = place;
-  const trip = { animation: null, frame: 0, wake: null, arrived: false, cancel: finish };
+  const listeners = new AbortController();
+  const trip = { animation: null, frame: 0, wake: null, arrived: false, finished: false, cancel: finish };
   active = trip;
   function enter() {
     if (trip.arrived) return;
@@ -18,8 +19,10 @@ export function travelTo(place, arrive, ready = () => true) {
     try { arrive(); } finally { changing = false; }
   }
   function finish() {
+    if (trip.finished) return;
+    trip.finished = true; listeners.abort();
     trip.animation?.cancel(); cancelAnimationFrame(trip.frame); trip.wake?.();
-    veil.remove(); document.removeEventListener('visibilitychange', skip); motion.removeEventListener('change', skip);
+    veil.remove();
     if (active === trip) { active = null; delete document.documentElement.dataset.placeTransition; }
   }
   function skip() { if (document.hidden || motion.matches) { try { enter(); } finally { finish(); } } }
@@ -28,10 +31,14 @@ export function travelTo(place, arrive, ready = () => true) {
     trip.animation = veil.animate([{ opacity: from }, { opacity: to }], { duration, easing: 'ease-in-out', fill: 'forwards' });
     return trip.animation.finished;
   };
-  document.addEventListener('visibilitychange', skip); motion.addEventListener('change', skip);
+  const blockNavigation = event => {
+    if (!event.metaKey && !event.ctrlKey && !event.altKey && ['Tab', 'Enter', ' ', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) { event.preventDefault(); event.stopImmediatePropagation(); }
+  };
+  for (const type of ['keydown', 'keyup']) window.addEventListener(type, blockNavigation, { capture: true, signal: listeners.signal });
+  document.addEventListener('visibilitychange', skip, { signal: listeners.signal }); motion.addEventListener('change', skip, { signal: listeners.signal });
   async function run() {
     try {
-      await fade(0, 1, 180);
+      await fade(0, 1, 160);
       if (active !== trip) return;
       enter();
       const deadline = performance.now() + 6000;
@@ -39,9 +46,9 @@ export function travelTo(place, arrive, ready = () => true) {
       if (active !== trip) return;
       await frame();
       if (active !== trip) return;
-      await fade(1, 0, 420);
+      await fade(1, 0, 280);
     } catch (error) { if (error.name !== 'AbortError') console.error('Could not change places:', error); }
     finally { finish(); }
   }
-  run();
+  return run();
 }

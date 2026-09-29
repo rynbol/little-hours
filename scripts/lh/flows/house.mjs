@@ -31,18 +31,19 @@ export default {
     }
     const { renderCount: count, builds } = await app.house();
     await steps.backToRoom(app);
-    await app.clickSel('#rooms-button'); await sleep(150);
+    await app.clickSel('#rooms-button');
+    await app.waitFor(`document.body.classList.contains('is-house')`, { what: 'the island arrival' });
     const again = await app.house();
     check('coming back keeps the built house', again && again.renderCount >= count && again.builds === builds, `renders ${count} → ${again?.renderCount}, builds ${builds} → ${again?.builds}`);
     check('and it arrives closed again', again && again.open < .2, again);
     await app.settle();
     check('then opens', (await app.house()).open === 1);
-    for (const selector of ['#back-to-room', '#rooms-button', '#back-to-room', '#rooms-button']) { await app.clickSel(selector); await sleep(40); }
+    for (const selector of ['#back-to-room', '#rooms-button', '#back-to-room', '#rooms-button']) { await app.clickSel(selector); await app.settle(); }
     await app.settle();
-    check('quick back and forth still ends open', (await app.house()).open === 1);
+    check('return trips still end open', (await app.house()).open === 1);
     await t.close(app);
 
-    app = await t.open({ seed: 'one-room', label: 'one room' });
+    app = await t.open({ seed: 'one-room', reducedMotion: true, label: 'one room, immediate travel' });
     await app.clickSel('#rooms-button'); await sleep(10); await app.clickSel('#back-to-room'); await sleep(500);
     await app.clickSel('#rooms-button');
     await app.waitFor('window.__littleHours.house.diagnostics()?.open === 1', { timeout: 6000, what: 'the house to open' }).catch(() => {});

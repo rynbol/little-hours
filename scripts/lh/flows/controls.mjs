@@ -69,8 +69,8 @@ export default {
     await app.js(`document.querySelector('.skip-link').focus()`);
     await app.key('Enter');
     await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the skip link to leave the house page' });
-    check('the skip link leaves the house page and focuses the timer', await app.js(`document.activeElement?.id === 'start-button'`) && await app.visible('#focus-card'));
     await app.settle();
+    check('the skip link leaves the house page and focuses the timer', await app.js(`document.activeElement?.id === 'start-button'`) && await app.visible('#focus-card'));
 
     await steps.openDecorate(app);
     const start = await app.room();

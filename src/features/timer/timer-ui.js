@@ -307,7 +307,7 @@ export function createTimerUI(app) {
     const task = event.target.value;
     app.acceptUpdate(app.store.update(draft => { draft.task = task; }));
   });
-  $('#focus-toggle').addEventListener('click', () => {
+  $('#focus-toggle').addEventListener('click', async () => {
     if (app.panels.current === 'pet') { app.panels.close(); expand(); return; }
     if (app.panels.current) app.panels.close();
     // On a phone the timer lives below the room. A tap should take you there,
@@ -318,7 +318,7 @@ export function createTimerUI(app) {
       return;
     }
     if (app.nav.houseOpen || app.nav.connected) {
-      if (app.nav.houseOpen) app.nav.setHouseOpen(false);
+      if (app.nav.houseOpen) await app.nav.setHouseOpen(false);
       if (app.nav.connected) app.nav.setConnectedView(false);
       expand(); return;
     }
@@ -326,9 +326,9 @@ export function createTimerUI(app) {
     else { focusCollapsed = !focusCollapsed; syncDock(); }
     if (!focusCollapsed) revealDock();
   });
-  $('.skip-link').addEventListener('click', event => {
+  $('.skip-link').addEventListener('click', async event => {
     event.preventDefault();
-    if (app.nav.houseOpen) app.nav.setHouseOpen(false);
+    if (app.nav.houseOpen) await app.nav.setHouseOpen(false);
     if (app.nav.connected) app.nav.setConnectedView(false);
     if (app.decorate.active) app.decorate.setEditMode(false);
     if (app.panels.current) app.panels.close();

@@ -1,4 +1,4 @@
 .place-transition { position: fixed; inset: 0; z-index: 10000; overflow: hidden; opacity: 0; pointer-events: auto; background: radial-gradient(ellipse at 30% 30%, #f3eddb, transparent 70%), linear-gradient(145deg, #bacfb8, #d6dabe 60%, #e7d8bf); }
 .place-transition[data-place='pond'] { background: radial-gradient(ellipse at 35% 25%, #ecf1dc, transparent 70%), linear-gradient(145deg, #afc7c0, #cbdac6 60%, #dddac0); }
-.place-transition[data-place='home'] { background: radial-gradient(ellipse at 35% 25%, #eaddc8, transparent 70%), linear-gradient(145deg, #bab9a7, #d4c6b3 60%, #dccab6); }
+.place-transition[data-place='home'], .place-transition[data-place='island'] { background: radial-gradient(ellipse at 18% 28%, var(--world-glow), transparent 55%), linear-gradient(170deg, var(--world-top), var(--world-bottom)); }
 @media (prefers-reduced-motion: reduce) { .place-transition { display: none; } }

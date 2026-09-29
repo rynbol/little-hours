@@ -36,8 +36,7 @@ export default {
     await app.waitFor(`document.querySelector('#house-detail h2')?.textContent === 'Garden wing'`, { what: 'the garden wing details' });
     check('picking the garden wing offers entry', (await app.text('#enter-house-room'))?.startsWith('Enter room'), await app.text('#enter-house-room'));
     await app.clickSel('#enter-house-room');
-    const overlay = await app.js(`({ travelling: document.body.classList.contains('is-travelling'), shown: !document.getElementById('room-travel').hidden, label: document.getElementById('travel-label').textContent, house: document.body.classList.contains('is-house') })`);
-    check('Come on in leaves the house page and shows the travel card', overlay.travelling && overlay.shown && overlay.label === 'On to Garden wing' && !overlay.house, overlay);
+    check('room entry fades through the shared travel layer', await app.js(`document.documentElement.dataset.placeTransition === 'home' && Boolean(document.querySelector('.place-transition'))`));
     await app.settle();
     check('the travel card goes away on arrival', !await travelling(app) && await app.js(`document.getElementById('room-travel').hidden`));
     check('the garden wing is now the active room', await active(app) === 'garden' && await app.text('#room-title') === 'Garden wing', `${await active(app)} ${await app.text('#room-title')}`);

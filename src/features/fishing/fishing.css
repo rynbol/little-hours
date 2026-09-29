@@ -80,9 +80,9 @@ body.is-lake { overflow: hidden; }
 @keyframes lake-strain { to { transform: translateX(2px); } }
 @media (prefers-reduced-motion: reduce) { .lake-tension.is-red { animation: none; outline: 2px solid #d9604f; } }
 
-.lake-card { position: absolute; right: max(24px, 6vw); top: 50%; transform: translateY(-50%); width: min(360px, calc(100% - 32px)); }
-.lake-card-inner { position: relative; overflow: hidden; padding: 22px 22px 20px; border-radius: 26px; color: var(--ui-ink, #4b3b40); background: linear-gradient(180deg, #fffaf1, #f4e9d9); border: 1px solid #fff9ed; box-shadow: 0 16px 50px #1c112938; opacity: 0; transform: translateY(18px) scale(.96); transition: opacity .35s ease, transform .45s cubic-bezier(.2, 1.3, .4, 1); }
-.lake-card.is-shown .lake-card-inner { opacity: 1; transform: none; }
+.lake-card { position: fixed; left: auto; bottom: auto; margin: 0; padding: 0; border: 0; border-radius: 26px; max-height: calc(100svh - 32px); overflow: auto; background: transparent; right: max(24px, 6vw); top: 50%; transform: translateY(-50%); width: min(360px, calc(100% - 32px)); }
+.lake-card-inner { position: relative; overflow: hidden; padding: 22px 22px 20px; border-radius: 26px; color: var(--ui-ink, #4b3b40); background: linear-gradient(180deg, #fffaf1, #f4e9d9); border: 1px solid #fff9ed; box-shadow: 0 16px 50px #1c112938; }
+.lake-card::backdrop { background: #21192718; }
 .lake-card-eyebrow { position: relative; margin: 0; text-align: center; font-size: 12px; font-weight: 500; color: #6a5960; }
 .lake-card-art { position: relative; height: 150px; display: grid; place-items: center; }
 .lake-card-art .fish-art { width: 250px; filter: drop-shadow(0 12px 14px rgba(60, 40, 30, .22)); animation: lake-swim 3.2s ease-in-out infinite; }
@@ -98,8 +98,8 @@ body.is-lake { overflow: hidden; }
 .lake-secondary { border: 1px solid #dfd1c5; color: #4b3b40 !important; background: #fff; }
 .lake-primary:hover, .lake-secondary:hover { transform: translateY(-1px); }
 
-.lake-journal { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px 16px; background: rgba(18, 12, 30, .5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: lake-fade .25s ease both; }
-.lake-journal-inner { width: min(900px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; box-sizing: border-box; padding: 26px 28px 30px; border-radius: 28px; color: #4b3b40; background: #faf4e9; box-shadow: 0 30px 90px rgba(10, 5, 20, .5); animation: lake-rise .35s cubic-bezier(.2, 1.2, .4, 1) both; }
+.lake-journal { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; display: grid; place-items: center; padding: 24px 16px; background: transparent; }
+.lake-journal-inner { width: min(900px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; box-sizing: border-box; padding: 26px 28px 30px; border-radius: 28px; color: #4b3b40; background: #faf4e9; box-shadow: 0 30px 90px rgba(10, 5, 20, .5); }
 .lake-journal header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
 .lake-journal-eyebrow { margin: 0; font-size: 11.5px; letter-spacing: .2em; font-weight: 700; color: #a65766; }
 .lake-journal h2 { margin: 4px 0 6px; font-size: 30px; color: #4b3b40; }
@@ -110,20 +110,20 @@ body.is-lake { overflow: hidden; }
 .lake-ranges li { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 8px; padding: 10px; border-radius: 16px; background: #fff; border: 1px solid #eadfce; }
 .lake-ranges svg { width: 28px; height: 28px; grid-row: span 2; }
 .lake-ranges strong { display: block; font-size: 13px; }
-.lake-ranges small { display: block; font-size: 11.5px; color: #9a8684; }
+.lake-ranges small { display: block; font-size: 11.5px; color: #6a5960; }
 .lake-mini-odds { grid-column: 1 / -1; display: flex; gap: 2px; height: 6px; border-radius: 9px; overflow: hidden; }
 .lake-mini-odds i { flex: var(--w) 0 0; background: var(--c); }
 .lake-journal section { margin-top: 20px; }
 .lake-journal h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: #4b3b40; }
 .lake-journal h3 i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 25%, transparent); }
-.lake-journal h3 small { margin-left: auto; font-size: 12px; letter-spacing: 0; color: #9a8684; font-variant-numeric: tabular-nums; }
+.lake-journal h3 small { margin-left: auto; font-size: 12px; letter-spacing: 0; color: #6a5960; font-variant-numeric: tabular-nums; }
 .lake-journal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .lake-entry { padding: 12px 12px 14px; border-radius: 18px; background: #fff; border: 1px solid #eadfce; text-align: center; transition: transform .2s ease, box-shadow .2s ease; }
 .lake-entry:not(.is-missing):hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(75, 59, 64, .12); }
 .lake-entry-art { height: 82px; display: grid; place-items: center; border-radius: 12px; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 16%, #fff), #fff); }
 .lake-entry .fish-art { width: 128px; }
 .lake-entry strong { display: block; margin-top: 8px; font-size: 14px; }
-.lake-entry small { display: block; margin-top: 2px; font-size: 12px; color: #9a8684; font-variant-numeric: tabular-nums; }
+.lake-entry small { display: block; margin-top: 2px; font-size: 12px; color: #6a5960; font-variant-numeric: tabular-nums; }
 .lake-entry.is-missing { background: #f5ede1; border-style: dashed; }
 .lake-entry.is-missing .lake-entry-art { background: none; color: #d8cbb9; }
 .lake-entry.is-new { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 60%, transparent); animation: lake-pop .5s cubic-bezier(.3, 1.6, .5, 1) both; }
@@ -153,3 +153,6 @@ body.is-lake { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .lake *, .lake *::before, .lake *::after { animation: none !important; transition: none !important; }
 }
+
+.lake-journal:not([open]), .lake-card:not([open]) { display: none; }
+.lake-journal::backdrop { background: #120c1e80; backdrop-filter: blur(6px); }

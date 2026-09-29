@@ -29,8 +29,9 @@ export function createHouseNavigation(app) {
 
   function setHouseOpen(open, selectedId, plantId) {
     if (travelling) return;
-    const garden = selectedId === 'orchard' || /^plot-[0-5]$/.test(selectedId);
-    if ((open && garden) || (!open && document.body.classList.contains('is-garden'))) return travelTo(open ? 'garden' : 'home', () => showHouse(open, selectedId, plantId), () => !open || Boolean(app.houseUI.diagnostics()?.scene.isReady()));
+    const currentGarden = document.body.classList.contains('is-garden');
+    const garden = selectedId ? selectedId === 'orchard' || /^plot-[0-5]$/.test(selectedId) : open && houseOpen && currentGarden;
+    if (open !== houseOpen || open && garden !== currentGarden) return travelTo(open ? garden ? 'garden' : 'island' : 'home', () => showHouse(open, selectedId, plantId), () => Boolean((open ? app.houseUI : app.room)?.diagnostics()?.scene.isReady()));
     showHouse(open, selectedId, plantId);
   }
   function showHouse(open, selectedId, plantId) {
@@ -148,7 +149,6 @@ export function createHouseNavigation(app) {
     const entry = app.state.house.rooms.find(room => room.id === id);
     if (!entry) { setHouseOpen(true, id); return; }
     if (!fromDoor) setConnectedView(false);
-    if (houseOpen) setHouseOpen(false);
     if (app.decorate.active) app.decorate.setEditMode(false);
     const originId = app.state.house.activeId;
     const arrive = () => {
@@ -168,6 +168,7 @@ export function createHouseNavigation(app) {
       $('#stage').classList.remove('room-arrival'); void $('#stage').offsetWidth; $('#stage').classList.add('room-arrival');
       clearTimeout(arrivalTimer); arrivalTimer = setTimeout(() => $('#stage').classList.remove('room-arrival'), 650);
     };
+    if (houseOpen) return travelTo('home', () => { showHouse(false); arrive(); }, () => Boolean(app.room?.diagnostics().scene.isReady()));
     if (id === app.state.house.activeId || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { arrive(); return; }
     const direction = app.state.house.rooms.findIndex(room => room.id === id) < app.state.house.rooms.findIndex(room => room.id === app.state.house.activeId) ? -1 : 1;
     $('#stage').style.setProperty('--room-travel-direction', direction);
@@ -184,7 +185,8 @@ export function createHouseNavigation(app) {
     const entry = app.state.house.rooms.find(room => room.id === id);
     // A door to a room not built yet: walk over, peek through, then plan it.
     const link = entry || houseConnections(app.state.house).find(slot => slot.id === id);
-    if (!entry && (!link || window.matchMedia('(prefers-reduced-motion: reduce)').matches)) { setHouseOpen(true, id); return; }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { if (entry) visitRoom(id, false); else setHouseOpen(true, id); return; }
+    if (!entry && !link) { setHouseOpen(true, id); return; }
     const planRoom = () => { cancelDoorTravel(); setHouseOpen(true, id); };
     closePicker(false);
     doorWalking = true; travelling = true; syncTravelControls();
