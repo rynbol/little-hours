@@ -97,17 +97,16 @@ test('an open care card shows completed focus while a control has focus', async 
   await page.locator('#pet-button').click();
   await expect(page.locator('#close-panel')).toBeFocused();
   await page.clock.fastForward('25:01');
-  await expect(page.locator('.pet-bond-heading')).toContainText('25 min together');
-  await expect(page.locator('.pet-bond-heading')).toContainText('5');
+  const bond = page.getByRole('meter', { name: 'Bond with Miso' });
+  await expect(bond).toHaveAttribute('aria-valuetext', '1 of 15 hearts');
+  await expect(bond.locator('i').nth(1)).toHaveAttribute('style', '--fill:0.25');
   await page.locator('#session-celebration .start-button').click();
   await page.locator('[data-pet-ritual="cuddle"]').click();
   await page.clock.fastForward('00:12');
   await page.locator('[data-pet-ritual="play"]').click();
-  const bond = page.getByRole('progressbar', { name: 'Bond with Miso' });
-  await expect(bond).toHaveAttribute('aria-valuemin', '8');
-  await expect(bond).toHaveAttribute('aria-valuemax', '24');
-  await expect(bond).toHaveAttribute('aria-valuenow', '8');
-  await expect(bond.locator('i')).toHaveAttribute('style', 'width:0%');
+  await expect(bond).toHaveAttribute('aria-valuetext', '2 of 15 hearts');
+  await expect(bond.locator('i').nth(1)).toHaveAttribute('style', '--fill:1');
+  await expect(bond.locator('i').nth(2)).toHaveAttribute('style', '--fill:0');
 });
 
 test('pet name drafts survive a selection change in another tab without renaming that pet', async ({ page, context }) => {

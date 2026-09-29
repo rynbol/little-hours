@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freshState, restoreState, createStateStore, storageKey } from './state.js';
 import { createSession } from './session.js';
-import { bondLevel, normalizePetBonds, focusPetId } from './pet-bonds.js';
+import { bondHearts, bondLevel, normalizePetBonds, focusPetId, MAX_HEARTS } from './pet-bonds.js';
 import { createBackup, readBackup } from '../features/backup/backup.js';
 
 function fixture(state = freshState()) {
@@ -123,4 +123,9 @@ test('the next focus preview and command choose the same pet after completion', 
   assert.equal(focusPetId(f.store.state), 'dog');
   f.store.setRunning(true);
   assert.equal(f.store.state.session.petId, 'dog');
+});
+
+test('the bond shows as fifteen hearts, four points each, with the friendship steps on whole hearts', () => {
+  assert.equal(MAX_HEARTS, 15);
+  assert.deepEqual([0, 5, 8, 24, 60, 200].map(affection => bondHearts({ affection })), [0, 1.25, 2, 6, 15, 15]);
 });
