@@ -7,7 +7,7 @@ import { pathDistance } from './house-paths.js';
 export const GARDEN_CENTER = [8.9, 0, 0];
 export const GARDEN_TAG = [8.2, -.15, -2.2];
 const GROUND = -.175, bark = '#7a5a42', soil = '#8a6a4f';
-const bloom = ['#eac0b9', '#f5e4bd', '#c8b7d7', '#e6a3a0'];
+const bloom = ['#efadac', '#f7df9d', '#b8a1df', '#e78f98'];
 const lampGlow = theme => theme === 'dusk' ? ['#ffd88f', 2.1] : theme === 'rain' ? ['#e9d6a8', 1.35] : ['#f3e2bd', 1];
 const hash = n => { const s = Math.sin(n * 57.3 + 9.1) * 43758.5453; return s - Math.floor(s); };
 export const ARBOUR = [6.35, 3.2], BENCH = [7.55, 1.05], NEST = [11.55, -2.35];

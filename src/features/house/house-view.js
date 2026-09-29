@@ -25,6 +25,7 @@ import { createHousePostcard } from './house-postcard.js';
 import { houseFrame } from './house-framing.js';
 import { createHouseMotion } from './house-motion.js';
 import { createIslandWater } from './house-water.js';
+import { ISLAND_ATMOSPHERES, islandSkyArt } from './island-atmosphere.js';
 import { nextExpansion, roomDisplayName } from '../../core/house.js';
 import './whole-house.css';
 
@@ -38,6 +39,8 @@ const PIN_ICONS = {
 };
 
 export function createHouseView(container, { house, selectedId, theme, avatar, onSelect, focused = false }) {
+  const backdrop = document.createElement('div'); backdrop.className = 'island-sky'; backdrop.setAttribute('aria-hidden', 'true');
+  if (container.id === 'house-canvas') container.appendChild(backdrop);
   const canvas = document.createElement('canvas');
   canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', 'Your miniature cottage. Choose a room or building site. Use the room navigation to choose with a keyboard.');
   container.appendChild(canvas);
@@ -169,6 +172,8 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   function resize() {
     if (disposed || suspended) return;
     engine.resize();
+    backdrop.hidden = selectedId === 'orchard';
+    if (backdrop.isConnected && !backdrop.hidden) backdrop.innerHTML = islandSkyArt(theme, Math.max(1, container.clientWidth), Math.max(1, container.clientHeight));
     if (model) { roomMotion.restore(); present(); }
   }
   function fitCamera() {
@@ -224,8 +229,10 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     house = next; selectedId = selected; theme = atmosphere; avatar = appearance;
     water.mesh.setEnabled(selectedId !== 'orchard');
     gardenRing.setEnabled(selectedId === 'orchard' && gardenPlot !== null); if (gardenPlot !== null) gardenRing.position.set(RETREAT_SPOTS[gardenPlot][0], .18, RETREAT_SPOTS[gardenPlot][1]);
-    sky.intensity = theme === 'dusk' ? .56 : .62; sun.intensity = theme === 'dusk' ? .8 : .95;
-    sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9'); water.setTheme(theme);
+    const island = container.id === 'house-canvas' && selectedId !== 'orchard', light = ISLAND_ATMOSPHERES[theme];
+    sky.intensity = island ? light.fill : theme === 'dusk' ? .56 : .62; sun.intensity = island ? light.key : theme === 'dusk' ? .8 : .95;
+    sky.diffuse = Color3.FromHexString(island ? light.sky : '#ffffff'); sky.groundColor = Color3.FromHexString(island ? light.ground : '#a0a7a4');
+    sun.diffuse = Color3.FromHexString(island ? light.sun : theme === 'dusk' ? '#ead2ab' : '#fff3d9'); water.setTheme(theme);
     const previous = model;
     builds++;
     model = createHouseModel(scene, house, selectedId, theme, avatar, previous);
@@ -326,7 +333,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       // Copy immediately after rendering: WebGL's default buffer need not be
       // preserved between frames (which would cost memory on every visit).
       engine.beginFrame(); scene.render(); engine.endFrame();
-      return createHousePostcard(canvas, name, caption, theme);
+      return createHousePostcard(canvas, name, caption, theme, selectedId !== 'orchard');
     },
     setClosed,
     // Keep the house built while its page is away; it arrives closed again.
@@ -340,6 +347,6 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     },
     setFocused(value) { if (focused === Boolean(value)) return; focused = Boolean(value); requestRender(); },
     diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, turning: Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001, trees: model.trees, plots: selectedId === 'orchard' ? RETREAT_SPOTS : PLANT_SPOTS, stroll: focused && selectedId !== 'orchard' ? null : stroll?.pose, strollPet: focused && selectedId !== 'orchard' ? null : stroll?.pet, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
-    dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); stroll?.dispose(); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); controls.remove(); tags.remove(); note.remove(); },
+    dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); stroll?.dispose(); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); backdrop.remove(); controls.remove(); tags.remove(); note.remove(); },
   };
 }

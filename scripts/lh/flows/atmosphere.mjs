@@ -31,7 +31,26 @@ export default {
       t.check(`${width}px island has room to breathe and no page overflow`, !layout.overflow && layout.available / layout.workspace > .98 && layout.width / layout.available > (width < 1200 ? .92 : .7) && layout.detailHidden, layout);
       await t.steps.houseRooms(view); await view.clickSel('#house-slot-loft');
       t.check(`${width}px room selection remains available`, await view.text('#house-detail h2') === 'Upstairs hideaway');
-      await t.shot(view, `island-${width}`); await t.close(view);
+      await view.clickSel('#close-house-detail');
+      t.check(`${width}px daylight has a sun and no moon`, await view.js(`Boolean(document.querySelector('.island-sky [data-celestial="sun"]')) && !document.querySelector('.island-sky [data-celestial="moon"]')`));
+      await t.shot(view, `island-day-${width}`);
+      await view.clickSel('#time-toggle'); await view.settle();
+      const moon = await view.js(`(() => { const sky = document.querySelector('.island-sky'), moon = sky.querySelector('[data-celestial="moon"] path'), box = moon?.getBoundingClientRect(); return { present: Boolean(moon), width: box?.width, left: box?.left, right: box?.right, viewport: innerWidth, pointer: getComputedStyle(sky).pointerEvents, gradient: getComputedStyle(document.body).backgroundImage, count: document.querySelectorAll('.island-sky').length }; })()`);
+      t.check(`${width}px night has one non-interactive sky with a legible crescent`, moon.present && moon.width > 36 && moon.left > 0 && moon.right < moon.viewport && moon.pointer === 'none' && moon.count === 1 && moon.gradient.includes('37, 43, 80'), moon);
+      await t.shot(view, `island-night-${width}`);
+      await view.clickSel('#house-open-garden'); await view.settle();
+      t.check(`${width}px the garden retains its own atmosphere`, await view.js(`document.querySelector('.island-sky').hidden && getComputedStyle(document.querySelector('.house-world')).backgroundImage.includes('189, 205, 182')`));
+      await view.clickSel('#garden-back'); await view.settle();
+      t.check(`${width}px moon returns when leaving the garden`, await view.visible('.island-sky [data-celestial="moon"]'));
+      await t.steps.backToRoom(view);
+      t.check(`${width}px returning home restores the room sky`, (await backdrop(view)).sky === dusk.sky);
+      if (width === 390) {
+        await view.clickSel('[data-panel="atmosphere"]'); await view.clickSel('[data-theme-choice="rain"]'); await view.key('Escape');
+        await t.steps.openHouse(view);
+        t.check('rain obscures the moon and uses its own island sky', await view.js(`!document.querySelector('.island-sky [data-celestial]') && getComputedStyle(document.body).backgroundImage.includes('52, 78, 104')`));
+        await t.shot(view, 'island-rain-390');
+      }
+      await t.close(view);
     }
   },
 };

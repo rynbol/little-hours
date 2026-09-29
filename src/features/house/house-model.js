@@ -119,7 +119,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     if (x > -3.1 && x < -1.9) continue;
     const y = -.1 + (i % 3) * .035;
     box(x, y, z, .025, .2, .025, '#6e855e');
-    ball(x, y + .13, z, .16, .09, .16, ['#eac0b9', '#f5e4bd', '#c8b7d7'][i % 3]);
+    ball(x, y + .13, z, .16, .09, .16, ['#efadac', '#f7df9d', '#b8a1df'][i % 3]);
     ball(x + .065, y + .02, z, .14, .05, .075, '#839d6f');
   }
   // A low garden bench and two terracotta pots by the front path.

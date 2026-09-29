@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { seedState } from '../scripts/lh/seeds.mjs';
+import { restoreState } from '../src/core/state.js';
 
 const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-v1')));
 async function arrive(page, seed = 'three-rooms') {
@@ -92,4 +93,35 @@ test('room planning keeps previews free and builds the named design once', async
   await expect(page.locator('#room-title')).toHaveText('A room for us');
   await expect(page.locator('#room-title')).toBeFocused();
   expect((await saved(page)).house.coins).toBe(before.coins - 25);
+});
+
+test('island postcards preserve the rendered house and include only the chosen sky', async ({ page }) => {
+  await arrive(page);
+  const before = restoreState(await saved(page)).house;
+  for (const night of [true, false]) {
+    if (!night) await page.locator('#time-toggle').click();
+    await expect(page.locator('.island-sky [data-celestial="moon"]')).toHaveCount(night ? 1 : 0);
+    await page.locator('#house-postcard').click();
+    await expect(page.locator('#house-postcard-dialog')).toBeVisible();
+    const pixels = await page.locator('#house-postcard-dialog img').evaluate(async image => {
+      await image.decode();
+      const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let moon = 0, house = 0;
+      for (let y = 220; y < 330; y++) for (let x = 190; x < 295; x++) { const p = (y * canvas.width + x) * 4; if (data[p] > 245 && data[p + 1] > 230 && data[p + 2] < 220) moon++; }
+      for (let y = 330; y < 800; y++) for (let x = 380; x < 1200; x++) { const p = (y * canvas.width + x) * 4; if (data[p] > data[p + 2] * 1.15 && data[p + 1] > data[p + 2] * 1.08 && data[p] < 200) house++; }
+      return { moon, house, width: canvas.width, height: canvas.height };
+    });
+    expect(pixels).toMatchObject({ width: 1600, height: 1200 });
+    expect(pixels.house).toBeGreaterThan(2000);
+    if (night) expect(pixels.moon).toBeGreaterThan(1200);
+    else expect(pixels.moon).toBeLessThan(100);
+    await page.locator('#house-postcard-dialog').screenshot({ path: `.lh/evidence/island-postcard-${night ? 'night' : 'day'}.png` });
+    const download = page.waitForEvent('download'); await page.locator('#download-postcard').click();
+    expect((await download).suggestedFilename()).toBe('little-hours-postcard.png');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#house-postcard')).toBeFocused();
+  }
+  expect(restoreState(await saved(page)).house).toEqual(before);
 });

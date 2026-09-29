@@ -10,8 +10,8 @@ export const STREAMS = Object.freeze([
 ]);
 const TOP = -.175, SEGMENTS = 72, RINGS = 7;
 const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
-const lawn = ['#a4bd8a', '#aec695', '#95af82', '#bad09d'];
-const rim = '#91aa7c', lip = '#7d986e';
+const lawn = ['#91ba76', '#a4c780', '#7da66c', '#b5ce8b'];
+const rim = '#82a96b', lip = '#6e945f';
 
 export function edgePoint(a, scale = 1) {
   const { cx, cz, rx, rz, power } = ISLAND, c = Math.cos(a), s = Math.sin(a);
