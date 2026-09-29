@@ -20,6 +20,7 @@ import { createHouseUI, createHouseNavigation } from './features/house/index.js'
 import { createAvatarPanel } from './features/avatar/index.js';
 import './features/avatar/wardrobe.css';
 import './features/pet/pet.css';
+import './ui/atmosphere.css';
 import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
