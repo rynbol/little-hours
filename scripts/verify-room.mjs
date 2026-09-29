@@ -35,6 +35,8 @@ class Canvas extends Surface {
 }
 doc.createElement = () => new Canvas();
 const frames = new Map(); let frameId = 0, time = 0, observer;
+const originalRandom = Math.random;
+Math.random = () => .5;
 // RAF and animation start times use the same deterministic clock.
 const originalClockDescriptor = Object.getOwnPropertyDescriptor(performance, 'now');
 Object.defineProperty(performance, 'now', { configurable: true, value: () => time });
@@ -1418,4 +1420,4 @@ try {
   }
   console.log('Babylon room checks passed. GPU appearance and native gestures require browser checks.');
 } catch (error) { room.dispose(); throw error; }
-finally { if (originalClockDescriptor) Object.defineProperty(performance, 'now', originalClockDescriptor); else delete performance.now; }
+finally { Math.random = originalRandom; if (originalClockDescriptor) Object.defineProperty(performance, 'now', originalClockDescriptor); else delete performance.now; }
