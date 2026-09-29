@@ -240,7 +240,7 @@ export function createFishingUI(app, { onClose } = {}) {
     if (!root.hidden) return;
     returnFocus = document.activeElement;
     phase = 'idle'; caught = null; chosen = null;
-    root.hidden = false; document.body.classList.add('is-lake');
+    root.hidden = false; document.body.classList.add('is-lake'); document.getElementById('app').inert = true;
     building = requestAnimationFrame(() => { building = setTimeout(() => { building = 0; if (!root.hidden) scene = createLakeScene(root.querySelector('.lake-stage'), { theme: app.state.theme, avatar: app.state.avatar, pet: app.state.pet, reducedMotion: reduced() }); }); });
     root.dataset.theme = app.state.theme;
     status(''); $('#lake-chances').open = false; renderTray();
@@ -258,7 +258,7 @@ export function createFishingUI(app, { onClose } = {}) {
     cancelAnimationFrame(building); clearTimeout(building); building = 0;
     clearTimers(); cancelAnimationFrame(loop); letGo(); fight = null; hooked = null; document.removeEventListener('keydown', onKey, true); document.removeEventListener('keyup', onKeyUp, true);
     scene?.dispose(); scene = null; phase = 'idle';
-    root.hidden = true; document.body.classList.remove('is-lake');
+    root.hidden = true; document.body.classList.remove('is-lake'); document.getElementById('app').inert = false;
     onClose?.(); returnFocus?.focus?.({ preventScroll: true });
   }
   return {

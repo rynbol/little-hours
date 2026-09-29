@@ -80,3 +80,16 @@ for (const width of [1440, 390]) {
     await expect(page.locator('#lake-page')).toBeVisible();
   });
 }
+
+test('the pond keeps keyboard navigation off the covered island and restores it on exit', async ({ page }) => {
+  await openPond(page);
+  for (let i = 0; i < 10; i++) {
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => document.activeElement === document.body || document.querySelector('#lake-page').contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#lake-page')).toBeHidden();
+  await page.locator('#back-to-room').focus(); await page.keyboard.press('Enter');
+  await expect(page.locator('#room-section')).toBeVisible();
+  await expect(page.locator('#start-button')).toBeEnabled();
+});
