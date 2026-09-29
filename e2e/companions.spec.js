@@ -82,7 +82,8 @@ test('completion awards the pet that began focusing and the room stays usable', 
   expect(accessibility.violations).toEqual([]);
   expect(await page.locator('#session-celebration').evaluate(el => el.matches(':modal'))).toBe(false);
   await page.locator('#session-celebration .start-button').click();
-  await expect(page.locator('#focus-reward')).toContainText('+5 ♡ · Mochi');
+  await expect(page.locator('#focus-reward .focus-hearts b')).toHaveText('+5 ♡');
+  await expect(page.locator('#focus-reward .focus-hearts > span')).toHaveText('Mochi');
   const state = await saved(page);
   expect(state.petBonds.cat.minutes).toBe(25); expect(state.petBonds.dog.minutes).toBe(0);
   await page.reload();

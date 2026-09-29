@@ -27,7 +27,6 @@ export function createGardenUI(root, { store, acceptUpdate, onFocus, onBack, onP
     const collection = $('#garden-collection-dialog');
     $('#garden-collection-open').addEventListener('click', () => { collection.returnValue = ''; collection.showModal(); });
     $('#garden-collection-close').addEventListener('click', () => collection.close());
-    collection.addEventListener('close', () => { if (collection.isConnected && collection.returnValue !== 'selected') $('#garden-collection-open')?.focus({ preventScroll: true }); });
     collection.addEventListener('keydown', event => { if (event.key === 'Escape') event.stopPropagation(); });
   }
   function render() {

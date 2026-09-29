@@ -44,6 +44,7 @@ test('entry closes pet care and a room pet tap leaves focus mode before reopenin
   expect(await page.evaluate(() => window.__littleHours.counts().engines)).toBe(1);
   expect(await page.evaluate(() => window.__littleHours.petCloseup)).toBeNull();
   await page.locator('#focus-mode-enter').click(); await expect(focusing(page)).toHaveCount(1);
+  await page.evaluate(() => window.__littleHours.settled());
   await expect.poll(() => page.evaluate(() => Boolean(window.__littleHours.screenPoint('pet')?.visible))).toBe(true);
   const point = await page.evaluate(() => window.__littleHours.screenPoint('pet'));
   await page.mouse.click(point.x, point.y);

@@ -72,6 +72,8 @@ for (const width of [1440, 390]) {
     await expect(page.locator('#lake-journal-button')).toBeFocused();
     await page.locator('#lake-journal-button').click();
     await page.locator('.lake-bait-guide > summary').click();
+    await expect(journal).toHaveCSS('opacity', '1');
+    await page.waitForFunction(() => !document.querySelector('#lake-journal').getAnimations({ subtree: true }).some(animation => animation.playState === 'running' && Number.isFinite(animation.effect?.getComputedTiming().endTime)));
     expect((await new AxeBuilder({ page }).include('#lake-journal').withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze()).violations).toEqual([]);
     await page.screenshot({ path: `.lh/evidence/journal-motion-${width}.png` });
     await page.mouse.click(3, 3);
