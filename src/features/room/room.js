@@ -1503,7 +1503,7 @@ export function createRoom(container, options = {}) {
     else {
       const head = companionRoutine.pose.atDesk ? placedObjects.get(layout.activeDeskId)?.metadata.avatarHead : mobileCompanion.head;
       if (!head?.isEnabled()) return null;
-      anchorPoint.copyFrom(head.getAbsolutePosition()); anchorPoint.y += avatarCameraEditing ? 0.28 : 0.5;
+      anchorPoint.copyFrom(head.getAbsolutePosition()); anchorPoint.y += who === 'buddy' ? 0.16 : avatarCameraEditing ? 0.28 : 0.5;
     }
     const width = engine.getRenderWidth(), height = engine.getRenderHeight();
     camera.viewport.toGlobalToRef(width, height, anchorViewport);

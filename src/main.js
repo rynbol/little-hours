@@ -122,7 +122,7 @@ try {
     pet: app.state.pet,
     onPet: app.pet.feedback,
     onPetCarry: app.pet.onPetCarry,
-    onFrame() { app.speech?.update(); app.delights?.update(); },
+    onFrame() { app.speech?.update(); app.delights?.update(); app.buddy?.follow(); },
     onDoorProgress: app.nav.onDoorProgress,
     onCompanionState: app.companion.onCompanionState,
     ...app.decorate.roomEvents,

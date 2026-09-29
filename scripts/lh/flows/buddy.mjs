@@ -1,14 +1,17 @@
 const MODE = `document.querySelector('.buddy')?.dataset.mode ?? null`;
 const BUBBLE = `(() => { const b = document.querySelector('#buddy-bubble'); return b && !b.hidden ? b.textContent.trim() : null; })()`;
+const NEAR = `(() => { const room = window.__littleHours.room; const head = room?.anchor('buddy'); const box = document.querySelector('#buddy-button').getBoundingClientRect(), canvas = document.querySelector('#room-canvas').getBoundingClientRect(); return head && { dx: Math.round(box.left + box.width / 2 - canvas.left - head.x), dy: Math.round(box.top + box.height / 2 - canvas.top - head.y) }; })()`;
 const SAVED = `JSON.parse(localStorage.getItem('little-hours-v1')).buddy`;
 
 export default {
-  about: 'the buddy: Pip sits on the timer card, hops and talks when poked, heads out exploring while a session runs, comes back holding a find, the find card and the collection show it, and a new name and colour survive a reload',
+  about: 'the buddy: Pip floats beside the avatar and follows it, hops and talks when poked, heads out exploring while a session runs, comes back holding a find, the find card and the collection show it, and a new name and colour survive a reload',
   async run(t) {
     const { check, sleep } = t;
     const app = await t.open({ seed: 'buddy-finish' });
     await app.settle();
-    check('Pip sits on the timer card, awake', await app.js(MODE) === 'idle' && await app.visible('#buddy-button'), await app.js(MODE));
+    check('Pip floats awake beside the avatar', await app.js(MODE) === 'idle' && await app.visible('#buddy-button'), await app.js(MODE));
+    const beside = await app.js(NEAR);
+    check('Pip sits just beside the avatar\'s head', beside && beside.dx > 0 && beside.dx < 80 && Math.abs(beside.dy) < 60, beside);
     check('the room tools name the buddy', await app.text('#buddy-tool-label') === 'Pip');
 
     await app.clickSel('#buddy-button');
@@ -19,11 +22,13 @@ export default {
 
     await app.clickSel('#start-button');
     await app.waitFor(`${MODE} === 'away'`, { what: 'Pip to head out', timeout: 5000 });
-    check('while the session runs Pip is off exploring and a sign stands in', await app.visible('.buddy-away') && /exploring/.test(await app.attr('#buddy-button', 'aria-label')));
+    const gone = await app.waitFor(`getComputedStyle(document.querySelector('.buddy-float')).opacity === '0'`, { what: 'Pip to fly off', timeout: 3000 }).catch(() => false);
+    check('while the session runs Pip flies off exploring', Boolean(gone) && /exploring/.test(await app.attr('#buddy-button', 'aria-label')) && await app.attr('#buddy-tool', 'data-buddy') === 'away');
 
     await app.waitFor(`document.querySelector('#session-celebration').open`, { what: 'the session to finish', timeout: 20000 });
     const saved = await app.js(SAVED);
     check('the finished session records one unopened find', saved.log.length === 1 && saved.log[0].opened === false && saved.minutes === 115, saved);
+    check('the room tools show a find is waiting', await app.attr('#buddy-tool', 'data-buddy') === 'back');
     check('Pip comes back holding the find', await app.js(MODE) === 'back' && await app.js(`document.querySelectorAll('.buddy-held .find-art').length`) === 1);
     await app.clickSel('#session-celebration .start-button');
     const back = await app.waitFor(BUBBLE, { what: 'the return line', timeout: 4000 }).catch(() => null);

@@ -2,7 +2,7 @@ import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 import { BUDDY_COLORS, FINDS, PLACES, adventureStory, buddyStage, colorOf, findOf, nextBuddyStage, placeOf, waitingFind } from '../../core/buddy.js';
 import { clockNow, clockRandom } from '../../core/test-pins.js';
-import { buddyArt, findArt, signArt } from './buddy-art.js';
+import { buddyArt, findArt } from './buddy-art.js';
 import './buddy.css';
 
 const SLEEP_AFTER = 90_000;
@@ -23,8 +23,8 @@ export function createBuddyUI(app) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const root = document.createElement('div');
   root.className = 'buddy';
-  root.innerHTML = `<button class="buddy-button" id="buddy-button" type="button"><span class="buddy-hop"><span class="buddy-held" aria-hidden="true"></span><span class="buddy-figure"></span></span><span class="buddy-away">${signArt()}</span></button><p class="buddy-bubble" id="buddy-bubble" role="status" aria-live="polite" hidden></p>`;
-  $('#focus-card').prepend(root);
+  root.innerHTML = `<button class="buddy-button" id="buddy-button" type="button"><span class="buddy-float"><span class="buddy-hop"><span class="buddy-held" aria-hidden="true"></span><span class="buddy-figure"></span></span></span></button><p class="buddy-bubble" id="buddy-bubble" role="status" aria-live="polite" hidden></p>`;
+  $('#room-canvas').append(root);
   const button = root.querySelector('.buddy-button'), figure = root.querySelector('.buddy-figure'), held = root.querySelector('.buddy-held'), bubble = root.querySelector('.buddy-bubble');
 
   const card = document.createElement('dialog');
@@ -33,7 +33,7 @@ export function createBuddyUI(app) {
   album.className = 'buddy-album'; album.id = 'buddy-album'; album.setAttribute('aria-labelledby', 'buddy-album-title');
   document.body.append(card, album);
 
-  let mode = null, stage = null, albumKey = '', sleeping = false, lastActivity = clockNow(), pokes = 0, pokeAt = 0, idleTimer = 0, bubbleTimer = 0, lookFrame = 0, pointer = null, greetPending = false;
+  let mode = null, stage = null, albumKey = '', sleeping = false, lastActivity = clockNow(), pokes = 0, pokeAt = 0, idleTimer = 0, bubbleTimer = 0, lookFrame = 0, pointer = null, greetPending = false, onstage = null, placedX = NaN, placedY = NaN;
   const timers = new Set();
   const later = (fn, ms) => { const id = setTimeout(() => { timers.delete(id); fn(); }, ms); timers.add(id); return id; };
   const buddy = () => app.state.buddy;
@@ -71,8 +71,24 @@ export function createBuddyUI(app) {
     }
     button.setAttribute('aria-label', mode === 'away' ? `${state.name} is off exploring until your timer ends` : mode === 'back' ? `${state.name} found something. Open it` : mode === 'sleep' ? `${state.name} is napping. Wake them up` : `${state.name}, your buddy. Give them a poke`);
     const tool = document.querySelector('#buddy-tool-label');
-    if (tool) tool.textContent = state.name;
-    if (album.open && JSON.stringify(state) !== albumKey) renderAlbum();
+    if (tool) { tool.textContent = state.name; tool.parentElement.dataset.buddy = mode; }
+    if (album.open && albumState() !== albumKey) renderAlbum();
+  }
+
+  function follow() {
+    if (mode === 'away') return;
+    const point = app.room?.anchor('buddy'), visible = Boolean(point?.visible);
+    if (visible !== onstage) {
+      const arriving = visible && onstage === false;
+      onstage = visible; root.classList.toggle('is-offstage', !visible);
+      if (arriving) { root.style.transition = 'none'; placedX = NaN; }
+    }
+    if (!visible) return;
+    const x = Math.round(point.x), y = Math.round(point.y);
+    if (x === placedX && y === placedY) return;
+    const first = Number.isNaN(placedX);
+    placedX = x; placedY = y; root.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    if (first) requestAnimationFrame(() => { root.style.transition = ''; root.classList.add('is-placed'); });
   }
 
   function wake(greet) {
@@ -95,8 +111,9 @@ export function createBuddyUI(app) {
     if (mode === 'sleep') { play('breathe', 2600); return; }
     if (mode !== 'idle' && mode !== 'back') return;
     const roll = clockRandom();
-    if (roll < .5) play('blink', 260);
-    else if (roll < .75 && !pointer) { root.style.setProperty('--look-x', (clockRandom() * 2 - 1).toFixed(2)); root.style.setProperty('--look-y', (clockRandom() * .8 - .4).toFixed(2)); later(() => { if (!pointer) { root.style.setProperty('--look-x', 0); root.style.setProperty('--look-y', 0); } }, 1400); }
+    if (roll < .45) play('blink', 260);
+    else if (roll < .6) play('flutter', 500);
+    else if (roll < .8 && !pointer) { root.style.setProperty('--look-x', (clockRandom() * 2 - 1).toFixed(2)); root.style.setProperty('--look-y', (clockRandom() * .8 - .4).toFixed(2)); later(() => { if (!pointer) { root.style.setProperty('--look-x', 0); root.style.setProperty('--look-y', 0); } }, 1400); }
     else play(mode === 'back' ? 'hop' : 'wiggle', 700);
   }
 
@@ -122,7 +139,7 @@ export function createBuddyUI(app) {
     const now = clockNow();
     pokes = now - pokeAt < 1600 ? pokes + 1 : 1; pokeAt = now;
     if (pokes >= 4) { play('wiggle', 700); play('happy', 1200); say(pick(LINES.tickle)); pokes = 0; }
-    else if (pokes % 2) { play('hop', 700); play('happy', 900); say(pick(LINES.poke), 1800); }
+    else if (pokes % 2) { play('hop', 700); play('flutter', 500); play('happy', 900); say(pick(LINES.poke), 1800); }
     else { play('spin', 800); say(pick(LINES.poke), 1800); }
   }
 
@@ -151,13 +168,15 @@ export function createBuddyUI(app) {
     app.feedback?.celebrate?.(card.querySelector('.buddy-card-art'));
   }
 
+  const albumState = () => JSON.stringify([buddy(), app.state.session.running]);
+
   function renderAlbum() {
-    albumKey = JSON.stringify(buddy());
+    albumKey = albumState();
     const state = buddy(), current = buddyStage(state.minutes), next = nextBuddyStage(state.minutes), found = FINDS.filter(find => state.finds[find.id]).length;
     const progress = next ? Math.round(((state.minutes - current.minutes) / (next.minutes - current.minutes)) * 100) : 100;
     const focused = document.activeElement?.closest?.('#buddy-album') ? document.activeElement.dataset.focusKey : null;
     album.innerHTML = `<div class="buddy-album-inner">
-      <header><div><p class="buddy-album-eyebrow">YOUR BUDDY</p><h2 id="buddy-album-title">${escapeText(state.name)}’s finds</h2><p>${found} of ${FINDS.length} found · Longer sessions reach farther places.</p></div><button class="buddy-close" type="button" data-focus-key="close" aria-label="Close collection">${icon('close')}</button></header>
+      <header><div><p class="buddy-album-eyebrow">YOUR BUDDY</p><h2 id="buddy-album-title">${escapeText(state.name)}’s finds</h2><p>${found} of ${FINDS.length} found · Longer sessions reach farther places.</p>${app.state.session.running ? `<p class="buddy-album-status">${escapeText(state.name)} is off exploring until your timer ends ✦</p>` : ''}</div><button class="buddy-close" type="button" data-focus-key="close" aria-label="Close collection">${icon('close')}</button></header>
       <section class="buddy-profile" style="--buddy-body:${colorOf(state.color).body};--buddy-shade:${colorOf(state.color).shade};--buddy-cheek:${colorOf(state.color).cheek}">
         <div class="buddy-profile-art">${buddyArt(current.id)}</div>
         <div class="buddy-profile-details">
@@ -213,5 +232,5 @@ export function createBuddyUI(app) {
     root.remove(); card.remove(); album.remove();
   }
 
-  return { sync, onCompletion, openAlbum, dispose, get mode() { return mode; } };
+  return { sync, follow, onCompletion, openAlbum, dispose, get mode() { return mode; } };
 }

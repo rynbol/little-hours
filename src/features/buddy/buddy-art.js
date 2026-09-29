@@ -18,6 +18,7 @@ export function buddyArt(stage = 'seed') {
     </defs>
     <ellipse class="buddy-shadow" cx="60" cy="110" rx="34" ry="5.5"/>
     <g class="buddy-spin"><g class="buddy-squish">
+      <g class="buddy-wings"><path class="buddy-wing" d="M24 60C8 50 1 32 9 25c8-6 21 9 25 29Z"/><path class="buddy-wing" d="M96 60c16-10 23-28 15-35-8-6-21 9-25 29Z"/></g>
       <g class="buddy-sprout">${SPROUTS[stage] ?? ''}</g>
       <path class="buddy-body" fill="url(#${id}-body)" d="M60 20c30 0 47 25 47 52 0 25-20 35-47 35S13 97 13 72c0-27 17-52 47-52Z"/>
       <path fill="url(#${id}-rim)" d="M60 20c30 0 47 25 47 52 0 25-20 35-47 35S13 97 13 72c0-27 17-52 47-52Z"/>
@@ -33,16 +34,6 @@ export function buddyArt(stage = 'seed') {
         <path class="buddy-mouth" d="M55 80q2.5 3 5 0q2.5 3 5 0"/>
       </g>
     </g></g>
-  </svg>`;
-}
-
-export function signArt() {
-  return `<svg class="buddy-sign" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
-    <ellipse class="buddy-shadow" cx="60" cy="110" rx="22" ry="4"/>
-    <path d="M58 108V58h4v50Z" fill="#9a7555"/>
-    <rect x="22" y="46" width="76" height="28" rx="7" fill="#c89b6d" stroke="#9a7555" stroke-width="2.5"/>
-    <text x="60" y="65" text-anchor="middle" font-size="13" font-weight="700" fill="#5e4231">exploring</text>
-    <path d="M30 96c3-2 6-2 8 0M44 101c3-2 6-2 8 0" stroke="#b99474" stroke-width="3" stroke-linecap="round" fill="none"/>
   </svg>`;
 }
 
