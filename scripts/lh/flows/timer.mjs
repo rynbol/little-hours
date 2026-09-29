@@ -10,8 +10,14 @@ export default {
     const ring = await app.box('#timer-ring'), onRing = minutes => { const a = minutes / 120 * Math.PI * 2; return { x: ring.x + Math.sin(a) * ring.width * .4, y: ring.y - Math.cos(a) * ring.height * .4 }; };
     await app.drag(onRing(25), onRing(60), 16); await sleep(100);
     check('dragging the seed round the dial sets 60 minutes at once', await app.text('#timer') === '60:00' && await app.attr('#timer-ring', 'aria-valuenow') === '60', await app.text('#timer'));
+    const pointerFocus = await app.js(`({ outline: getComputedStyle(document.getElementById('timer-ring')).outlineStyle, selectedText: String(window.getSelection()) })`);
+    check('dragging the timer leaves no selection box or selected text', pointerFocus.outline === 'none' && pointerFocus.selectedText === '', pointerFocus);
+    await t.shot(app, 'timer-pointer');
     await app.key('Home'); await app.key('ArrowRight'); await app.key('ArrowRight');
     check('Home and two right arrows set 3 minutes', await app.text('#timer') === '03:00' && await app.attr('#timer-ring', 'aria-valuetext') === '3 minutes', await app.text('#timer'));
+    const keyboardFocus = await app.js(`({ visible: document.getElementById('timer-ring').matches(':focus-visible'), outline: getComputedStyle(document.getElementById('timer-ring')).outlineStyle, radius: getComputedStyle(document.getElementById('timer-ring')).borderRadius })`);
+    check('keyboard adjustment keeps its circular focus indicator', keyboardFocus.visible && keyboardFocus.outline === 'solid' && keyboardFocus.radius === '50%', keyboardFocus);
+    await t.shot(app, 'timer-keyboard');
     await app.clickSel('[data-minutes="25"]');
     check('the 25 minute button still sets 25', await app.text('#timer') === '25:00' && await app.attr('[data-minutes="25"]', 'aria-pressed') === 'true');
     await app.clickSel('#start-button');
