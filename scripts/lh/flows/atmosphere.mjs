@@ -27,9 +27,9 @@ export default {
     for (const width of [1440, 900, 390]) {
       const view = await t.open({ seed: 'three-rooms', width, height: 900, reducedMotion: true, theme: 'day' });
       await t.steps.openHouse(view);
-      const layout = await view.js(`(() => { const canvas = document.querySelector('#house-canvas').getBoundingClientRect(), detail = document.querySelector('#house-detail').getBoundingClientRect(), page = document.querySelector('#house-page').getBoundingClientRect(), workspace = document.querySelector('.workspace').getBoundingClientRect(); return { width: canvas.width, available: page.width, workspace: workspace.width, detailBelow: detail.top >= canvas.bottom, overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
-      t.check(`${width}px island has room to breathe and no page overflow`, !layout.overflow && layout.available / layout.workspace > .98 && layout.width / layout.available > (width < 1200 ? .92 : .7) && (width >= 1200 || layout.detailBelow), layout);
-      await view.clickSel('#house-slot-loft');
+      const layout = await view.js(`(() => { const canvas = document.querySelector('#house-canvas').getBoundingClientRect(), detail = document.querySelector('#house-detail').getBoundingClientRect(), page = document.querySelector('#house-page').getBoundingClientRect(), workspace = document.querySelector('.workspace').getBoundingClientRect(); return { width: canvas.width, available: page.width, workspace: workspace.width, detailHidden: document.querySelector('#house-detail').hidden, overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
+      t.check(`${width}px island has room to breathe and no page overflow`, !layout.overflow && layout.available / layout.workspace > .98 && layout.width / layout.available > (width < 1200 ? .92 : .7) && layout.detailHidden, layout);
+      await t.steps.houseRooms(view); await view.clickSel('#house-slot-loft');
       t.check(`${width}px room selection remains available`, await view.text('#house-detail h2') === 'Upstairs hideaway');
       await t.shot(view, `island-${width}`); await t.close(view);
     }

@@ -127,17 +127,11 @@ export function createUIFeedback(root, { signal } = {}) {
     if (!allowed()) return;
     const detail = page.querySelector('#house-detail');
     if (!previous || previous[0] !== slot || previous[3] !== built) {
-      animate(detail, [{ opacity: .2, translate: '24px 12px', rotate: '1.4deg' }, { opacity: 1, translate: '-3px 0', rotate: '-.3deg', offset: .72 }, { opacity: 1, translate: '0 0', rotate: '0deg' }], { duration: 620 }, 'paper');
-      stagger(detail.querySelectorAll(':scope > h2, :scope > .house-description, :scope > .house-owned-art, .house-designs button, :scope > .start-button'), 18);
-      pop(page.querySelector('[data-house-slot][aria-pressed="true"]'), true);
+      if (!detail.hidden && !page.classList.contains('is-living-garden')) animate(detail, [{ opacity: 0, translate: '0 8px' }, { opacity: 1, translate: '0 0' }], { duration: 220 }, 'paper');
     } else if (previous[1] !== design) {
       pop(page.querySelector('[data-house-design][aria-pressed="true"]'), true);
       enter(page.querySelector('.house-design-copy'), 0, 12);
       pop(page.querySelector('.house-design-check'));
-    }
-    if (!previous) {
-      enter(page.querySelector('.house-world'), 0, 28);
-      stagger(page.querySelectorAll('.house-room-link'), 18);
     }
     if (built && !previous?.[3]) {
       const badge = page.querySelector('#house-celebration');

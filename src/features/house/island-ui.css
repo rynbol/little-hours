@@ -1,0 +1,93 @@
+.house-page:not(.is-living-garden) .house-layout { position: relative; display: block; }
+.house-page:not(.is-living-garden) .house-heading { margin: 0 0 4px; min-height: 54px; }
+.house-page:not(.is-living-garden) .house-heading h1 { font-size: clamp(25px, 3vw, 32px); }
+.house-heading #rename-house { flex: none; width: 44px; height: 44px; border: 0; background: transparent; }
+.house-page:not(.is-living-garden) .house-world { border: 0; border-radius: 0; box-shadow: none; background: transparent; overflow: visible; }
+.house-page:not(.is-living-garden) .house-canvas { height: clamp(420px, calc(100svh - 244px), 760px); }
+.house-page:not(.is-living-garden) .house-canvas::before { opacity: .65; }
+.house-page:not(.is-living-garden) .house-view-tools { bottom: 12px; right: 0; border: 0; background: transparent; }
+.house-view-tools button { width: 44px; height: 44px; }
+.house-page:not(.is-living-garden) .house-camera-controls { top: 8px; right: 0; }
+.house-page:not(.is-living-garden) .house-camera-group { padding: 0; background: var(--chrome-surface); border-color: transparent; box-shadow: none; }
+.house-page:not(.is-living-garden) .house-camera-controls button { min-height: 44px; color: var(--chrome-ink); font-size: 11px; }
+.house-page:not(.is-living-garden) .house-camera-controls button[aria-pressed='true'] { color: var(--chrome-ink); background: transparent; box-shadow: none; }
+.island-dock { display: flex; justify-content: center; align-items: center; gap: 4px; width: max-content; max-width: 100%; margin: 0 auto; padding: 4px; border: 1px solid var(--chrome-line); border-radius: 99px; background: var(--chrome-surface); }
+.island-dock > button { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 20px; min-height: 44px; border: 0; border-radius: 99px; color: var(--chrome-ink); background: transparent; font-size: 12px; }
+.island-dock > button:hover { background: var(--chrome-hover); }
+.island-dock svg { width: 17px; height: 17px; }
+.is-living-garden .island-dock { display: none; }
+.house-underworld { justify-content: flex-end; margin: 0; }
+.house-page:not(.is-living-garden) #house-postcard { min-height: 44px; border: 0; background: transparent; color: var(--chrome-muted); }
+#house-room-menu { position: fixed; inset: auto 0 100px; margin-inline: auto; width: min(340px, calc(100% - 32px)); max-height: calc(100svh - 160px); overflow: auto; padding: 18px; border: 1px solid #fff8ed; border-radius: 22px; background: #faf4e9; color: #4b3b40; box-shadow: 0 16px 48px #16102030; }
+#house-room-menu header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 6px 12px; }
+#house-room-menu h2 { color: #4b3b40; margin: 0; font: 24px Georgia, serif; }
+#house-room-menu #house-count { color: #6a5960; font-size: 11px; }
+#house-room-menu .house-growth-dots { display: none; }
+#house-room-menu .house-rooms { display: grid; grid-template-columns: 1fr; padding: 0; gap: 4px; }
+#house-room-menu .house-room-link { min-height: 66px; border: 0; border-radius: 12px; padding: 10px; background: transparent; color: #4b3b40; gap: 12px; box-shadow: none; transform: none; }
+#house-room-menu .house-room-link:hover, #house-room-menu .house-room-link[aria-pressed='true'] { background: #e9eddf; }
+#house-room-menu .house-room-number { display: grid; width: 26px; height: 30px; border: 0; color: #586b4d; opacity: 1; }
+#house-room-menu .house-room-link > span:nth-child(2) { flex: 1; min-width: 0; }
+#house-room-menu .house-room-link > svg { width: 15px; height: 15px; }
+#house-room-menu .house-room-link strong { font-size: 13px; }
+#house-room-menu .house-room-link small { font-size: 10px; color: #6a5960; opacity: 1; }
+.house-page:not(.is-living-garden) .house-detail { position: absolute; z-index: 4; right: 0; bottom: 0; width: 360px; max-height: min(680px, calc(100svh - 180px)); overflow: auto; padding: 24px; color: #4b3b40; border-radius: 22px; background: #faf4e9; box-shadow: 0 18px 60px #21162630; }
+.house-page:not(.is-living-garden) .house-detail h2 { color: #4b3b40; font-size: 25px; line-height: 1.2; margin: 0 34px 16px 0; }
+.house-detail-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: #6a5960; z-index: 1; }
+.house-detail-close:hover { background: #eee7dd; }
+.house-room-summary { display: flex; align-items: center; gap: 14px; padding-top: 14px; }
+.house-page .house-room-summary h2 { flex: 1; min-width: 0; margin: 0; font-size: 23px; }
+.house-room-summary .house-owned-art { display: block; flex: none; width: 100px; height: 92px; padding: 0; margin: 0; background: none; border: 0; border-radius: 0; }
+.house-owned-art img, .house-design-thumb img, .house-future-art img, .house-selected-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.house-room-actions { display: flex; gap: 8px; margin-top: 18px; }
+.house-page:not(.is-living-garden) .house-detail .start-button { min-height: 46px; justify-content: center; gap: 8px; box-shadow: none; font-size: 12px; background: #657655; border-color: #657655; color: #fffaf0; }
+.house-room-actions .start-button, .house-room-actions .house-secondary { width: auto; flex: 1; margin: 0; }
+.house-page:not(.is-living-garden) .house-secondary { min-height: 44px; color: #536347; font-size: 12px; border-color: #ccd0bb; }
+#room-name-details { border-top: 1px solid #ded7ca; margin-top: 18px; }
+#room-name-details summary { color: #6a5960; font-size: 12px; min-height: 44px; padding-block: 14px; cursor: pointer; }
+#room-name-details .room-name-form { border: 0; margin: 0; padding: 0; }
+#room-name-details label { color: #6a5960; font-size: 11px; }
+.house-detail .room-name-form input, .house-detail .house-new-name { min-height: 44px; background: #fffaf0; color: #4b3b40; font-size: 14px; border-color: #ccc1b1; }
+.house-detail .house-new-name::placeholder { color: #756866; }
+#room-name-details .quiet-button { min-height: 44px; color: #536347; }
+#house-design-options { margin-top: 12px; }
+#house-design-options summary { display: flex; align-items: center; gap: 12px; min-height: 70px; color: #4b3b40; padding: 6px 8px; background: #eeece1; border-radius: 12px; list-style: none; cursor: pointer; }
+#house-design-options summary::-webkit-details-marker { display: none; }
+#house-design-options summary > strong { flex: 1; min-width: 0; font-size: 12px; font-weight: 500; }
+#house-design-options summary > span:last-child { font-size: 10px; color: #536347; }
+.house-selected-art { width: 76px; height: 63px; flex: none; }
+.house-page .house-designs { gap: 10px; margin-top: 14px; }
+.house-page .house-designs button { border: 1px solid transparent; background: #efeadf; border-radius: 12px; box-shadow: none; padding: 6px; }
+.house-page .house-designs button[aria-pressed='true'] { border-color: #637653; background: #e7ebdc; box-shadow: none; }
+.house-page .house-designs button:hover { transform: none; box-shadow: none; }
+.house-page .house-designs .house-design-thumb { height: 70px; }
+.house-page .house-designs strong { color: #4b3b40; font-size: 10px; }
+.house-detail .text-link { min-height: 44px; color: #536347; font-size: 11px; }
+.house-detail .house-choice-label, .house-detail .house-choice-label small { color: #6a5960; font-size: 11px; }
+.house-detail .house-build-budget { padding: 12px 0 0; background: none; }
+.house-detail .house-cost > span { font: 500 18px 'Manrope', sans-serif; color: #5c543e; }
+.house-detail .house-cost svg { width: 22px; height: 22px; }
+.house-detail .house-cost small, .house-detail .house-progress-copy { color: #6a5960; font-size: 11px; }
+.house-detail .house-progress { height: 4px; }
+.house-page .house-future-art { border-radius: 16px; background: #eee8e7; }
+.house-page .house-future-art img { height: 170px; opacity: 1; }
+.house-page button:focus-visible, .house-page summary:focus-visible, .house-page input:focus-visible { outline: 2px solid #ad7e97; outline-offset: 3px; }
+@media (max-width: 720px) {
+  .house-page:not(.is-living-garden) .house-heading { flex-wrap: nowrap; align-items: center; gap: 8px; }
+  .house-page:not(.is-living-garden) .house-heading h1 { font-size: 24px; }
+  .house-page:not(.is-living-garden) .house-title-row { gap: 0; }
+  .house-page:not(.is-living-garden) .house-heading > button { font-size: 0; padding: 0; width: 44px; height: 44px; border: 0; }
+  .house-page:not(.is-living-garden) .house-heading > button svg { display: block; width: 19px; height: 19px; }
+  .house-page:not(.is-living-garden) .house-canvas { height: clamp(380px, calc(100svh - 256px), 700px); }
+  .house-page:not(.is-living-garden) .house-detail { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); left: 12px; right: 12px; width: min(420px, calc(100% - 24px)); max-width: 420px; justify-self: auto; margin-inline: auto; max-height: calc(100svh - 160px); padding: 22px; }
+  .island-dock > button { padding-inline: 16px; }
+  .house-page:not(.is-living-garden) #house-postcard { margin-top: 6px; }
+  .house-detail .room-name-form input, .house-detail .house-new-name { font-size: 16px; }
+}
+
+@supports (transition-behavior: allow-discrete) {
+  .house-page:not(.is-living-garden) .house-detail { opacity: 1; transition: opacity .18s ease, display .18s allow-discrete; }
+  .house-page:not(.is-living-garden) .house-detail[hidden] { opacity: 0; pointer-events: none; }
+}
+
+body .house-detail .house-progress-copy { display: block; }

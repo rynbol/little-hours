@@ -1,4 +1,5 @@
 export const steps = {
+  async houseRooms(app) { if (await app.js(`Boolean(document.getElementById('house-room-menu') && !document.getElementById('house-room-menu').matches(':popover-open'))`)) await app.clickSel('#house-rooms-toggle'); },
   async openMore(app) { if (await app.js(`Boolean(document.getElementById('room-more') && !document.getElementById('room-more').matches(':popover-open'))`)) await app.clickSel('#room-more-toggle'); },
   async openProgress(app) { if (await app.js(`Boolean(document.getElementById('focus-progress') && !document.getElementById('focus-progress').open)`)) await app.clickSel('#focus-progress > summary'); },
   async openFocus(app) { await app.clickSel('#focus-mode-enter'); await app.waitFor(`document.body.classList.contains('is-focus-mode')`, { what: 'Focus mode' }); await app.settle(); },

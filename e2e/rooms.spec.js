@@ -46,7 +46,11 @@ test('the room heading edits its own saved name without losing drafts or literal
   await expect(page.locator('#loading-note')).toBeHidden({ timeout: 60000 });
   await expect(page.locator('#room-title')).toHaveText('Your studio');
   await page.locator('#rooms-button').click();
+  await expect(page.locator('#house-detail')).toBeHidden();
+  await page.locator('#house-rooms-toggle').click();
+  await page.locator('#house-slot-studio').click();
   await expect(page.locator('#house-detail h2')).toHaveText('Your studio');
+  await page.locator('#room-name-details > summary').click();
   await expect(page.locator('#room-name-input')).toHaveValue('Your studio');
 });
 
@@ -148,6 +152,7 @@ for (const route of ['card', 'arrow', 'house']) {
     let destination;
     if (route === 'house') {
       await page.locator('#rooms-button').click();
+      await page.locator('#house-rooms-toggle').click();
       await page.locator('#house-slot-garden').click();
       destination = page.locator('#enter-house-room');
     } else if (route === 'arrow') {
