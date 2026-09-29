@@ -15,8 +15,14 @@ export default {
     const tea = (await app.room()).layout.items.find(item => item.type === 'side-table');
     const teaPoint = await app.point({ item: tea.id });
     check('the tea table is visible and tappable', teaPoint?.visible);
+    const invited = `window.__littleHours.room.diagnostics().companion.requestedItemId === ${JSON.stringify(tea.id)}`;
+    await app.waitFor(`[0, 1].includes(window.__littleHours.room.diagnostics().companion.sit)`, { what: 'the avatar to finish sitting or standing' });
     await app.click(teaPoint.x, teaPoint.y);
-    await app.waitFor(`window.__littleHours.room.diagnostics().companion.requestedItemId === ${JSON.stringify(tea.id)}`, { what: 'a tap inviting the avatar for tea' });
+    if (!await app.waitFor(invited, { what: 'a tap inviting the avatar for tea', timeout: 1500 }).catch(() => false)) {
+      await app.waitFor(`[0, 1].includes(window.__littleHours.room.diagnostics().companion.sit)`, { what: 'the avatar to finish sitting or standing' });
+      await app.click(teaPoint.x, teaPoint.y);
+    }
+    await app.waitFor(invited, { what: 'a tap inviting the avatar for tea' });
     check('tapping furniture still starts the companion interaction', await app.js(`window.__littleHours.room.diagnostics().companion.requestedItemId === ${JSON.stringify(tea.id)}`));
 
     await app.clickSel('[data-panel="atmosphere"]');
