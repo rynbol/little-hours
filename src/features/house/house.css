@@ -1,4 +1,4 @@
-/* The house is a living postcard, with the room plans on a warm paper slip. */
+.house-page { width: 100%; }
 .house-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin: 8px 0 24px; }
 .house-heading > div, .house-title-row { min-width: 0; }
 .house-heading h1 { font-size: clamp(29px, 3vw, 44px); line-height: 1.2; }
@@ -9,11 +9,10 @@
 .house-title-row .icon-button { width: 30px; height: 30px; border-color: #b898793d; }
 .house-heading > button { flex: none; }
 .house-heading > button svg { rotate: 180deg; }
-.house-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 24px; align-items: start; }
+.house-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
 .house-left { min-width: 0; }
-.house-world { position: relative; min-width: 0; border: 1px solid #ae8d8b70; border-radius: 24px; background: radial-gradient(ellipse at 48% 46%, #dac0b440, transparent 66%), linear-gradient(165deg, #4f4260 0%, #86697f 54%, #c0a193 100%); overflow: hidden; box-shadow: inset 0 1px #ffe5d321, 0 15px 50px #140c161a; }
-body[data-theme='day'] .house-world { background: radial-gradient(ellipse at 48% 38%, #fff7d150, transparent 65%), linear-gradient(170deg, #93b8c2, #c8d6c8 58%, #d9cfae); }
-body[data-theme='rain'] .house-world { background: radial-gradient(ellipse at 50% 45%, #c1c5cc4d, transparent 65%), linear-gradient(155deg, #566676, #8b99a3 62%, #9aafa6); }
+.house-world { position: relative; min-width: 0; border: 1px solid var(--chrome-line); border-radius: 32px; background: radial-gradient(ellipse at 35% 25%, var(--world-glow), transparent 66%), linear-gradient(160deg, var(--world-top), var(--world-bottom)); overflow: hidden; box-shadow: inset 0 1px #fff4e31a, 0 18px 55px #231c2814; }
+.house-page:not(.is-living-garden) .house-world::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 45% 14% at 35% 70%, var(--world-mist), transparent); }
 .house-world-caption { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 22px 24px 0; color: #f4e5d7; font-size: 10px; position: relative; z-index: 1; }
 .house-address { display: flex; align-items: center; gap: 8px; letter-spacing: 1.6px; font-size: 8px; }
 .house-address svg { width: 15px; height: 15px; }
@@ -23,12 +22,12 @@ body[data-theme='rain'] .house-world { background: radial-gradient(ellipse at 50
 .house-growth-dots .is-grown { background: currentColor; }
 body[data-theme='day'] .house-world-caption { color: #4f6257; }
 .house-scene { position: relative; }
-.house-canvas { position: relative; height: clamp(330px, calc(100svh - 355px), 580px); min-height: 330px; width: 100%; display: grid; place-items: center; color: #f4e5d7; text-align: center; }
-.house-canvas::before { content: ''; position: absolute; left: 4%; top: 42%; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle closest-side, #ffe8c6 0 15%, #ffd1a3e6 17%, #f8b6904d 30%, #f2a68a1c 55%, transparent); pointer-events: none; }
-body[data-theme='day'] .house-canvas::before { left: 13%; top: 11%; border-radius: 50%; width: 150px; height: 150px; background: radial-gradient(circle, #fffbea 0 18%, #fff4c7cc 21%, #fff0c055 36%, transparent 68%), repeating-conic-gradient(from 8deg, #fff6d02e 0 5deg, transparent 5deg 22deg); -webkit-mask: radial-gradient(circle, #000 30%, transparent 70%); mask: radial-gradient(circle, #000 30%, transparent 70%); }
-body[data-theme='rain'] .house-canvas::before { left: 16%; top: 14%; width: 110px; height: 110px; background: radial-gradient(circle, #e9ecef66 0 22%, #dfe4e826 40%, transparent 70%); }
+.house-canvas { position: relative; height: clamp(450px, calc(100svh - 340px), 680px); min-height: 0; width: 100%; display: grid; place-items: center; color: #f4e5d7; text-align: center; }
+.house-canvas::before { content: ''; position: absolute; left: 8%; top: 6%; width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle, #fff0d7 0 21%, #ffe3bb33 23%, transparent 67%); pointer-events: none; }
+body[data-theme='day'] .house-canvas::before { background: radial-gradient(circle, #fffbee 0 24%, #fff2c678 26%, transparent 68%); }
+body[data-theme='rain'] .house-canvas::before { opacity: .25; }
 .house-canvas canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: pan-y; }
-.house-sky-mark { position: absolute; top: 10%; right: 12%; font-size: 46px; color: #f6e3cfa8; pointer-events: none; }
+.house-sky-mark { display: none; }
 .house-sky-mark::before, .house-sky-mark::after { content: '✦'; position: absolute; font-size: 12px; left: -38px; top: -3px; }
 .house-sky-mark::after { left: 38px; top: 43px; font-size: 9px; }
 .house-scene-caption { position: absolute; left: 23px; bottom: 12px; color: #fff0dfbd; font-family: Georgia, serif; font-size: 15px; font-style: italic; pointer-events: none; }
@@ -37,15 +36,21 @@ body[data-theme='day'] .house-scene-caption { color: #536355; }
 .house-view-tools button { display: grid; place-items: center; width: 33px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: #fff0df; font-size: 21px; }
 .house-view-tools button:hover { background: #fff0df26; }
 .house-view-tools svg { width: 14px; height: 14px; }
-.house-preview-bar { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 42px; margin: 0 18px 10px; }
+body[data-theme='day'] .house-view-tools { background: #fff9ecc9; border-color: #62745c33; }
+body[data-theme='day'] .house-view-tools button { color: #586950; }
+body[data-theme='day'] .house-camera-group { background: #fff9eceb; border-color: #62745c33; }
+body[data-theme='day'] .house-camera-controls button { color: #586950; }
+body[data-theme='day'] .house-camera-controls button[aria-pressed='true'] { background: #dae4cc; color: #435739; box-shadow: none; }
+.house-preview-bar { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 0 18px 10px; }
+.house-preview-bar:not(:has(button:not([hidden]))) { display: none; }
 .house-map-hint { font-size: 11px; color: #fff1e3; text-align: center; }
 body[data-theme='day'] .house-map-hint { color: #425146; }
 .house-preview-bar button { flex: none; border: 1px solid #fff1df70; border-radius: 20px; color: #fff1e3; background: #33243b65; font-size: 10px; padding: 8px 11px; }
 .house-preview-bar button:hover { background: #33243b95; }
 .house-rooms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; padding: 0 16px 16px; }
-.house-room-link { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 85px; padding: 12px; border: 1px solid #fff2dd5e; border-radius: 13px; color: #fff0e0; background: #3c354654; text-align: left; transition: background .2s, transform .2s, border-color .2s; }
+.house-room-link { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 70px; padding: 12px; border: 1px solid var(--chrome-line); border-radius: 17px; color: var(--chrome-ink); background: var(--chrome-surface); text-align: left; transition: background .2s, transform .2s, border-color .2s; }
 .house-room-link.is-site { border-style: dashed; }
-.house-room-link:hover { background: #524254a8; transform: translateY(-3px); }
+.house-room-link:hover { background: var(--chrome-hover); transform: translateY(-2px); }
 .house-room-link[aria-pressed='true'] { border-style: solid; border-color: #fff1d9; background: #f8ebd9; color: #59483e; box-shadow: 0 3px 12px #34263c20; }
 .house-room-number { display: grid; place-items: center; width: 30px; height: 34px; flex: none; border: 1px solid currentColor; border-radius: 13px 13px 6px 6px; opacity: .8; }
 .house-room-number svg { width: 15px; height: 15px; }
@@ -53,7 +58,7 @@ body[data-theme='day'] .house-map-hint { color: #425146; }
 .house-room-link strong { display: block; font-size: 12px; font-weight: 550; line-height: 1.3; overflow-wrap: anywhere; }
 .house-room-link small { display: block; font-size: 9px; line-height: 1.5; margin-top: 4px; opacity: .85; }
 .house-room-link .house-slot-label { font-size: 7px; letter-spacing: 1.3px; margin: 0 0 4px; opacity: .7; }
-.house-detail { position: relative; background: #f4ead8; border: 1px solid #efddc1; border-radius: 6px 6px 21px 21px; color: #594734; padding: 24px; box-shadow: 0 10px 35px #110c152b, inset 0 5px #e4c4ad; }
+.house-detail { position: relative; background: #faf4e9; border: 1px solid #fff9ee; border-radius: 26px; color: #594734; padding: 22px; box-shadow: 0 12px 36px #271d2b1c; }
 .house-paper-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .house-paper-top > span { font-size: 25px; color: #a47670; line-height: 1; }
 .house-detail .eyebrow { color: #8b7160; font-size: 8px; letter-spacing: 1.5px; margin: 0; }
@@ -62,7 +67,7 @@ body[data-theme='day'] .house-map-hint { color: #425146; }
 .house-description { font-size: 11px; line-height: 1.7; color: #816c5c; margin: 0 0 18px; }
 .house-owned-art { display: flex; flex-direction: column; align-items: center; padding: 10px 10px 18px; border: 1px solid #806e4821; border-radius: 70px 70px 12px 12px; background: linear-gradient(180deg, var(--room-tint), #ece1cb50); margin: 16px 0 20px; }
 .house-owned-art > div { height: 165px; width: 100%; }
-.house-owned-art svg { width: 100%; height: 100%; }
+.house-owned-art img { width: 100%; height: 100%; }
 .house-owned-art > span { font-family: Georgia, serif; font-size: 19px; margin-top: 3px; }
 .house-owned-art small { color: #816c5c; font-size: 9px; margin-top: 6px; }
 .house-detail .start-button { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; margin-top: 14px; min-height: 45px; font-size: 12px; border-radius: 10px; background: #6c7860; border: 1px solid #66725a; color: #fff6e5; box-shadow: inset 0 1px #fff3cd25, 0 3px 0 #4b5946; }
@@ -108,7 +113,7 @@ label.house-choice-label { margin: 16px 0 8px; }
 .house-designs button:hover { transform: translateY(-3px); box-shadow: 0 4px 10px #6a55431c; }
 .house-designs button[aria-pressed='true'] { border-color: #6c7d5b; box-shadow: 0 0 0 2px #6c7d5b; }
 .house-design-thumb { display: block; height: 57px; }
-.house-design-thumb svg { width: 100%; height: 100%; }
+.house-design-thumb img { width: 100%; height: 100%; }
 .house-design-check { position: absolute; display: none; top: -5px; right: -4px; width: 16px; height: 16px; line-height: 16px; background: #6c7d5b; border-radius: 50%; color: white; font-size: 10px; }
 .house-designs button[aria-pressed='true'] .house-design-check { display: block; }
 .house-designs strong { display: block; font-size: 9px; line-height: 1.3; font-weight: 500; }
@@ -116,7 +121,7 @@ label.house-choice-label { margin: 16px 0 8px; }
 .house-design-copy strong { font-weight: 550; color: #6a7157; }
 .house-fine-print { font-size: 9px; color: #917d65; text-align: center; line-height: 1.6; margin: 12px 0 0; }
 .house-future-art { display: grid; place-items: center; padding: 20px 0; background: #ded8dd77; border-radius: 100px 100px 15px 15px; }
-.house-future-art svg { width: 100%; height: 150px; opacity: .65; }
+.house-future-art img { width: 100%; height: 150px; opacity: .65; }
 .house-future-art span { font-family: Georgia, serif; font-style: italic; font-size: 18px; color: #967e86; }
 .house-name-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 20px; padding: 14px; background: #393039; border-radius: 10px; font-size: 12px; }
 .house-name-form input { min-width: 0; max-width: 100%; border: 1px solid #8c7350; border-radius: 6px; padding: 8px 10px; background: #29252d; color: #e6d0b0; }
@@ -127,8 +132,8 @@ label.house-choice-label { margin: 16px 0 8px; }
 .house-just-built .house-detail { animation: house-paper-in .7s both; }
 @keyframes house-welcome { from { opacity: 0; transform: translateY(15px) scale(.9); } to { opacity: 1; transform: none; } }
 @keyframes house-paper-in { from { transform: translateY(8px); } to { transform: none; } }
-@media (min-width: 1500px) { .house-layout { grid-template-columns: minmax(0, 1fr) 380px; gap: 30px; } .house-detail { padding: 28px; } .house-design-thumb { height: 70px; } }
-@media (max-width: 1050px) { .house-layout { grid-template-columns: minmax(0, 1fr) 315px; gap: 16px; } .house-detail { padding: 20px; } .house-room-number { display: none; } .house-room-link { padding: 10px; } .house-address { letter-spacing: .8px; } }
+@media (min-width: 1500px) { .house-layout { grid-template-columns: minmax(0, 1fr) 300px; gap: 30px; } .house-detail { padding: 24px; } .house-design-thumb { height: 70px; } }
+@media (max-width: 1199px) { .house-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; } .house-page:not(.is-living-garden) .house-detail { width: min(100%, 640px); justify-self: center; } .house-canvas { height: clamp(430px, 58svh, 660px); } .house-owned-art > div { height: 150px; } }
 @media (max-width: 800px) {
   .house-page { padding: 10px 0 0; }
   .house-heading { align-items: start; gap: 10px; margin-bottom: 20px; }
@@ -138,9 +143,10 @@ label.house-choice-label { margin: 16px 0 8px; }
   .house-heading > button svg { display: none; }
   .house-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .house-world-caption { padding: 17px 16px 0; }
-  .house-canvas { position: relative; height: 340px; min-height: 0; }
+  .house-canvas { position: relative; height: clamp(360px, 55svh, 560px); min-height: 0; }
   .house-rooms { gap: 6px; padding: 0 10px 10px; }
-  .house-room-link { min-height: 82px; }
+  .house-room-link { min-height: 70px; padding: 10px; }
+  .house-room-number { display: none; }
   .house-room-link strong { font-size: 11px; }
   .house-room-link small { font-size: 8px; }
   .house-room-link .house-slot-label { font-size: 6px; letter-spacing: .8px; }
@@ -162,7 +168,7 @@ label.house-choice-label { margin: 16px 0 8px; }
   .house-heading > button { min-height: 30px; }
   .house-address { font-size: 7px; letter-spacing: .5px; gap: 5px; }
   #house-count { font-size: 9px; gap: 6px; }
-  .house-canvas { position: relative; height: 290px; }
+  .house-canvas { position: relative; height: 360px; }
   .house-detail { padding: 20px; }
   .house-preview-bar { flex-wrap: wrap; gap: 5px; }
 }

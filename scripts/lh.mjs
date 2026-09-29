@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromePath, closeAll, gpuFlag, killAllNow, launch, sleep, slow } from './lh/chrome.mjs';
 import { openApp } from './lh/app.mjs';
@@ -13,10 +13,11 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
 
   lh doctor                         check this machine can run trustworthy checks
   lh serve [--ref <git ref>]        start a dev server and keep it running (Ctrl-C stops it)
+  lh art                            render room preview assets from the actual game scenes
   lh flows                          list the flows
   lh run <flow...|all>              run flows with real input; exits 1 on any failure
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
-  lh perf [--view house|room|decorate|pet|focus]
+  lh perf [--view house|garden|lake|room|decorate|pet|focus]
                                     idle cost, frame gaps, click-to-paint, GPU time, draw calls
   lh trace <cycle>                  Chrome performance trace of one cycle
   lh heap <cycle> [--repeat 30]     leak check: heap growth and Babylon object counts over repeated cycles
@@ -97,6 +98,31 @@ function table(rows, columns) {
   return [line(columns), line(widths.map(width => '-'.repeat(width))), ...rows.map(line)].join('\n');
 }
 
+async function roomArt() {
+  const server = await start(), browser = await launch({ width: 900, height: 750, scale: 2, reducedMotion: true });
+  const folder = join(repoRoot, 'public', 'rooms'); mkdirSync(folder, { recursive: true });
+  try {
+    await browser.navigate(`${server.url}/checks/room-art.html`);
+    for (let attempt = 0; attempt < 200 && !await browser.js(`Boolean(document.querySelector('[data-design]'))`); attempt++) await sleep(50);
+    const designs = await browser.js(`[...document.querySelectorAll('button[data-design]')].map(button => button.dataset.design)`);
+    if (designs.length !== 6) throw new Error('The room artwork controls did not load');
+    for (const design of designs) {
+      await browser.clickSel(`[data-design="${design}"]`);
+      let data;
+      for (let attempt = 0; attempt < 600; attempt++) {
+        data = await browser.js(`document.querySelector('#preview').dataset.design === ${JSON.stringify(design)} ? document.querySelector('#preview').src : null`);
+        if (data) break;
+        await sleep(50);
+      }
+      if (!data?.startsWith('data:image/webp;base64,')) throw new Error(`No rendered artwork for ${design}`);
+      const bytes = Buffer.from(data.split(',')[1], 'base64');
+      if (bytes.length < 10000) throw new Error(`Empty artwork for ${design}`);
+      writeFileSync(join(folder, `${design}.webp`), bytes);
+      console.log(`${design}: ${Math.round(bytes.length / 1024)} KB`);
+    }
+  } finally { await browser.close(); }
+}
+
 async function flowNames() {
   return readdirSync(join(repoRoot, 'scripts/lh/flows')).filter(file => file.endsWith('.mjs')).map(file => file.replace(/\.mjs$/, '')).sort();
 }
@@ -144,16 +170,26 @@ async function perfOnce(url, view) {
     const result = { readyMs: app.readyMs };
     await watchEvents(app);
     if (view === 'house') { await app.clickSel('#rooms-button'); result.openMs = await takeEvents(app, 4000); }
+    if (view === 'garden') { await views.garden.go(app); result.openMs = await takeEvents(app, 2000); }
+    if (view === 'lake') { await views.lake.go(app); result.openMs = await takeEvents(app, 2000); }
     if (view === 'pet') { await views.pet.go(app); result.openMs = await takeEvents(app, 1500); }
     if (view === 'focus') { await views.focus.go(app); result.openMs = await takeEvents(app, 1500); }
     if (view === 'decorate') { await app.clickSel('#decorate-button'); result.openMs = await takeEvents(app, 3000); }
     Object.assign(result, await idle(app, Number(options.seconds || 5)));
     if (view === 'house') {
-      const tags = await app.js(`[...document.querySelectorAll('button.house-room-tag:not(.is-site)')].map(tag => tag.dataset.room)`);
+      const tags = await app.js(`[...document.querySelectorAll('button.house-room-tag:not(.is-site):not(.is-garden):not(.is-pond)')].map(tag => tag.dataset.room)`);
       for (const id of tags) { await app.clickSel(`.house-room-tag[data-room="${id}"]`); result[`tapMs ${id}`] = await takeEvents(app, 1500); }
     }
-    if (app.hook && await app.js(`typeof window.__littleHours.gpuFrame === 'function'`)) {
-      const which = view === 'house' ? 'house' : 'room';
+    if (view === 'lake') {
+      const gpu = await app.js(`(() => {
+        const { engine, scene } = window.__littleHours.lake.diagnostics(), gl = engine._gl, pixel = new Uint8Array(4), times = [];
+        for (let i = 0; i < 35; i++) { engine._drawCalls.fetchNewFrame(); const start = performance.now(); engine.beginFrame(); scene.render(); engine.endFrame(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); if (i >= 5) times.push(performance.now() - start); }
+        times.sort((a, b) => a - b);
+        return { gpuFrameMs: times[15], drawCalls: engine._drawCalls.current, triangles: Math.round(scene.getActiveIndices() / 3), renderPixels: engine.getRenderWidth() * engine.getRenderHeight() };
+      })()`);
+      Object.assign(result, gpu);
+    } else if (app.hook && await app.js(`typeof window.__littleHours.gpuFrame === 'function'`)) {
+      const which = view === 'house' || view === 'garden' ? 'house' : 'room';
       const gpu = await app.js(`window.__littleHours.gpuFrame('${which}')`), stats = await app.js(`window.__littleHours.stats('${which}')`);
       Object.assign(result, { gpuFrameMs: gpu.ms, drawCalls: stats.drawCalls, triangles: stats.triangles, renderPixels: gpu.width * gpu.height });
     }
@@ -313,7 +349,7 @@ const commands = {
   help: async () => { console.log(HELP); return 0; },
   flows: async () => { for (const name of await flowNames()) console.log(`${name.padEnd(12)} ${(await loadFlow(name)).about}`); return 0; },
   run: async () => runFlows(!positional.length || positional[0] === 'all' ? await flowNames() : positional),
-  shot: shots, perf, trace: traceCommand, heap, doctor, cleanup, serve: serveForever,
+  art: roomArt, shot: shots, perf, trace: traceCommand, heap, doctor, cleanup, serve: serveForever,
 };
 
 if (!commands[command]) { console.error(`Unknown command "${command}".\n\n${HELP}`); process.exit(2); }

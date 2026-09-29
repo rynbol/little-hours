@@ -17,7 +17,7 @@ export function createUIFeedback(root, { signal } = {}) {
     let slots = keyed.get(element);
     if (!slots) { slots = new Map(); keyed.set(element, slots); }
     slots.get(key)?.cancel();
-    const animation = element.animate(frames, { duration: 480, easing: 'cubic-bezier(.2,.75,.25,1)', ...options });
+    const animation = element.animate(frames, { duration: 220, easing: 'cubic-bezier(.2,.75,.25,1)', ...options });
     animations.add(animation); slots.set(key, animation);
     const cleanup = () => { animations.delete(animation); if (slots.get(key) === animation) slots.delete(key); done?.(); };
     // A held press keeps its fill until release. Keep it cancellable even
@@ -26,19 +26,16 @@ export function createUIFeedback(root, { signal } = {}) {
     animation.oncancel = cleanup;
     return animation;
   }
-  const pop = (element, strong = false) => animate(element, [
-    { scale: strong ? '.88' : '.94' },
-    { scale: strong ? '1.055' : '1.035', offset: .48 },
-    { scale: '.985', offset: .72 }, { scale: '1' },
-  ], { duration: strong ? 580 : 420 }, 'press');
-  function enter(element, delay = 0, distance = 22) {
-    animate(element, [{ opacity: 0, translate: `0 ${distance}px`, scale: '.97' }, { opacity: 1, translate: '0 -2px', scale: '1.008', offset: .72 }, { opacity: 1, translate: '0 0', scale: '1' }], { duration: 540, delay, fill: 'backwards' }, 'entrance');
+  const reactionTarget = element => element?.matches('.house-room-tag') ? element.querySelector('.house-pin') : element;
+  const pop = (element, strong = false) => animate(reactionTarget(element), [{ scale: strong ? '.94' : '.98' }, { scale: '1' }], { duration: strong ? 240 : 180 }, 'press');
+  function enter(element, delay = 0, distance = 8) {
+    animate(element, [{ opacity: 0, translate: `0 ${Math.min(distance, 10)}px` }, { opacity: 1, translate: '0 0' }], { duration: 220, delay, fill: 'backwards' }, 'entrance');
   }
-  function stagger(elements, distance = 22) {
+  function stagger(elements, distance = 8) {
     [...elements].filter(element => {
       const rect = element.getBoundingClientRect();
       return rect.width && rect.height && rect.right > 0 && rect.left < innerWidth && rect.bottom > 0 && rect.top < innerHeight;
-    }).slice(0, 12).forEach((element, i) => enter(element, i * 38, distance));
+    }).slice(0, 12).forEach((element, i) => enter(element, i * 18, distance));
   }
   function celebrate(target, heart = false, large = false) {
     if (!target || !allowed() || particles.size >= 36) return;
@@ -81,7 +78,7 @@ export function createUIFeedback(root, { signal } = {}) {
     const element = control(event);
     if (!element || !allowed() || event.button !== 0) return;
     pressed = element;
-    animate(element, [{ scale: '1' }, { scale: '.93' }], { duration: 100, fill: 'forwards' }, 'press');
+    animate(reactionTarget(element), [{ scale: '1' }, { scale: '.98' }], { duration: 100, fill: 'forwards' }, 'press');
   }
   function release() {
     if (!pressed) return;
@@ -96,20 +93,18 @@ export function createUIFeedback(root, { signal } = {}) {
       if (!allowed()) return;
       const target = locateAgain(element);
       pop(target, element.matches('[data-house-design], [data-furniture], #build-house-room'));
-      const icon = target?.querySelector('svg, .house-design-thumb, .furniture-art');
-      if (icon) animate(icon, [{ rotate: '-10deg', scale: '.88' }, { rotate: '7deg', scale: '1.12', offset: .5 }, { rotate: '0deg', scale: '1' }], { duration: 600 }, 'icon');
       if (element.matches('[data-preset], [data-reset-design]')) {
-        animate(app.querySelector('#room-canvas'), [{ opacity: .25, scale: '.94' }, { opacity: 1, scale: '1.015', offset: .72 }, { opacity: 1, scale: '1' }], { duration: 720 });
+        animate(app.querySelector('#room-canvas'), [{ opacity: .6 }, { opacity: 1 }], { duration: 220 });
       }
       if (element.matches('#house-preview-toggle')) {
-        animate(app.querySelector('#house-canvas'), [{ opacity: .45, scale: '.97' }, { opacity: 1, scale: '1' }], { duration: 420 });
+        animate(app.querySelector('#house-canvas'), [{ opacity: .6 }, { opacity: 1 }], { duration: 220 });
       }
       if (element.matches('#start-button, [data-minutes]')) pop(app.querySelector('#timer-dial'));
       if (element.matches('#house-surprise')) {
         stagger(app.querySelectorAll('.house-designs button'), 12);
         celebrate(app.querySelector('[data-house-design][aria-pressed="true"]'));
       }
-      if (performance.now() - lastBurst > 180 && element.matches('#start-button, #pet-now, [data-pet-choice], [data-house-design], [data-furniture], .art-picker button')) {
+      if (performance.now() - lastBurst > 180 && element.matches('#start-button, #pet-now, [data-pet-choice]')) {
         lastBurst = performance.now(); celebrate(target, element.matches('#pet-now, [data-pet-choice]'));
       }
     });
@@ -127,17 +122,11 @@ export function createUIFeedback(root, { signal } = {}) {
     if (!allowed()) return;
     const detail = page.querySelector('#house-detail');
     if (!previous || previous[0] !== slot || previous[3] !== built) {
-      animate(detail, [{ opacity: .2, translate: '24px 12px', rotate: '1.4deg' }, { opacity: 1, translate: '-3px 0', rotate: '-.3deg', offset: .72 }, { opacity: 1, translate: '0 0', rotate: '0deg' }], { duration: 620 }, 'paper');
-      stagger(detail.querySelectorAll(':scope > h2, :scope > .house-description, :scope > .house-owned-art, .house-designs button, :scope > .start-button'), 18);
-      pop(page.querySelector('[data-house-slot][aria-pressed="true"]'), true);
+      if (!detail.hidden && !page.classList.contains('is-living-garden')) animate(detail, [{ opacity: 0, translate: '0 8px' }, { opacity: 1, translate: '0 0' }], { duration: 220 }, 'paper');
     } else if (previous[1] !== design) {
       pop(page.querySelector('[data-house-design][aria-pressed="true"]'), true);
       enter(page.querySelector('.house-design-copy'), 0, 12);
       pop(page.querySelector('.house-design-check'));
-    }
-    if (!previous) {
-      enter(page.querySelector('.house-world'), 0, 28);
-      stagger(page.querySelectorAll('.house-room-link'), 18);
     }
     if (built && !previous?.[3]) {
       const badge = page.querySelector('#house-celebration');
@@ -146,7 +135,7 @@ export function createUIFeedback(root, { signal } = {}) {
     }
     if (previous && previous[2] !== preview) enter(page.querySelector('.house-map-hint'), 0, 10);
   }
-  const watchedPanels = '#builder-panel, #room-panel, #focus-card, #house-name-form, #house-postcard-dialog, #session-celebration';
+  const watchedPanels = '#builder-panel, #room-panel, #focus-card, #house-name-form, #session-celebration';
   const observer = new MutationObserver(records => {
     let houseDirty = false, collectionDirty = false, inspectorDirty = false;
     const panels = new Set();

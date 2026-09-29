@@ -64,6 +64,7 @@ export default {
     await t.close(app);
 
     const finish = await t.open({ seed: 'pet-finish' });
+    await finish.clickSel('#start-button');
     await finish.waitFor(`document.querySelector('#session-celebration').open`, { timeout: 12000, what: 'the focus celebration' });
     t.check('focus grows the starting pet’s bond and unlocks its ribbon', await finish.js(`${bond('cat')}.affection === 8 && ${bond('cat')}.ribbon === 1`));
     t.check('completion keeps the room interactive and celebrates overhead', await finish.js(`!document.querySelector('#session-celebration').matches(':modal') && ${diagnostics}.celebrationAge < 3.2 && Boolean(document.querySelector('.room-delight[data-kind="finish"]'))`));

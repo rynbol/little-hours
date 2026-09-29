@@ -1,3 +1,4 @@
+import { buildGardenPlants, PLANT_SPOTS } from './garden-model.js';
 import { placeAsset } from '../../models/assets.js';
 import { onIsland, STREAMS } from './house-island.js';
 import { inPond, DOCK } from './house-pond.js';
@@ -6,14 +7,14 @@ import { pathDistance } from './house-paths.js';
 export const GARDEN_CENTER = [8.9, 0, 0];
 export const GARDEN_TAG = [8.2, -.15, -2.2];
 const GROUND = -.175, bark = '#7a5a42', soil = '#8a6a4f';
-const bloom = ['#eac0b9', '#f5e4bd', '#c8b7d7', '#e6a3a0'];
+const bloom = ['#efadac', '#f7df9d', '#b8a1df', '#e78f98'];
 const lampGlow = theme => theme === 'dusk' ? ['#ffd88f', 2.1] : theme === 'rain' ? ['#e9d6a8', 1.35] : ['#f3e2bd', 1];
 const hash = n => { const s = Math.sin(n * 57.3 + 9.1) * 43758.5453; return s - Math.floor(s); };
 export const ARBOUR = [6.35, 3.2], BENCH = [7.55, 1.05], NEST = [11.55, -2.35];
 
 const clear = (x, z) => onIsland(x, z, .55) && !inPond(x, z, .7)
   && !(Math.abs(x - DOCK.x) < .75 && z > DOCK.to - .2)
-  && pathDistance(x, z) > .75 && Math.hypot(x - BENCH[0], z - BENCH[1]) > .8 && Math.hypot(x - ARBOUR[0], z - ARBOUR[1]) > .8
+  && PLANT_SPOTS.every(([px, pz]) => Math.hypot(x - px, z - pz) > 1.05) && pathDistance(x, z) > .75 && Math.hypot(x - BENCH[0], z - BENCH[1]) > .8 && Math.hypot(x - ARBOUR[0], z - ARBOUR[1]) > .8
   && Math.hypot(x - NEST[0], z - NEST[1]) > .5 && Math.hypot(x - 8.95, z - 2.72) > .6 && STREAMS.flat().every(([sx, sz]) => Math.hypot(x - sx, z - sz) > .6) && !(x > -5.9 && x < 5.4 && z > -3.15 && z < 3.2);
 const SPOTS = (() => {
   const spots = [];
@@ -48,7 +49,7 @@ function clump(api, x, z, count, seed) {
   api.ball(x, GROUND + .04, z, .36, .08, .3, '#8fa678');
 }
 
-export function buildGarden(api, trees, theme) {
+export function buildGarden(api, trees, theme, plants = []) {
   const [ax, az] = ARBOUR;
   for (const dx of [-.42, .42]) api.box(ax + dx, GROUND + .55, az, .08, 1.1, .08, '#e9dcc0');
   for (let i = 0; i <= 6; i++) {
@@ -76,7 +77,9 @@ export function buildGarden(api, trees, theme) {
   api.prism(nx, GROUND + 1.08, nz, .32, .14, .26, '#5a746c');
   api.disc(nx, GROUND + .98, nz + .11, .07, .02, '#4b3a30');
 
-  [[6.9, 2.55], [8.35, 2.7], [7.1, -.4], [8.1, -1.9], [11.95, .9], [11.2, 3.05], [6.2, -1.3], [10.4, -1.55]].forEach(([x, z], i) => clump(api, x, z, 5 + i % 3, i * 7));
+  [[6.9, 2.55], [8.35, 2.7], [7.1, -.4], [11.95, .9], [11.2, 3.05], [6.2, -1.3], [10.4, -1.55]].forEach(([x, z], i) => clump(api, x, z, 5 + i % 3, i * 7));
+
+  buildGardenPlants(api, plants);
 
   trees.forEach((entry, index) => {
     const [x, z] = treeSpot(index), seed = [...entry.date].reduce((sum, char) => sum * 31 + char.charCodeAt(0), 7) >>> 0;

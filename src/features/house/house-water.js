@@ -4,6 +4,7 @@ import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { waterfalls } from './house-island.js';
 import { pondPoint, WATER } from './house-pond.js';
+import { ISLAND_ATMOSPHERES } from './island-atmosphere.js';
 
 const VERTEX = `precision highp float;
 attribute vec3 position; attribute vec2 uv, uv2; uniform mat4 viewProjection; varying vec2 vUv; varying float vKind;
@@ -60,12 +61,12 @@ export function createIslandWater(scene, theme) {
   const mesh = new Mesh('island-water', scene), data = new VertexData();
   Object.assign(data, { positions: shape.positions, uvs: shape.uvs, uvs2: shape.uv2s, indices: shape.indices }); data.applyToMesh(mesh);
   const paint = new ShaderMaterial('island-water-paint', scene, { vertexSource: VERTEX, fragmentSource: FRAGMENT }, { attributes: ['position', 'uv', 'uv2'], uniforms: ['viewProjection', 'time', 'light', 'deep', 'shallow', 'foam'], needAlphaBlending: true });
-  paint.setColor3('deep', Color3.FromHexString('#5f9fae')); paint.setColor3('shallow', Color3.FromHexString('#a6d8d2')); paint.setColor3('foam', Color3.FromHexString('#f3fbf8'));
+  paint.setColor3('foam', Color3.FromHexString('#f3fbf8'));
   paint.setFloat('time', 0); paint.backFaceCulling = false;
   mesh.material = paint; mesh.isPickable = false; mesh.freezeWorldMatrix();
   const water = {
     mesh,
-    setTheme(next) { paint.setFloat('light', LIGHT[next] ?? 1); },
+    setTheme(next) { const colors = ISLAND_ATMOSPHERES[next]; paint.setFloat('light', LIGHT[next] ?? 1); paint.setColor3('deep', Color3.FromHexString(colors.deep)); paint.setColor3('shallow', Color3.FromHexString(colors.shallow)); },
     animate(seconds) { paint.setFloat('time', seconds); },
   };
   water.setTheme(theme);

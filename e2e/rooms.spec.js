@@ -46,7 +46,11 @@ test('the room heading edits its own saved name without losing drafts or literal
   await expect(page.locator('#loading-note')).toBeHidden({ timeout: 60000 });
   await expect(page.locator('#room-title')).toHaveText('Your studio');
   await page.locator('#rooms-button').click();
+  await expect(page.locator('#house-detail')).toBeHidden();
+  await page.locator('#house-rooms-toggle').click();
+  await page.locator('#house-slot-studio').click();
   await expect(page.locator('#house-detail h2')).toHaveText('Your studio');
+  await page.locator('#room-name-details > summary').click();
   await expect(page.locator('#room-name-input')).toHaveValue('Your studio');
 });
 
@@ -83,6 +87,8 @@ test('room cards respect focus and reduced motion, with readable phone controls'
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).include('.room-heading').include('#home-connections').analyze()).violations).toEqual([]);
   expect((await new AxeBuilder({ page }).include('#room-picker').analyze()).violations).toEqual([]);
+  await expect.poll(() => page.locator('.room-card-art img').evaluateAll(images => images.every(image => image.complete && image.naturalWidth === 720))).toBe(true);
+  expect(await page.locator('.room-card-art img').count()).toBe(3);
   await page.screenshot({ path: testInfo.outputPath('room-cards-phone.png') });
   await page.locator('#close-room-picker').click();
   await page.locator('.home-wide').click();
@@ -146,6 +152,7 @@ for (const route of ['card', 'arrow', 'house']) {
     let destination;
     if (route === 'house') {
       await page.locator('#rooms-button').click();
+      await page.locator('#house-rooms-toggle').click();
       await page.locator('#house-slot-garden').click();
       destination = page.locator('#enter-house-room');
     } else if (route === 'arrow') {
@@ -154,19 +161,56 @@ for (const route of ['card', 'arrow', 'house']) {
       if (await page.locator('#room-switcher-toggle').count()) await page.locator('#room-switcher-toggle').click();
       destination = page.locator('[data-house-go="garden"]');
     }
-    await page.clock.install();
-    await page.clock.pauseAt(new Date(Date.now() + 1000));
+    if (route === 'house') {
+      await page.evaluate(() => {
+        const observer = new MutationObserver(() => {
+          const animation = document.querySelector('.place-transition')?.getAnimations()[0];
+          if (animation) { animation.pause(); observer.disconnect(); }
+        });
+        observer.observe(document.body, { childList: true });
+      });
+    } else {
+      await page.clock.install();
+      await page.clock.pauseAt(new Date(Date.now() + 60_000));
+    }
     await destination.press('Enter');
-    await expect(page.locator('body')).toHaveClass(/is-travelling/);
+    if (route === 'house') await expect(page.locator('html')).toHaveAttribute('data-place-transition', 'home');
+    else await expect(page.locator('body')).toHaveClass(/is-travelling/);
     await other.locator('#start-button').click();
     await expect(other.locator('body')).toHaveClass(/is-focusing/);
     await expect(page.locator('body')).toHaveClass(/is-focusing/);
-    await page.clock.runFor(300);
+    if (route === 'house') {
+      await page.locator('.place-transition').evaluate(node => node.getAnimations().forEach(animation => animation.play()));
+      await expect(page.locator('html')).not.toHaveAttribute('data-place-transition');
+    } else await page.clock.runFor(300);
     const actual = await page.evaluate(() => ({ save: JSON.parse(localStorage.getItem('little-hours-v1')), heading: document.querySelector('#room-title').textContent, body: document.body.className }));
     await testInfo.attach('arrival-state', { body: JSON.stringify(actual, null, 2), contentType: 'application/json' });
     await page.screenshot({ path: testInfo.outputPath(`${route}-focus-race.png`) });
     expect(actual.save.session.running).toBe(true);
     expect(actual.save.house.activeId).toBe('studio');
     await other.close();
+  });
+}
+
+for (const motion of ['no-preference', 'reduce']) {
+  test(`room picker opens and closes cleanly with ${motion} motion`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: motion });
+    await openRooms(page);
+    const picker = page.locator('#room-picker');
+    await page.locator('#room-switcher-toggle').click();
+    await expect(picker).toBeVisible();
+    await expect(page.locator('[aria-current="location"]')).toBeFocused();
+    await page.waitForFunction(() => !document.querySelector('#room-picker').getAnimations().some(animation => animation.playState === 'running'));
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator('[data-house-go="garden"]')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(picker).not.toHaveAttribute('open');
+    await expect(page.locator('#room-switcher-toggle')).toBeFocused();
+    await page.locator('#room-switcher-toggle').press('Enter');
+    await expect(picker).toBeVisible();
+    await expect(page.locator('[aria-current="location"]')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(picker).toBeHidden();
+    expect(await page.evaluate(() => document.getAnimations().filter(animation => animation.effect?.target?.closest?.('#room-picker')).length)).toBe(0);
   });
 }

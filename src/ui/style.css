@@ -244,7 +244,7 @@ h2 em { color: #a07147; font-weight: 400; }
   .focus-card h2 { grid-column: 1; font-size: 32px; margin: 12px 0 23px; }
   .field-label, #task { grid-column: 1; }
   .timer-area { grid-column: 2; grid-row: 1 / 4; align-self: center; margin: 0 0 17px; }
-  .start-button { grid-column: 2; grid-row: 4 / 6; align-self: end; }
+  .focus-card .start-button { grid-column: 2; grid-row: 4 / 6; align-self: end; }
   .reset-session { grid-column: 2; }
   .sound-row { grid-column: 1; margin-top: 19px; }
   .daily-note { grid-column: 2; align-self: center; }
@@ -432,7 +432,7 @@ h2 em { color: #a07147; font-weight: 400; }
 /* Room designs share the editor, but each is its own saved little world. */
 .preset-card[data-active='true'] { border-color: #9a7745; box-shadow: inset 0 0 0 1px #9a774555; }
 .preset-card .preset-art { height: 116px; border: 0; background: #dac6aa; }
-.preset-card .preset-art svg { width: 100%; height: 100%; display: block; }
+.preset-card .preset-art img { width: 100%; height: 100%; display: block; }
 .preset-card[data-design='cloud'] .preset-art { background: #e4d5e5; }
 .preset-card[data-design='metro'] .preset-art { background: #aca6b9; }
 .preset-card[data-design='sakura'] .preset-art { background: #e3dcc0; }

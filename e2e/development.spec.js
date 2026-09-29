@@ -6,7 +6,7 @@ const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('littl
 
 test('development bait preserves the starter and never ships in production', async ({ page }, testInfo) => {
   await page.goto('/'); await ready(page);
-  await page.locator('#task').fill('A quiet afternoon');
+  await page.locator('#focus-options > summary').click(); await page.locator('#task').fill('A quiet afternoon');
   const state = await saved(page), production = Boolean(testInfo.project.metadata.production);
   expect(state.pond.bait).toHaveLength(production ? 1 : 15);
   expect(state.pond.bait[0]).toEqual({ minutes: 10, at: 0 });
@@ -24,7 +24,7 @@ for (const pin of ['clock', 'random']) {
       localStorage.setItem('little-hours-v1', JSON.stringify({ pond: { bait: [], journal: {}, log: [] } }));
     }, pin);
     await page.goto('/'); await ready(page);
-    await page.locator('#task').fill('One little thing');
+    await page.locator('#focus-options > summary').click(); await page.locator('#task').fill('One little thing');
     expect((await saved(page)).pond.bait).toEqual([]);
   });
 }

@@ -3,7 +3,7 @@ import { slow } from '../chrome.mjs';
 
 const LAKE = `(() => { const lake = window.__littleHours.lake, d = lake.diagnostics(); return { open: lake.isOpen, phase: d?.phase ?? null, ui: d?.ui ?? null, fight: d?.fight ?? null }; })()`;
 const POND = `(() => { const p = window.__littleHours.state.pond; return { bait: p.bait.map(b => b.minutes), found: Object.keys(p.journal).length, caught: Object.values(p.journal).reduce((n, e) => n + e.count, 0), last: p.log.at(-1) ?? null }; })()`;
-const shown = selector => `!document.querySelector(${JSON.stringify(selector)}).hidden`;
+const shown = selector => `document.querySelector(${JSON.stringify(selector)}).open`;
 
 const REEL_AT = `(() => { if (document.querySelector('#lake-bite').hidden) return null; const r = document.querySelector('#lake-reel').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`;
 
@@ -26,7 +26,9 @@ export default {
     check('the pond tag opens the lake with its own scene', (await app.js(LAKE)).phase === 'idle' && await app.js(`document.body.classList.contains('is-lake')`));
     check('bait is grouped into its five ranges', await app.js(`[...document.querySelectorAll('[data-bait]')].map(b => b.dataset.bait + b.querySelector('b').textContent).join()`) === 'crumb×1,worm×1,cricket×2,firefly×1,star×1');
     check('the journal shows 3 of 15 found', await app.text('#lake-found') === '3/15');
-    await app.clickSel('[data-bait="crumb"]');
+    check('arrival leaves the bait selector and catch chances tucked away', !await app.visible('#lake-tackle') && !await app.visible('#lake-odds') && await app.text('#lake-status') === '');
+    await app.clickSel('#lake-bait-toggle'); await app.clickSel('[data-bait="crumb"]');
+    await app.clickSel('#lake-chances > summary');
     check('choosing bread crumb shows its odds with no rare fish', await app.attr('[data-bait="crumb"]', 'aria-checked') === 'true' && await app.js(`document.querySelectorAll('#lake-odds li:not(.is-off)').length`) === 2);
     await app.clickSel('[data-bait="star"]');
     const before = await app.js(POND);
@@ -35,6 +37,7 @@ export default {
     check('a cast gets a bite with a reel button', Boolean(reel));
     const hooked = await app.js(LAKE);
     check('pressing on the bite hooks the fish and shows the line tension', hooked.phase === 'reel' && hooked.fight?.line <= 1 && await app.visible('#lake-tension'), hooked);
+    check('the journal waits until the fight is over', await app.js(`document.querySelector('#lake-journal-button').disabled`));
     await t.shot(app, 'hooked');
     let held = true, peak = 0, fought = null;
     for (const end = Date.now() + 90000 * slow; Date.now() < end;) {
@@ -47,14 +50,16 @@ export default {
     }
     if (held) await app.release(reel.x, reel.y);
     check('holding tightens the line and easing off before the red lands it without a snap', peak > .5 && peak < 1 && fought.ui !== 'idle', { peak, fought });
-    await app.waitFor(`document.querySelector('#lake-card.is-shown') !== null`, { what: 'the catch card', timeout: 30000 }).catch(async error => { throw new Error(error.message + JSON.stringify(fought)); });
+    await app.waitFor(`document.querySelector('#lake-card').open`, { what: 'the catch card', timeout: 30000 }).catch(async error => { throw new Error(error.message + JSON.stringify(fought)); });
     const after = await app.js(POND), name = await app.text('#lake-card-name');
     check('the fish leaps out and its card names it', (await app.js(LAKE)).phase === 'shown' && Boolean(name), name);
     check('landing it spends the star lure only', JSON.stringify(after.bait) === JSON.stringify(before.bait.slice(0, -1)), after.bait);
     check('the catch is in the journal and the log', after.caught === before.caught + 1 && after.last?.minutes === 95, after);
+    await app.key('Tab'); await app.key('Tab');
+    check('the catch card contains keyboard focus', await app.js(`document.querySelector('#lake-card').matches(':modal') && document.querySelector('#lake-card').contains(document.activeElement)`));
     await t.shot(app, 'card');
     await app.key('Escape');
-    await app.waitFor(`document.querySelector('#lake-card').hidden`, { what: 'the card to close' });
+    await app.waitFor(`!document.querySelector('#lake-card').open`, { what: 'the card to close' });
     check('Escape puts the fish in the basket and stays at the lake', (await app.js(LAKE)).open);
     await castForBite(app);
     await app.waitFor(`document.querySelector('#lake-bite').hidden`, { what: 'the fish to get away', timeout: 6000 });
@@ -62,9 +67,12 @@ export default {
     await app.clickSel('#lake-journal-button');
     await app.waitFor(shown('#lake-journal'), { what: 'the journal' });
     check('the journal lists every species, found or not', await app.js(`document.querySelectorAll('.lake-entry').length`) === 15 && await app.js(`document.querySelectorAll('.lake-entry:not(.is-missing)').length`) === after.found);
+    await app.key('Tab');
+    check('the journal contains keyboard focus', await app.js(`document.querySelector('#lake-journal').matches(':modal') && document.querySelector('#lake-journal').contains(document.activeElement)`));
     await t.shot(app, 'journal');
     await app.key('Escape');
-    check('Escape closes the journal first', await app.js(`document.querySelector('#lake-journal').hidden`) && (await app.js(LAKE)).open);
+    check('Escape closes the journal first', await app.js(`!document.querySelector('#lake-journal').open`) && (await app.js(LAKE)).open);
+    check('closing the journal restores its button', await app.js(`document.activeElement.id === 'lake-journal-button'`));
     await app.key('Escape');
     await app.waitFor(`!window.__littleHours.lake.isOpen`, { what: 'the lake to close' });
     check('then Escape leaves the lake for the island and frees its scene', await app.js(`document.body.classList.contains('is-house') && !document.body.classList.contains('is-lake')`) && (await app.js(`window.__littleHours.counts().engines`)) === engines - 1);
@@ -77,6 +85,7 @@ export default {
     const empty = await t.open({ seed: 'pond-empty' });
     await empty.settle();
     await steps.openLake(empty);
+    await empty.clickSel('#lake-bait-toggle');
     check('with no bait the cast waits and says how to earn some', await empty.js(`document.querySelector('#lake-cast').disabled`) && /Finish a focus session/.test(await empty.text('.lake-empty')));
     await empty.close();
   },

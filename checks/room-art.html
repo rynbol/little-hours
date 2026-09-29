@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Little Hours room artwork</title><style>body{margin:0;background:transparent}#room{width:800px;height:660px}nav{position:fixed;top:0;left:0}#preview{display:none}</style></head><body><main id="room"></main><nav aria-label="Room artwork"></nav><img id="preview" alt="Rendered room preview"><script type="module">
+import { createRoom } from '../src/features/room/room.js';
+import { PRESETS, createLayout } from '../src/core/layout.js';
+if (!import.meta.env.DEV) throw new Error('Development artwork renderer only');
+const room = createRoom(document.getElementById('room'));
+room.setQuality('high');
+const preview = document.getElementById('preview');
+for (const preset of PRESETS) {
+  const button = document.createElement('button'); button.textContent = preset.name; button.dataset.design = preset.id;
+  button.addEventListener('click', async () => {
+    preview.removeAttribute('data-design');
+    room.setLayout(createLayout(preset.id)); room.resetView(); room.setTheme('dusk');
+    const { scene, engine } = room.diagnostics();
+    await scene.whenReadyAsync();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    engine.beginFrame(); scene.render(); engine.endFrame();
+    const canvas = document.createElement('canvas'); canvas.width = 720; canvas.height = 594;
+    canvas.getContext('2d').drawImage(engine.getRenderingCanvas(), 0, 0, canvas.width, canvas.height);
+    preview.src = canvas.toDataURL('image/webp', .92); preview.dataset.design = preset.id;
+  });
+  document.querySelector('nav').append(button);
+}
+window.addEventListener('pagehide', () => room.dispose(), { once: true });
+</script></body></html>

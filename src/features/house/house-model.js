@@ -10,7 +10,9 @@ import { roomDesign, rugStack, standHeight, FLOOR_Y } from '../../core/layout.js
 import { getFurniture } from '../../core/catalog.js';
 import { surfaceChoices } from '../../core/surfaces.js';
 import { houseFurniture, houseArchitecture } from './house-furniture.js';
+import { gardenGrowth } from '../../core/garden-plants.js';
 import { buildGarden } from './house-garden.js';
+import { buildGardenRetreat, buildRetreatFlowers, buildGardenExit } from './garden-retreat.js';
 import { buildPond } from './house-pond.js';
 import { buildIsland } from './house-island.js';
 import { buildExteriorPart, buildBlueprint, exteriorPlan, hingeOf, hingePose, CHIMNEY_TOP } from './house-exterior.js';
@@ -51,9 +53,9 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     const m = MeshBuilder.CreateBox('part', { width: w, height: h, depth: d }, scene);
     m.position.set(x, y, z); if (Array.isArray(tilt)) m.rotation.set(...tilt); else m.rotation.z = tilt; paint(m, hex, strength);
   }
-  function ball(x, y, z, w, h, d, hex, strength = 1) {
-    const m = MeshBuilder.CreateSphere('part', { diameter: 1, segments: 4 }, scene);
-    m.position.set(x, y, z); m.scaling.set(w, h, d); paint(m, hex, strength);
+  function ball(x, y, z, w, h, d, hex, strength = 1, tilt = 0, segments = 4) {
+    const m = MeshBuilder.CreateSphere('part', { diameter: 1, segments }, scene);
+    m.position.set(x, y, z); m.scaling.set(w, h, d); m.rotation.z = tilt; paint(m, hex, strength);
   }
   // A gable end: a triangle `w` wide and `h` tall, standing on (x, y, z).
   // `sideways` turns it to face along x, for the ends of the house.
@@ -79,7 +81,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     if (!buckets.has(bucket)) buckets.set(bucket, []);
     buckets.get(bucket).push(data);
   }
-  const outside = { box, ball, prism, disc, shape };
+  const outside = { box, ball, prism, disc, shape, orb: (x, y, z, w, h, d, hex, strength = 1, tilt = 0) => ball(x, y, z, w, h, d, hex, strength, tilt, 12) };
   function cylinder(x, y, z, top, bottom, h, hex) {
     const m = MeshBuilder.CreateCylinder('part', { diameterTop: top, diameterBottom: bottom, height: h, tessellation: 12 }, scene);
     m.position.set(x, y, z); paint(m, hex);
@@ -117,7 +119,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     if (x > -3.1 && x < -1.9) continue;
     const y = -.1 + (i % 3) * .035;
     box(x, y, z, .025, .2, .025, '#6e855e');
-    ball(x, y + .13, z, .16, .09, .16, ['#eac0b9', '#f5e4bd', '#c8b7d7'][i % 3]);
+    ball(x, y + .13, z, .16, .09, .16, ['#efadac', '#f7df9d', '#b8a1df'][i % 3]);
     ball(x + .065, y + .02, z, .14, .05, .075, '#839d6f');
   }
   // A low garden bench and two terracotta pots by the front path.
@@ -140,8 +142,13 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   });
   batch('island', 'island', () => buildIsland({ ...outside, cylinder }), 'grounds');
   batch('pond', 'pond', () => buildPond({ ...outside, cylinder }));
-  const trees = house.garden || [];
-  batch('orchard', JSON.stringify([theme, trees.map(tree => [tree.date, Math.round(tree.growth * 20)])]), () => buildGarden({ ...outside, cylinder }, trees, theme));
+  const trees = house.garden || [], plants = house.plants || [];
+  batch('orchard', JSON.stringify([theme, trees.map(tree => [tree.date, Math.round(tree.growth * 20)]), plants.map(plant => [plant.slot, plant.species, gardenGrowth(plant)])]), () => buildGarden({ ...outside, cylinder }, trees, theme, plants));
+  if (selectedId === 'orchard' || previous?.pieces.has('retreat-grounds')) {
+    batch('retreat-exit', theme, () => buildGardenExit({ ...outside, cylinder }, theme), 'garden-exit');
+    batch('retreat-grounds', theme, () => buildGardenRetreat({ ...outside, cylinder }, theme), 'orchard');
+    if (plants.some(plant => plant.slot !== null)) batch('retreat-plants', JSON.stringify(plants.map(plant => [plant.slot, plant.species, gardenGrowth(plant)])), () => buildRetreatFlowers({ ...outside, cylinder }, plants), 'orchard');
+  }
   for (const entry of house.rooms) batch(entry.id, JSON.stringify([entry.layout, theme, entry.id === house.activeId && avatar, house.rooms.length === 1]), () => {
     origin = HOUSE_POSITIONS[entry.id];
     const style = roomDesign(entry.layout).style || 'retreat';
@@ -225,8 +232,15 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     mesh.parent = hinge || levels[slot] || null; mesh.useVertexColors = true; mesh.metadata = { houseSlot: slot === 'grounds' ? null : slot }; mesh.isPickable = slot !== 'grounds';
     mesh.freezeWorldMatrix(); target.mesh = mesh;
   }
-  for (const entry of pieces.values()) { meshes.push(entry.mesh); framing.push(entry.framing); live.push(...entry.live); shells.push(...entry.shells); }
+  for (const [id, entry] of pieces) {
+    const retreat = id.startsWith('retreat-');
+    entry.mesh.setEnabled(retreat === (selectedId === 'orchard'));
+    for (const root of entry.live) root.setEnabled(selectedId !== 'orchard');
+    for (const shell of entry.shells) shell.root.setEnabled(selectedId !== 'orchard');
+    meshes.push(entry.mesh); if (!retreat) framing.push(entry.framing); live.push(...entry.live); shells.push(...entry.shells);
+  }
   let openAmount = previous?.openAmount ?? 0;
+  previous = null;
   function refresh() {
     for (const level of Object.values(levels)) level.computeWorldMatrix(true);
     for (const { key } of moving) hinges[key].computeWorldMatrix(true);

@@ -39,7 +39,7 @@ export function createRoomUI(app) {
       ? 'Avatar preview. Drag left or right over the character to turn them. Your focus timer is paused while editing.'
       : app.decorate.active
       ? 'Room decorator. Hover to outline furniture, then drag to move it. Drop a piece over the bottom collection to put it away. Drag empty space to turn the room. Escape cancels.'
-      : `Interactive 3D cutaway study room. Drag to turn the room. Tap a plant to water it, a bookcase to read, a tea table for tea, or a seat to get comfortable. Little moments offers the same actions with buttons. Tap a lamp, the fire or the record player to switch it, tap your companion or ${pet}, or tap a doorway to walk to another room, or to plan a new one, while your focus timer is paused.`;
+      : `Interactive 3D cutaway study room. Drag to turn the room. Tap a plant to water it, a bookcase to read, a tea table for tea, or a seat to get comfortable. Tap a lamp, the fire or the record player to switch it, tap your companion or ${pet}, or tap a doorway to walk to another room, or to plan a new one, while your focus timer is paused.`;
     $('#room-canvas').setAttribute('aria-label', label);
     $('#room-canvas canvas')?.setAttribute('aria-label', label);
   }
