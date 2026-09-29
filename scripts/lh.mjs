@@ -17,7 +17,7 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
   lh flows                          list the flows
   lh run <flow...|all>              run flows with real input; exits 1 on any failure
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
-  lh perf [--view house|garden|room|decorate|pet|focus]
+  lh perf [--view house|garden|lake|room|decorate|pet|focus]
                                     idle cost, frame gaps, click-to-paint, GPU time, draw calls
   lh trace <cycle>                  Chrome performance trace of one cycle
   lh heap <cycle> [--repeat 30]     leak check: heap growth and Babylon object counts over repeated cycles
@@ -171,6 +171,7 @@ async function perfOnce(url, view) {
     await watchEvents(app);
     if (view === 'house') { await app.clickSel('#rooms-button'); result.openMs = await takeEvents(app, 4000); }
     if (view === 'garden') { await views.garden.go(app); result.openMs = await takeEvents(app, 2000); }
+    if (view === 'lake') { await views.lake.go(app); result.openMs = await takeEvents(app, 2000); }
     if (view === 'pet') { await views.pet.go(app); result.openMs = await takeEvents(app, 1500); }
     if (view === 'focus') { await views.focus.go(app); result.openMs = await takeEvents(app, 1500); }
     if (view === 'decorate') { await app.clickSel('#decorate-button'); result.openMs = await takeEvents(app, 3000); }
@@ -179,7 +180,15 @@ async function perfOnce(url, view) {
       const tags = await app.js(`[...document.querySelectorAll('button.house-room-tag:not(.is-site):not(.is-garden):not(.is-pond)')].map(tag => tag.dataset.room)`);
       for (const id of tags) { await app.clickSel(`.house-room-tag[data-room="${id}"]`); result[`tapMs ${id}`] = await takeEvents(app, 1500); }
     }
-    if (app.hook && await app.js(`typeof window.__littleHours.gpuFrame === 'function'`)) {
+    if (view === 'lake') {
+      const gpu = await app.js(`(() => {
+        const { engine, scene } = window.__littleHours.lake.diagnostics(), gl = engine._gl, pixel = new Uint8Array(4), times = [];
+        for (let i = 0; i < 35; i++) { engine._drawCalls.fetchNewFrame(); const start = performance.now(); engine.beginFrame(); scene.render(); engine.endFrame(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); if (i >= 5) times.push(performance.now() - start); }
+        times.sort((a, b) => a - b);
+        return { gpuFrameMs: times[15], drawCalls: engine._drawCalls.current, triangles: Math.round(scene.getActiveIndices() / 3), renderPixels: engine.getRenderWidth() * engine.getRenderHeight() };
+      })()`);
+      Object.assign(result, gpu);
+    } else if (app.hook && await app.js(`typeof window.__littleHours.gpuFrame === 'function'`)) {
       const which = view === 'house' || view === 'garden' ? 'house' : 'room';
       const gpu = await app.js(`window.__littleHours.gpuFrame('${which}')`), stats = await app.js(`window.__littleHours.stats('${which}')`);
       Object.assign(result, { gpuFrameMs: gpu.ms, drawCalls: stats.drawCalls, triangles: stats.triangles, renderPixels: gpu.width * gpu.height });
