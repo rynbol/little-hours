@@ -41,6 +41,9 @@ test('seeds, saved names, placement and the garden controls work on a phone', as
   await page.goto('/'); await ready(page); await openGarden(page); await plantSeed(page);
   await selectSpot(page, 1); await page.locator('#seed-lavender').click(); await plantSeed(page);
   await expect(page.locator('#coin-balance')).toHaveText('10');
+  await page.locator('#garden-rename').click(); await page.locator('#garden-name-input').fill('Unsaved name');
+  await selectSpot(page, 0); await expect(page.locator('#garden-card-title')).toHaveText('Blush cosmos');
+  await expect(page.locator('#garden-name-form')).toBeHidden();
   await selectSpot(page, 0); await page.locator('#garden-collection-open').click(); await page.locator('#garden-collection-plant-2').click(); await page.locator('#garden-place').click();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-v1')).garden.plants.map(p => p.slot))).toEqual([1, 0]);
   await expect(page.locator('#garden-spot-0')).toHaveAttribute('aria-label', 'Spot 1, Lavender');

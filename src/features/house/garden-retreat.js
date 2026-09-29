@@ -1,10 +1,11 @@
+import { gardenGround } from './garden-ground.js';
 import { buildGardenTree } from './garden-trees.js';
 import { buildGardenSpecimen } from './garden-model.js';
 
 export const RETREAT_SPOTS = [[-2.35, -1.95], [2.35, -1.95], [-3, .2], [3, .2], [-2.25, 2.35], [2.25, 2.35]];
 export const GARDEN_EXIT = [-3.8, .04, -6.1];
 export const GARDEN_EXIT_TAG = [-3.8, .45, -4.45];
-export const RETREAT_BOUNDS = [{ points: new Float32Array([...Array.from({ length: 32 }, (_, i) => { const a = i / 32 * Math.PI * 2; return [Math.cos(a) * 6.1, -.5, Math.sin(a) * 5.5]; }).flat(), -4.3, 3.1, -3.05, 4.3, 3.1, -3.05, -1.5, 2.6, -4.1, 1.5, 2.6, -4.1, -6.65, -.5, -8.55, -1, -.5, -8.55, -5.8, 2.8, -6.1, -1.8, 2.8, -6.1]) }];
+export const RETREAT_BOUNDS = [{ points: new Float32Array([...gardenGround().positions, ...Array.from({ length: 32 }, (_, i) => { const a = i / 32 * Math.PI * 2; return [Math.cos(a) * 6.1, -.5, Math.sin(a) * 5.5]; }).flat(), -4.3, 3.1, -3.05, 4.3, 3.1, -3.05, -1.5, 2.6, -4.1, 1.5, 2.6, -4.1, -6.65, -.5, -8.55, -1, -.5, -8.55, -5.8, 2.8, -6.1, -1.8, 2.8, -6.1]) }];
 const shades = ['#819b70', '#95ad7b', '#a4b78b', '#718e68'];
 const petals = ['#ecc3b6', '#d5bddb', '#f5e6bb', '#e5acb9'];
 const hash = n => { const value = Math.sin(n * 71.3 + 2.1) * 43758.54; return value - Math.floor(value); };
@@ -74,12 +75,19 @@ function pottingCorner(api) {
 }
 
 export function buildGardenRetreat(api, theme) {
-  terrace(api, -3.4, -.26, -4.2, 7, 9, .34, '#cbbca1');
-  terrace(api, -3.4, -.09, -4.2, 6.95, 8.95, .22, '#6f8c62');
-  terrace(api, -3.4, -.012, -4.2, 6.8, 8.8, .14, '#a0b282');
-  terrace(api, 0, -.26, .05, 12.2, 11, .34, '#cbbca1');
-  terrace(api, 0, -.09, .05, 12.15, 10.95, .22, '#6f8c62');
-  terrace(api, 0, 0, .05, 12, 10.8, .14, '#a0b282');
+  const ground = gardenGround();
+  api.shape(ground.positions, ground.colors, ground.normals, ground.indices);
+  for (const index of [4, 15, 25, 39, 52, 64, 81, 110]) {
+    const x = ground.positions[index * 3], z = ground.positions[index * 3 + 2];
+    for (let i = 0; i < 5; i++) {
+      const shrink = 1 - i * .009;
+      api.ball(x * shrink + Math.sin(i * 2) * .055, -.13 - i * .19, z * shrink, .25 - i * .027, .25, .24 - i * .025, shades[(index + i) % 4]);
+    }
+  }
+  for (const index of [8, 19, 33, 47, 62, 80, 100, 115]) {
+    const x = ground.positions[index * 3], z = ground.positions[index * 3 + 2];
+    api.orb(x * .965, -.78 - index % 3 * .15, z * .965, 1.02, .67, .88, ['#bdb29b', '#b3aa93', '#c5b9a0'][index % 3]);
+  }
   for (let i = 0; i < 48; i++) {
     const a = i / 48 * Math.PI * 2, x = Math.cos(a) * 5.65, z = .05 + Math.sin(a) * 5;
     if (x < -1.8 && z < -2.8) continue;
@@ -109,7 +117,7 @@ export function buildGardenRetreat(api, theme) {
     if (i < 17 && i !== 3) { const b = Math.PI + (i + .5) / 17 * Math.PI; for (const y of [.35, .66]) api.box(Math.cos(b) * 5.25, y, Math.sin(b) * 4.55, .96, .06, .06, '#d6c8a6', [0, -b - Math.PI / 2, 0]); }
   }
   roseArbour(api); pottingCorner(api);
-  for (const [i, [x, z]] of [[-6.1, -3.9], [-6.25, -5.3], [-5.65, -7.45], [-3.4, -7.9], [-1.2, -6.1], [-1.7, -4.9]].entries()) flowers(api, x, z, i + 11, 1.4);
+  for (const [i, [x, z]] of [[-6.1, -3.9], [-5.8, -5.1], [-5.05, -6.65], [-3.4, -7.5], [-1.2, -6.1], [-1.7, -4.9]].entries()) flowers(api, x, z, i + 11, 1.4);
   for (const [i, x] of [-5.2, 4.3].entries()) {
     buildGardenTree(api, i ? 'willow' : 'cherry', x, -3.05, 0, .86);
     flowers(api, x + (i ? -.45 : .45), -3.5, i + 5, 1.5);
