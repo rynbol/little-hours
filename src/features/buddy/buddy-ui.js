@@ -134,26 +134,30 @@ export function createBuddyUI(app) {
     const progress = next ? Math.round(((state.minutes - current.minutes) / (next.minutes - current.minutes)) * 100) : 100;
     const focused = document.activeElement?.closest?.('#buddy-album') ? document.activeElement.dataset.focusKey : null;
     album.innerHTML = `<div class="buddy-album-inner">
-      <header><div><p class="buddy-album-eyebrow">YOUR BUDDY</p><h2 id="buddy-album-title">${escapeText(state.name)}’s finds</h2><p>${found} of ${FINDS.length} found · Longer sessions reach farther places.</p>${app.state.session.running ? `<p class="buddy-album-status">${escapeText(state.name)} is off exploring until your timer ends ✦</p>` : ''}</div><button class="buddy-close" type="button" data-focus-key="close" aria-label="Close collection">${icon('close')}</button></header>
+      <header><div><h2 id="buddy-album-title">${escapeText(state.name)}’s finds</h2><p>${found} of ${FINDS.length} found</p>${app.state.session.running ? `<p class="buddy-album-status">${escapeText(state.name)} is off exploring until your timer ends ✦</p>` : ''}</div><button class="buddy-close" type="button" data-focus-key="close" aria-label="Close collection">${icon('close')}</button></header>
       <section class="buddy-profile" style="--buddy-body:${colorOf(state.color).body};--buddy-shade:${colorOf(state.color).shade};--buddy-cheek:${colorOf(state.color).cheek}">
         <div class="buddy-profile-art" id="buddy-closeup"></div>
         <div class="buddy-profile-details">
-          <form class="buddy-name-form"><label for="buddy-name">Name</label><input id="buddy-name" data-focus-key="name" maxlength="20" autocomplete="off" value="${escapeText(state.name)}"><button class="quiet-button" data-focus-key="save">Save</button></form>
+          <div class="buddy-name"><h3>${escapeText(state.name)}</h3><button type="button" id="buddy-edit-name" data-focus-key="edit" aria-label="Rename ${escapeText(state.name)}">${icon('build')}</button></div>
+          <form class="buddy-name-form" hidden><label class="sr-only" for="buddy-name">Name</label><input id="buddy-name" data-focus-key="name" maxlength="20" autocomplete="off" value="${escapeText(state.name)}"><button class="quiet-button" data-focus-key="save">Save</button></form>
           <div class="buddy-colors" role="radiogroup" aria-label="${escapeText(state.name)}’s colour">${BUDDY_COLORS.map(color => `<button type="button" role="radio" aria-checked="${color.id === state.color}" aria-label="${color.label}" data-color="${color.id}" data-focus-key="color-${color.id}" style="--swatch:${color.body}"></button>`).join('')}</div>
-          <p class="buddy-growth"><strong>${current.label}</strong> · ${hours(state.minutes)} focused together${next ? ` · ${next.label} at ${hours(next.minutes)}` : ''}</p>
+          <p class="buddy-growth"><strong>${current.label}</strong>${next ? `<span>${next.label} in ${hours(next.minutes - state.minutes)}</span>` : ''}</p>
           <div class="buddy-growth-bar" role="progressbar" aria-label="Growth to the next stage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div>
         </div>
       </section>
-      ${PLACES.map(place => `<section class="buddy-place"><h3>${escapeText(place.label.replace(/^the /, ''))}<small>${place.minutes}+ min sessions</small></h3><ul>${FINDS.filter(find => find.place === place.id).map(find => {
+      ${PLACES.map(place => `<section class="buddy-place"><h3>${escapeText(place.label.replace(/^the /, '').replace(/^./, letter => letter.toUpperCase()))}<small>${place.minutes}+ min</small></h3><ul>${FINDS.filter(find => find.place === place.id).map(find => {
         const owned = state.finds[find.id];
-        return `<li class="buddy-find${owned ? '' : ' is-unfound'}" data-tier="${find.tier}">${findArt(find.id, Boolean(owned))}<strong>${owned ? escapeText(find.label) : '???'}</strong><small>${owned ? `${TIER_LABELS[find.tier]} · ×${owned.count}` : TIER_LABELS[find.tier]}</small></li>`;
+        return owned ? `<li class="buddy-find" data-tier="${find.tier}" aria-label="${escapeText(find.label)}, ${TIER_LABELS[find.tier]}, found ${owned.count} times">${findArt(find.id, true)}<strong>${escapeText(find.label)}</strong><small>×${owned.count}</small></li>` : `<li class="buddy-find is-unfound" data-tier="${find.tier}" aria-label="Not found yet, ${TIER_LABELS[find.tier]}">${findArt(find.id, false)}</li>`;
       }).join('')}</ul></section>`).join('')}
     </div>`;
     const slot = album.querySelector('#buddy-closeup');
     if (closeupHost) slot.replaceWith(closeupHost); else { closeupHost = slot; closeup = createBuddyCloseup(closeupHost); }
     closeup.update({ colors: colorOf(state.color), stage: current.id, name: state.name });
     album.querySelector('.buddy-close').addEventListener('click', () => album.close());
-    album.querySelector('.buddy-name-form').addEventListener('submit', event => { event.preventDefault(); app.acceptUpdate(app.store.renameBuddy(album.querySelector('#buddy-name').value)); });
+    const form = album.querySelector('.buddy-name-form'), input = album.querySelector('#buddy-name');
+    album.querySelector('#buddy-edit-name').addEventListener('click', () => { form.hidden = !form.hidden; if (!form.hidden) { input.focus(); input.select(); } });
+    form.addEventListener('submit', event => { event.preventDefault(); app.acceptUpdate(app.store.renameBuddy(input.value)); });
+    if (focused === 'name' || focused === 'save') form.hidden = false;
     album.querySelectorAll('[data-color]').forEach(swatch => swatch.addEventListener('click', () => app.acceptUpdate(app.store.setBuddyColor(swatch.dataset.color))));
     if (focused) album.querySelector(`[data-focus-key="${focused}"]`)?.focus();
   }

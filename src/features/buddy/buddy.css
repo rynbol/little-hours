@@ -8,7 +8,7 @@
 .buddy-card::backdrop, .buddy-album::backdrop { background: #21192733; }
 .buddy-card-inner { position: relative; padding: 22px 22px 20px; border-radius: 26px; color: var(--ui-ink, #4b3b40); background: linear-gradient(180deg, #fffaf1, #f4e9d9); border: 1px solid #fff9ed; box-shadow: 0 16px 50px #1c112938; text-align: center; }
 .buddy-close { position: absolute; right: 14px; top: 14px; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: #f0e4d6; color: var(--ui-ink, #4b3b40); cursor: pointer; }
-.buddy-card-eyebrow, .buddy-album-eyebrow { margin: 0; font-size: 11.5px; letter-spacing: .16em; font-weight: 700; text-transform: uppercase; color: var(--ui-rose, #a65766); }
+.buddy-card-eyebrow { margin: 0; font-size: 11.5px; letter-spacing: .16em; font-weight: 700; text-transform: uppercase; color: var(--ui-rose, #a65766); }
 .buddy-card-art { position: relative; display: grid; place-items: center; height: 132px; margin: 6px 0 2px; }
 .buddy-card-art .find-art { width: 108px; height: 108px; filter: drop-shadow(0 10px 12px #3c281e30); animation: buddy-held-bob 3s ease-in-out infinite; }
 .buddy-card-new { position: absolute; right: 22%; top: 10px; padding: 3px 9px; border-radius: 999px; background: #f4d67c; color: #5e4231; font-size: 11px; font-weight: 800; letter-spacing: .04em; transform: rotate(8deg); }
@@ -27,39 +27,46 @@
 .buddy-album-inner { position: relative; width: min(820px, 100%); max-height: calc(100svh - 48px); overflow-y: auto; box-sizing: border-box; padding: 26px 28px 30px; border-radius: 28px; color: var(--ui-ink, #4b3b40); background: var(--ui-paper, #faf4e9); box-shadow: 0 30px 90px #0a051480; }
 .buddy-album header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
 .buddy-album header .buddy-close { position: static; flex: none; }
-.buddy-album h2 { margin: 4px 0 6px; font-size: 30px; color: var(--ui-ink, #4b3b40); text-wrap: balance; }
-.buddy-album header p:not(.buddy-album-eyebrow) { margin: 0; font-size: 14px; color: var(--ui-subtle, #79666b); }
+.buddy-album h2 { margin: 0 0 4px; font-size: 28px; color: var(--ui-ink, #4b3b40); text-wrap: balance; }
+.buddy-album header p { margin: 0; font-size: 13px; color: var(--ui-subtle, #79666b); }
 .buddy-album header .buddy-album-status { margin-top: 6px; color: var(--ui-rose, #a65766); font-weight: 600; }
-.buddy-profile { display: flex; gap: 20px; align-items: center; margin-top: 18px; padding: 16px; border-radius: 20px; background: #f3e8da; }
-.buddy-profile-art { flex: none; width: 120px; height: 120px; }
+.buddy-profile { display: flex; gap: 22px; align-items: center; margin-top: 18px; padding: 14px 22px 14px 14px; border-radius: 24px; background: radial-gradient(circle at 76px 50%, #fffaf0, #f3e8da 110px); }
+.buddy-profile-art { flex: none; width: 128px; height: 128px; }
 .buddy-profile-art canvas { display: block; width: 100%; height: 100%; outline: none; }
 .buddy-profile-details { display: grid; gap: 10px; flex: 1; min-width: 0; }
-.buddy-name-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.buddy-name-form label { font-size: 12px; font-weight: 700; color: var(--ui-subtle, #79666b); }
+.buddy-name { display: flex; align-items: center; gap: 2px; }
+.buddy-name h3 { margin: 0; font: 22px/1.1 Georgia, serif; color: var(--ui-ink, #4b3b40); overflow-wrap: anywhere; }
+#buddy-edit-name { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; background: none; color: #92776b; cursor: pointer; }
+#buddy-edit-name svg { width: 13px; }
+.buddy-name-form { display: flex; gap: 8px; align-items: center; }
+.buddy-name-form[hidden] { display: none; }
 .buddy-name-form input { flex: 1; min-width: 120px; max-width: 220px; padding: 8px 11px; border: 1px solid var(--ui-border, #dfd1c5); border-radius: 10px; background: #fffaf3; color: var(--ui-ink, #4b3b40); font: inherit; }
 .buddy-name-form .quiet-button { padding: 8px 14px; border: 1px solid var(--ui-border, #dfd1c5); border-radius: 10px; background: #fffaf3; color: var(--ui-ink, #4b3b40); font-weight: 600; cursor: pointer; }
 .buddy-colors { display: flex; gap: 8px; flex-wrap: wrap; }
-.buddy-colors button { width: 28px; height: 28px; padding: 0; border: 2px solid #fffaf3; border-radius: 50%; background: var(--swatch); box-shadow: 0 0 0 1px #d9c8b8; cursor: pointer; }
+.buddy-colors button { width: 24px; height: 24px; padding: 0; border: 2px solid #fffaf3; border-radius: 50%; background: var(--swatch); box-shadow: 0 0 0 1px #d9c8b8; cursor: pointer; }
 .buddy-colors button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--ui-rose, #a65766); }
-.buddy-growth { margin: 0; font-size: 13px; color: var(--ui-subtle, #79666b); }
-.buddy-growth strong { color: var(--ui-ink, #4b3b40); }
-.buddy-growth-bar { height: 8px; border-radius: 999px; background: #e6d8c8; overflow: hidden; }
-.buddy-growth-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #9fc28a, #7fae6c); }
-.buddy-place { margin-top: 20px; }
-.buddy-place h3 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--ui-ink, #4b3b40); }
-.buddy-place h3 small { font-size: 11.5px; letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--ui-subtle, #79666b); }
+.buddy-growth { display: flex; justify-content: space-between; gap: 8px; margin: 0; font-size: 12px; color: var(--ui-subtle, #79666b); }
+.buddy-growth strong { font-size: 13px; color: var(--ui-ink, #4b3b40); }
+.buddy-growth-bar { height: 16px; margin-top: -4px; padding: 3px; border-radius: 999px; background: #eadccb; box-shadow: inset 0 1px 2px #8a6a5230; }
+.buddy-growth-bar i { position: relative; display: block; min-width: 10px; height: 100%; border-radius: inherit; background: linear-gradient(#ffffff80, #fff0 45%), linear-gradient(90deg, var(--buddy-body), var(--buddy-shade)); transition: width .6s ease; }
+.buddy-growth-bar i::after { content: '✦'; position: absolute; right: -6px; top: 50%; transform: translateY(-52%); font-size: 13px; line-height: 1; color: #f2c56b; text-shadow: 0 0 4px #fff4d0; }
+.buddy-place { margin-top: 22px; }
+.buddy-place h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; font: 17px Georgia, serif; color: var(--ui-ink, #4b3b40); }
+.buddy-place h3 small { font-family: 'DM Sans', sans-serif; font-size: 11.5px; color: var(--ui-subtle, #79666b); }
 .buddy-place ul { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0; padding: 0; list-style: none; }
-.buddy-find { display: grid; justify-items: center; gap: 3px; padding: 12px 8px 10px; border-radius: 16px; background: #fffaf3; border: 1px solid #efe2d4; text-align: center; }
-.buddy-find .find-art { width: 52px; height: 52px; }
-.buddy-find strong { font-size: 13px; color: var(--ui-ink, #4b3b40); }
+.buddy-find { display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 104px; padding: 10px 8px; border-radius: 20px; background: #f5ece0; text-align: center; }
+.buddy-find .find-art { width: 50px; height: 50px; margin-bottom: 4px; }
+.buddy-find strong { font-size: 12.5px; font-weight: 600; color: var(--ui-ink, #4b3b40); }
 .buddy-find small { font-size: 11px; color: var(--ui-subtle, #79666b); }
-.buddy-find[data-tier="rare"]:not(.is-unfound) { border-color: #d9c6ee; background: linear-gradient(180deg, #fbf6ff, #fffaf3); }
-.find-art.is-unfound { filter: brightness(0) opacity(.16); }
-.buddy-find.is-unfound strong { color: var(--ui-subtle, #79666b); }
+.buddy-find[data-tier="uncommon"]:not(.is-unfound) { background: #e9eff0; }
+.buddy-find[data-tier="rare"]:not(.is-unfound) { background: #efe7f6; }
+.buddy-find.is-unfound { background: #f7f1e8; }
+.find-art.is-unfound { filter: brightness(0) opacity(.1); }
 
 @media (max-width: 640px) {
-  .buddy-place ul { grid-template-columns: repeat(2, 1fr); }
-  .buddy-profile { flex-direction: column; align-items: stretch; }
+  .buddy-place ul { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .buddy-find { min-height: 92px; }
+  .buddy-profile { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 18px 18px; background: radial-gradient(circle at 50% 70px, #fffaf0, #f3e8da 120px); }
   .buddy-profile-art { align-self: center; }
   .buddy-album-inner { padding: 22px 18px 24px; }
 }

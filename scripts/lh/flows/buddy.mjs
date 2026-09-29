@@ -61,7 +61,7 @@ export default {
 
     await app.clickSel('#buddy-card-collection');
     await app.waitFor(`document.querySelector('#buddy-album').open`, { what: 'the collection', timeout: 4000 });
-    check('the collection counts the new find', /^1 of 20 found/.test(await app.text('.buddy-album header p:not(.buddy-album-eyebrow)')));
+    check('the collection counts the new find', /^1 of 20 found/.test(await app.text('.buddy-album header p')));
     check('the find shows by name and the rest are silhouettes', await app.js(`[...document.querySelectorAll('.buddy-find:not(.is-unfound) strong')].map(e => e.textContent).join()`) === title && await app.js(`document.querySelectorAll('.buddy-find.is-unfound').length`) === 19);
 
     const drawn = await app.waitFor(`document.querySelector('#buddy-closeup canvas')?.width > 0 && window.__littleHours.buddyCloseup?.().frames > 2`, { what: 'the 3D Pip in the album', timeout: 4000 }).catch(() => false);
@@ -69,6 +69,7 @@ export default {
     await app.clickSel('#buddy-album [data-color="mint"]');
     await app.waitFor(`${SAVED}.color === 'mint'`, { what: 'the colour to save', timeout: 3000 });
     check('picking a colour makes the album Pip twirl', await app.waitFor(`window.__littleHours.buddyCloseup?.().twirling`, { what: 'the album Pip to twirl', timeout: 1500 }).catch(() => false));
+    await app.clickSel('#buddy-edit-name');
     await app.clickSel('#buddy-name');
     await app.js(`document.querySelector('#buddy-name').select()`);
     for (const letter of 'Bean') await app.key(letter);
