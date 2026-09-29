@@ -28,12 +28,14 @@ async function transition(page, click, destination) {
 test('garden and pond entrances and exits fade, including the path home and study exit', async ({ page }) => {
   await page.goto('/'); await ready(page);
   await transition(page, () => openGarden(page), 'garden');
-  await expect(page.getByRole('button', { name: 'Back home', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Back to island', exact: true })).toBeVisible();
   await transition(page, () => page.locator('#garden-back').click(), 'island');
   await transition(page, () => page.locator('#house-open-garden').click(), 'garden');
-  await transition(page, () => page.getByRole('button', { name: 'Back home', exact: true }).click(), 'home');
+  await transition(page, () => page.getByRole('button', { name: 'Back to island', exact: true }).click(), 'island');
+  await page.locator('#back-to-room').click();
   await expect(page.locator('#room-section')).toBeVisible();
   await transition(page, () => openGarden(page), 'garden');
+  await page.locator('#garden-spot-0').click();
   await page.locator('#garden-plant-seed').click();
   await transition(page, () => page.locator('#garden-study').click(), 'home');
   await expect(page.locator('#start-button')).toBeFocused();

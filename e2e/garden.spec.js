@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { seedState } from '../scripts/lh/seeds.mjs';
 
+const plantSeed = async page => { if (!await page.locator('#garden-plant-seed').isVisible()) await page.locator('#garden-spot-0').click(); await page.locator('#garden-plant-seed').click(); };
+const selectSpot = async (page, index) => { if (await page.locator('#garden-card-close').isVisible()) await page.locator('#garden-card-close').click(); await page.locator(`#garden-spot-${index}`).click(); };
 const ready = page => expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
 const openGarden = async page => { if (await page.locator('#focus-progress').getAttribute('open') === null) await page.locator('#focus-progress > summary').click(); await page.locator('#focus-garden').click(); await expect(page.locator('#house-detail h2')).toHaveText('Your garden'); await expect(page.locator('html')).not.toHaveAttribute('data-place-transition', { timeout: 30000 }); };
 
@@ -9,7 +12,7 @@ test('a free seed grows across real study sessions and blooms once with the othe
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.clock.install({ time: new Date('2026-09-28T12:00:00') });
   await page.goto('/'); await ready(page); await openGarden(page);
-  await page.locator('#garden-plant-seed').click();
+  await plantSeed(page);
   await expect(page.locator('#coin-balance')).toHaveText('0');
   await page.locator('#garden-rename').click(); await page.locator('#garden-name-input').fill('Sunday <3'); await page.locator('#garden-name-form').getByRole('button', { name: 'Save', exact: true }).click();
   for (let i = 0; i < 2; i++) {
@@ -35,10 +38,10 @@ test('a free seed grows across real study sessions and blooms once with the othe
 test('seeds, saved names, placement and the garden controls work on a phone', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(() => { if (!sessionStorage.seeded) { localStorage.setItem('little-hours-v1', JSON.stringify({ house: { coins: 20 } })); sessionStorage.seeded = '1'; } });
-  await page.goto('/'); await ready(page); await openGarden(page); await page.locator('#garden-plant-seed').click();
-  await page.locator('#garden-spot-1').click(); await page.locator('#seed-lavender').click(); await page.locator('#garden-plant-seed').click();
+  await page.goto('/'); await ready(page); await openGarden(page); await plantSeed(page);
+  await selectSpot(page, 1); await page.locator('#seed-lavender').click(); await plantSeed(page);
   await expect(page.locator('#coin-balance')).toHaveText('10');
-  await page.locator('#garden-spot-0').click(); await page.locator('#garden-collection-open').click(); await page.locator('#garden-collection-plant-2').click(); await page.locator('#garden-place').click();
+  await selectSpot(page, 0); await page.locator('#garden-collection-open').click(); await page.locator('#garden-collection-plant-2').click(); await page.locator('#garden-place').click();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-v1')).garden.plants.map(p => p.slot))).toEqual([1, 0]);
   await expect(page.locator('#garden-spot-0')).toHaveAttribute('aria-label', 'Spot 1, Lavender');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -52,7 +55,7 @@ test('the garden reuses the house engine, keeps room batches and stops drawing w
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/'); await ready(page); await openGarden(page);
   await expect.poll(() => page.evaluate(() => Boolean(window.__littleHours.house.diagnostics()?.scene.isReady()))).toBe(true);
   const initial = await page.evaluate(() => { const d = window.__littleHours.house.diagnostics(); return { engines: window.__littleHours.counts().engines, room: d.scene.meshes.find(m => m.metadata?.houseSlot === 'studio')?.uniqueId }; });
-  await page.locator('#garden-plant-seed').click();
+  await plantSeed(page);
   expect(await page.evaluate(() => window.__littleHours.counts().engines)).toBe(initial.engines);
   expect(await page.evaluate(() => window.__littleHours.house.diagnostics().scene.meshes.find(m => m.metadata?.houseSlot === 'studio')?.uniqueId)).toBe(initial.room);
   await page.waitForTimeout(1700); const before = await page.evaluate(() => window.__littleHours.house.diagnostics().renderCount);
@@ -77,7 +80,7 @@ test('garden butterflies animate and the selected bed follows real input without
   await expect.poll(async () => (await wings()).visible).toBe(true);
   const first = (await wings()).position;
   await expect.poll(async () => JSON.stringify((await wings()).position)).not.toBe(JSON.stringify(first));
-  await page.locator('#garden-spot-4').click();
+  await selectSpot(page, 4);
   expect(await page.evaluate(() => {
     const d = window.__littleHours.house.diagnostics(), ring = d.scene.getMeshByName('garden-selected-bed');
     return [ring.position.x, ring.position.z];
@@ -90,7 +93,7 @@ test('garden butterflies animate and the selected bed follows real input without
 
 test('a name draft stays with its plant when another tab replaces that garden spot', async ({ page, context }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/'); await ready(page); await openGarden(page); await page.locator('#garden-plant-seed').click();
+  await page.goto('/'); await ready(page); await openGarden(page); await plantSeed(page);
   await page.locator('#garden-rename').click(); await page.locator('#garden-name-input').fill('My first bloom');
   const other = await context.newPage(); await other.goto('/'); await ready(other);
   await other.evaluate(() => {
@@ -105,7 +108,7 @@ test('a name draft stays with its plant when another tab replaces that garden sp
 });
 
 test('a garden postcard exports locally without spending coins or changing progress', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/'); await ready(page); await openGarden(page); await page.locator('#garden-plant-seed').click();
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/'); await ready(page); await openGarden(page); await plantSeed(page);
   const before = await page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-v1')).garden);
   await page.locator('#house-postcard').click(); await expect(page.locator('#house-postcard-dialog')).toBeVisible();
   const download = page.waitForEvent('download'); await page.locator('#download-postcard').click();
@@ -118,7 +121,7 @@ test('the immersive garden keeps its overlays, keyboard exits and name editor in
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/'); await ready(page); await openGarden(page);
   const viewport = page.viewportSize();
   expect(await page.locator('#house-page').boundingBox()).toMatchObject({ x: 0, y: 0, ...viewport });
-  await page.locator('#garden-plant-seed').click();
+  await plantSeed(page);
   await page.locator('#garden-rename').click();
   await page.locator('#garden-name-input').click();
   await page.locator('#garden-name-input').fill('A little sunshine');
@@ -130,6 +133,9 @@ test('the immersive garden keeps its overlays, keyboard exits and name editor in
   await page.keyboard.press('Escape');
   await expect(page.locator('#garden-collection-dialog')).toBeHidden();
   await expect(page.locator('#garden-collection-open')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#garden-card')).toBeHidden();
+  await expect(page.locator('#garden-spot-0')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator('#house-open-garden')).toBeVisible();
   await expect(page.locator('#house-open-garden')).toBeFocused();
@@ -143,7 +149,7 @@ test('your avatar and selected pet walk in the garden and rest together during f
   await page.goto('/'); await ready(page); await openGarden(page);
   const pair = () => page.evaluate(() => {
     const d = window.__littleHours.house.diagnostics(), root = d.scene.getTransformNodeByName('house-stroll');
-    return { visible: root.isEnabled(), scale: root.scaling.x, avatar: root.getDescendants().filter(n => n.name === 'Walking companion').length, dog: root.getDescendants().some(n => n.name === 'pet-dog'), pose: d.stroll, pet: d.strollPet, home: d.scene.getMeshByName('house-retreat-home').isEnabled() };
+    return { visible: root.isEnabled(), scale: root.scaling.x, avatar: root.getDescendants().filter(n => n.name === 'Walking companion').length, dog: root.getDescendants().some(n => n.name === 'pet-dog'), pose: d.stroll, pet: d.strollPet, home: d.scene.getMeshByName('house-retreat-exit').isEnabled() };
   });
   await expect.poll(async () => (await pair()).visible).toBe(true);
   expect(await pair()).toMatchObject({ scale: .76, avatar: 1, dog: true, home: true, pose: { sit: 0 } });
@@ -153,13 +159,57 @@ test('your avatar and selected pet walk in the garden and rest together during f
   await expect.poll(async () => (await pair()).pose.z).toBe(2.1 / .76);
   expect(await pair()).toMatchObject({ visible: true, pose: { x: 0, moving: false }, pet: { moving: false } });
   expect((await pair()).pet.x).toBeCloseTo(-.35 / .76 - .25);
-  await page.getByRole('button', { name: 'Back home', exact: true }).click();
-  await expect(page.locator('#room-section')).toBeVisible();
-  await page.locator('#start-button').click(); await openGarden(page);
+  await page.getByRole('button', { name: 'Back to island', exact: true }).click();
+  await expect(page.locator('#house-open-garden')).toBeVisible();
+  await page.locator('#back-to-room').click(); await page.locator('#start-button').click(); await openGarden(page);
   await expect.poll(async () => (await pair()).pose.sit).toBe(1);
   expect(await pair()).toMatchObject({ visible: true, avatar: 1, dog: true, pet: { moving: false } });
   const before = await page.evaluate(() => ({ session: window.__littleHours.state.session, garden: window.__littleHours.state.garden, coins: window.__littleHours.state.house.coins }));
-  await page.getByRole('button', { name: 'Back home', exact: true }).click();
-  await expect(page.locator('#room-section')).toBeVisible();
+  await page.getByRole('button', { name: 'Back to island', exact: true }).click();
+  await expect(page.locator('#house-open-garden')).toBeVisible();
   expect(await page.evaluate(() => ({ session: window.__littleHours.state.session, garden: window.__littleHours.state.garden, coins: window.__littleHours.state.house.coins }))).toEqual(before);
+});
+
+for (const width of [1440, 390]) {
+  test(`${width}px garden arrives clear and opens one card on demand`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    await page.goto('/'); await ready(page); await openGarden(page);
+    await expect(page.locator('#garden-card')).toBeHidden();
+    await expect(page.locator('#garden-spots')).toBeHidden();
+    await page.screenshot({ path: `.lh/evidence/garden-arrival-${width}.png` });
+    await page.locator('#garden-spot-0').click();
+    await expect(page.locator('#garden-card')).toBeVisible();
+    await expect(page.locator('#garden-card-title')).toBeFocused();
+    await expect(page.locator('#garden-card-title')).toHaveText('Choose a seed');
+    await page.screenshot({ path: `.lh/evidence/garden-seeds-${width}.png` });
+    await page.locator('#garden-plant-seed').click();
+    await expect(page.locator('#garden-study')).toBeFocused();
+    expect((await page.locator('#garden-card').boundingBox()).height).toBeLessThan(240);
+    await page.screenshot({ path: `.lh/evidence/garden-plant-${width}.png` });
+    await page.locator('#garden-card-close').click();
+    await expect(page.locator('#garden-card')).toBeHidden();
+    await expect(page.locator('#garden-spot-0')).toBeFocused();
+    const bed = await page.locator('#garden-spot-0').boundingBox();
+    await page.mouse.click(bed.x + .3, bed.y + bed.height / 2);
+    await expect(page.locator('#garden-card-title')).toHaveText('Blush cosmos');
+    await expect(page.locator('#garden-card')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#garden-card')).toBeHidden();
+    await expect(page.locator('#garden-back')).toBeVisible();
+  });
+}
+
+test('an animated garden arrival opens the specific plant selected from focus', async ({ page }) => {
+  const state = seedState('garden-grown');
+  state.garden.plants[2].minutes = 25; state.garden.activeId = state.garden.plants[2].id; state.garden.plants[2].name = 'For rainy days';
+  await page.addInitScript(value => localStorage.setItem('little-hours-v1', JSON.stringify(value)), state);
+  await page.goto('/'); await ready(page); await openGarden(page);
+  await expect(page.locator('#garden-card-title')).toHaveText('For rainy days');
+  await expect(page.locator('#garden-card-title')).toBeFocused();
+  await expect(page.locator('#garden-spot-2')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#garden-card')).toBeHidden();
+  await page.locator('#garden-back').click();
+  await page.locator('#house-open-garden').click();
+  await expect(page.locator('#garden-card')).toBeHidden();
 });

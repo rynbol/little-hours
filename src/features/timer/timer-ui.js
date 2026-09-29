@@ -70,7 +70,7 @@ export function createTimerUI(app) {
   const openGarden = (plantId = focusGardenPlantId(app.state)) => {
     if (app.nav.travelling || app.avatar.active) return;
     if (app.panels.current) app.panels.close();
-    app.roomUI.leaveMini(); app.nav.setHouseOpen(true, 'orchard'); app.houseUI.selectGardenPlant(plantId);
+    app.roomUI.leaveMini(); app.nav.setHouseOpen(true, 'orchard', plantId);
   };
   gardenButton.addEventListener('click', () => openGarden());
   const quickbar = createFocusQuickbar({ signal: app.signal, onToggle: toggleRunning, onSettings: () => { expand(); $('#focus-card').focus({ preventScroll: true }); } });

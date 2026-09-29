@@ -26,7 +26,8 @@ export function createUIFeedback(root, { signal } = {}) {
     animation.oncancel = cleanup;
     return animation;
   }
-  const pop = (element, strong = false) => animate(element, [
+  const reactionTarget = element => element?.matches('.house-room-tag') ? element.querySelector('.house-pin') : element;
+  const pop = (element, strong = false) => animate(reactionTarget(element), [
     { scale: strong ? '.88' : '.94' },
     { scale: strong ? '1.055' : '1.035', offset: .48 },
     { scale: '.985', offset: .72 }, { scale: '1' },
@@ -81,7 +82,7 @@ export function createUIFeedback(root, { signal } = {}) {
     const element = control(event);
     if (!element || !allowed() || event.button !== 0) return;
     pressed = element;
-    animate(element, [{ scale: '1' }, { scale: '.93' }], { duration: 100, fill: 'forwards' }, 'press');
+    animate(reactionTarget(element), [{ scale: '1' }, { scale: '.93' }], { duration: 100, fill: 'forwards' }, 'press');
   }
   function release() {
     if (!pressed) return;

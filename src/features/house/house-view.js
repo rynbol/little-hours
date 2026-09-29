@@ -16,7 +16,7 @@ import '@babylonjs/core/Culling/ray.js';
 import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
 import { gardenPlantName } from '../../core/garden-plants.js';
 import { PLANT_SPOTS, gardenPlotAt } from './garden-model.js';
-import { RETREAT_SPOTS, RETREAT_BOUNDS, GARDEN_HOME_TAG } from './garden-retreat.js';
+import { RETREAT_SPOTS, RETREAT_BOUNDS, GARDEN_EXIT_TAG } from './garden-retreat.js';
 import { createGardenButterflies } from './garden-butterflies.js';
 import { GARDEN_TAG } from './house-garden.js';
 import { POND_TAG } from './house-pond.js';
@@ -29,6 +29,7 @@ import { nextExpansion, roomDisplayName } from '../../core/house.js';
 import './whole-house.css';
 
 const PIN_ICONS = {
+  island: '<path d="M16 5 7 12l9 7M7 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   room: '<path d="M5 20V10.5L12 5l7 5.5V20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20v-5.5h4V20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
   loft: '<path d="M5 19h4v-4h4v-4h4V7h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   garden: '<path d="M12 20v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 13c0-4 2.5-6.5 6.5-6.5 0 4-2.5 6.5-6.5 6.5ZM12 15.5c0-3-2-5-5.5-5 0 3 2 5 5.5 5Z" fill="currentColor"/>',
@@ -59,7 +60,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   shadows.getShadowMap().refreshRate = 0;
   const gardenRing = MeshBuilder.CreateTorus('garden-selected-bed', { diameter: 2.27, thickness: .04, tessellation: 64 }, scene);
   const ringPaint = new StandardMaterial('garden-selected-bed-paint', scene); ringPaint.diffuseColor = Color3.FromHexString('#e7d6a1'); ringPaint.emissiveColor = Color3.FromHexString('#7e7d43'); ringPaint.specularColor.setAll(0); gardenRing.material = ringPaint; gardenRing.scaling.z = .82; gardenRing.isPickable = false; gardenRing.setEnabled(false);
-  let gardenPlot = 0;
+  let gardenPlot = null;
   const instrumentation = new SceneInstrumentation(scene);
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const roomMotion = createHouseMotion(HOUSE_POSITIONS);
@@ -174,10 +175,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     if (!model) return;
     const width = Math.max(1, container.clientWidth), height = Math.max(1, container.clientHeight);
     const garden = selectedId === 'orchard', phone = width <= 700 || (width <= 1000 && height > 650);
-    const overlay = container.closest('.is-living-garden'), tray = overlay?.querySelector('.garden-tray'), card = overlay?.querySelector('.garden-card');
-    const bottom = garden ? Math.max((tray?.offsetHeight || 200) + 38, phone && card?.offsetHeight ? height - card.offsetTop + 12 : 0) : 0;
-    const left = garden && !phone ? 20 : 0, top = garden ? phone ? 116 : 90 : 0;
-    const usableWidth = Math.max(180, width - left - (garden && !phone ? width <= 1000 ? 285 : 335 : 0));
+    const bottom = garden ? 230 : 0;
+    const left = garden ? 18 : 0, top = garden ? phone ? 100 : 76 : 0;
+    const usableWidth = Math.max(180, width - left * 2);
     const usableHeight = Math.max(130, height - top - bottom);
     const frame = houseFrame(garden ? RETREAT_BOUNDS : model.framing, camera.getViewMatrix(true), usableWidth / usableHeight, garden ? .95 : .92);
     const scale = frame.height / usableHeight;
@@ -189,9 +189,11 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const width = container.clientWidth, height = container.clientHeight, matrix = camera.getTransformationMatrix();
     for (const button of tags.children) {
       const id = button.dataset.room;
-      button.hidden = (id === 'garden-home') !== (selectedId === 'orchard');
+      const plot = /^plot-[0-5]$/.test(id) ? Number(id.slice(5)) : null;
+      button.hidden = (id === 'garden-exit' || plot !== null) !== (selectedId === 'orchard');
       const base = HOUSE_POSITIONS[id], offset = model.levels[id]?.position;
-      if (!base) tagPoint.set(...(id === 'garden-home' ? GARDEN_HOME_TAG : id === 'pond' ? POND_TAG : GARDEN_TAG));
+      if (plot !== null) { const [x, z] = RETREAT_SPOTS[plot]; tagPoint.set(x + .65, .52, z + .54); }
+      else if (!base) tagPoint.set(...(id === 'garden-exit' ? GARDEN_EXIT_TAG : id === 'pond' ? POND_TAG : GARDEN_TAG));
       else tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : id === 'loft' ? .7 : 0), base[2] + offset.z + 2.08);
       Vector3.TransformCoordinatesToRef(tagPoint, matrix, tagProjection);
       const half = Math.min(24, width / 4);
@@ -217,11 +219,11 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   tags.addEventListener('click', event => { const button = event.target.closest('button'); if (button) onSelect(button.dataset.room); });
   function update(next, selected, atmosphere = theme, appearance = avatar) {
     const previousSelection = selectedId, hadModel = Boolean(model);
-    canvas.setAttribute('aria-label', selected === 'orchard' ? 'Your miniature garden. Tap a flower bed to choose a plant, or use the garden spots below.' : 'Your miniature cottage. Choose a room or building site. Use the room navigation to choose with a keyboard.');
+    canvas.setAttribute('aria-label', selected === 'orchard' ? 'Your miniature garden. Tap a flower bed to choose a plant, or choose a marker with your keyboard.' : 'Your miniature cottage. Choose a room or building site. Use the room navigation to choose with a keyboard.');
     roomMotion.stop();
     house = next; selectedId = selected; theme = atmosphere; avatar = appearance;
     water.mesh.setEnabled(selectedId !== 'orchard');
-    gardenRing.setEnabled(selectedId === 'orchard'); gardenRing.position.set(RETREAT_SPOTS[gardenPlot][0], .18, RETREAT_SPOTS[gardenPlot][1]);
+    gardenRing.setEnabled(selectedId === 'orchard' && gardenPlot !== null); if (gardenPlot !== null) gardenRing.position.set(RETREAT_SPOTS[gardenPlot][0], .18, RETREAT_SPOTS[gardenPlot][1]);
     sky.intensity = theme === 'dusk' ? .56 : .62; sun.intensity = theme === 'dusk' ? .8 : .95;
     sun.diffuse = Color3.FromHexString(theme === 'dusk' ? '#ead2ab' : '#fff3d9'); water.setTheme(theme);
     const previous = model;
@@ -245,7 +247,15 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       const button = pin('button', entry.id === 'loft' ? 'loft' : 'room', entry.id, roomDisplayName(entry), here ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor');
       button.setAttribute('aria-label', `Visit ${roomDisplayName(entry)}`); button.setAttribute('aria-current', here ? 'location' : 'false');
     }
-    if (selectedId === 'orchard') pin('button', 'room', 'garden-home', 'Home').setAttribute('aria-label', 'Back home');
+    if (selectedId === 'orchard') {
+      pin('button', 'island', 'garden-exit', 'Island').setAttribute('aria-label', 'Back to island');
+      RETREAT_SPOTS.forEach((_, index) => {
+        const plant = house.plants?.find(item => item.slot === index), button = pin('button', plant ? 'garden' : 'site', `plot-${index}`, plant ? gardenPlantName(plant) : 'Plant a seed');
+        button.id = `garden-spot-${index}`; button.classList.add('garden-bed-pin');
+        button.setAttribute('aria-label', `Spot ${index + 1}, ${plant ? gardenPlantName(plant) : 'empty'}`);
+        button.setAttribute('aria-pressed', String(gardenPlot === index));
+      });
+    }
     pin('button', 'garden', 'orchard', 'Garden').classList.add('is-garden');
     const pond = pin('button', 'pond', 'pond', 'Willow Pond', 'Go fishing'); pond.classList.add('is-pond'); pond.setAttribute('aria-label', 'Go fishing at Willow Pond');
     // The blueprint's tag: what grows next and how close it is.
@@ -298,7 +308,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     if (id === hovering) return;
     hovering = id; canvas.style.cursor = id ? 'pointer' : 'grab';
     const room = house.rooms.find(room => room.id === id);
-    canvas.title = id?.startsWith('plot-') ? gardenPlantName(house.plants?.find(plant => plant.slot === Number(id.slice(5)))) : id === 'garden-home' ? 'Back home' : id === 'orchard' ? 'Your garden' : id === 'pond' ? 'Willow Pond' : id ? room ? roomDisplayName(room) : 'A little room to grow' : '';
+    canvas.title = id?.startsWith('plot-') ? gardenPlantName(house.plants?.find(plant => plant.slot === Number(id.slice(5)))) : id === 'garden-exit' ? 'Back to island' : id === 'orchard' ? 'Your garden' : id === 'pond' ? 'Willow Pond' : id ? room ? roomDisplayName(room) : 'A little room to grow' : '';
   };
   const onVisibility = () => { if (document.hidden) { onCancel(); roomMotion.stop(); shadows.getShadowMap().resetRefreshCounter(); cancelAnimationFrame(frame); frame = 0; } else requestRender(); };
   window.addEventListener('blur', onCancel); canvas.addEventListener('lostpointercapture', onCancel); canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointerup', onUp); canvas.addEventListener('pointercancel', onCancel); canvas.addEventListener('pointerleave', onLeave); canvas.addEventListener('pointermove', onMove);
@@ -310,7 +320,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   return {
     update,
     turn,
-    selectGardenPlot(index) { gardenPlot = index; gardenRing.position.set(RETREAT_SPOTS[index][0], .18, RETREAT_SPOTS[index][1]); gardenRing.setEnabled(selectedId === 'orchard'); fitCamera(); requestRender(); },
+    selectGardenPlot(index) { gardenPlot = index; tags.querySelectorAll('.garden-bed-pin').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.room === `plot-${index}`))); if (index !== null) gardenRing.position.set(RETREAT_SPOTS[index][0], .18, RETREAT_SPOTS[index][1]); gardenRing.setEnabled(selectedId === 'orchard' && index !== null); requestRender(); },
     celebrate(id) { if (!motion.matches) roomMotion.trigger(id, 'build', performance.now()); burst = { start: performance.now(), origin: (HOUSE_POSITIONS[id] || [0, 0, 0]).map((v, i) => v + (model.levels[id]?.position.asArray()[i] || 0)) }; requestRender(); },
     async createPostcard(name, caption) {
       // Copy immediately after rendering: WebGL's default buffer need not be

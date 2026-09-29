@@ -12,7 +12,7 @@ import { surfaceChoices } from '../../core/surfaces.js';
 import { houseFurniture, houseArchitecture } from './house-furniture.js';
 import { gardenGrowth } from '../../core/garden-plants.js';
 import { buildGarden } from './house-garden.js';
-import { buildGardenRetreat, buildRetreatFlowers, buildGardenHome } from './garden-retreat.js';
+import { buildGardenRetreat, buildRetreatFlowers, buildGardenExit } from './garden-retreat.js';
 import { buildPond } from './house-pond.js';
 import { buildIsland } from './house-island.js';
 import { buildExteriorPart, buildBlueprint, exteriorPlan, hingeOf, hingePose, CHIMNEY_TOP } from './house-exterior.js';
@@ -145,7 +145,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   const trees = house.garden || [], plants = house.plants || [];
   batch('orchard', JSON.stringify([theme, trees.map(tree => [tree.date, Math.round(tree.growth * 20)]), plants.map(plant => [plant.slot, plant.species, gardenGrowth(plant)])]), () => buildGarden({ ...outside, cylinder }, trees, theme, plants));
   if (selectedId === 'orchard' || previous?.pieces.has('retreat-grounds')) {
-    batch('retreat-home', theme, () => buildGardenHome(outside, theme), 'garden-home');
+    batch('retreat-exit', theme, () => buildGardenExit({ ...outside, cylinder }, theme), 'garden-exit');
     batch('retreat-grounds', theme, () => buildGardenRetreat({ ...outside, cylinder }, theme), 'orchard');
     if (plants.some(plant => plant.slot !== null)) batch('retreat-plants', JSON.stringify(plants.map(plant => [plant.slot, plant.species, gardenGrowth(plant)])), () => buildRetreatFlowers({ ...outside, cylinder }, plants), 'orchard');
   }

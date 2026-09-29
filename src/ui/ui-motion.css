@@ -6,6 +6,7 @@
 }
 .ui-motion-enabled:not(.is-avatar-editing) #app button:active { transform: none; }
 .ui-motion-enabled:not(.is-avatar-editing) #app .house-room-tag:active { transform: translate(calc(var(--pin-half) * -1), -100%); }
+.ui-motion-enabled:not(.is-avatar-editing) #app .house-room-tag.garden-bed-pin:active { transform: translate(-50%, -50%); }
 .ui-motion-enabled:not(.is-avatar-editing) #app :is(.room-panel, .builder-panel, .house-detail, .focus-card, .house-celebration) { animation: none; }
 .ui-motion-enabled:not(.is-avatar-editing) :is(.house-design-thumb, .furniture-art, .preset-art, .house-room-number) { transform-origin: 50% 80%; }
 .ui-motion-enabled .motion-spark { font-size: 20px; text-shadow: 0 2px 6px #fff3db65; }

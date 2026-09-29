@@ -1,11 +1,10 @@
-import { buildExteriorPart, exteriorPlan } from './house-exterior.js';
 import { buildGardenTree } from './garden-trees.js';
 import { buildGardenSpecimen } from './garden-model.js';
 
 export const RETREAT_SPOTS = [[-2.35, -1.95], [2.35, -1.95], [-3, .2], [3, .2], [-2.25, 2.35], [2.25, 2.35]];
-export const GARDEN_HOME = [-3.8, .04, -6.1];
-export const GARDEN_HOME_TAG = [-3.8, .45, -4.45];
-export const RETREAT_BOUNDS = [{ points: new Float32Array([...Array.from({ length: 32 }, (_, i) => { const a = i / 32 * Math.PI * 2; return [Math.cos(a) * 6.1, -.5, Math.sin(a) * 5.5]; }).flat(), -4.3, 3.1, -3.05, 4.3, 3.1, -3.05, -1.5, 2.6, -4.1, 1.5, 2.6, -4.1, -6.65, -.5, -8.55, -1, -.5, -8.55, -5.8, 3.7, -6.1, -1.8, 3.7, -6.1]) }];
+export const GARDEN_EXIT = [-3.8, .04, -6.1];
+export const GARDEN_EXIT_TAG = [-3.8, .45, -4.45];
+export const RETREAT_BOUNDS = [{ points: new Float32Array([...Array.from({ length: 32 }, (_, i) => { const a = i / 32 * Math.PI * 2; return [Math.cos(a) * 6.1, -.5, Math.sin(a) * 5.5]; }).flat(), -4.3, 3.1, -3.05, 4.3, 3.1, -3.05, -1.5, 2.6, -4.1, 1.5, 2.6, -4.1, -6.65, -.5, -8.55, -1, -.5, -8.55, -5.8, 2.8, -6.1, -1.8, 2.8, -6.1]) }];
 const shades = ['#819b70', '#95ad7b', '#a4b78b', '#718e68'];
 const petals = ['#ecc3b6', '#d5bddb', '#f5e6bb', '#e5acb9'];
 const hash = n => { const value = Math.sin(n * 71.3 + 2.1) * 43758.54; return value - Math.floor(value); };
@@ -144,12 +143,26 @@ export function buildRetreatFlowers(api, plants) {
   }
 }
 
-export function buildGardenHome(api, theme) {
-  const scale = .68, [hx, hy, hz] = GARDEN_HOME;
-  const cottage = Object.fromEntries(['box', 'ball', 'prism'].map(kind => [kind, (x, y, z, w, h, d, ...rest) => api[kind](hx + x * scale, hy + y * scale, hz + z * scale, w * scale, h * scale, d * scale, ...rest)]));
-  cottage.disc = (x, y, z, diameter, depth, ...rest) => api.disc(hx + x * scale, hy + y * scale, hz + z * scale, diameter * scale, depth * scale, ...rest);
-  const { parts, options } = exteriorPlan({ rooms: [{ id: 'studio' }] }, 'studio');
-  for (const part of parts) buildExteriorPart(cottage, part, 'studio', theme, options);
-  api.box(hx, .06, hz + 1.63, 1.1, .12, .48, '#d8ccb3');
-  api.box(hx, .025, hz + 1.94, 1.35, .065, .35, '#e4d8bc');
+export function buildGardenExit(api, theme) {
+  const [x, , z] = GARDEN_EXIT;
+  for (let i = 0; i < 7; i++) stone(api, x + Math.sin(i * .5) * .12, -4.65 - i * .52, 1.12, .46, i);
+  for (const side of [-1, 1]) {
+    api.box(x + side * 1.03, 1.13, z, .17, 2.26, .17, '#b29c79');
+    api.box(x + side * 1.03, 1.13, z - .74, .17, 2.26, .17, '#b29c79');
+    for (const y of [.5, .95, 1.4, 1.85]) api.box(x + side * 1.03, y, z - .37, .06, .05, .75, '#c6b390');
+    for (let i = 0; i < 7; i++) {
+      api.ball(x + side * 1.03 + Math.sin(i * 2) * .1, .2 + i * .32, z + .03, .42, .43, .38, shades[i % 4]);
+      if (i % 2) api.ball(x + side * 1.05, .26 + i * .32, z + .23, .21, .19, .19, petals[i % 4]);
+    }
+    flowers(api, x + side * 1.22, z + .4, side + 6, 1.3);
+  }
+  for (const depth of [0, -.74]) api.box(x, 2.24, z + depth, 2.55, .15, .16, '#cab594');
+  for (let i = 0; i < 7; i++) {
+    api.box(x - 1.24 + i * .41, 2.33, z - .38, .09, .09, 1.1, '#dec9a5');
+    api.ball(x - 1.15 + i * .38, 2.43, z, .57, .34, .55, shades[i % 4]);
+    if (i % 2) api.ball(x - 1.15 + i * .38, 2.48, z + .26, .23, .2, .23, '#e9c7be');
+  }
+  api.box(x + .65, 1.86, z + .05, .035, .58, .035, '#a58f6b');
+  api.box(x + .65, 1.6, z + .05, .24, .07, .24, '#a58f6b');
+  api.ball(x + .65, 1.75, z + .05, .18, .23, .18, '#ffe3ae', theme === 'dusk' ? 1.9 : 1.3);
 }

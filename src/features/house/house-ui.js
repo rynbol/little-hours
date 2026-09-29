@@ -79,7 +79,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
   root.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || postcardDialog.open || event.isComposing) return;
     if ($('#house-room-menu').matches(':popover-open')) { event.stopPropagation(); event.preventDefault(); $('#house-room-menu').hidePopover(); $('#house-rooms-toggle').focus({ preventScroll: true }); }
-    else if (selectedId === 'orchard') { event.stopPropagation(); event.preventDefault(); select(store.state.house.activeId, false); }
+    else if (selectedId === 'orchard') { event.stopPropagation(); event.preventDefault(); if (!gardenUI.dismiss()) select(store.state.house.activeId, false); }
     else if (detailOpen) { event.stopPropagation(); event.preventDefault(); closeDetail(); }
   });
 
@@ -104,7 +104,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     $('#house-celebration').hidden = true; root.classList.remove('house-just-built');
     signature = ''; render();
     if (plot !== null) gardenUI.selectSlot(plot);
-    (leavingGarden && selectedId !== 'orchard' ? $('#house-open-garden') : $('#house-detail h2'))?.focus({ preventScroll: true });
+    (plot !== null ? $('#garden-card-title') : leavingGarden && selectedId !== 'orchard' ? $('#house-open-garden') : $('#house-detail h2'))?.focus({ preventScroll: true });
   }
   function celebrate(entry) {
     const badge = $('#house-celebration');
@@ -182,11 +182,12 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     const nextModel = JSON.stringify([modelHouse.rooms, modelHouse.garden, modelHouse.plants, house.activeId, selectedId, store.state.theme, store.state.avatar, store.state.pet]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
-      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: id => id === 'garden-home' ? onClose() : id === 'pond' ? onPond?.() : select(id) };
+      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: id => id === 'garden-exit' ? select(store.state.house.activeId, false) : id === 'pond' ? onPond?.() : select(id) };
       const build = () => {
         try {
           if (view) view.update(options.house, options.selectedId, options.theme, options.avatar);
           else view = createHouseView($('#house-canvas'), options);
+          if (selectedId === 'orchard') view.selectGardenPlot(gardenUI.selectedSlot);
         } catch (error) {
           console.error('Could not show the cottage:', error);
           $('#house-canvas').textContent = 'Your rooms are safe. Use the room buttons below to enter or expand your house.';
@@ -206,7 +207,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     // The house stays built while away, so coming back is instant.
     hide() { $('#house-room-menu').hidePopover(); gardenUI.close(); document.body.classList.remove('is-garden'); shown = false; postcardDialog.close(); root.hidden = true; view?.setSuspended(true); if (!view) modelSignature = ''; signature = ''; celebration = null; clearTimeout(celebrationTimer); $('#house-celebration').hidden = true; root.classList.remove('house-just-built'); $('#house-name-form').hidden = true; },
     render,
-    selectGardenPlant(id) { if (shown && selectedId === 'orchard') gardenUI.selectPlant(id); },
+    selectGardenPlant(id) { if (shown && selectedId === 'orchard') { gardenUI.selectPlant(id); $('#garden-card-title')?.focus({ preventScroll: true }); } },
     diagnostics: () => view?.diagnostics(),
     get view() { return view; },
     dispose() { gardenUI.close(); document.body.classList.remove('is-garden'); cancelAnimationFrame(firstBuild); clearTimeout(firstBuild); clearTimeout(celebrationTimer); postcardDialog.close(); if (postcardUrl) URL.revokeObjectURL(postcardUrl); view?.dispose(); },

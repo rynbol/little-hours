@@ -27,15 +27,15 @@ export function createHouseNavigation(app) {
     return true;
   }
 
-  function setHouseOpen(open, selectedId) {
+  function setHouseOpen(open, selectedId, plantId) {
     if (travelling) return;
     const garden = selectedId === 'orchard' || /^plot-[0-5]$/.test(selectedId);
-    if ((open && garden) || (!open && document.body.classList.contains('is-garden'))) return travelTo(open ? 'garden' : 'home', () => showHouse(open, selectedId), () => !open || Boolean(app.houseUI.diagnostics()?.scene.isReady()));
-    showHouse(open, selectedId);
+    if ((open && garden) || (!open && document.body.classList.contains('is-garden'))) return travelTo(open ? 'garden' : 'home', () => showHouse(open, selectedId, plantId), () => !open || Boolean(app.houseUI.diagnostics()?.scene.isReady()));
+    showHouse(open, selectedId, plantId);
   }
-  function showHouse(open, selectedId) {
+  function showHouse(open, selectedId, plantId) {
     if (travelling) return;
-    if (open === houseOpen) { if (open && selectedId) app.houseUI.show(selectedId); return; }
+    if (open === houseOpen) { if (open && selectedId) app.houseUI.show(selectedId); if (open && plantId) app.houseUI.selectGardenPlant(plantId); return; }
     if (open) {
       closePicker(false);
       setConnectedView(false);
@@ -48,6 +48,7 @@ export function createHouseNavigation(app) {
     app.room?.setSuspended(open);
     if (open) { app.houseUI.show(selectedId); (document.body.classList.contains('is-garden') ? $('#garden-back') : $('#back-to-room'))?.focus({ preventScroll: true }); }
     else { app.houseUI.hide(); $('#rooms-button').focus({ preventScroll: true }); }
+    if (open && plantId) app.houseUI.selectGardenPlant(plantId);
     app.timer.syncDock();
   }
   const picker = $('#room-picker'), switcher = $('#room-switcher-toggle');
