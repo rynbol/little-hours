@@ -11,8 +11,10 @@ export default {
     await app.drag(onRing(25), onRing(60), 16); await sleep(100);
     check('dragging the seed round the dial sets 60 minutes at once', await app.text('#timer') === '60:00' && await app.attr('#timer-ring', 'aria-valuenow') === '60', await app.text('#timer'));
     await app.key('Home'); await app.key('ArrowRight'); await app.key('ArrowRight');
+    await app.waitFor(`document.getElementById('timer').textContent === '03:00'`, { what: 'the keyboard duration to save' });
     check('Home and two right arrows set 3 minutes', await app.text('#timer') === '03:00' && await app.attr('#timer-ring', 'aria-valuetext') === '3 minutes', await app.text('#timer'));
     await app.clickSel('[data-minutes="25"]');
+    await app.waitFor(`document.getElementById('timer').textContent === '25:00'`, { what: 'the preset duration to save' });
     check('the 25 minute button still sets 25', await app.text('#timer') === '25:00' && await app.attr('[data-minutes="25"]', 'aria-pressed') === 'true');
     await app.clickSel('#start-button');
     await app.waitFor(`document.getElementById('timer').textContent !== '25:00'`, { what: 'the countdown', timeout: 3000 });

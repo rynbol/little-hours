@@ -24,6 +24,7 @@ export default {
     await steps.openRoomPicker(app);
     const began = Date.now();
     await app.clickSel('[data-house-go="garden"]');
+    await app.waitFor('document.body.classList.contains("is-travelling")', { what: 'the room transition to start' });
     check('selection closes the sheet and locks the route during transition', !await isOpen(app) && await app.js('document.getElementById("next-room").disabled && document.body.classList.contains("is-travelling") && !document.body.classList.contains("is-door-walking")'));
     await app.waitFor('window.__littleHours.state.house.activeId === "garden" && !document.body.classList.contains("is-travelling")');
     check('room switching finishes in under 1.5 seconds', Date.now() - began < 1500 * t.slow, `${Date.now() - began} ms`);
@@ -79,6 +80,7 @@ export default {
     check('phone: a bottom sheet with three readable touch targets and no overflow', Math.abs(phone.bottom - 844) < 2 && phone.width === 390 && !phone.overflow && phone.cards.every(Boolean), phone);
     await t.shot(app, 'phone');
     await app.clickSel('[data-house-go="loft"]');
+    await app.waitFor('window.__littleHours.state.house.activeId === "loft"', { what: 'the reduced-motion arrival to save' });
     check('reduced motion arrives immediately without an animation', await active(app) === 'loft' && !await app.js('document.body.classList.contains("is-travelling")') && !await isOpen(app));
     await steps.openRoomPicker(app);
     await app.clickSel('#room-picker-house');

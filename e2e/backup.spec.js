@@ -27,7 +27,15 @@ test('download a copy, bring back an edited one, then swap back', async ({ page 
   // Nothing changes until the replacement is confirmed.
   expect(await saved(page)).toEqual(before);
 
-  await page.locator('#confirm-restore').click();
+  await page.evaluate(() => new Promise(acquired => {
+    navigator.locks.request('little-hours-home-write', () => new Promise(release => {
+      window.releaseRestoreTestLock = release;
+      acquired();
+    }));
+  }));
+  await page.locator('#confirm-restore').dblclick();
+  expect((await saved(page)).house.name).toBe(originalName);
+  await page.evaluate(() => window.releaseRestoreTestLock());
   await expect(page.locator('#coin-balance')).toHaveText('40');
   await expect(page.locator('body')).toHaveAttribute('data-theme', 'rain');
   expect((await saved(page)).house.name).toBe('Pebble Cottage');

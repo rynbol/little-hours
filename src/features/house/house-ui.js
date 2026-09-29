@@ -1,3 +1,4 @@
+import { isFocusing } from '../../core/session.js';
 import './house.css';
 import { createHouseView } from './house-view.js';
 import { HOUSE_SLOTS, nextExpansion, roomDisplayName } from '../../core/house.js';
@@ -82,7 +83,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
   }
   function render() {
     if (!shown) return;
-    view?.setFocused(store.state.session.running);
+    view?.setFocused(isFocusing(store.state.session));
     const house = store.state.house, next = nextExpansion(house), plan = planFor(selectedId);
     const key = JSON.stringify([house, selectedId, plan.design, preview, celebration, store.state.theme, store.state.avatar]);
     if (key === signature) return;
@@ -116,13 +117,13 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
       $('#house-surprise')?.addEventListener('click', () => { const options = PRESETS.filter(p => p.id !== plan.design); plan.design = options[Math.floor(clockRandom() * options.length)].id; preview = true; render(); });
       $('#see-house-preview')?.addEventListener('click', () => $('#house-canvas').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' }));
       $('#new-room-name')?.addEventListener('input', event => { plan.name = event.target.value; });
-      $('#build-room-form')?.addEventListener('submit', event => {
+      $('#build-room-form')?.addEventListener('submit', async event => {
         event.preventDefault();
         // The store refreshes the latest save and settles expired focus sessions
         // before validating/spending. Keep name + room creation in one write.
-        const result = store.buildRoom(slot.id, plan.design, plan.name);
+        const result = await store.buildRoom(slot.id, plan.design, plan.name);
         if (result.built) celebration = slot.id;
-        acceptUpdate(result); signature = ''; render();
+        await acceptUpdate(result); signature = ''; render();
         if (result.built) { celebrate(result.state.house.rooms.find(room => room.id === slot.id)); $('#enter-house-room')?.focus({ preventScroll: true }); }
         else notice(result.reason);
       });
@@ -140,7 +141,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     const nextModel = JSON.stringify([modelHouse.rooms, modelHouse.garden, house.activeId, selectedId, store.state.theme, store.state.avatar, store.state.pet]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
-      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: id => id === 'pond' ? onPond?.() : select(id) };
+      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: isFocusing(store.state.session), onSelect: id => id === 'pond' ? onPond?.() : select(id) };
       const build = () => {
         try {
           if (view) view.update(options.house, options.selectedId, options.theme, options.avatar);

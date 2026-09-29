@@ -67,9 +67,12 @@ export const shellMarkup = (audioPrefs) => `
         <button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
         <button class="focus-mode-button" id="focus-mode-enter" aria-expanded="false" aria-controls="focus-mode-hud" disabled>${icon('avatar')}<span>Focus mode</span>${icon('arrow')}</button>
         <button class="reset-session" id="reset-session" hidden>Start over</button>
+        <p class="session-kind" id="session-kind" hidden></p>
+        <div class="session-result" id="session-result" hidden><p id="session-result-copy"></p><div class="break-actions" role="group" aria-label="Take a break"><button class="quiet-button" data-break-minutes="5">5 min break</button><button class="quiet-button" data-break-minutes="15">15 min break</button></div></div>
+        <p class="sr-only" id="timer-status" role="status" aria-live="polite" aria-atomic="true"></p>
         <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="${audioPrefs.volume}" aria-label="Rain volume" disabled /><label class="chime-toggle"><span>Chime at the end</span><input type="checkbox" id="chime-toggle" ${audioPrefs.chime ? 'checked' : ''} /></label></div>
         <div id="focus-reward" class="focus-reward"></div>
-        <details class="session-journal"><summary><span>Today</span><span id="today-total">0 min</span></summary><div id="today-sessions"></div></details>
+        <details class="session-journal"><summary><span>Today</span><span id="today-total">0 min</span></summary><div id="today-sessions"></div><div class="week-history" id="week-history"></div><p class="history-note">Up to 365 completed sessions stay on this device. Download a copy in Saved on this device.</p></details>
         <div class="daily-note" id="daily-note">Good things begin with a little time.</div>
       </aside>
     </main>
@@ -84,5 +87,6 @@ export const shellMarkup = (audioPrefs) => `
   <dialog id="session-celebration" class="session-celebration" aria-labelledby="celebration-title" aria-describedby="celebration-copy">
     <form method="dialog"><button class="celebration-close" aria-label="Close session celebration">${icon('close')}</button><div class="celebration-flower" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="m24 0 5.6 17.7L48 24l-18.4 6.3L24 48l-5.6-17.7L0 24l18.4-6.3Z"/></svg></div><h2 id="celebration-title">You did it.</h2><p id="celebration-copy"></p><div class="celebration-coins">${coinArt()}<strong id="celebration-earned"></strong></div><p class="celebration-bond" id="celebration-bond"></p><button class="start-button" autofocus>Lovely ${icon('heart')}</button></form>
   </dialog>
+  <dialog id="replace-session" class="session-celebration" aria-labelledby="replace-session-title"><h2 id="replace-session-title">Start a new session?</h2><p id="replace-session-copy"></p><div class="break-actions"><button class="quiet-button" id="keep-session">Keep my session</button><button class="quiet-button" id="replace-session-confirm">Start fresh</button></div></dialog>
   <div id="drag-return-preview" class="drag-return-preview" aria-hidden="true" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>`;

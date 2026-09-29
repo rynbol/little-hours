@@ -141,10 +141,12 @@ export function createFishingUI(app, { onClose } = {}) {
     later(() => { if (phase === 'idle') status(''); }, 3600);
     $('#lake-cast').focus({ preventScroll: true });
   }
-  function land() {
-    letGo(); fight = null;
-    const result = app.store.landFish(hooked.index, hooked.rolled); hooked = null;
-    app.acceptUpdate(result); caught = result.caught;
+  async function land() {
+    letGo(); fight = null; phase = 'landing';
+    const update = app.store.landFish(hooked.index, hooked.rolled); hooked = null;
+    const result = await app.acceptUpdate(update);
+    if (phase !== 'landing' || !scene) return;
+    caught = result.caught;
     phase = 'leap'; $('#lake-bite').hidden = true; status(''); renderTray();
     if (!caught) { phase = 'idle'; renderTray(); return; }
     scene.leap(caught).then(() => { if (phase === 'leap') showCard(caught); });

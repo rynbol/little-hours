@@ -1,3 +1,4 @@
+import { isFocusing } from '../../core/session.js';
 import { nextExpansion, houseConnections, roomDisplayName } from '../../core/house.js';
 import { roomDesign } from '../../core/layout.js';
 import { DOOR_OPEN_SECONDS } from '../companion/index.js';
@@ -9,7 +10,7 @@ import { studyTrees } from '../../core/garden.js';
 import './room-navigation.css';
 
 export function createHouseNavigation(app) {
-  let houseOpen = false, connectedView = null, connectionsKey = '', travelTimer = 0, peekFrame = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
+  let houseOpen = false, connectedView = null, connectionsKey = '', travelTimer = 0, peekFrame = 0, arrivalTimer = 0, travelling = false, doorWalking = false, preparing = false;
 
   function cancelDoorTravel(message) {
     if (!travelling) return false;
@@ -59,8 +60,8 @@ export function createHouseNavigation(app) {
   }
 
   function renderConnections(updateModel = true) {
-    connectedView?.setFocused(app.state.session.running);
-    const key = JSON.stringify([app.state.house, app.state.history.length, app.state.theme, app.state.avatar, Boolean(connectedView), app.state.session.running]);
+    connectedView?.setFocused(isFocusing(app.state.session));
+    const key = JSON.stringify([app.state.house, app.state.history.length, app.state.theme, app.state.avatar, Boolean(connectedView), isFocusing(app.state.session)]);
     if (connectionsKey === key) return;
     connectionsKey = key;
     const focusedId = picker.contains(document.activeElement) ? document.activeElement.dataset.houseGo : null;
@@ -88,8 +89,8 @@ export function createHouseNavigation(app) {
       button.querySelector('.room-grow-name').textContent = next.short;
       button.addEventListener('click', () => { closePicker(false); setHouseOpen(true, next.id); }); grow.append(button);
     }
-    const notice = $('#room-picker-notice'); notice.hidden = !app.state.session.running;
-    notice.textContent = app.state.session.running ? 'Pause your focus session to change rooms.' : '';
+    const notice = $('#room-picker-notice'); notice.hidden = !isFocusing(app.state.session);
+    notice.textContent = isFocusing(app.state.session) ? 'Pause your focus session to change rooms.' : '';
     const wide = $('.home-wide'); wide.querySelector('span').textContent = connectedView ? 'Back to room' : 'Whole house'; wide.setAttribute('aria-pressed', String(Boolean(connectedView))); wide.setAttribute('aria-label', wide.querySelector('span').textContent);
     if (connectedView && updateModel) connectedView.update(withGarden(), app.state.house.activeId, app.state.theme, app.state.avatar);
     syncTravelControls();
@@ -102,7 +103,7 @@ export function createHouseNavigation(app) {
     if (open && app.decorate.active) app.decorate.setEditMode(false);
     if (open) {
       $('#house-in-room').hidden = false;
-      connectedView = createHouseView($('#house-in-room'), { house: withGarden(), selectedId: app.state.house.activeId, theme: app.state.theme, avatar: app.state.avatar, focused: app.state.session.running, onSelect: id => id === 'pond' ? app.lake?.open() : selectDestination(id) });
+      connectedView = createHouseView($('#house-in-room'), { house: withGarden(), selectedId: app.state.house.activeId, theme: app.state.theme, avatar: app.state.avatar, focused: isFocusing(app.state.session), onSelect: id => id === 'pond' ? app.lake?.open() : selectDestination(id) });
     } else { connectedView.dispose(); connectedView = null; $('#house-in-room').hidden = true; }
     $('#room-canvas').hidden = open;
     document.body.classList.toggle('is-connected', open); app.roomUI.renderHeading();
@@ -114,42 +115,43 @@ export function createHouseNavigation(app) {
     app.roomUI.leaveMini();
     if (app.panels.current) app.panels.close();
   }
-  function selectDestination(id) {
-    if (travelling) return;
+  async function selectDestination(id) {
+    if (travelling || preparing) return;
     if (id !== app.state.house.activeId) {
       if (app.panels.current === 'avatar') app.panels.close();
-      app.acceptUpdate(app.store.update());
-      if (app.state.session.running) { app.toast('Pause your focus session before walking to another room.', true); return; }
+      preparing = true;
+      try { await app.acceptUpdate(app.store.update()); } finally { preparing = false; }
+      if (isFocusing(app.state.session)) { app.toast('Pause your focus session before walking to another room.', true); return; }
     }
     closePicker(false);
-    leaveNavigationViews();
     if (id !== app.state.house.activeId) visitRoom(id, false);
-    else switcher.focus({ preventScroll: true });
+    else { leaveNavigationViews(); switcher.focus({ preventScroll: true }); }
   }
-  function visitRoom(id, decorate = app.decorate.active, fromDoor = false) {
-    if (travelling && !fromDoor) return;
+  async function visitRoom(id, decorate = app.decorate.active, fromDoor = false) {
+    if (preparing || (travelling && !fromDoor)) return;
     // Closing the avatar editor resumes a timer it paused, so close it before
     // the focus check.
     if (app.panels.current === 'avatar') app.panels.close();
     if (!fromDoor && id !== app.state.house.activeId) {
-      app.acceptUpdate(app.store.update());
-      if (app.state.session.running) { app.toast('Pause your focus session before walking to another room.', true); return; }
+      preparing = true;
+      try { await app.acceptUpdate(app.store.update()); } finally { preparing = false; }
+      if (isFocusing(app.state.session)) { app.toast('Pause your focus session before walking to another room.', true); return; }
     }
     const entry = app.state.house.rooms.find(room => room.id === id);
     if (!entry) { setHouseOpen(true, id); return; }
-    if (!fromDoor) setConnectedView(false);
+    if (!fromDoor) leaveNavigationViews();
     if (houseOpen) setHouseOpen(false);
     if (app.decorate.active) app.decorate.setEditMode(false);
     const originId = app.state.house.activeId;
-    const arrive = () => {
+    const arrive = async () => {
       const wasTravelling = travelling;
-      app.acceptUpdate(app.store.update());
+      await app.acceptUpdate(app.store.update());
       if (wasTravelling && !travelling) return;
-      if (app.state.session.running || app.state.house.activeId !== originId) { cancelDoorTravel(); return; }
+      if (isFocusing(app.state.session) || app.state.house.activeId !== originId) { cancelDoorTravel(); return; }
       const moved = id !== app.state.house.activeId;
       app.decorate.resetForArrival();
       $('#room-travel').hidden = true; document.body.classList.remove('is-travelling', 'is-door-walking'); travelling = false;
-      app.acceptUpdate(app.store.enterHouseRoom(id));
+      await app.acceptUpdate(app.store.enterHouseRoom(id));
       syncTravelControls();
       // Arrival must release the travel lock before opening the room editor.
       if (decorate) app.decorate.openCollection();
@@ -164,11 +166,12 @@ export function createHouseNavigation(app) {
     travelling = true; syncTravelControls(); $('#travel-label').textContent = `On to ${roomDisplayName(entry)}`; $('#room-travel small').textContent = 'A different corner of home.'; $('#room-travel').hidden = false; document.body.classList.add('is-travelling'); app.timer.render();
     travelTimer = setTimeout(arrive, 240);
   }
-  function visitDoor(id) {
-    if (travelling) return;
+  async function visitDoor(id) {
+    if (travelling || preparing) return;
     if (app.panels.current === 'avatar') app.panels.close();
-    app.acceptUpdate(app.store.update());
-    if (app.state.session.running) { app.toast('Pause your focus session before walking to another room.', true); return; }
+    preparing = true;
+    try { await app.acceptUpdate(app.store.update()); } finally { preparing = false; }
+    if (isFocusing(app.state.session)) { app.toast('Pause your focus session before walking to another room.', true); return; }
     if (id === app.state.house.activeId) { leaveNavigationViews(); return; }
     leaveNavigationViews();
     const entry = app.state.house.rooms.find(room => room.id === id);
@@ -216,7 +219,7 @@ export function createHouseNavigation(app) {
 
   function onStateChange(previous) {
     if (!travelling) return;
-    if (app.state.session.running) cancelDoorTravel('Focusing started in another tab, so room travel stopped.');
+    if (isFocusing(app.state.session)) cancelDoorTravel('Focusing started in another tab, so room travel stopped.');
     else if (previous.house.activeId !== app.state.house.activeId || JSON.stringify(previous.layout) !== JSON.stringify(app.state.layout)) cancelDoorTravel('Your room changed. Tap the door again when you’re ready.');
   }
 
@@ -258,7 +261,7 @@ export function createHouseNavigation(app) {
   return {
     get houseOpen() { return houseOpen; },
     get connected() { return connectedView; },
-    get travelling() { return travelling; },
+    get travelling() { return travelling || preparing; },
     setHouseOpen, setConnectedView, renderConnections, visitRoom, visitDoor, onStateChange, onDoorProgress,
     dispose() { closePicker(false); clearTimeout(travelTimer); cancelAnimationFrame(peekFrame); clearTimeout(arrivalTimer); connectedView?.dispose(); },
   };

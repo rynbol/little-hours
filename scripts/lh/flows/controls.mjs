@@ -55,6 +55,7 @@ export default {
     await app.clickSel('#start-button');
     check('a paused session offers Start over', await app.visible('#reset-session'));
     await app.clickSel('#reset-session');
+    await app.waitFor(`document.getElementById('timer').textContent === '25:00' && document.getElementById('reset-session').hidden`, { what: 'the reset to save' });
     check('Start over resets to 25:00 and keeps focus on the timer', await app.text('#timer') === '25:00' && !await app.visible('#reset-session') && await app.js(`document.activeElement?.id === 'start-button'`), await app.text('#timer'));
 
     await steps.openHouse(app);

@@ -27,6 +27,7 @@ export default {
     t.check('care sits beside the live room without a modal or inert canvas', await app.js(`document.body.classList.contains('is-pet-care') && !document.querySelector('#room-canvas').closest('[inert]') && document.querySelector('#room-panel').parentElement.classList.contains('workspace')`));
     await t.shot(app, 'care');
     await app.clickSel('#pet-feed'); await t.shot(app, 'meals'); await app.clickSel('#pet-meal-supper');
+    await app.waitFor(`${bond('cat')}.care.meals === 1 && ${diagnostics}.pet.care`, { what: 'supper to save and begin' });
     t.check('supper spends five coins and earns one heart together', await app.js(`window.__littleHours.state.house.coins === 115 && ${bond('cat')}.affection === 1 && ${bond('cat')}.care.meals === 1`));
     const approach = await app.js(`(() => { const p = ${diagnostics}.pet; return { phase: p.care?.phase, state: p.state, prop: p.care?.prop }; })()`);
     t.check('the cat walks toward a real meal placed in the room', approach.phase === 'approach' && approach.state === 'walking', approach);
@@ -34,32 +35,43 @@ export default {
     t.check('the meal stays at the bowl while the pet eats', await app.js(`(() => { const d = ${diagnostics}, b = d.petBelongings; return d.pet.action === 'eat' && b.food.isEnabled() && b.bowl.isEnabled() && Math.abs(b.bowl.position.x - ${approach.prop.x}) < .01 && Math.abs(b.bowl.position.z - ${approach.prop.z}) < .01; })()`));
     await t.shot(app, 'supper'); await film(app, t, '01-supper');
     await app.clickSel('#pet-now');
+    await app.waitFor(`${bond('cat')}.affection === 3`, { what: 'the cuddle to save' });
     t.check('petting remains available during a meal', await app.js(`${bond('cat')}.affection === 3 && ${diagnostics}.pet.care?.kind === 'treat'`));
     await app.clickSel('#pet-feed');
     t.check('fullness prevents a second charge', await app.js(`document.querySelector('#pet-meal-supper').disabled && document.querySelector('#pet-meal-crunch').disabled && window.__littleHours.state.house.coins === 115`));
     await app.clickSel('#pet-feed'); await idleCare(app);
     await app.clickSel('#pet-play');
+    await app.waitFor(`${bond('cat')}.affection === 4 && ${diagnostics}.pet.care`, { what: 'play to save and begin' });
     t.check('play is free and earns one heart', await app.js(`${bond('cat')}.affection === 4 && window.__littleHours.state.house.coins === 115`));
     await app.waitFor(`${diagnostics}.pet.care?.phase === 'active'`, { timeout: 30000, what: 'play to begin' });
     t.check('play has a visible room toy', await app.js(`${diagnostics}.petBelongings.toy.isEnabled() && !${diagnostics}.petBelongings.food.isEnabled()`));
     await t.shot(app, 'play'); await film(app, t, '02-play'); await idleCare(app);
     await app.clickSel('#pet-play');
+    await app.waitFor(`${diagnostics}.pet.care?.kind === 'play'`, { what: 'the next play to begin' });
     t.check('playing again is available without farming hearts', await app.js(`${bond('cat')}.affection === 4 && ${diagnostics}.pet.care?.kind === 'play'`));
     await app.clickSel('#pet-belongings > summary'); await app.clickSel('#pet-fabric-rose');
+    await app.waitFor(`${bond('cat')}.care.fabric === 'rose' && ${diagnostics}.petBelongings.fabric === 'rose'`, { what: 'the rose belongings to save' });
     t.check('rose belongings cost fifteen coins and change the actual room blanket', await app.js(`window.__littleHours.state.house.coins === 100 && ${bond('cat')}.care.fabric === 'rose' && ${diagnostics}.petBelongings.fabric === 'rose' && ${diagnostics}.petBelongings.blanket.isEnabled()`));
-    await app.clickSel('#pet-fabric-linen'); await app.clickSel('#pet-fabric-rose');
+    await app.clickSel('#pet-fabric-linen');
+    await app.waitFor(`${bond('cat')}.care.fabric === 'linen'`, { what: 'the linen belongings to save' });
+    await app.clickSel('#pet-fabric-rose');
+    await app.waitFor(`${bond('cat')}.care.fabric === 'rose'`, { what: 'the owned rose belongings to save' });
     t.check('owned belongings can be changed freely', await app.js(`window.__littleHours.state.house.coins === 100`));
     await t.shot(app, 'belongings');
     await app.clickSel('#pet-edit-name'); await type(app, '#pet-name', 'Maple & Me'); await app.clickSel('#pet-name-form button');
+    await app.waitFor(`document.querySelector('#pet-button-label').textContent === 'Maple & Me'`, { what: 'the personal name to save' });
     t.check('a personal name reaches the room and card', await app.text('#pet-button-label') === 'Maple & Me' && await app.text('.pet-card-identity h2') === 'Maple & Me', { label: await app.text('#pet-button-label'), saved: (await app.saved()).petBonds.cat.name });
     await app.reload(); await app.clickSel('#pet-button');
     t.check('coins, name, hearts, meal cooldown and belongings survive reload', await app.js(`${bond('cat')}.name === 'Maple & Me' && ${bond('cat')}.affection === 4 && ${bond('cat')}.care.fabric === 'rose' && ${bond('cat')}.care.meals === 1 && document.querySelector('#pet-feed').textContent.includes('Full') && window.__littleHours.state.house.coins === 100`));
     await app.clickSel('#pet-collection > summary'); await app.clickSel('[data-pet-choice="panda"]'); await app.clickSel('#pet-wish');
+    await app.waitFor(`window.__littleHours.state.petWish === 'panda'`, { what: 'the saving target to save' });
     t.check('a saving target survives and reaches the timer', (await app.saved()).petWish === 'panda' && (await app.text('#focus-reward')).includes('Kiki'));
     await app.clickSel('[data-pet-choice="fox"]'); await type(app, '#pet-adopt-name', 'Juniper'); await app.clickSel('#pet-adopt-button');
+    await app.waitFor(`window.__littleHours.state.pet === 'fox'`, { what: 'the fox adoption to save' });
     t.check('welcoming a named fox spends its price once', await app.js(`window.__littleHours.state.pet === 'fox' && ${bond('fox')}.name === 'Juniper' && window.__littleHours.state.house.coins === 10`));
     await t.shot(app, 'welcome');
     await app.clickSel('#close-panel'); await app.clickSel('#start-button');
+    await app.waitFor(`window.__littleHours.state.session.running`, { what: 'focus to start' });
     t.check('starting focus adds an avatar sparkle', await app.js(`Boolean(document.querySelector('.room-delight[data-kind="start"]'))`));
     await t.close(app);
 
@@ -85,18 +97,24 @@ export default {
     await family.clickSel('#pet-button'); await family.clickSel('#pet-collection > summary');
     for (const id of ['cat', 'dog', 'bunny', 'fox', 'panda']) {
       await family.clickSel(`[data-pet-choice="${id}"]`);
+      await family.waitFor(`window.__littleHours.petCloseup.species === '${id}'`, { what: `${id} to be chosen` });
       t.check(`${id} uses a live close-up without accumulating renderers`, await family.js(`window.__littleHours.petCloseup.species === '${id}' && window.__littleHours.counts().engines === 2`));
       await family.clickSel('#pet-collection > summary'); await t.shot(family, `closeup-${id}`); await family.clickSel('#pet-collection > summary');
     }
-    await family.clickSel('[data-pet-choice="cat"]'); await family.clickSel('#pet-collection > summary'); await family.clickSel('#pet-gifts > summary');
+    await family.clickSel('[data-pet-choice="cat"]');
+    await family.waitFor(`window.__littleHours.state.pet === 'cat'`, { what: 'the cat to be chosen' });
+    await family.clickSel('#pet-collection > summary'); await family.clickSel('#pet-gifts > summary');
     for (const gift of ['daisy', 'star', 'moon']) {
       await family.clickSel(`#pet-gift-${gift}`);
+      await family.waitFor(`${diagnostics}.petBelongings.gift.selected === '${gift}'`, { what: `${gift} to be displayed` });
       t.check(`${gift} can be displayed freely in the room`, await family.js(`${diagnostics}.petBelongings.gift.selected === '${gift}' && window.__littleHours.state.house.coins === 0`));
       await t.shot(family, `gift-${gift}`);
     }
     await family.clickSel('#pet-gifts > summary'); await family.clickSel('#pet-closeup');
+    await family.waitFor(`${bond('cat')}.affection === 62`, { what: 'the close-up cuddle to save' });
     t.check('touching the live face gives immediate affection', await family.js(`document.querySelector('#pet-closeup').dataset.reaction === 'cuddle' && ${bond('cat')}.affection === 62`));
     await family.clickSel('#pet-study');
+    await family.waitFor(`window.__littleHours.state.session.running`, { what: 'study together to start' });
     t.check('study together starts focus and settles the close-up to sleep', await family.js(`window.__littleHours.state.session.running && window.__littleHours.petCloseup.studying`));
     await t.shot(family, 'study-together'); await family.clickSel('#pet-study'); await family.clickSel('#close-panel');
     t.check('closing care releases its renderer', await family.js(`window.__littleHours.counts().engines === 1 && window.__littleHours.petCloseup === null`));
@@ -104,6 +122,7 @@ export default {
 
     const mobile = await t.open({ seed: 'pet-shop', width: 390, height: 844, reducedMotion: true });
     await mobile.clickSel('#pet-button'); await mobile.clickSel('#pet-play');
+    await mobile.waitFor(`${diagnostics}.pet.care?.phase === 'active'`, { what: 'reduced-motion play to begin' });
     t.check('reduced motion shows play without particles or a walk', await mobile.js(`document.querySelectorAll('.room-delight i').length === 0 && ${diagnostics}.pet.care?.phase === 'active' && !${diagnostics}.pet.moving`));
     t.check('room and care actions are both visible on a phone', await mobile.js(`(() => { const room = document.querySelector('#stage').getBoundingClientRect(), action = document.querySelector('#pet-play').getBoundingClientRect(); return document.documentElement.scrollWidth <= innerWidth && room.top >= 0 && room.bottom <= action.top && action.bottom <= innerHeight; })()`));
     await t.shot(mobile, 'mobile');

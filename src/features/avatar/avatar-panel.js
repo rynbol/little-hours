@@ -2,25 +2,24 @@ import { AVATAR_DEFAULT, AVATAR_LOOKS } from '../../core/avatar.js';
 import { avatarEditorContent } from './avatar-ui.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
+import { isFocusing } from '../../core/session.js';
 
 export function createAvatarPanel(app) {
-  let active = false, resumeTimer = false, section = 'looks';
+  let active = false, resumeTimer = null, section = 'looks';
 
   function syncEditing(current) {
     const leaving = current !== 'avatar' && active;
     if (current === 'avatar' && !active) {
       active = true; section = 'looks'; app.room?.setAvatarEditing?.(true);
-      resumeTimer = app.state.session.running;
+      resumeTimer = isFocusing(app.state.session) ? app.state.session.id : null;
       if (resumeTimer) {
-        const result = app.store.setRunning(false);
-        resumeTimer = !result.completion;
-        app.acceptUpdate(result);
+        app.acceptUpdate(app.store.setRunning(false, resumeTimer));
       } else app.timer.render();
       app.companion.say('customize', { force: true });
     } else if (leaving) {
       active = false; app.room?.setAvatarEditing?.(false);
-      const resume = resumeTimer; resumeTimer = false;
-      if (resume && !app.state.session.running) app.acceptUpdate(app.store.setRunning(true));
+      const resume = resumeTimer; resumeTimer = null;
+      if (resume) app.acceptUpdate(app.store.resumeFocus(resume));
       else app.timer.render();
       app.companion.say('customizeDone', { force: true });
     }
@@ -38,6 +37,7 @@ export function createAvatarPanel(app) {
       <div class="avatar-customizer">${avatarEditorContent(app.state.avatar, section)}</div>
       <div class="avatar-editor-footer"><button class="avatar-reset" id="avatar-reset">Reset look</button><span class="avatar-save-note">${app.storageWarningShown ? 'This visit only' : 'Saved as you go'}</span><button class="avatar-done" id="avatar-done">${icon('check')} Done</button></div>`;
     const rerenderChoices = selector => {
+      if (app.panels.current !== 'avatar') return;
       const scroll = panel.querySelector('.avatar-customizer').scrollTop;
       app.panels.render();
       panel.querySelector('.avatar-customizer').scrollTop = scroll;
@@ -46,19 +46,19 @@ export function createAvatarPanel(app) {
     panel.querySelectorAll('[data-avatar-section]').forEach(button => button.addEventListener('click', () => {
       section = button.dataset.avatarSection; app.panels.render(); panel.querySelector(`[data-avatar-section="${section}"]`)?.focus({ preventScroll: true });
     }));
-    panel.querySelectorAll('[data-avatar-part]').forEach(button => button.addEventListener('click', () => {
+    panel.querySelectorAll('[data-avatar-part]').forEach(button => button.addEventListener('click', async () => {
       const part = button.dataset.avatarPart, value = button.dataset.avatarValue;
-      app.acceptUpdate(app.store.update(draft => { draft.avatar[part] = value; }));
+      await app.acceptUpdate(app.store.update(draft => { draft.avatar[part] = value; }));
       rerenderChoices(`[data-avatar-part="${part}"][data-avatar-value="${value}"]`);
     }));
-    panel.querySelectorAll('[data-avatar-look]').forEach(button => button.addEventListener('click', () => {
+    panel.querySelectorAll('[data-avatar-look]').forEach(button => button.addEventListener('click', async () => {
       const look = AVATAR_LOOKS.find(x => x.id === button.dataset.avatarLook);
-      app.acceptUpdate(app.store.update(draft => { Object.assign(draft.avatar, look.appearance); }));
+      await app.acceptUpdate(app.store.update(draft => { Object.assign(draft.avatar, look.appearance); }));
       rerenderChoices(`[data-avatar-look="${look.id}"]`);
     }));
-    $('#avatar-reset').addEventListener('click', () => {
-      app.acceptUpdate(app.store.update(draft => { draft.avatar = { ...AVATAR_DEFAULT }; }));
-      app.panels.render(); $('#avatar-reset')?.focus({ preventScroll: true });
+    $('#avatar-reset').addEventListener('click', async () => {
+      await app.acceptUpdate(app.store.update(draft => { draft.avatar = { ...AVATAR_DEFAULT }; }));
+      rerenderChoices('#avatar-reset');
     });
     $('#avatar-done').addEventListener('click', app.panels.close);
   }
