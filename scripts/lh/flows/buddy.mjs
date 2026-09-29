@@ -79,6 +79,13 @@ export default {
     await app.key('Escape');
     await sleep(300);
 
+    const FADE = `window.__littleHours.room.diagnostics().scene.getMeshByName('buddy-body').visibility`;
+    await app.js(`window.__littleHours.room.buddyDo({ kind: 'spot', target: 'head', offset: [0, -0.3], pose: 'hover', seconds: 6 })`);
+    const ghosted = await app.waitFor(`${FADE} < 0.5`, { what: 'Pip to fade inside the avatar', timeout: 4000 }).catch(() => false);
+    await app.js(`window.__littleHours.room.buddyDo({ kind: 'shoulder', target: 'head', offset: [0.34, 0.06], pose: 'hover', seconds: 6 })`);
+    const solid = await app.waitFor(`${FADE} === 1`, { what: 'Pip to turn solid again beside the avatar', timeout: 4000 }).catch(() => false);
+    check('Pip passes through the avatar as a see-through ghost', Boolean(ghosted && solid), { ghosted, solid });
+
     await steps.openDecorate(app);
     const hidden = await app.waitFor(`!${PIP}.visible`, { what: 'Pip to step aside', timeout: 3000 }).catch(() => false);
     await steps.closeDecorate(app);

@@ -1526,16 +1526,12 @@ export function createRoom(container, options = {}) {
     out.x += (dx * depth - dz * right) / length; out.z += (dz * depth + dx * right) / length; out.y += up;
     return true;
   }
-  function keepOutOfAvatar(point) {
+  const buddyPetHead = new Vector3();
+  function insideColumn(x, y, z, top, radius) { return y < top.y + 0.12 && y > FLOOR_Y && Math.hypot(x - top.x, z - top.z) < radius; }
+  function passingThrough(x, y, z) {
     const head = avatarHead()?.getAbsolutePosition();
-    if (!head || point.y > head.y + 0.2) return;
-    const dx = point.x - head.x, dz = point.z - head.z, apart = Math.hypot(dx, dz), room = 0.3;
-    if (apart >= room) return;
-    const cx = camera.position.x - head.x, cz = camera.position.z - head.z, length = Math.hypot(cx, cz) || 1;
-    const [ox, oz] = apart > 1e-3 ? [dx / apart, dz / apart] : [-cz / length, cx / length];
-    point.x = head.x + ox * room; point.z = head.z + oz * room;
-  }
-  function insideFurniture(x, y, z) {
+    if (head && insideColumn(x, y, z, head, 0.2)) return true;
+    if (petModel?.root.isEnabled()) { petModel.headPoint(buddyPetHead); if (insideColumn(x, y, z, buddyPetHead, 0.24)) return true; }
     if (buddyAge - buddyBoxesAt > 1 || buddyAge < buddyBoxesAt) {
       buddyBoxesAt = buddyAge; buddyBoxes.length = 0;
       for (const object of placedObjects.values()) if (object.isEnabled()) { const { min, max } = object.getHierarchyBoundingVectors(true); buddyBoxes.push(min.x + .02, min.y, min.z + .02, max.x - .02, max.y - .02, max.z - .02); }
@@ -1546,7 +1542,6 @@ export function createRoom(container, options = {}) {
   function animateBuddy(dt, seconds) {
     const moving = buddyArrived !== Infinity ? buddyAge - buddyArrived : 0, hop = buddyPlan?.motion?.type === 'path' ? Math.floor(moving / buddyPlan.motion.hop) : 0;
     const aimed = aimBuddy(buddyPlan, buddyGoal, moving);
-    if (aimed) keepOutOfAvatar(buddyGoal);
     if (buddyWanted === 'here' && buddyFlight.mode === 'away' && aimed) buddyFlight.place(buddyGoal);
     if (aimed && hop !== buddyHop) { buddyHop = hop; buddyFlight.go(buddyGoal); }
     const pose = buddyFlight.update(dt, aimed ? buddyGoal : null, reducedMotion);
@@ -1561,13 +1556,13 @@ export function createRoom(container, options = {}) {
     if (settled >= 0 && target === 'head' && buddyPlan.kind === 'chat') buddyLook.copyFrom(avatarHead()?.getAbsolutePosition() ?? camera.position);
     else if (settled >= 0 && target === 'pet' && petModel) petModel.headPoint(buddyLook);
     else buddyLook.copyFrom(camera.position);
-    buddySpot.set(pose.x, pose.y, pose.z); if (buddyFlight.mode === 'here') keepOutOfAvatar(buddySpot);
+    buddySpot.set(pose.x, pose.y, pose.z);
     Object.assign(buddyFrame, { x: buddySpot.x, y: buddySpot.y, z: buddySpot.z, scale: pose.scale, spin: pose.spin, flying: pose.flying, heading: pose.heading, squash: pose.squash, trail: pose.trail });
     buddyFrame.visible = pose.visible && !editing && !avatarCameraEditing;
     buddyFrame.faceYaw = Math.atan2(buddyLook.x - buddySpot.x, buddyLook.z - buddySpot.z);
     buddyFrame.activity = settled >= 0 && buddyPlan ? buddyPlan.pose : 'hover'; buddyFrame.trail = pose.trail || (settled >= 0 && Boolean(buddyPlan?.motion)); buddyFrame.activityAge = Math.max(0, settled);
     buddyArea.minX = buddyArea.maxX = buddySpot.x; buddyArea.minZ = buddyArea.maxZ = buddySpot.z; buddyFrame.ground = surfaceBelow(buddyArea);
-    buddyFrame.ghost = buddyFrame.visible && insideFurniture(buddySpot.x, buddySpot.y, buddySpot.z);
+    buddyFrame.ghost = buddyFrame.visible && passingThrough(buddySpot.x, buddySpot.y, buddySpot.z);
     buddyModel.animate(buddyFrame, dt, seconds, reducedMotion);
     buddyLight.intensity = buddyFrame.visible ? 0.45 * buddyFrame.scale : 0; if (buddyFrame.visible) buddyModel.headPoint(buddyLight.position);
   }
