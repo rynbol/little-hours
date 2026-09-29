@@ -55,7 +55,7 @@ test('a running session keeps counting while the page is closed', async ({ page 
 test('the chime preference is remembered', async ({ page }) => {
   const chime = page.locator('#chime-toggle');
   await expect(chime).toBeChecked();
-  await chime.uncheck();
+  await page.locator('#focus-options > summary').click(); await chime.uncheck();
   await page.reload();
   await expect(page.locator('#chime-toggle')).not.toBeChecked();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-sound')))).toEqual({ volume: 30, chime: false });

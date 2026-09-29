@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+const openGarden = async page => { if (await page.locator('#focus-progress').getAttribute('open') === null) await page.locator('#focus-progress > summary').click(); await page.locator('#focus-garden').click(); };
+
 const ready = page => expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
 const settled = page => expect(page.locator('html')).not.toHaveAttribute('data-place-transition', { timeout: 30000 });
 async function transition(page, click, destination) {
@@ -25,13 +27,13 @@ async function transition(page, click, destination) {
 
 test('garden and pond entrances and exits fade, including the path home and study exit', async ({ page }) => {
   await page.goto('/'); await ready(page);
-  await transition(page, () => page.locator('#focus-garden').click(), 'garden');
+  await transition(page, () => openGarden(page), 'garden');
   await expect(page.getByRole('button', { name: 'Back home', exact: true })).toBeVisible();
   await transition(page, () => page.locator('#garden-back').click(), 'island');
   await transition(page, () => page.locator('#house-open-garden').click(), 'garden');
   await transition(page, () => page.getByRole('button', { name: 'Back home', exact: true }).click(), 'home');
   await expect(page.locator('#room-section')).toBeVisible();
-  await transition(page, () => page.locator('#focus-garden').click(), 'garden');
+  await transition(page, () => openGarden(page), 'garden');
   await page.locator('#garden-plant-seed').click();
   await transition(page, () => page.locator('#garden-study').click(), 'home');
   await expect(page.locator('#start-button')).toBeFocused();
@@ -46,7 +48,7 @@ test('garden and pond entrances and exits fade, including the path home and stud
 test('reduced motion skips place transitions and repeated keyboard exits leave no overlay', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/'); await ready(page);
-  await page.locator('#focus-garden').click();
+  await openGarden(page);
   await expect(page.locator('#garden-back')).toBeVisible(); await settled(page);
   await page.keyboard.press('Escape');
   await expect(page.locator('#house-open-garden')).toBeFocused(); await settled(page);
@@ -62,7 +64,7 @@ test('reduced motion skips place transitions and repeated keyboard exits leave n
   if (await page.locator('#back-to-room').isVisible()) await page.locator('#back-to-room').click();
   await expect(page.locator('#room-section')).toBeVisible();
   await expect(page.locator('#start-button')).toBeEnabled();
-  await page.locator('#focus-garden').click();
+  await openGarden(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(page.locator('#garden-back')).toBeVisible(); await settled(page);
   await expect(page.locator('.place-transition')).toHaveCount(0);

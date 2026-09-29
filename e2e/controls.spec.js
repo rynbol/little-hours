@@ -4,7 +4,7 @@ test('live timing updates keep the quality button under a held pointer', async (
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');
   await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
-  await page.locator('[data-panel="performance"]').click();
+  await page.locator('#room-more-toggle').click(); await page.locator('[data-panel="performance"]').click();
   await expect(page.locator('#performance-metrics dd')).toHaveCount(6, { timeout: 30000 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.evaluate(async () => {

@@ -2,9 +2,10 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const ready = page => expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
-const openGarden = async page => { await page.locator('#focus-garden').click(); await expect(page.locator('#house-detail h2')).toHaveText('Your garden'); await expect(page.locator('html')).not.toHaveAttribute('data-place-transition', { timeout: 30000 }); };
+const openGarden = async page => { if (await page.locator('#focus-progress').getAttribute('open') === null) await page.locator('#focus-progress > summary').click(); await page.locator('#focus-garden').click(); await expect(page.locator('#house-detail h2')).toHaveText('Your garden'); await expect(page.locator('html')).not.toHaveAttribute('data-place-transition', { timeout: 30000 }); };
 
 test('a free seed grows across real study sessions and blooms once with the other rewards', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.clock.install({ time: new Date('2026-09-28T12:00:00') });
   await page.goto('/'); await ready(page); await openGarden(page);
@@ -17,6 +18,11 @@ test('a free seed grows across real study sessions and blooms once with the othe
     await expect(page.locator('#celebration-garden')).toContainText(i ? 'Sunday <3 bloomed' : 'Sunday <3 is growing');
     await expect(page.locator('#celebration-earned')).toContainText('+25 coins');
     await expect(page.locator('#celebration-bond')).toContainText('+5 ♡');
+    expect(await page.locator('#celebration-garden').evaluate(node => !node.closest('.celebration-coins'))).toBe(true);
+    expect((await page.locator('#celebration-garden > svg').boundingBox()).width).toBeGreaterThanOrEqual(69);
+    const popup = await page.locator('#session-celebration').boundingBox();
+    expect(popup.x).toBeGreaterThanOrEqual(0); expect(popup.y).toBeGreaterThanOrEqual(0); expect(popup.x + popup.width).toBeLessThanOrEqual(390);
+    await page.screenshot({ path: `.lh/evidence/study-plant-${i}.png` });
     await page.locator('#celebration-garden button').click();
     await expect(page.locator('.garden-growth [role="progressbar"]')).toHaveAttribute('aria-valuenow', String((i + 1) * 25));
   }

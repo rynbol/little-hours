@@ -1129,18 +1129,6 @@ export function createRoom(container, options = {}) {
     return result;
   }
   function interactWithItem(itemId) { return interactionFeedback(companionRoutine.requestInteraction(itemId)); }
-  function interactWithKind(kind) {
-    const candidates = layout.items.filter(item => interactionFor(item.type)?.kind === kind);
-    // Prefer reading in a chair, and try another placed piece if a corner is
-    // blocked. Only the final result speaks, never every rejected route.
-    candidates.sort((a, b) => Number(b.type === 'lounge-chair') - Number(a.type === 'lounge-chair'));
-    let result = { ok: false, reason: 'blocked' };
-    for (const item of candidates) {
-      result = companionRoutine.requestInteraction(item.id);
-      if (result.ok || result.reason !== 'blocked') break;
-    }
-    return interactionFeedback(result);
-  }
   function tapItem(itemId) {
     const item = layout.items.find(entry => entry.id === itemId);
     if (interactionFor(item?.type)) return interactWithItem(itemId);
@@ -1799,7 +1787,7 @@ export function createRoom(container, options = {}) {
     resize, setTheme, setLayout, setEditMode, setAvatarEditing, setAvatarAppearance, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setSurface, setQuality,
     turnAvatar(angle, reset = false) { if (!avatarCameraEditing || avatarPoseTransition) return; avatarPreviewTarget = reset ? 0 : avatarPreviewTarget + angle; requestRender(); },
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
-    setActivity(value) { if (value === 'working') celebrationAge = Infinity; focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet, interactWithItem, interactWithKind,
+    setActivity(value) { if (value === 'working') celebrationAge = Infinity; focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet, interactWithItem,
     setPet(species) { const next = PETS[species] ? species : 'cat'; if (next === petSpecies) return; if (petRoutine.pose.held) releasePet(); petSpecies = next; buildPet(); requestRender(); },
     anchor,
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },

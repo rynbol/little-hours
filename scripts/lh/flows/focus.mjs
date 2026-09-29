@@ -22,7 +22,7 @@ export default {
     check('the close control leaves focus running', await app.js(`window.__littleHours.state.session.running`));
     await t.close(app);
     const phone = await t.open({ seed: 'three-rooms', width: 390, height: 844, reducedMotion: true });
-    await phone.clickSel('#mini-button'); await t.steps.openFocus(phone);
+    await t.steps.openMore(phone); await phone.clickSel('#mini-button'); await t.steps.openFocus(phone);
     const fit = await phone.js(`(() => { const stage = document.getElementById('stage'), box = stage.getBoundingClientRect(), exit = document.getElementById('focus-mode-exit').getBoundingClientRect(); return !stage.classList.contains('is-mini') && box.top === 0 && box.left === 0 && box.width === innerWidth && Math.abs(box.height - innerHeight) < 2 && exit.right <= innerWidth && exit.bottom <= innerHeight && exit.height >= 44; })()`);
     check('phone focus fills the viewport and leaves mini view with a reachable exit', fit);
     await t.shot(phone, 'phone'); await t.steps.closeFocus(phone); await t.close(phone);

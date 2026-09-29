@@ -89,7 +89,7 @@ export default {
     await app.waitFor(`document.body.classList.contains('is-connected')`, { what: 'whole-house view' });
     walk = await chooseRoom(app, 'garden', t);
     check('a room card leaves whole-house view and goes straight there', !walk.walked && walk.active === 'garden' && !await app.js(`document.body.classList.contains('is-connected')`), walk);
-    await app.clickSel('#mini-button');
+    await t.steps.openMore(app); await app.clickSel('#mini-button');
     walk = await chooseRoom(app, 'loft', t);
     check('choosing a room from mini view restores the room and goes upstairs', !walk.walked && walk.active === 'loft' && !await app.js(`document.getElementById('stage').classList.contains('is-mini')`), walk);
     await steps.openDecorate(app);

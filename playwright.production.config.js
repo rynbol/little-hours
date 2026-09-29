@@ -3,7 +3,7 @@ import base from './playwright.config.js';
 
 export default defineConfig({
   ...base,
-  testMatch: ['development.spec.js', 'focus-mode.spec.js', 'garden.spec.js', 'place-transitions.spec.js'],
+  testMatch: ['development.spec.js', 'focus-mode.spec.js', 'focus-outlook.spec.js', 'garden.spec.js', 'place-transitions.spec.js'],
   grepInvert: /@dev-diagnostics/,
   projects: [{ ...base.projects[0], name: 'production', metadata: { production: true } }],
   use: { ...base.use, baseURL: 'http://127.0.0.1:4183' },

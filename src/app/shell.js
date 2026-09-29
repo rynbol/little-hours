@@ -5,12 +5,12 @@ export const shellMarkup = (audioPrefs) => `
   <a class="skip-link" href="#start-button">Skip to focus timer</a>
   <div class="app-shell">
     <header class="app-header">
-      <a class="brand" href="/" aria-label="Little Hours home"><span class="brand-mark">${icon('home')}</span><span>little hours<span class="brand-dot">.</span></span></a>
-      <span class="brand-tagline">a little time, a little magic</span><div class="header-right"><button class="coin-wallet" id="coin-wallet" aria-label="Your house and coins">${coinArt()}<span id="coin-balance">0</span><span>coins</span></button><button class="time-toggle" id="time-toggle" aria-label="Switch to daylight" title="Switch to daylight">${icon('moon')}<span>Night</span></button><button class="focus-toggle" id="focus-toggle" aria-expanded="true" aria-controls="focus-card" aria-label="Hide focus panel">${icon('clock')}<span>Focus</span><span id="dock-timer">25:00</span></button></div>
+      <a class="brand" href="/" aria-label="Little Hours home"><span>little hours<span class="brand-dot">.</span></span></a>
+      <div class="header-right"><button class="coin-wallet" id="coin-wallet" aria-label="Your house and coins">${coinArt()}<span id="coin-balance">0</span><span>coins</span></button><button class="time-toggle" id="time-toggle" aria-label="Switch to daylight" title="Switch to daylight">${icon('moon')}<span>Night</span></button><button class="focus-toggle" id="focus-toggle" aria-expanded="true" aria-controls="focus-card" aria-label="Hide focus panel">${icon('clock')}<span>Focus</span><span id="dock-timer">25:00</span></button></div>
     </header>
     <main class="workspace">
       <section id="room-section" class="room-section" aria-labelledby="room-title">
-        <div class="room-heading"><div class="room-heading-identity"><div class="room-title-row"><h1 id="room-title" tabindex="-1">The twilight retreat</h1><button class="icon-button" id="rename-room" aria-label="Rename room" aria-controls="room-title-form" aria-expanded="false">${icon('build')}</button></div><form class="room-title-form" id="room-title-form" hidden><label class="sr-only" for="room-title-input">Room name</label><input id="room-title-input" maxlength="40" autocomplete="off" required><button id="save-room-title" type="submit">Save</button><button id="cancel-room-title" type="button">Cancel</button></form><p class="room-subtitle" id="room-subtitle" hidden></p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Visit your house" aria-controls="house-page">${icon('home')}<span>My house</span></button><button class="mode-button" id="decorate-button" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button><button class="icon-button" id="reset-view" aria-label="Reset room view">${icon('reset')}</button></div></div>
+        <div class="room-heading"><div class="room-heading-identity"><div class="room-title-row"><h1 id="room-title" tabindex="-1">The twilight retreat</h1><button class="icon-button" id="rename-room" aria-label="Rename room" aria-controls="room-title-form" aria-expanded="false">${icon('build')}</button></div><form class="room-title-form" id="room-title-form" hidden><label class="sr-only" for="room-title-input">Room name</label><input id="room-title-input" maxlength="40" autocomplete="off" required><button id="save-room-title" type="submit">Save</button><button id="cancel-room-title" type="button">Cancel</button></form><p class="room-subtitle" id="room-subtitle" hidden></p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Visit your house" aria-controls="house-page">${icon('home')}<span>My house</span></button><button class="mode-button" id="decorate-button" aria-label="Decorate" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button></div></div>
         <nav id="home-connections" class="home-connections" aria-label="Move around your house">
           <div class="room-route"><button id="previous-room" class="room-step" aria-label="Previous room">${icon('arrow')}</button><button id="room-switcher-toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="room-picker"><span class="room-route-map" aria-hidden="true"></span><span>Rooms</span><span id="room-route-count"></span><svg class="room-route-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3 3 3-3"/></svg></button><button id="next-room" class="room-step" aria-label="Next room">${icon('arrow')}</button></div>
           <button class="home-wide" aria-pressed="false">${icon('home')}<span>Whole house</span></button>
@@ -37,9 +37,10 @@ export const shellMarkup = (audioPrefs) => `
           <nav class="room-tools" aria-label="Room controls">
             <button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Ambience</span></button>
             <button class="tool" id="pet-button" data-panel="pet" aria-expanded="false" aria-controls="room-panel">${icon('cat')}<span id="pet-button-label">Miso</span></button>
-            <button class="tool" id="avatar-button" data-panel="avatar" aria-expanded="false" aria-controls="room-panel">${icon('avatar')}<span>Avatar</span></button>
+            <button class="tool" id="room-more-toggle" popovertarget="room-more" aria-label="More room controls"><span aria-hidden="true">···</span><span>More</span></button>
+            <div id="room-more" popover><button class="tool" id="reset-view" aria-label="Reset room view">${icon('reset')}<span>Reset view</span></button><button class="tool" id="avatar-button" data-panel="avatar" aria-expanded="false" aria-controls="room-panel">${icon('avatar')}<span>Avatar</span></button>
             <button class="tool" id="mini-button" aria-pressed="false">${icon('mini')}<span>Mini view</span></button>
-            <button class="tool" data-panel="performance" aria-label="Performance and quality" title="Performance and quality" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Quality</span></button>
+            <button class="tool" data-panel="performance" aria-label="Performance and quality" title="Performance and quality" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Quality</span></button></div>
           </nav>
         </div>
         <div class="room-panel" id="room-panel" hidden></div>
@@ -54,9 +55,7 @@ export const shellMarkup = (audioPrefs) => `
       <section id="house-page" class="house-page" aria-label="Your growing house" hidden></section>
       <aside class="focus-card" id="focus-card" tabindex="-1" aria-labelledby="focus-title">
         <div class="card-top"><span class="eyebrow">A MOMENT FOR YOU</span><span class="tiny-flower" aria-hidden="true">${blossomArt()}</span></div>
-        <h2 id="focus-title">Little by <em>little.</em></h2><p class="focus-intro">Make space for one good thing.</p>
-        <label class="field-label sr-only" for="task">What you’re working on</label>
-        <input id="task" maxlength="180" placeholder="What are you working on?" autocomplete="off" />
+        <h2 id="focus-title" class="sr-only">Focus timer</h2><p class="focus-intro">Make space for one good thing.</p>
         <div class="timer-area">
           <div class="timer-dial" id="timer-dial">
             <svg class="timer-ring" id="timer-ring" viewBox="0 0 200 200" role="slider" tabindex="0" aria-label="Focus length" aria-valuemin="1" aria-valuemax="120" aria-valuenow="25" aria-valuetext="25 minutes"><circle class="timer-track" cx="100" cy="100" r="91"/><circle class="timer-progress" id="timer-progress" cx="100" cy="100" r="91" pathLength="100"/><circle class="timer-seed" cx="100" cy="9" r="5"/></svg>
@@ -64,12 +63,18 @@ export const shellMarkup = (audioPrefs) => `
           </div>
           <div class="durations" role="group" aria-label="Focus duration"><button data-minutes="25" aria-pressed="true">25 <span>min</span></button><button data-minutes="50" aria-pressed="false">50 <span>min</span></button><button data-minutes="90" aria-pressed="false">90 <span>min</span></button></div>
         </div>
-        <button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
-        <button class="focus-mode-button" id="focus-mode-enter" aria-expanded="false" aria-controls="focus-mode-hud" disabled>${icon('avatar')}<span>Focus mode</span>${icon('arrow')}</button>
+        <div class="focus-actions"><button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
+        <button class="focus-mode-button" id="focus-mode-enter" aria-label="Focus mode" title="Focus mode" aria-expanded="false" aria-controls="focus-mode-hud" disabled>${icon('mini')}<span>Focus mode</span></button></div>
         <button class="reset-session" id="reset-session" hidden>Start over</button>
+        <details id="focus-options" class="focus-disclosure"><summary>Session settings</summary>
+        <label class="field-label sr-only" for="task">What you’re working on</label>
+        <input id="task" maxlength="180" placeholder="What are you working on?" autocomplete="off" />
         <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="${audioPrefs.volume}" aria-label="Rain volume" disabled /><label class="chime-toggle"><span>Chime at the end</span><input type="checkbox" id="chime-toggle" ${audioPrefs.chime ? 'checked' : ''} /></label></div>
+        </details>
+        <details id="focus-progress" class="focus-disclosure"><summary>Your progress</summary>
         <div id="focus-reward" class="focus-reward"></div>
         <details class="session-journal"><summary><span>Today</span><span id="today-total">0 min</span></summary><div id="today-sessions"></div></details>
+        </details>
         <div class="daily-note" id="daily-note">Good things begin with a little time.</div>
       </aside>
     </main>

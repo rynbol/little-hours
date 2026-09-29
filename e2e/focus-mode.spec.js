@@ -99,7 +99,7 @@ test('another tab can pause the timer or replace the room without leaving focus 
 
 test('phone focus mode leaves mini view, fills the viewport and keeps an accessible exit', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('#mini-button').click(); await expect(page.locator('#stage')).toHaveClass(/is-mini/);
+  await page.locator('#room-more-toggle').click(); await page.locator('#mini-button').click(); await expect(page.locator('#stage')).toHaveClass(/is-mini/);
   await page.locator('#focus-mode-enter').click();
   await expect(page.locator('#stage')).not.toHaveClass(/is-mini/);
   const box = await page.locator('#stage').boundingBox();

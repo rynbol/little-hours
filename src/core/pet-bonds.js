@@ -89,10 +89,12 @@ export function choosePetFabric(state, id, fabric) {
   care.fabric = fabric;
   return { ok: true, price };
 }
+export const focusHearts = minutes => minutes >= 5 ? Math.floor(minutes / 5) : 0;
+
 export function recordPetFocus(state, minutes, at) {
   if (minutes < 5) return { earned: 0, gifts: [] };
   const id = state.pets.includes(state.session.petId) ? state.session.petId : state.pet;
-  const bond = state.petBonds[id], earned = Math.floor(minutes / 5), previousGifts = petGifts(bond).earned.length;
+  const bond = state.petBonds[id], earned = focusHearts(minutes), previousGifts = petGifts(bond).earned.length;
   bond.minutes = Math.min(1_000_000_000, bond.minutes + minutes); bond.sessions = Math.min(1_000_000_000, bond.sessions + 1);
   const gifts = petGifts(bond).earned.slice(previousGifts);
   if (gifts.length) bond.gift = gifts.at(-1).id;

@@ -1,4 +1,6 @@
 export const steps = {
+  async openMore(app) { if (await app.js(`Boolean(document.getElementById('room-more') && !document.getElementById('room-more').matches(':popover-open'))`)) await app.clickSel('#room-more-toggle'); },
+  async openProgress(app) { if (await app.js(`Boolean(document.getElementById('focus-progress') && !document.getElementById('focus-progress').open)`)) await app.clickSel('#focus-progress > summary'); },
   async openFocus(app) { await app.clickSel('#focus-mode-enter'); await app.waitFor(`document.body.classList.contains('is-focus-mode')`, { what: 'Focus mode' }); await app.settle(); },
   async closeFocus(app) { await app.clickSel('#focus-mode-exit'); await app.waitFor(`!document.body.classList.contains('is-focus-mode')`, { what: 'leaving Focus mode' }); await app.settle(); },
   async openRoomPicker(app) { if (await app.visible('#room-switcher-toggle')) { await app.clickSel('#room-switcher-toggle'); await app.waitFor(`document.getElementById('room-picker').open`, { what: 'the room picker' }); await app.waitFor(`!document.getElementById('room-picker').getAnimations().some(animation => animation.playState === 'running')`, { what: 'the room picker animation' }); } },
@@ -7,7 +9,7 @@ export const steps = {
   async toggleHouse(app) { await app.clickSel('[data-house-open]'); await app.settle(); },
   async openDecorate(app) { await app.clickSel('#decorate-button'); await app.waitFor(`document.body.classList.contains('is-decorating')`, { what: 'Decorate' }); await app.settle(); },
   async closeDecorate(app) { await app.clickSel('#decorate-button'); await app.waitFor(`!document.body.classList.contains('is-decorating')`, { what: 'leaving Decorate' }); await app.settle(); },
-  async openAvatar(app) { await app.clickSel('#avatar-button'); await app.waitFor(`document.body.classList.contains('is-avatar-editing')`, { what: 'the avatar editor' }); await app.settle(); },
+  async openAvatar(app) { await steps.openMore(app); await app.clickSel('#avatar-button'); await app.waitFor(`document.body.classList.contains('is-avatar-editing')`, { what: 'the avatar editor' }); await app.settle(); },
   async openLake(app) { await steps.openHouse(app); await app.clickSel('[data-room="pond"]'); await app.waitFor(`Boolean(window.__littleHours.lake.isOpen && window.__littleHours.lake.diagnostics())`, { what: 'the lake', timeout: 10000 }); await app.settle(); },
   async closeAvatar(app) { await app.clickSel('#avatar-done'); await app.waitFor(`!document.body.classList.contains('is-avatar-editing')`, { what: 'leaving the avatar editor' }); await app.settle(); },
 };

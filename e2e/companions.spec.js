@@ -154,7 +154,7 @@ test('care keeps its room column with a collapsed timer and closes for room view
   const bounds = await page.evaluate(() => ({ room: document.querySelector('#room-section').getBoundingClientRect().right, card: document.querySelector('#room-panel').getBoundingClientRect().left }));
   expect(bounds.card).toBeGreaterThan(bounds.room);
   await page.locator('.home-wide').click(); await expect(page.locator('#room-panel')).toBeHidden();
-  await page.locator('.home-wide').click(); await page.locator('#pet-button').click(); await page.locator('#mini-button').click();
+  await page.locator('.home-wide').click(); await page.locator('#pet-button').click(); await page.locator('#room-more-toggle').click(); await page.locator('#mini-button').click();
   await expect(page.locator('#room-panel')).toBeHidden(); await expect(page.locator('#stage')).toHaveClass(/is-mini/);
 });
 
