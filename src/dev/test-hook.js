@@ -42,6 +42,7 @@ export function installTestHook(app) {
   function busy() {
     const reasons = [];
     const body = document.body.classList;
+    if (document.documentElement.dataset.placeTransition) reasons.push('place transition');
     if (body.contains('is-travelling')) reasons.push('travelling');
     if (body.contains('is-door-walking')) reasons.push('door walk');
     const room = views.room();

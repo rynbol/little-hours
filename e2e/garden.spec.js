@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const ready = page => expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
-const openGarden = async page => { await page.locator('#focus-garden').click(); await expect(page.locator('#house-detail h2')).toHaveText('Your garden'); };
+const openGarden = async page => { await page.locator('#focus-garden').click(); await expect(page.locator('#house-detail h2')).toHaveText('Your garden'); await expect(page.locator('html')).not.toHaveAttribute('data-place-transition', { timeout: 30000 }); };
 
 test('a free seed grows across real study sessions and blooms once with the other rewards', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -130,4 +130,30 @@ test('the immersive garden keeps its overlays, keyboard exits and name editor in
   await page.keyboard.press('Escape');
   await expect(page.locator('#room-section')).toBeVisible();
   await expect(page.locator('body')).not.toHaveClass(/is-garden/);
+});
+
+test('your avatar and selected pet walk in the garden and rest together during focus @dev-diagnostics', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('little-hours-v1', JSON.stringify({ pet: 'dog' })));
+  await page.goto('/'); await ready(page); await openGarden(page);
+  const pair = () => page.evaluate(() => {
+    const d = window.__littleHours.house.diagnostics(), root = d.scene.getTransformNodeByName('house-stroll');
+    return { visible: root.isEnabled(), scale: root.scaling.x, avatar: root.getDescendants().filter(n => n.name === 'Walking companion').length, dog: root.getDescendants().some(n => n.name === 'pet-dog'), pose: d.stroll, pet: d.strollPet, home: d.scene.getMeshByName('house-retreat-home').isEnabled() };
+  });
+  await expect.poll(async () => (await pair()).visible).toBe(true);
+  expect(await pair()).toMatchObject({ scale: .76, avatar: 1, dog: true, home: true, pose: { sit: 0 } });
+  const start = (await pair()).pose;
+  await expect.poll(async () => Math.hypot((await pair()).pose.x - start.x, (await pair()).pose.z - start.z), { timeout: 10000 }).toBeGreaterThan(.5);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect.poll(async () => (await pair()).pose.z).toBe(2.1 / .76);
+  expect(await pair()).toMatchObject({ visible: true, pose: { x: 0, moving: false }, pet: { moving: false } });
+  expect((await pair()).pet.x).toBeCloseTo(-.35 / .76 - .25);
+  await page.getByRole('button', { name: 'Back home', exact: true }).click();
+  await expect(page.locator('#room-section')).toBeVisible();
+  await page.locator('#start-button').click(); await openGarden(page);
+  await expect.poll(async () => (await pair()).pose.sit).toBe(1);
+  expect(await pair()).toMatchObject({ visible: true, avatar: 1, dog: true, pet: { moving: false } });
+  const before = await page.evaluate(() => ({ session: window.__littleHours.state.session, garden: window.__littleHours.state.garden, coins: window.__littleHours.state.house.coins }));
+  await page.getByRole('button', { name: 'Back home', exact: true }).click();
+  await expect(page.locator('#room-section')).toBeVisible();
+  expect(await page.evaluate(() => ({ session: window.__littleHours.state.session, garden: window.__littleHours.state.garden, coins: window.__littleHours.state.house.coins }))).toEqual(before);
 });

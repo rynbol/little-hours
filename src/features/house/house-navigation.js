@@ -7,6 +7,7 @@ import { roomDesignArt } from '../decorate/index.js';
 import { createHouseView } from './house-view.js';
 import { studyTrees } from '../../core/garden.js';
 import './room-navigation.css';
+import { travelTo } from '../../ui/place-transition.js';
 
 export function createHouseNavigation(app) {
   let houseOpen = false, connectedView = null, connectionsKey = '', travelTimer = 0, peekFrame = 0, arrivalTimer = 0, travelling = false, doorWalking = false;
@@ -26,6 +27,12 @@ export function createHouseNavigation(app) {
   }
 
   function setHouseOpen(open, selectedId) {
+    if (travelling) return;
+    const garden = selectedId === 'orchard' || /^plot-[0-5]$/.test(selectedId);
+    if ((open && garden) || (!open && document.body.classList.contains('is-garden'))) return travelTo(open ? 'garden' : 'home', () => showHouse(open, selectedId), () => !open || Boolean(app.houseUI.diagnostics()?.scene.isReady()));
+    showHouse(open, selectedId);
+  }
+  function showHouse(open, selectedId) {
     if (travelling) return;
     if (open === houseOpen) { if (open && selectedId) app.houseUI.show(selectedId); return; }
     if (open) {

@@ -1,8 +1,11 @@
+import { buildExteriorPart, exteriorPlan } from './house-exterior.js';
 import { buildGardenTree } from './garden-trees.js';
 import { buildGardenSpecimen } from './garden-model.js';
 
 export const RETREAT_SPOTS = [[-2.35, -1.95], [2.35, -1.95], [-3, .2], [3, .2], [-2.25, 2.35], [2.25, 2.35]];
-export const RETREAT_BOUNDS = [{ points: new Float32Array([...Array.from({ length: 32 }, (_, i) => { const a = i / 32 * Math.PI * 2; return [Math.cos(a) * 6.1, -.5, Math.sin(a) * 5.5]; }).flat(), -4.3, 3.1, -3.05, 4.3, 3.1, -3.05, -1.5, 2.6, -4.1, 1.5, 2.6, -4.1]) }];
+export const GARDEN_HOME = [-3.8, .04, -6.1];
+export const GARDEN_HOME_TAG = [-3.8, .45, -4.45];
+export const RETREAT_BOUNDS = [{ points: new Float32Array([...Array.from({ length: 32 }, (_, i) => { const a = i / 32 * Math.PI * 2; return [Math.cos(a) * 6.1, -.5, Math.sin(a) * 5.5]; }).flat(), -4.3, 3.1, -3.05, 4.3, 3.1, -3.05, -1.5, 2.6, -4.1, 1.5, 2.6, -4.1, -6.65, -.5, -8.55, -1, -.5, -8.55, -5.8, 3.7, -6.1, -1.8, 3.7, -6.1]) }];
 const shades = ['#819b70', '#95ad7b', '#a4b78b', '#718e68'];
 const petals = ['#ecc3b6', '#d5bddb', '#f5e6bb', '#e5acb9'];
 const hash = n => { const value = Math.sin(n * 71.3 + 2.1) * 43758.54; return value - Math.floor(value); };
@@ -72,11 +75,15 @@ function pottingCorner(api) {
 }
 
 export function buildGardenRetreat(api, theme) {
+  terrace(api, -3.4, -.26, -4.2, 7, 9, .34, '#cbbca1');
+  terrace(api, -3.4, -.09, -4.2, 6.95, 8.95, .22, '#6f8c62');
+  terrace(api, -3.4, -.012, -4.2, 6.8, 8.8, .14, '#a0b282');
   terrace(api, 0, -.26, .05, 12.2, 11, .34, '#cbbca1');
   terrace(api, 0, -.09, .05, 12.15, 10.95, .22, '#6f8c62');
   terrace(api, 0, 0, .05, 12, 10.8, .14, '#a0b282');
   for (let i = 0; i < 48; i++) {
     const a = i / 48 * Math.PI * 2, x = Math.cos(a) * 5.65, z = .05 + Math.sin(a) * 5;
+    if (x < -1.8 && z < -2.8) continue;
     api.ball(x, .09 + i % 3 * .055, z, .62, .32, .6, shades[i % 4]);
     if (i % 2) flowers(api, x * .965, z * .965, i, .8 + i % 3 * .13);
     if (i % 4 === 0) api.ball(x * 1.025, -.17, z * 1.025, .6, .3, .48, '#d1c6a7');
@@ -88,6 +95,7 @@ export function buildGardenRetreat(api, theme) {
   }
   for (const [i, [x, z]] of [[.52, -1.78], [.68, -2.32], [.46, -2.85], [0, -3.04]].entries()) stone(api, x, z, .58, .43, i);
   for (const side of [-1, 1]) for (let i = 0; i < 7; i++) stone(api, side * (.65 + i * .53), .05 + Math.sin(i * .7) * .36, .55, .38, i);
+  for (const [i, [x, z]] of [[-3.85, -.5], [-4.15, -1.05], [-3.95, -1.6], [-3.7, -2.15], [-3.45, -2.7], [-3.2, -3.25], [-3.25, -3.8], [-3.5, -4.3], [-3.8, -4.75]].entries()) stone(api, x, z, .7, .52, i);
   for (const [slot, [x, z]] of RETREAT_SPOTS.entries()) {
     terrace(api, x, .1, z, 2.08, 1.75, .16, '#baab87', slot);
     terrace(api, x, .12, z, 1.79, 1.46, .04, '#80734f', slot);
@@ -97,11 +105,13 @@ export function buildGardenRetreat(api, theme) {
   }
   for (let i = 0; i < 18; i++) {
     const a = Math.PI + i / 17 * Math.PI, x = Math.cos(a) * 5.25, z = Math.sin(a) * 4.55;
+    if (i === 4 || i === 5) continue;
     api.box(x, .45, z, .1, .9, .1, '#dbcead'); api.ball(x, .92, z, .15, .13, .15, '#f0e2bd');
-    if (i < 17) { const b = Math.PI + (i + .5) / 17 * Math.PI; for (const y of [.35, .66]) api.box(Math.cos(b) * 5.25, y, Math.sin(b) * 4.55, .96, .06, .06, '#d6c8a6', [0, -b - Math.PI / 2, 0]); }
+    if (i < 17 && i !== 3) { const b = Math.PI + (i + .5) / 17 * Math.PI; for (const y of [.35, .66]) api.box(Math.cos(b) * 5.25, y, Math.sin(b) * 4.55, .96, .06, .06, '#d6c8a6', [0, -b - Math.PI / 2, 0]); }
   }
   roseArbour(api); pottingCorner(api);
-  for (const [i, x] of [-4.2, 4.3].entries()) {
+  for (const [i, [x, z]] of [[-6.1, -3.9], [-6.25, -5.3], [-5.65, -7.45], [-3.4, -7.9], [-1.2, -6.1], [-1.7, -4.9]].entries()) flowers(api, x, z, i + 11, 1.4);
+  for (const [i, x] of [-5.2, 4.3].entries()) {
     buildGardenTree(api, i ? 'willow' : 'cherry', x, -3.05, 0, .86);
     flowers(api, x + (i ? -.45 : .45), -3.5, i + 5, 1.5);
   }
@@ -132,4 +142,14 @@ export function buildRetreatFlowers(api, plants) {
     const spot = RETREAT_SPOTS[plant.slot];
     if (spot) buildGardenSpecimen(api, plant, ...spot, { floor: .16, reach: .82, spread: .58, count: 7 });
   }
+}
+
+export function buildGardenHome(api, theme) {
+  const scale = .68, [hx, hy, hz] = GARDEN_HOME;
+  const cottage = Object.fromEntries(['box', 'ball', 'prism'].map(kind => [kind, (x, y, z, w, h, d, ...rest) => api[kind](hx + x * scale, hy + y * scale, hz + z * scale, w * scale, h * scale, d * scale, ...rest)]));
+  cottage.disc = (x, y, z, diameter, depth, ...rest) => api.disc(hx + x * scale, hy + y * scale, hz + z * scale, diameter * scale, depth * scale, ...rest);
+  const { parts, options } = exteriorPlan({ rooms: [{ id: 'studio' }] }, 'studio');
+  for (const part of parts) buildExteriorPart(cottage, part, 'studio', theme, options);
+  api.box(hx, .06, hz + 1.63, 1.1, .12, .48, '#d8ccb3');
+  api.box(hx, .025, hz + 1.94, 1.35, .065, .35, '#e4d8bc');
 }

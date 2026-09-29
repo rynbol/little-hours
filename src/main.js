@@ -1,3 +1,4 @@
+import { travelTo } from './ui/place-transition.js';
 import './ui/style.css';
 import './ui/ui.css';
 import { createUIFeedback } from './ui/ui-feedback.js';
@@ -142,7 +143,7 @@ app.houseUI = createHouseUI($('#house-page'), {
   store, acceptUpdate, art: roomDesignArt, icon, notice: app.toast,
   onClose: () => app.nav.setHouseOpen(false),
   onEnter: app.nav.visitRoom,
-  onFocus: () => { app.nav.setHouseOpen(false); app.timer.expand(); $('#start-button').focus(); },
+  onFocus: () => travelTo('home', () => { app.nav.setHouseOpen(false); app.timer.expand(); $('#start-button').focus(); }),
   onPond: () => app.lake.open(),
 });
 document.addEventListener('keydown', event => {

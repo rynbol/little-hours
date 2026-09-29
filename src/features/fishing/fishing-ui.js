@@ -1,3 +1,4 @@
+import { travelTo } from '../../ui/place-transition.js';
 import { BAIT_RANGES, FIGHT, SPECIES, TIERS, baitRange, rollCatch, speciesOf, startFight, stepFight, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
 import { fishArt } from './fish-art.js';
@@ -18,7 +19,7 @@ const cm = size => `${size.toFixed(1).replace(/\.0$/, '')} cm`;
 const escape = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 export function createFishingUI(app, { onClose } = {}) {
-  let root = null, scene = null, phase = 'idle', chosen = null, timers = [], caught = null, biteTimer = 0, returnFocus = null, building = 0, fight = null, hooked = null, holding = false, loop = 0, lastFrame = 0;
+  let disposed = false, root = null, scene = null, phase = 'idle', chosen = null, timers = [], caught = null, biteTimer = 0, returnFocus = null, building = 0, fight = null, hooked = null, holding = false, loop = 0, lastFrame = 0;
   const $ = selector => root.querySelector(selector);
   const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.push(id); return id; };
   const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
@@ -211,6 +212,11 @@ export function createFishingUI(app, { onClose } = {}) {
   function onKeyUp(event) { if (event.key === ' ' || event.key === 'Enter') letGo(); }
 
   function open() {
+    if (disposed || (root && !root.hidden)) return;
+    travelTo('pond', openPond, () => Boolean(scene?.diagnostics().scene.isReady()));
+  }
+  function openPond() {
+    if (disposed) return;
     if (!root) build();
     if (!root.hidden) return;
     returnFocus = document.activeElement;
@@ -225,6 +231,10 @@ export function createFishingUI(app, { onClose } = {}) {
   }
   function close() {
     if (!root || root.hidden) return;
+    travelTo(document.body.classList.contains('is-house') ? 'island' : 'home', closePond);
+  }
+  function closePond() {
+    if (!root || root.hidden) return;
     cancelAnimationFrame(building); clearTimeout(building); building = 0;
     clearTimers(); cancelAnimationFrame(loop); letGo(); fight = null; hooked = null; document.removeEventListener('keydown', onKey, true); document.removeEventListener('keyup', onKeyUp, true);
     scene?.dispose(); scene = null; phase = 'idle';
@@ -236,6 +246,6 @@ export function createFishingUI(app, { onClose } = {}) {
     get isOpen() { return Boolean(root && !root.hidden); },
     render() { if (root && !root.hidden && phase === 'idle') renderTray(); },
     diagnostics: () => scene ? { ...scene.diagnostics(), ui: phase, fight: fight && { tension: fight.tension, line: fight.line, mood: fight.mood, runs: fight.runs } } : null,
-    dispose() { close(); root?.remove(); root = null; },
+    dispose() { disposed = true; closePond(); root?.remove(); root = null; },
   };
 }

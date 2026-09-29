@@ -1,4 +1,5 @@
 import './house.css';
+import { travelTo } from '../../ui/place-transition.js';
 import { createGardenUI } from './garden-ui.js';
 import { createHouseView } from './house-view.js';
 import { HOUSE_SLOTS, nextExpansion, roomDisplayName } from '../../core/house.js';
@@ -36,7 +37,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
       </div>
       <aside id="house-detail" class="house-detail" aria-label="Selected house room"></aside></div>
     <dialog id="house-postcard-dialog" class="house-postcard-dialog" aria-labelledby="postcard-title"><div class="house-postcard-heading"><div><p class="eyebrow">FROM MY LITTLE CORNER OF THE WORLD</p><h2 id="postcard-title">Wish you were here.</h2></div><button class="icon-button" id="close-postcard" aria-label="Close postcard">${icon('close')}</button></div><img id="house-postcard-image" alt="A postcard of your miniature house"><div class="house-postcard-actions"><p>A little piece of home to send to someone.<small>A PNG to share wherever you like.</small></p><a id="download-postcard" download="little-hours-postcard.png">Save image ${icon('arrow')}</a></div></dialog>`;
-  const gardenUI = createGardenUI($('#house-detail'), { store, acceptUpdate, onFocus, onBack: () => { select(store.state.house.activeId); $('#house-open-garden').focus({ preventScroll: true }); }, notice, onPlot: index => view?.selectGardenPlot(index), celebrate: () => view?.celebrate('orchard') });
+  const gardenUI = createGardenUI($('#house-detail'), { store, acceptUpdate, onFocus, onBack: () => select(store.state.house.activeId), notice, onPlot: index => view?.selectGardenPlot(index), celebrate: () => view?.celebrate('orchard') });
   $('#house-open-garden').addEventListener('click', () => select('orchard'));
   $('#back-to-room').addEventListener('click', onClose);
   $('#rename-house').addEventListener('click', () => {
@@ -70,16 +71,22 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     finally { exporting = false; $('#house-postcard').disabled = false; }
   });
 
-  root.addEventListener('keydown', event => { if (event.key === 'Escape' && selectedId === 'orchard' && !postcardDialog.open) { event.stopPropagation(); event.preventDefault(); select(store.state.house.activeId); $('#house-open-garden').focus({ preventScroll: true }); } });
+  root.addEventListener('keydown', event => { if (event.key === 'Escape' && selectedId === 'orchard' && !postcardDialog.open) { event.stopPropagation(); event.preventDefault(); select(store.state.house.activeId); } });
 
   function select(id) {
+    const garden = id === 'orchard' || /^plot-[0-5]$/.test(id);
+    if (garden !== (selectedId === 'orchard')) return travelTo(garden ? 'garden' : 'island', () => applySelection(id), () => Boolean(view?.diagnostics().scene.isReady()));
+    applySelection(id);
+  }
+  function applySelection(id) {
+    const leavingGarden = selectedId === 'orchard';
     const plot = /^plot-[0-5]$/.test(id) ? Number(id.slice(5)) : null;
     if (id !== 'orchard' && plot === null) gardenUI.close();
     selectedId = plot === null ? id : 'orchard'; preview = true; celebration = null; clearTimeout(celebrationTimer);
     $('#house-celebration').hidden = true; root.classList.remove('house-just-built');
     signature = ''; render();
     if (plot !== null) gardenUI.selectSlot(plot);
-    $('#house-detail h2')?.focus({ preventScroll: true });
+    (leavingGarden && selectedId !== 'orchard' ? $('#house-open-garden') : $('#house-detail h2'))?.focus({ preventScroll: true });
   }
   function celebrate(entry) {
     const badge = $('#house-celebration');
@@ -155,7 +162,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     const nextModel = JSON.stringify([modelHouse.rooms, modelHouse.garden, modelHouse.plants, house.activeId, selectedId, store.state.theme, store.state.avatar, store.state.pet]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
-      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: id => id === 'pond' ? onPond?.() : select(id) };
+      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: store.state.session.running, onSelect: id => id === 'garden-home' ? onClose() : id === 'pond' ? onPond?.() : select(id) };
       const build = () => {
         try {
           if (view) view.update(options.house, options.selectedId, options.theme, options.avatar);

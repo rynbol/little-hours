@@ -16,7 +16,7 @@ import '@babylonjs/core/Culling/ray.js';
 import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
 import { gardenPlantName } from '../../core/garden-plants.js';
 import { PLANT_SPOTS, gardenPlotAt } from './garden-model.js';
-import { RETREAT_SPOTS, RETREAT_BOUNDS } from './garden-retreat.js';
+import { RETREAT_SPOTS, RETREAT_BOUNDS, GARDEN_HOME_TAG } from './garden-retreat.js';
 import { createGardenButterflies } from './garden-butterflies.js';
 import { GARDEN_TAG } from './house-garden.js';
 import { POND_TAG } from './house-pond.js';
@@ -118,8 +118,8 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     roomMotion.restore();
     model.animate(seconds, focused, motion.matches); water.animate(seconds); butterflies.animate(seconds, selectedId === 'orchard' && !motion.matches);
     for (const root of model.live) root.metadata.avatar?.setEnabled(focused);
-    stroll.setVisible(!focused && selectedId !== 'orchard');
-    if (!focused) stroll.animate(seconds, motion.matches);
+    stroll.setVisible(!focused || selectedId === 'orchard');
+    if (!focused || selectedId === 'orchard') stroll.animate(seconds, motion.matches, selectedId === 'orchard' ? focused ? 'garden-rest' : 'garden' : 'island');
     const turning = Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001;
     if (turning) {
       const ease = motion.matches || dragging?.moved ? 0 : Math.exp(-dt * 11);
@@ -188,9 +188,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const width = container.clientWidth, height = container.clientHeight, matrix = camera.getTransformationMatrix();
     for (const button of tags.children) {
       const id = button.dataset.room;
-      button.hidden = selectedId === 'orchard';
+      button.hidden = (id === 'garden-home') !== (selectedId === 'orchard');
       const base = HOUSE_POSITIONS[id], offset = model.levels[id]?.position;
-      if (!base) tagPoint.set(...(id === 'pond' ? POND_TAG : GARDEN_TAG));
+      if (!base) tagPoint.set(...(id === 'garden-home' ? GARDEN_HOME_TAG : id === 'pond' ? POND_TAG : GARDEN_TAG));
       else tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : id === 'loft' ? .7 : 0), base[2] + offset.z + 2.08);
       Vector3.TransformCoordinatesToRef(tagPoint, matrix, tagProjection);
       const half = Math.min(24, width / 4);
@@ -244,6 +244,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       const button = pin('button', entry.id === 'loft' ? 'loft' : 'room', entry.id, roomDisplayName(entry), here ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor');
       button.setAttribute('aria-label', `Visit ${roomDisplayName(entry)}`); button.setAttribute('aria-current', here ? 'location' : 'false');
     }
+    if (selectedId === 'orchard') pin('button', 'room', 'garden-home', 'Home').setAttribute('aria-label', 'Back home');
     pin('button', 'garden', 'orchard', 'Garden').classList.add('is-garden');
     const pond = pin('button', 'pond', 'pond', 'Willow Pond', 'Go fishing'); pond.classList.add('is-pond'); pond.setAttribute('aria-label', 'Go fishing at Willow Pond');
     // The blueprint's tag: what grows next and how close it is.
@@ -296,7 +297,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     if (id === hovering) return;
     hovering = id; canvas.style.cursor = id ? 'pointer' : 'grab';
     const room = house.rooms.find(room => room.id === id);
-    canvas.title = id?.startsWith('plot-') ? gardenPlantName(house.plants?.find(plant => plant.slot === Number(id.slice(5)))) : id === 'orchard' ? 'Your garden' : id === 'pond' ? 'Willow Pond' : id ? room ? roomDisplayName(room) : 'A little room to grow' : '';
+    canvas.title = id?.startsWith('plot-') ? gardenPlantName(house.plants?.find(plant => plant.slot === Number(id.slice(5)))) : id === 'garden-home' ? 'Back home' : id === 'orchard' ? 'Your garden' : id === 'pond' ? 'Willow Pond' : id ? room ? roomDisplayName(room) : 'A little room to grow' : '';
   };
   const onVisibility = () => { if (document.hidden) { onCancel(); roomMotion.stop(); shadows.getShadowMap().resetRefreshCounter(); cancelAnimationFrame(frame); frame = 0; } else requestRender(); };
   window.addEventListener('blur', onCancel); canvas.addEventListener('lostpointercapture', onCancel); canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointerup', onUp); canvas.addEventListener('pointercancel', onCancel); canvas.addEventListener('pointerleave', onLeave); canvas.addEventListener('pointermove', onMove);
@@ -327,7 +328,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       resize();
     },
     setFocused(value) { if (focused === Boolean(value)) return; focused = Boolean(value); requestRender(); },
-    diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, turning: Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001, trees: model.trees, plots: selectedId === 'orchard' ? RETREAT_SPOTS : PLANT_SPOTS, stroll: focused ? null : stroll?.pose, strollPet: focused ? null : stroll?.pet, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
+    diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, turning: Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001, trees: model.trees, plots: selectedId === 'orchard' ? RETREAT_SPOTS : PLANT_SPOTS, stroll: focused && selectedId !== 'orchard' ? null : stroll?.pose, strollPet: focused && selectedId !== 'orchard' ? null : stroll?.pet, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
     dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); stroll?.dispose(); model.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); controls.remove(); tags.remove(); note.remove(); },
   };
 }
