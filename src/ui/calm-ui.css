@@ -20,7 +20,7 @@ body #focus-mode-enter svg { margin: 0; color: #785e69; }
 .focus-disclosure #task { width: 100%; margin: 5px 0 0; }
 body #focus-options .sound-row { margin-top: 10px; padding-top: 10px; }
 body #focus-progress .session-journal { margin-top: 14px; }
-body .room-tools { grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(310px, 100%); border: 0; background: transparent; box-shadow: none; }
+body .room-tools { grid-template-columns: repeat(4, minmax(0, 1fr)); width: min(410px, 100%); border: 0; background: transparent; box-shadow: none; }
 body .room-tools > .tool { min-height: 44px; }
 #room-more-toggle > span:first-child { font-size: 22px; line-height: 16px; letter-spacing: 1px; }
 #room-more { position: fixed; inset: auto 24px 88px auto; width: 210px; margin: 0; padding: 7px; border: 1px solid #fff8ee; border-radius: 18px; color: #54464b; background: #faf4e9; box-shadow: 0 14px 50px #21152630; }

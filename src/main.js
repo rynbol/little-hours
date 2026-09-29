@@ -25,6 +25,7 @@ import './ui/calm-ui.css';
 import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
+import { createBuddyUI } from './features/buddy/index.js';
 import { installTestHook } from './dev/test-hook.js';
 import { stockBait } from './core/fishing.js';
 
@@ -57,6 +58,7 @@ app.nav = createHouseNavigation(app);
 app.roomUI = createRoomUI(app);
 app.panels = createPanels(app);
 app.lake = createFishingUI(app);
+app.buddy = createBuddyUI(app);
 wireSoundControls(app);
 
 function applyState(next, force = false) {
@@ -85,12 +87,14 @@ function applyState(next, force = false) {
   app.decorate.syncLayout(force);
   app.companion.syncIntent();
   app.roomUI.syncControls();
+  app.buddy?.sync();
 }
 function acceptUpdate(result) {
   applyState(result.state);
   if (result.completion) {
     app.room?.celebrate(); app.room?.petRitual('cuddle'); app.delights?.show('finish'); app.delights?.show('bond', 'pet');
     app.timer.showCelebration(result.completion);
+    app.buddy?.onCompletion(result.completion);
     // Ring for a session that just ended, not one found finished long ago.
     if (clockNow() - result.completion.at < 90_000) audio.chime();
   }
@@ -193,6 +197,7 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   app.nav.dispose(); app.decorate.dispose();
   app.houseUI?.dispose();
   app.lake.dispose();
+  app.buddy.dispose();
   app.delights?.dispose();
   app.room?.dispose?.();
   audio.dispose();

@@ -30,6 +30,8 @@ export const SEEDS = {
   'pet-bonded': { ...house(1, 25), seenAt: new Date('2026-01-10T15:50:00').getTime(), petBonds: { cat: { affection: 60, minutes: 300, ribbon: 3, care: { fabric: 'rose', belongings: ['linen', 'rose'] } } } },
   'pet-finish': { ...house(1), petBonds: { cat: { affection: 3 } }, session: { duration: 1500000, remaining: 6000, running: false, endsAt: null, petId: 'cat' } },
   pond: { ...house(3), history: studyDays, pond: { bait: [{ minutes: 10, at: 1 }, { minutes: 20, at: 2 }, { minutes: 35, at: 3 }, { minutes: 35, at: 4 }, { minutes: 60, at: 5 }, { minutes: 95, at: 6 }], journal: { minnow: { count: 3, best: 7.4, first: 1 }, perch: { count: 1, best: 18.2, first: 2 }, koi: { count: 1, best: 41, first: 3 } }, log: [] } },
+  buddy: { ...house(3), buddy: { name: 'Pip', color: 'peach', minutes: 420, finds: { clover: { count: 3, first: 1 }, pebble: { count: 2, first: 2 }, acorn: { count: 1, first: 3 }, 'sea-glass': { count: 1, first: 4 }, 'owl-feather': { count: 1, first: 5 }, 'fairy-cap': { count: 1, first: 6 } }, log: [{ find: 'fairy-cap', place: 'garden', minutes: 50, at: 6, opened: false }] } },
+  'buddy-finish': { ...house(3), buddy: { name: 'Pip', color: 'peach', minutes: 90, finds: {}, log: [] }, session: { duration: 1500000, remaining: 4000, running: false, endsAt: null } },
   'pond-empty': { ...house(3), pond: { bait: [], journal: {}, log: [] } },
 };
 

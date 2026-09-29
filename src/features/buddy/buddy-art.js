@@ -1,0 +1,72 @@
+let uid = 0;
+
+const SPROUTS = {
+  seed: '',
+  sprout: '<path class="buddy-stem" d="M60 22c0-5 1-9 3-12"/><path class="buddy-leaf" d="M62 13c5-6 12-6 15-3-4 5-10 6-15 3Z"/>',
+  leafy: '<path class="buddy-stem" d="M60 22c0-6 1-11 2-15"/><path class="buddy-leaf" d="M61 12c6-7 15-7 18-3-5 6-12 7-18 3Z"/><path class="buddy-leaf" d="M60 15c-5-6-13-7-16-3 4 5 10 6 16 3Z"/>',
+  budding: '<path class="buddy-stem" d="M60 22c0-7 0-12 0-17"/><path class="buddy-leaf" d="M60 15c6-6 14-6 17-2-5 5-11 6-17 2Z"/><path class="buddy-leaf" d="M60 17c-5-5-12-6-15-2 4 4 9 5 15 2Z"/><ellipse class="buddy-bud" cx="60" cy="5" rx="4.5" ry="5.5"/>',
+  blooming: '<path class="buddy-stem" d="M60 22c0-7 0-12 0-16"/><path class="buddy-leaf" d="M60 16c6-6 14-6 17-2-5 5-11 6-17 2Z"/><path class="buddy-leaf" d="M60 18c-5-5-12-6-15-2 4 4 9 5 15 2Z"/><g class="buddy-flower">' + [0, 72, 144, 216, 288].map(turn => `<ellipse cx="60" cy="0" rx="3.6" ry="5" transform="rotate(${turn} 60 5)"/>`).join('') + '<circle class="buddy-flower-heart" cx="60" cy="5" r="2.6"/></g>',
+};
+
+export function buddyArt(stage = 'seed') {
+  const id = `buddy-${++uid}`;
+  return `<svg class="buddy-svg" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+    <defs>
+      <radialGradient id="${id}-body" cx=".38" cy=".3" r=".8"><stop offset="0" class="buddy-stop-light"/><stop offset=".55" class="buddy-stop-body"/><stop offset="1" class="buddy-stop-shade"/></radialGradient>
+      <radialGradient id="${id}-rim" cx=".5" cy=".42" r=".62"><stop offset=".72" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".38"/></radialGradient>
+      <radialGradient id="${id}-gloss" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    </defs>
+    <ellipse class="buddy-shadow" cx="60" cy="110" rx="34" ry="5.5"/>
+    <g class="buddy-spin"><g class="buddy-squish">
+      <g class="buddy-sprout">${SPROUTS[stage] ?? ''}</g>
+      <path class="buddy-body" fill="url(#${id}-body)" d="M60 20c30 0 47 25 47 52 0 25-20 35-47 35S13 97 13 72c0-27 17-52 47-52Z"/>
+      <path fill="url(#${id}-rim)" d="M60 20c30 0 47 25 47 52 0 25-20 35-47 35S13 97 13 72c0-27 17-52 47-52Z"/>
+      <ellipse fill="url(#${id}-gloss)" cx="42" cy="40" rx="13" ry="8" transform="rotate(-24 42 40)"/>
+      <circle fill="#fff" opacity=".9" cx="36" cy="44" r="2.4"/>
+      <g class="buddy-face">
+        <ellipse class="buddy-cheek" cx="33" cy="79" rx="7.5" ry="4.5"/><ellipse class="buddy-cheek" cx="87" cy="79" rx="7.5" ry="4.5"/>
+        <g class="buddy-look"><g class="buddy-eyes">
+          <g class="buddy-eyes-open"><ellipse cx="45" cy="68" rx="5.6" ry="7.4"/><ellipse cx="75" cy="68" rx="5.6" ry="7.4"/><circle class="buddy-glint" cx="47" cy="65" r="2"/><circle class="buddy-glint" cx="77" cy="65" r="2"/></g>
+          <g class="buddy-eyes-shut"><path d="M39 69q6 5 12 0"/><path d="M69 69q6 5 12 0"/></g>
+          <g class="buddy-eyes-happy"><path d="M39 70q6-8 12 0"/><path d="M69 70q6-8 12 0"/></g>
+        </g></g>
+        <path class="buddy-mouth" d="M55 80q2.5 3 5 0q2.5 3 5 0"/>
+      </g>
+    </g></g>
+  </svg>`;
+}
+
+export function signArt() {
+  return `<svg class="buddy-sign" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+    <ellipse class="buddy-shadow" cx="60" cy="110" rx="22" ry="4"/>
+    <path d="M58 108V58h4v50Z" fill="#9a7555"/>
+    <rect x="22" y="46" width="76" height="28" rx="7" fill="#c89b6d" stroke="#9a7555" stroke-width="2.5"/>
+    <text x="60" y="65" text-anchor="middle" font-size="13" font-weight="700" fill="#5e4231">exploring</text>
+    <path d="M30 96c3-2 6-2 8 0M44 101c3-2 6-2 8 0" stroke="#b99474" stroke-width="3" stroke-linecap="round" fill="none"/>
+  </svg>`;
+}
+
+const FIND_ART = {
+  'clover': '<path d="M24 26v14" stroke="#5f8f55" stroke-width="3" stroke-linecap="round"/>' + [0, 90, 180, 270].map(turn => `<path transform="rotate(${turn} 24 22)" d="M24 22c-2-7-11-8-11-2 0 5 7 5 11 2Z" fill="#7fb36f" stroke="#5f8f55" stroke-width="1.5"/>`).join(''),
+  'snail-shell': '<path d="M9 36c0-14 10-24 21-22 9 2 12 12 6 18-5 5-12 2-11-4 1-4 6-4 6 0" fill="#e8c79a" stroke="#b58657" stroke-width="3" stroke-linecap="round"/><path d="M8 37h34" stroke="#b58657" stroke-width="3" stroke-linecap="round"/>',
+  'seed-pouch': '<path d="M15 20c0 14-4 22 9 22s9-8 9-22Z" fill="#d7b98e" stroke="#9f7c52" stroke-width="2.5"/><path d="M13 19c5-3 17-3 22 0" stroke="#a45c5c" stroke-width="3" stroke-linecap="round" fill="none"/><circle cx="22" cy="31" r="2" fill="#9f7c52"/><circle cx="27" cy="34" r="1.6" fill="#9f7c52"/>',
+  'fairy-cap': '<path d="M20 28h8v12h-8Z" fill="#f4ead8" stroke="#c9b394" stroke-width="2"/><path d="M8 30c0-10 7-18 16-18s16 8 16 18Z" fill="#e0685c" stroke="#b44b43" stroke-width="2"/><circle cx="17" cy="22" r="2.6" fill="#fff6ea"/><circle cx="28" cy="18" r="2.2" fill="#fff6ea"/><circle cx="32" cy="26" r="1.8" fill="#fff6ea"/>',
+  'pebble': '<ellipse cx="24" cy="28" rx="16" ry="10" fill="#aab2b5" stroke="#7f878b" stroke-width="2.5"/><ellipse cx="18" cy="24" rx="5" ry="2.5" fill="#d7dcde"/>',
+  'duck-feather': '<path d="M12 40C14 24 24 10 38 8c-2 16-12 28-26 32Z" fill="#f2efe7" stroke="#b9b1a1" stroke-width="2"/><path d="M12 40 32 16" stroke="#b9b1a1" stroke-width="2"/>',
+  'sea-glass': '<path d="M12 22l10-10 14 6 2 14-12 8-12-6Z" fill="#9fd6c8" stroke="#6aa99a" stroke-width="2.5" opacity=".92"/><path d="M18 22l5-5" stroke="#e8fbf5" stroke-width="3" stroke-linecap="round"/>',
+  'pond-pearl': '<path d="M6 30c6-12 30-12 36 0-8 8-28 8-36 0Z" fill="#8e98b6" stroke="#6b7493" stroke-width="2"/><circle cx="24" cy="25" r="8" fill="#f6f1ee" stroke="#d9cfd8" stroke-width="1.5"/><circle cx="21" cy="22" r="2.4" fill="#fff"/>',
+  'acorn': '<path d="M14 22c0 12 4 18 10 18s10-6 10-18Z" fill="#c98f52" stroke="#9a6a3a" stroke-width="2"/><path d="M11 22c0-7 6-10 13-10s13 3 13 10Z" fill="#8f6a44" stroke="#6d4f31" stroke-width="2"/><path d="M24 12V7" stroke="#6d4f31" stroke-width="3" stroke-linecap="round"/>',
+  'pinecone': '<path d="M24 6c9 6 12 18 8 30-3 5-13 5-16 0-4-12-1-24 8-30Z" fill="#a6784e" stroke="#7a5534" stroke-width="2"/><path d="M17 18h14M15 25h18M16 32h16" stroke="#7a5534" stroke-width="2" stroke-linecap="round"/>',
+  'owl-feather': '<path d="M14 42C12 26 20 12 34 6c4 14-4 30-20 36Z" fill="#b99a78" stroke="#7d6247" stroke-width="2"/><path d="M14 42 30 14M20 30l6 2M18 24l8 1M24 18l6 2" stroke="#7d6247" stroke-width="2" stroke-linecap="round"/>',
+  'brass-key': '<circle cx="15" cy="17" r="8" fill="none" stroke="#c9a14a" stroke-width="4"/><path d="M20 23 38 39M31 32l4-4M35 36l4-4" stroke="#c9a14a" stroke-width="4" stroke-linecap="round"/>',
+  'fern': '<path d="M16 42c0-20 8-30 20-30 4 0 6 3 6 6s-3 5-6 4" fill="none" stroke="#5f8f55" stroke-width="3" stroke-linecap="round"/><path d="M18 34l-6-3M20 27l-6-4M24 20l-4-5M19 36l6 1M22 29l6 0M27 22l5-1" stroke="#7fb36f" stroke-width="3" stroke-linecap="round"/>',
+  'striped-stone': '<ellipse cx="24" cy="27" rx="16" ry="11" fill="#8d8f9b" stroke="#676a76" stroke-width="2.5"/><path d="M11 24c8 3 18 3 26 0M10 30c9 3 19 3 28 0" stroke="#e8e2d6" stroke-width="2.4" fill="none"/>',
+  'crystal': '<path d="M24 6l10 12-10 24-10-24Z" fill="#c9b6ee" stroke="#9a83cf" stroke-width="2"/><path d="M14 18h20M24 6v36" stroke="#9a83cf" stroke-width="1.5"/><path d="M19 15l3-4" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>',
+  'rainbow-drop': '<path d="M24 6c8 11 13 18 13 24a13 13 0 0 1-26 0c0-6 5-13 13-24Z" fill="#bfe3f3" stroke="#83b7d1" stroke-width="2"/><path d="M16 32a8 8 0 0 1 16 0" stroke="#ef9a9a" stroke-width="2.4" fill="none"/><path d="M19 33a5 5 0 0 1 10 0" stroke="#f3d27a" stroke-width="2.4" fill="none"/><path d="M19 22l3-5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>',
+  'cloud-puff': '<path d="M12 36a8 8 0 0 1 2-16 10 10 0 0 1 19-2 8 8 0 0 1 3 18Z" fill="#fbf8f4" stroke="#c9c3cf" stroke-width="2.5"/>',
+  'star-shard': '<path d="m24 5 5 12 13 2-10 8 3 13-11-7-11 7 3-13-10-8 13-2Z" fill="#f4d67c" stroke="#d1a843" stroke-width="2" stroke-linejoin="round"/>',
+  'moon-button': '<circle cx="24" cy="24" r="16" fill="#e7e2f3" stroke="#aaa0c7" stroke-width="2.5"/><path d="M28 14a10 10 0 1 0 6 16 8 8 0 0 1-6-16Z" fill="#f4d67c"/><circle cx="20" cy="22" r="1.6" fill="#aaa0c7"/><circle cx="24" cy="26" r="1.6" fill="#aaa0c7"/>',
+  'comet-ribbon': '<path d="M6 36c10-2 14-14 24-16s8 8 12 6" fill="none" stroke="#c49ad8" stroke-width="4" stroke-linecap="round"/><path d="M8 40c10-2 16-12 26-12" fill="none" stroke="#8fc7e8" stroke-width="3" stroke-linecap="round"/><path d="m36 8 2 5 5 1-4 3 1 5-4-3-4 3 1-5-4-3 5-1Z" fill="#f4d67c"/>',
+};
+
+export const findArt = (id, found = true) => `<svg class="find-art${found ? '' : ' is-unfound'}" viewBox="0 0 48 48" aria-hidden="true" focusable="false">${FIND_ART[id] ?? ''}</svg>`;
