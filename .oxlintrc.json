@@ -1,0 +1,8 @@
+{
+  "categories": { "correctness": "off" },
+  "env": { "browser": true, "es2024": true },
+  "rules": { "no-undef": "error" },
+  "overrides": [
+    { "files": ["scripts/**", "e2e/**", "checks/**", "**/*.test.js", "*.config.js", "*.mjs"], "env": { "node": true } }
+  ]
+}
