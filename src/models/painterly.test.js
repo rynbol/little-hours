@@ -30,3 +30,12 @@ test('in the room, ambient light alone reads as shade and window sun reads as li
     assert.ok(shade + sun * .5 > end, `${theme} room sunlight never reads as lit`);
   }
 });
+
+test('room furniture darkens where it meets the floor, and the island is left unshaded', () => {
+  for (const theme of ['day', 'dusk', 'rain']) {
+    const [strength, height] = PAINTERLY_LOOKS[`room-${theme}`].ground;
+    assert.ok(strength > 0.3 && strength < 0.8, `room-${theme} contact shade is visible but not black`);
+    assert.ok(height >= 1, `room-${theme} contact shade reaches up a sofa side`);
+    assert.equal(PAINTERLY_LOOKS[theme].ground[0], 0, `${theme} island below y=0 stays unshaded`);
+  }
+});
