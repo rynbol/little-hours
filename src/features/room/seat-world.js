@@ -2,6 +2,7 @@ import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
+import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
@@ -354,6 +355,45 @@ function buildShell(shape, doors) {
   }
 }
 
+const GRASS_VERTEX = `precision highp float;
+attribute vec3 position; attribute vec2 uv; uniform mat4 world, viewProjection; uniform float time;
+varying float vTip, vFog, vGust, vShade;
+void main() {
+  vec4 p = world * vec4(position, 1.);
+  float wave = sin(p.x * .045 + p.z * .03 - time * .9) * .5 + .5 + sin(p.x * .11 - p.z * .07 - time * 1.7) * .15;
+  float gust = smoothstep(.55, 1., wave), sway = sin(time * 2.1 + p.x * .35 + p.z * .25 + uv.y * 6.28) * .22 + gust * .9;
+  p.xz += vec2(.92, .38) * sway * uv.x * .55; p.y -= uv.x * gust * .18;
+  vTip = step(.001, uv.x); vGust = gust * vTip; vShade = .82 + .36 * uv.y;
+  vFog = smoothstep(20., 175., length(p.xz)) * .82;
+  gl_Position = viewProjection * p;
+}`;
+const GRASS_FRAGMENT = `precision highp float;
+varying float vTip, vFog, vGust, vShade; uniform vec3 root, tip, shine, haze;
+void main() {
+  vec3 c = mix(root, tip, vTip * vTip) * vShade;
+  c = mix(c, shine, vGust * .42);
+  gl_FragColor = vec4(mix(c, haze, vFog), 1.);
+}`;
+
+export function grassBlades() {
+  const positions = [], uvs = [], indices = [], random = seeded(83);
+  const patch = (count, near, far, width, height) => {
+    for (let i = 0; i < count; i++) {
+      const b = -1.15 + random() * 1.8, r = near + (far - near) * Math.sqrt(random()), x = Math.sin(b) * r, z = -Math.cos(b) * r;
+      if (Math.abs(x) < 6.4 + width && z > -4.9 - width) continue;
+      if (nearRiver(x, z) < 3.2) continue;
+      const y = terrainHeight(x, z) - 0.04, h = height * (0.6 + random() * 0.8), turn = random() * Math.PI, dx = Math.cos(turn) * width / 2, dz = Math.sin(turn) * width / 2, lean = (random() - 0.5) * h * 0.4, shade = random(), start = positions.length / 3;
+      positions.push(x - dx, y, z - dz, x + dx, y, z + dz, x + lean, y + h, z + lean * 0.5);
+      uvs.push(0, shade, 0, shade, h, shade);
+      indices.push(start, start + 1, start + 2);
+    }
+  };
+  patch(3200, 4.9, 11, 0.12, 0.55);
+  patch(3000, 11, 26, 0.3, 0.9);
+  patch(7000, 26, 64, 0.6, 1.35);
+  return { positions, uvs, indices };
+}
+
 const SHELL_ROLES = { curtain: '#a88380', curtainShade: '#8c686d', brass: '#bf9762' };
 
 function toMesh(shape, name, scene, parent, material) {
@@ -410,9 +450,12 @@ export function createSeatWorld(scene, parent) {
   const shapes = {};
   const make = (name, build, material = unlit, parentNode = root) => { const shape = createShape(); build(shape); shapes[name] = shape; return toMesh(shape, `seat-world-${name}`, scene, parentNode, material); };
   const spiritMatrices = new Float32Array(SPIRITS * 16);
-  let sky = null, land, cloudRoot, clouds, flockRoot, flock, moon, shooting, spirits;
+  const grassPaint = new ShaderMaterial('seat-world-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'uv'], uniforms: ['world', 'viewProjection', 'time', 'root', 'tip', 'shine', 'haze'] });
+  grassPaint.backFaceCulling = false; grassPaint.setFloat('time', 0);
+  let sky = null, land, grass, cloudRoot, clouds, flockRoot, flock, moon, shooting, spirits;
   function build() {
     sky = make('sky', buildSky); land = make('land', shape => { buildLand(shape); buildHamlet(shape); buildForest(shape); buildRuins(shape); buildCastle(shape); buildWatchtower(shape); buildVolcano(shape); });
+    grass = new Mesh('seat-world-grass', scene); Object.assign(new VertexData(), grassBlades()).applyToMesh(grass); grass.material = grassPaint; grass.parent = root; grass.isPickable = false; grass.metadata = { castShadow: false, seatWorld: true };
     cloudRoot = new TransformNode('seat-world-cloud-drift', scene); cloudRoot.parent = root;
     clouds = make('clouds', buildClouds, unlit, cloudRoot);
     flockRoot = new TransformNode('seat-world-flock-flight', scene); flockRoot.parent = root; flockRoot.position.y = FLOCK.y;
@@ -448,6 +491,8 @@ export function createSeatWorld(scene, parent) {
     glow.lit = windowsLit(theme, progress); glow.stars = theme === 'dusk' ? 0.55 + progress * 0.45 : 0;
     placeMoon();
     for (const mesh of [sky, land, clouds, flock, moon, shooting, spirits]) paint(mesh, palette);
+    const blade = (key, scale) => hex(palette[key]).scale(scale);
+    grassPaint.setColor3('root', blade('grass', 0.62)); grassPaint.setColor3('tip', Color3.Lerp(blade('meadow', 1.08), hex(palette.glow), 0.12)); grassPaint.setColor3('shine', Color3.Lerp(blade('meadow', 1.28), hex(palette.glow), 0.3)); grassPaint.setColor3('haze', hex(palette.haze));
   }
   function setShell(style, wallPaint = {}, doors = []) {
     const base = SHELL_PAINT[style] || SHELL_PAINT.retreat, key = JSON.stringify([style, wallPaint, doors]);
@@ -475,6 +520,7 @@ export function createSeatWorld(scene, parent) {
     if (!root.isEnabled(false)) return;
     seconds += reduced ? 0 : delta;
     cloudRoot.rotation.y = seconds * 0.004;
+    grassPaint.setFloat('time', seconds);
     const run = (seconds % FLOCK_SECONDS) / FLOCK_SECONDS * 2;
     flockRoot.rotation.y = -(FLOCK.center - FLOCK.span / 2 + FLOCK.span * Math.min(1, run));
     flockRoot.position.y = FLOCK.y + Math.sin(seconds * 0.7) * 0.9;
@@ -495,6 +541,6 @@ export function createSeatWorld(scene, parent) {
     prepare() { if (!sky) { build(); recolor(); } },
     setEnabled(enabled) { if (enabled && !sky) build(); root.setEnabled(enabled); if (enabled) { recolor(); placeSpirits(true); } },
     animate,
-    dispose() { root.dispose(false, false); unlit.dispose(); lit.dispose(); },
+    dispose() { root.dispose(false, false); unlit.dispose(); lit.dispose(); grassPaint.dispose(); },
   };
 }

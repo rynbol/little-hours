@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, VISTA_THEMES } from './seat-world.js';
+import { createSeatWorld, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, VISTA_THEMES } from './seat-world.js';
 
 const setup = () => { const engine = new NullEngine(), scene = new Scene(engine); return { engine, scene, world: createSeatWorld(scene, new TransformNode('room', scene)) }; };
 const litWindows = world => {
@@ -80,5 +80,23 @@ test('the castle, the volcano and the watchtower all stand inside the view from 
     const bearing = Math.atan2(x / count, -z / count);
     assert.ok(count > 0 && bearing > -0.95 && bearing < 0.45, `${role} sits ${bearing.toFixed(2)} rad off the window`);
   }
+  engine.dispose();
+});
+
+test('wind grass grows outside the room, only its tips bend, and it holds still for reduced motion', () => {
+  const { positions, uvs } = grassBlades();
+  assert.ok(positions.length / 9 > 10000, `${positions.length / 9} blades`);
+  for (let v = 0; v < positions.length / 3; v++) {
+    const x = positions[v * 3], z = positions[v * 3 + 2];
+    if (v % 3 < 2) { assert.equal(uvs[v * 2], 0); assert.ok(!(Math.abs(x) < 6.4 && z > -4.9), `blade inside the room at ${x}, ${z}`); } else assert.ok(uvs[v * 2] > 0);
+  }
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const paint = world.meshes.find(mesh => mesh.name === 'seat-world-grass').material;
+  world.animate(2, false);
+  const swaying = paint._floats.time;
+  assert.ok(swaying > 0);
+  world.animate(3, true);
+  assert.equal(paint._floats.time, swaying);
   engine.dispose();
 });
