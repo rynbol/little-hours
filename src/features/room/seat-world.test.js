@@ -186,3 +186,14 @@ test('sunbeams fan down from the sun over the valley by day, dim in rain and van
   assert.equal(rayMesh.material._floats.time, 0);
   engine.dispose();
 });
+
+test('the meadow breaks into warm yellow-green patches warmer than the plain grass tips', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const paint = world.meshes.find(mesh => mesh.name === 'seat-world-grass').material, warmth = color => color.r / color.g;
+  for (const theme of ['day', 'dusk', 'rain']) {
+    world.setTheme(theme);
+    assert.ok(warmth(paint._colors3.warm) > warmth(paint._colors3.tip) + 0.15, theme);
+  }
+  engine.dispose();
+});

@@ -11,7 +11,7 @@ import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 export const VISTA_THEMES = Object.freeze({
   dusk: {
     zenith: '#1a1d48', high: '#4a3c78', horizon: '#f2a070', glow: '#ffc27a', haze: '#7a5f8c', below: '#3a3354',
-    far: '#5c5082', mid: '#40496c', valley: '#34485a', field: '#3d5462', cliff: '#463f56', grass: '#3a5646', meadow: '#476a4e',
+    far: '#5c5082', mid: '#40496c', valley: '#34485a', field: '#3d5462', cliff: '#463f56', grass: '#3a5646', meadow: '#476a4e', meadowWarm: '#6a7048',
     trunk: '#3b2e33', leaf: '#2c4a40', leafLight: '#4a6a50', walls: ['#c9a58a', '#b98f86', '#a9a3a0', '#d4b894'], roofs: ['#6a3f3a', '#4a3a3a', '#7a4a3a', '#3f4a5a'],
     stone: '#6b6480', water: '#50608e', glint: '#f2d7b0', window: '#ffc978', windowWarm: '#ffa860', windowDark: '#2b2d44', lamp: '#ffdca0',
     star: '#fff4d8', moon: '#fff1d0', cloud: '#f2aa92', cloudShade: '#6a5a8c',
@@ -20,7 +20,7 @@ export const VISTA_THEMES = Object.freeze({
   },
   day: {
     zenith: '#2f74c8', high: '#6fa9e0', horizon: '#d9ecef', glow: '#fff4d6', haze: '#a4c4df', below: '#8fb08a',
-    far: '#7090c0', mid: '#6c9a86', valley: '#7aa84c', field: '#a0c45a', cliff: '#8c8a7c', grass: '#76a843', meadow: '#8cbf4e',
+    far: '#7090c0', mid: '#6c9a86', valley: '#7aa84c', field: '#a0c45a', cliff: '#8c8a7c', grass: '#76a843', meadow: '#8cbf4e', meadowWarm: '#c8cf5a',
     trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffffff', cloudShade: '#c4d3e6',
@@ -29,7 +29,7 @@ export const VISTA_THEMES = Object.freeze({
   },
   rain: {
     zenith: '#3f4a5e', high: '#5c6878', horizon: '#9aa2a8', glow: '#b8b4ae', haze: '#7a8590', below: '#4c5864',
-    far: '#687684', mid: '#56646f', valley: '#46545a', field: '#50605e', cliff: '#5a5a60', grass: '#4a6452', meadow: '#56705a',
+    far: '#687684', mid: '#56646f', valley: '#46545a', field: '#50605e', cliff: '#5a5a60', grass: '#4a6452', meadow: '#56705a', meadowWarm: '#78784e',
     trunk: '#3e3a3a', leaf: '#3c5448', leafLight: '#4a6454', walls: ['#b8ab9c', '#a8958e', '#9ea0a2', '#bcae90'], roofs: ['#6a4848', '#4a5468', '#5a5068', '#7a5a4a'],
     stone: '#747880', water: '#5a6a7c', glint: '#c8ccd0', window: '#ffc27a', windowWarm: '#ffaa66', windowDark: '#3a4050', lamp: '#ffd49a',
     star: '#5c6878', moon: '#c8ccd0', cloud: '#8a939e', cloudShade: '#6a7480',
@@ -415,11 +415,12 @@ export function sunRayShape() {
 }
 const GRASS_VERTEX = `precision highp float;
 attribute vec3 position; attribute vec2 uv; uniform mat4 world, viewProjection; uniform float time;
-uniform float shadow; varying float vTip, vFog, vGust, vShade, vCloud;
+uniform float shadow; varying float vTip, vFog, vGust, vShade, vCloud, vWarm, vDeep;
 ${CLOUD_SHADE}
 void main() {
   vec4 p = world * vec4(position, 1.);
   vCloud = cloudShade(p.xz, time) * shadow;
+  vWarm = smoothstep(.38, .62, noise(position.xz * .13 + 11.)); vDeep = smoothstep(.55, .85, noise(position.xz * .09 + 37.)) * (1. - vWarm);
   float wave = sin(p.x * .045 + p.z * .03 - time * .9) * .5 + .5 + sin(p.x * .11 - p.z * .07 - time * 1.7) * .15;
   float gust = smoothstep(.55, 1., wave), sway = sin(time * 2.1 + p.x * .35 + p.z * .25 + uv.y * 6.28) * .22 + gust * .9;
   p.xz += vec2(.92, .38) * sway * uv.x * .55; p.y -= uv.x * gust * .18;
@@ -428,9 +429,10 @@ void main() {
   gl_Position = viewProjection * p;
 }`;
 const GRASS_FRAGMENT = `precision highp float;
-varying float vTip, vFog, vGust, vShade, vCloud; uniform vec3 root, tip, shine, haze;
+varying float vTip, vFog, vGust, vShade, vCloud, vWarm, vDeep; uniform vec3 root, tip, shine, haze, warm;
 void main() {
-  vec3 c = mix(root, tip, vTip * vTip) * vShade;
+  vec3 top = mix(mix(tip, warm, vWarm), root * 1.15, vDeep * .6);
+  vec3 c = mix(root, top, vTip * vTip) * vShade;
   c = mix(c, shine, vGust * .42 * (1. - vCloud));
   c *= 1. - vCloud * .45;
   gl_FragColor = vec4(mix(c, haze, vFog), 1.);
@@ -511,7 +513,7 @@ export function createSeatWorld(scene, parent) {
   const shapes = {};
   const make = (name, build, material = unlit, parentNode = root) => { const shape = createShape(); build(shape); shapes[name] = shape; return toMesh(shape, `seat-world-${name}`, scene, parentNode, material); };
   const spiritMatrices = new Float32Array(SPIRITS * 16);
-  const grassPaint = new ShaderMaterial('seat-world-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'uv'], uniforms: ['world', 'viewProjection', 'time', 'shadow', 'root', 'tip', 'shine', 'haze'] });
+  const grassPaint = new ShaderMaterial('seat-world-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'uv'], uniforms: ['world', 'viewProjection', 'time', 'shadow', 'root', 'tip', 'shine', 'haze', 'warm'] });
   const landPaint = new ShaderMaterial('seat-world-land-paint', scene, { vertexSource: LAND_VERTEX, fragmentSource: LAND_FRAGMENT }, { attributes: ['position', 'color'], uniforms: ['world', 'viewProjection', 'time', 'shadow'] });
   landPaint.backFaceCulling = false; landPaint.setFloat('time', 0); landPaint.setFloat('shadow', 0);
   grassPaint.backFaceCulling = false; grassPaint.setFloat('time', 0); grassPaint.setFloat('shadow', 0);
@@ -558,7 +560,7 @@ export function createSeatWorld(scene, parent) {
     placeMoon();
     for (const mesh of [sky, land, clouds, flock, moon, shooting, spirits]) paint(mesh, palette);
     const blade = (key, scale) => hex(palette[key]).scale(scale);
-    grassPaint.setColor3('root', blade('grass', 0.62)); grassPaint.setColor3('tip', Color3.Lerp(blade('meadow', 1.08), hex(palette.glow), 0.12)); grassPaint.setColor3('shine', Color3.Lerp(blade('meadow', 1.28), hex(palette.glow), 0.3)); grassPaint.setColor3('haze', hex(palette.haze)); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
+    grassPaint.setColor3('root', blade('grass', 0.62)); grassPaint.setColor3('tip', Color3.Lerp(blade('meadow', 1.08), hex(palette.glow), 0.12)); grassPaint.setColor3('shine', Color3.Lerp(blade('meadow', 1.28), hex(palette.glow), 0.3)); grassPaint.setColor3('haze', hex(palette.haze)); grassPaint.setColor3('warm', blade('meadowWarm', 1)); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
     rayPaint.setFloat('strength', SUN_RAY_STRENGTH[theme] ?? 0); rayPaint.setColor3('tint', Color3.Lerp(Color3.White(), hex(palette.glow), 0.6)); rays.setEnabled(SUN_RAY_STRENGTH[theme] > 0);
   }
   function setShell(style, wallPaint = {}, doors = []) {
