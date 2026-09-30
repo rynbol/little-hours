@@ -19,7 +19,7 @@ export default {
   about: 'the pond: the island pond tag opens the lake, bait from sessions sits in ranges with their odds, a cast gets a bite, holding to reel against the line tension lands a fish that fills the journal and spends one bait, a missed bite keeps the bait, Escape closes the card, then the journal, then the lake, and the catch survives a reload',
   async run(t) {
     const { check } = t;
-    const app = await t.open({ seed: 'pond' });
+    const app = await t.open({ seed: 'pond', scale: 1 });
     await app.settle();
     await steps.openLake(app);
     const engines = await app.js(`window.__littleHours.counts().engines`);
@@ -82,7 +82,7 @@ export default {
     check('after a reload the catch and the spent bait are kept', saved.caught === after.caught && saved.bait.length === after.bait.length, saved);
     await app.close();
 
-    const empty = await t.open({ seed: 'pond-empty' });
+    const empty = await t.open({ seed: 'pond-empty', scale: 1 });
     await empty.settle();
     await steps.openLake(empty);
     await empty.clickSel('#lake-bait-toggle');

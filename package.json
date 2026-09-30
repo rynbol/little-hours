@@ -11,7 +11,7 @@
     "verify:room": "node scripts/verify-room.mjs",
     "test:e2e": "playwright test",
     "lh": "node scripts/lh.mjs",
-    "guard": "node scripts/guard.mjs",
+    "guard": "node scripts/guard.mjs && oxlint --quiet src scripts e2e checks",
     "assets": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup --python scripts/assets.py --"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.63.0",
+    "oxlint": "^1.86.0",
     "vite": "8.3.0"
   }
 }
