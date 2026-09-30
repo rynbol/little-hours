@@ -41,11 +41,13 @@ export default {
     check('the care note floats in', await app.js(MOVED('#pet-ritual-status')) === 1, await app.text('#pet-ritual-status'));
     check('a re-render keeps open rows open without replaying them', await app.js(`document.querySelector('#pet-friendship').open`) && await app.js(MOVED('.pet-milestones li')) === 0);
     await app.js(SLOW_SAVES);
+    await app.js(`(window.__playIcon = document.querySelector('#pet-play svg'), true)`);
     await press(app, sleep, '#pet-play');
     await app.waitFor(`window.__slowSaves === 0`, { what: 'the slowed Play save to land' });
+    await app.waitFor(`document.querySelector('#pet-play svg') !== window.__playIcon && ${MOVED('#pet-play svg')} > 0`, { timeout: 10000, what: 'the rebuilt Play button to spin' }).catch(() => {});
     await sleep(150);
     await app.js(FAST_SAVES);
-    check('Play spins the ball, even when the save lands late and rebuilds the card', await app.js(MOVED('#pet-play svg')) === 1, await app.js(`[${MOVED('#pet-play svg')}, window.__moves.filter(el => el.matches('#pet-play svg')).length]`));
+    check('Play spins the ball, even when the save lands late and rebuilds the card', await app.js(`document.querySelector('#pet-play svg') !== window.__playIcon`) && await app.js(MOVED('#pet-play svg')) === 1, await app.js(`[${MOVED('#pet-play svg')}, window.__moves.filter(el => el.matches('#pet-play svg')).length]`));
     await press(app, sleep, '#pet-feed');
     check('Feed hops the bowl and the meals slide in', await app.js(MOVED('#pet-feed svg')) === 1 && await app.js(MOVED('#pet-meals > button')) > 0);
     await press(app, sleep, '#pet-edit-name');
