@@ -20,7 +20,7 @@ export const VISTA_THEMES = Object.freeze({
   day: {
     zenith: '#2f74c8', high: '#6fa9e0', horizon: '#d9ecef', glow: '#fff4d6', haze: '#a4c4df', below: '#8fb08a',
     far: '#7090c0', mid: '#6c9a86', valley: '#7aa84c', field: '#a0c45a', cliff: '#8c8a7c', grass: '#76a843', meadow: '#8cbf4e',
-    trunk: '#5e4634', leaf: '#3a7338', leafLight: '#7ab04a', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
+    trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffffff', cloudShade: '#c4d3e6',
     castle: '#8d93a6', castleRoof: '#4d6680', rock: '#6e6462', ember: '#c8604a', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#e8ffd0', snow: '#f4f6fa',
@@ -264,10 +264,15 @@ function buildRuins(shape) {
 
 function roundTree(shape, x, z, tall, random) {
   const y = terrainHeight(x, z);
-  shape.box(x, y + tall * 0.3, z, 0.3 + tall * 0.04, tall * 0.6, 0.3 + tall * 0.04, random() * 3, 'trunk');
-  for (let clump = 0; clump < 3; clump++) {
-    const a = random() * Math.PI * 2, off = clump ? tall * 0.18 : 0, size = tall * (clump ? 0.26 : 0.34);
-    shape.blob(x + Math.cos(a) * off, y + tall * (0.72 + clump * 0.08), z + Math.sin(a) * off, size, size * 0.85, size, 'leaf', 'leafLight', 0.55, 4, 8);
+  shape.box(x, y + tall * 0.25, z, 0.3 + tall * 0.05, tall * 0.5, 0.3 + tall * 0.05, random() * 3, 'trunk');
+  for (let clump = 0; clump < 5; clump++) {
+    const a = random() * Math.PI * 2, off = clump ? tall * (0.16 + random() * 0.08) : 0, size = tall * (clump ? 0.22 + random() * 0.06 : 0.32);
+    const cx = x + Math.cos(a) * off, cy = y + tall * (clump ? 0.58 + random() * 0.22 : 0.7), cz = z + Math.sin(a) * off, start = shape.roles.length;
+    shape.blob(cx, cy, cz, size, size * 0.85, size, 'leaf', 'leafLight', 0.5, 5, 9);
+    for (let i = start; i < shape.roles.length; i++) {
+      const nx = shape.positions[i * 3] - cx, ny = shape.positions[i * 3 + 1] - cy, nz = shape.positions[i * 3 + 2] - cz;
+      shape.shades[i] *= 0.8 + 0.4 * Math.max(0, (nx * SUN_TOWARD[0] + ny * SUN_TOWARD[1] + nz * SUN_TOWARD[2]) / Math.hypot(nx, ny, nz));
+    }
   }
 }
 

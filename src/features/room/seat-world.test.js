@@ -158,3 +158,12 @@ test('lava runs unbroken from the volcano crater down its ribbed slopes', () => 
   assert.equal(rivers.length, 4);
   engine.dispose();
 });
+
+test('tree canopies are sunlit on top and deep in shade beneath', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
+  const canopy = shape.shades.filter((shade, i) => shape.roles[i] === 'leaf' || shape.roles[i] === 'leafLight');
+  assert.ok(Math.max(...canopy) / Math.min(...canopy) > 2.5);
+  engine.dispose();
+});
