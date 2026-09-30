@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, VISTA_THEMES } from './seat-world.js';
+import { createSeatWorld, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, sunRayShape } from './seat-world.js';
 
 const setup = () => { const engine = new NullEngine(), scene = new Scene(engine); return { engine, scene, world: createSeatWorld(scene, new TransformNode('room', scene)) }; };
 const litWindows = world => {
@@ -165,5 +165,24 @@ test('tree canopies are sunlit on top and deep in shade beneath', () => {
   const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
   const canopy = shape.shades.filter((shade, i) => shape.roles[i] === 'leaf' || shape.roles[i] === 'leafLight');
   assert.ok(Math.max(...canopy) / Math.min(...canopy) > 2.5);
+  engine.dispose();
+});
+
+test('sunbeams fan down from the sun over the valley by day, dim in rain and vanish at dusk', () => {
+  const { positions } = sunRayShape(), gap = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
+  const rays = Array.from({ length: positions.length / 12 }, (_, i) => [0, 3].map(k => positions.slice(i * 12 + k * 3, i * 12 + k * 3 + 3)));
+  const spread = end => Math.max(...rays.flatMap(a => rays.map(b => gap(a[end], b[end]))));
+  assert.ok(spread(1) < spread(0) * 0.8, 'tops gather toward the sun');
+  assert.ok(rays.every(([bottom, top]) => gap(top, SUN_POINT) < gap(bottom, SUN_POINT) && top[1] > bottom[1] + 30));
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const rayMesh = world.meshes.find(mesh => mesh.name === 'seat-world-rays');
+  for (const [theme, strength] of [['day', 1], ['rain', 0.35], ['dusk', 0]]) {
+    world.setTheme(theme);
+    assert.equal(rayMesh.material._floats.strength, strength);
+    assert.equal(rayMesh.isEnabled(false), strength > 0);
+  }
+  world.setTheme('day'); world.animate(5, true);
+  assert.equal(rayMesh.material._floats.time, 0);
   engine.dispose();
 });
