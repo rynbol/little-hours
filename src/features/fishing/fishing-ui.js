@@ -1,5 +1,5 @@
 import { travelTo } from '../../ui/place-transition.js';
-import { BAIT_RANGES, FIGHT, SPECIES, TIERS, baitRange, onFish, rollCatch, speciesOf, startFight, stepFight, tierOf } from '../../core/fishing.js';
+import { BAIT_RANGES, FIGHT, SPECIES, TANK_LIMIT, TIERS, baitRange, onFish, rollCatch, speciesOf, startFight, stepFight, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
 import { fishArt } from './fish-art.js';
 import { createLakeScene } from './lake-scene.js';
@@ -16,6 +16,7 @@ const baitIcon = id => `<svg viewBox="0 0 24 24" aria-hidden="true">${BAIT_ART[i
 const rangeText = range => range.to === Infinity ? `${range.from}+ min` : `${range.from}–${range.to} min`;
 const hintFor = tier => { const index = TIERS.findIndex(t => t.id === tier), range = BAIT_RANGES.reduce((best, r) => r.weights[index] > best.weights[index] ? r : best); return `Best on ${range.label.toLowerCase()} · ${rangeText(range)}`; };
 const cm = size => `${size.toFixed(1).replace(/\.0$/, '')} cm`;
+const TANK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12" rx="2" fill="#cfe8e4" stroke="currentColor" stroke-width="1.5"/><path d="M8 12.5c1.6-2 4-2 5.5 0-1.5 2-3.9 2-5.5 0Zm5.5 0 2.2-1.4v2.8Z" fill="#ec8a4e"/><path d="M3.5 15.5h17" stroke="#dccb9f" stroke-width="2"/></svg>';
 const escape = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 export function createFishingUI(app, { onClose } = {}) {
@@ -48,6 +49,7 @@ export function createFishingUI(app, { onClose } = {}) {
     for (const type of ['pointerup', 'pointercancel', 'pointerleave']) root.addEventListener(type, letGo);
     window.addEventListener('blur', letGo);
     $('#lake-journal-button').addEventListener('click', () => openJournal());
+    for (const id of ['#lake-card', '#lake-journal']) $(id).addEventListener('click', toggleTankFish);
     $('#lake-journal').addEventListener('click', event => { if (event.target === $('#lake-journal')) closeJournal(); });
     for (const [id, dismiss] of [['#lake-card', stow], ['#lake-journal', closeJournal]]) $(id).addEventListener('cancel', event => { event.preventDefault(); event.stopPropagation(); dismiss(); });
     const chooseBait = id => { chosen = id; renderTray(); $(`[data-bait="${id}"]`)?.focus({ preventScroll: true }); };
@@ -187,11 +189,25 @@ export function createFishingUI(app, { onClose } = {}) {
       <div class="lake-card-art">${fishArt(species.id)}</div>
       <span class="lake-tier">${tier.label}</span><h2 id="lake-card-name">${escape(species.name)}</h2>
       <dl><div><dt>Size</dt><dd>${cm(fish.size)}</dd></div><div><dt>Caught</dt><dd>×${fish.count}</dd></div><div><dt>Best</dt><dd>${cm(fish.best)}</dd></div></dl>
+      ${tankButton(species.id)}
       <div class="lake-card-actions"><button type="button" class="lake-secondary" id="lake-card-journal">Open journal</button><button type="button" class="lake-primary" id="lake-card-keep">${pond().bait.length ? 'Keep fishing' : 'Put it in the basket'}</button></div></div>`;
     card.showModal();
     $('#lake-card-keep').addEventListener('click', stow);
     $('#lake-card-journal').addEventListener('click', () => { stow(); openJournal(fish.species); });
     $('#lake-card-keep').focus({ preventScroll: true });
+  }
+  const tankCount = () => `${pond().tank.length} of ${TANK_LIMIT} in your aquarium`;
+  function tankButton(id) {
+    const inTank = pond().tank.includes(id), full = !inTank && pond().tank.length >= TANK_LIMIT;
+    return `<button type="button" class="lake-tank" data-tank="${id}" aria-pressed="${inTank}"${full ? ' disabled' : ''}>${TANK_ICON}<span>${inTank ? 'In your aquarium' : full ? 'Aquarium is full' : 'Put in aquarium'}</span></button>`;
+  }
+  async function toggleTankFish(event) {
+    const button = event.target.closest('[data-tank]');
+    if (!button || button.disabled) return;
+    await app.acceptUpdate(app.store.toggleTankFish(button.dataset.tank));
+    for (const other of root.querySelectorAll('[data-tank]')) other.outerHTML = tankButton(other.dataset.tank);
+    root.querySelector(`[data-tank="${button.dataset.tank}"]`)?.focus({ preventScroll: true });
+    const count = $('#lake-tank-count'); if (count) count.textContent = tankCount();
   }
   function stow() {
     if (phase !== 'card') return;
@@ -206,11 +222,11 @@ export function createFishingUI(app, { onClose } = {}) {
     $('#lake-tackle').hidePopover();
     const journal = pond().journal, found = Object.keys(journal).length, total = Object.values(journal).reduce((sum, e) => sum + e.count, 0);
     const panel = $('#lake-journal');
-    panel.innerHTML = `<div class="lake-journal-inner"><header><div><p class="lake-journal-eyebrow">POND JOURNAL</p><h2 id="lake-journal-title">${found} of ${SPECIES.length} found</h2><p>${total} fish caught</p></div><button type="button" class="lake-close" id="lake-journal-close" aria-label="Close journal">×</button></header>
+    panel.innerHTML = `<div class="lake-journal-inner"><header><div><p class="lake-journal-eyebrow">POND JOURNAL</p><h2 id="lake-journal-title">${found} of ${SPECIES.length} found</h2><p>${total} fish caught · <span id="lake-tank-count">${tankCount()}</span></p></div><button type="button" class="lake-close" id="lake-journal-close" aria-label="Close journal">×</button></header>
       <details class="lake-bait-guide"><summary>Bait guide</summary><ol class="lake-ranges">${BAIT_RANGES.map(range => `<li>${baitIcon(range.id)}<span><strong>${range.label}</strong><small>${rangeText(range)}</small></span><span class="lake-mini-odds">${TIERS.map((tier, i) => range.weights[i] ? `<i style="--w:${range.weights[i]};--c:${tier.color}"></i>` : '').join('')}</span></li>`).join('')}</ol></details>
       ${TIERS.map(tier => { const list = SPECIES.filter(s => s.tier === tier.id); return `<section style="--c:${tier.color}"><h3><i></i>${tier.label}<small>${list.filter(s => journal[s.id]).length} / ${list.length}</small></h3><div class="lake-journal-grid">${list.map(s => {
         const entry = journal[s.id];
-        return entry ? `<article class="lake-entry${s.id === highlight ? ' is-new' : ''}" data-species="${s.id}"><div class="lake-entry-art">${fishArt(s.id)}</div><strong>${escape(s.name)}</strong><small>×${entry.count} · best ${cm(entry.best)}</small></article>`
+        return entry ? `<article class="lake-entry${s.id === highlight ? ' is-new' : ''}" data-species="${s.id}"><div class="lake-entry-art">${fishArt(s.id)}</div><strong>${escape(s.name)}</strong><small>×${entry.count} · best ${cm(entry.best)}</small>${tankButton(s.id)}</article>`
           : `<article class="lake-entry is-missing" data-species="${s.id}"><div class="lake-entry-art">${fishArt(s.id, { silhouette: true })}</div><strong>???</strong><small>${hintFor(tier.id)}</small></article>`;
       }).join('')}</div></section>`; }).join('')}</div>`;
     panel.showModal();

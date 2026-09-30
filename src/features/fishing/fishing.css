@@ -102,6 +102,14 @@ body.is-lake { overflow: hidden; }
 .lake-card dl div { padding: 8px 6px; text-align: center; }
 .lake-card dt { font-size: 11px; color: #6a5960; }
 .lake-card dd { margin: 2px 0 0; font-family: 'Manrope', sans-serif; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; color: #4b3b40; }
+.lake-tank { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid #cfe1dc; background: #f2f8f6; color: #3f5d58 !important; font-weight: 700 !important; font-size: 13.5px !important; transition: background .15s ease, transform .15s ease; }
+.lake-tank svg { width: 20px; height: 20px; flex: none; }
+.lake-tank:hover:not(:disabled) { transform: translateY(-1px); background: #e6f3f0; }
+.lake-tank[aria-pressed="true"] { background: #3f7d74; border-color: #3f7d74; color: #fff !important; }
+.lake-tank:disabled { opacity: .55; cursor: default; }
+.lake-card-inner > .lake-tank { position: relative; width: 100%; margin: 4px 0 10px; }
+.lake-entry .lake-tank { height: 30px; margin-top: 8px; padding: 0 10px; font-size: 12px !important; gap: 5px; }
+.lake-entry .lake-tank svg { width: 16px; height: 16px; }
 .lake-card-actions { position: relative; display: grid; grid-template-columns: 1fr 1.3fr; gap: 10px; }
 .lake-primary, .lake-secondary { height: 46px; border-radius: 14px; font-weight: 700 !important; font-size: 14.5px !important; transition: transform .15s ease, background .15s ease; }
 .lake-primary { border: 0; color: #fff !important; background: var(--ui-rose, #a65766); box-shadow: none; }

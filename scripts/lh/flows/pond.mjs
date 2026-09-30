@@ -16,7 +16,7 @@ async function castForBite(app) {
 }
 
 export default {
-  about: 'the pond: the island pond tag opens the lake, bait from sessions sits in ranges with their odds, a cast gets a bite, keeping the float on the fish lands one that fills the journal and spends one bait, striking too soon spooks it, a missed bite keeps the bait, Escape closes the card, then the journal, then the lake, and the catch survives a reload',
+  about: 'the pond: the island pond tag opens the lake, bait from sessions sits in ranges with their odds, a cast gets a bite, keeping the float on the fish lands one that fills the journal and spends one bait, striking too soon spooks it, a missed bite keeps the bait, the card and journal put fish in the aquarium, Escape closes the card, then the journal, then the lake, and the catch survives a reload, and aquarium fish swim in the room tank',
   async run(t) {
     const { check } = t;
     const app = await t.open({ seed: 'pond' });
@@ -25,7 +25,7 @@ export default {
     const engines = await app.js(`window.__littleHours.counts().engines`);
     check('the pond tag opens the lake with its own scene', (await app.js(LAKE)).phase === 'idle' && await app.js(`document.body.classList.contains('is-lake')`));
     check('bait is grouped into its five ranges', await app.js(`[...document.querySelectorAll('[data-bait]')].map(b => b.dataset.bait + b.querySelector('b').textContent).join()`) === 'crumb×1,worm×1,cricket×2,firefly×1,star×1');
-    check('the journal shows 3 of 15 found', await app.text('#lake-found') === '3/15');
+    check('the journal shows 3 of 22 found', await app.text('#lake-found') === '3/22');
     check('arrival leaves the bait selector and catch chances tucked away', !await app.visible('#lake-tackle') && !await app.visible('#lake-odds') && await app.text('#lake-status') === '');
     await app.clickSel('#lake-bait-toggle'); await app.clickSel('[data-bait="crumb"]');
     await app.clickSel('#lake-chances > summary');
@@ -61,6 +61,10 @@ export default {
     await app.key('Tab'); await app.key('Tab');
     check('the catch card contains keyboard focus', await app.js(`document.querySelector('#lake-card').matches(':modal') && document.querySelector('#lake-card').contains(document.activeElement)`));
     await t.shot(app, 'card');
+    const caughtId = await app.js(`document.querySelector('#lake-card [data-tank]').dataset.tank`);
+    await app.clickSel('#lake-card [data-tank]');
+    await app.waitFor(`document.querySelector('#lake-card [data-tank]').getAttribute('aria-pressed') === 'true'`, { what: 'the aquarium button to press' });
+    check('the card puts the fish in the aquarium', JSON.stringify(await app.js(`window.__littleHours.state.pond.tank`)) === JSON.stringify([caughtId]) && await app.text('#lake-card [data-tank]') === 'In your aquarium', caughtId);
     await app.key('Escape');
     await app.waitFor(`!document.querySelector('#lake-card').open`, { what: 'the card to close' });
     check('Escape puts the fish in the basket and stays at the lake', (await app.js(LAKE)).open);
@@ -74,9 +78,10 @@ export default {
     check('a missed bite slips away and keeps the bait', (await app.js(POND)).bait.length === after.bait.length && /slipped/.test(await app.text('#lake-status')));
     await app.clickSel('#lake-journal-button');
     await app.waitFor(shown('#lake-journal'), { what: 'the journal' });
-    check('the journal lists every species, found or not', await app.js(`document.querySelectorAll('.lake-entry').length`) === 15 && await app.js(`document.querySelectorAll('.lake-entry:not(.is-missing)').length`) === after.found);
+    check('the journal lists every species, found or not', await app.js(`document.querySelectorAll('.lake-entry').length`) === 22 && await app.js(`document.querySelectorAll('.lake-entry:not(.is-missing)').length`) === after.found);
     await app.key('Tab');
     check('the journal contains keyboard focus', await app.js(`document.querySelector('#lake-journal').matches(':modal') && document.querySelector('#lake-journal').contains(document.activeElement)`));
+    check('the journal shows which fish are in the aquarium', await app.js(`[...document.querySelectorAll('#lake-journal [aria-pressed="true"]')].map(b => b.dataset.tank).join()`) === caughtId && /1 of 8 in your aquarium/.test(await app.text('#lake-journal header')));
     await t.shot(app, 'journal');
     await app.key('Escape');
     check('Escape closes the journal first', await app.js(`!document.querySelector('#lake-journal').open`) && (await app.js(LAKE)).open);
@@ -89,6 +94,14 @@ export default {
     const saved = await app.js(POND);
     check('after a reload the catch and the spent bait are kept', saved.caught === after.caught && saved.bait.length === after.bait.length, saved);
     await app.close();
+
+    const tank = await t.open({ seed: 'aquarium' });
+    await tank.settle();
+    const TANK = `(() => { const tank = window.__littleHours.room.diagnostics().scene.transformNodes.find(n => n.metadata?.furnitureType === 'fish-tank'); return { fish: tank.getChildren().filter(n => n.name.startsWith('tank-fish-')).map(n => n.name.slice(10) + ':' + n.isEnabled() + ':' + n.getChildMeshes().every(m => m.isEnabled() && m.isVisible && m.isInFrustum(window.__littleHours.room.diagnostics().scene.frustumPlanes))), generic: tank.getChildMeshes().find(m => m.name === 'aquarium-fish').isEnabled() }; })()`;
+    const inTank = await tank.js(TANK);
+    check('fish from the aquarium list swim in the room tank, drawn on screen, in place of the three fish', inTank.fish.join() === 'koi:true:true,starfish:true:true,jelly:true:true' && !inTank.generic, inTank);
+    await t.shot(tank, 'aquarium');
+    await tank.close();
 
     const empty = await t.open({ seed: 'pond-empty' });
     await empty.settle();

@@ -540,6 +540,13 @@ export function createRoom(container, options = {}) {
     object.metadata.setPhase(plantPhase);
     object.metadata.plant.getChildMeshes(false).concat(object.metadata.plant).forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = true; });
   }
+  let tankFish = [];
+  const showTank = object => object.metadata.setFish?.(tankFish);
+  function setTankFish(ids) {
+    tankFish = [...ids];
+    for (const object of placedObjects.values()) showTank(object);
+    requestRender();
+  }
   function setPlantPhase(phase) {
     if (phase === plantPhase) return;
     plantPhase = phase;
@@ -778,7 +785,7 @@ export function createRoom(container, options = {}) {
         object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type; object.metadata.tint = item.tint;
         if (customizedDesk) object.metadata.avatarAppearanceKey = avatarKey;
         object.getChildMeshes().forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = !mesh.metadata?.effect; });
-        showPlant(object);
+        showPlant(object); showTank(object);
         placedObjects.set(item.id, object);
         if (settleNew && !reducedMotion) { object.scaling.setAll(0.92); settlingPieces.set(item.id, { object, start: performance.now() }); }
       }
@@ -1844,7 +1851,7 @@ export function createRoom(container, options = {}) {
   requestRender();
 
   return {
-    setHouse, setPlantPhase,
+    setHouse, setPlantPhase, setTankFish,
     celebrate() { if (!editing && !avatarCameraEditing && !suspended && !reducedMotion) { celebrationAge = 0; requestRender(); } },
     petCareBusy() { return Boolean(editing || avatarCameraEditing || suspended || petRoutine.pose.held || petRoutine.pose.care); },
     canPetCare() { return Boolean(!editing && !avatarCameraEditing && !suspended && !petRoutine.pose.held && !petRoutine.pose.care && petRoutine.diningSpot()); },

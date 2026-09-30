@@ -6,7 +6,7 @@ import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, PET_HOME, createLayout, validatePlacement, normalizeLayout, findFreePosition, nearestValidPlacement, rugsOverlap, pieceCount, petBed, rugStack, rugTouches, groundAt, standHeight, footprintBounds, FLOOR_Y, RUG_STEP, FLAT_RUG } from './layout.js';
-import { createFurniture, disposeFurnitureAssets } from '../models/furniture.js';
+import { createFurniture, disposeFurnitureAssets, TANK_WATER } from '../models/furniture.js';
 import { cutRect, subtractRect, openings, OPENING_INSET } from './walls.js';
 import { SURFACES } from './surfaces.js';
 
@@ -803,7 +803,7 @@ test('aquarium fish swim to and fro inside the water and turn around; with reduc
     const headings = new Set();
     for (let seconds = 0.2; seconds < 30; seconds += 0.37) {
       tank.metadata.animate(seconds, false, false);
-      for (const at of [...spots(fish), ...spots(bubbles)]) assert.ok(Math.abs(at.x) <= 0.7 && at.y >= 0.88 && at.y <= 1.48 && Math.abs(at.z) <= 0.24, `inside the water at ${seconds}`);
+      for (const at of [...spots(fish), ...spots(bubbles)]) assert.ok(Math.abs(at.x) <= 0.94 && at.y >= 0.88 && at.y <= 1.68 && Math.abs(at.z) <= 0.3, `inside the water at ${seconds}`);
       matrices(fish).forEach((matrix, i) => headings.add(`${i}:${Math.sign(matrix.m[0])}`));
     }
     assert.ok(bubbles.isEnabled(), 'bubbles rise with motion');
@@ -813,6 +813,46 @@ test('aquarium fish swim to and fro inside the water and turn around; with reduc
     assert.deepEqual(spots(fish), rest, 'reduced motion returns them to rest');
     tank.dispose();
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('fish put in either aquarium swim inside its water in their own shapes; an empty tank brings back the three fish', () => {
+  const ink = new Proxy(function () {}, { get: (_, key) => key === 'canvas' ? undefined : ink, apply: () => ink, set: () => true });
+  const hadCanvas = 'OffscreenCanvas' in globalThis, canvas = globalThis.OffscreenCanvas;
+  globalThis.OffscreenCanvas = class { constructor(width, height) { this.width = width; this.height = height; } getContext() { return ink; } };
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    for (const type of ['fish-tank', 'grand-tank']) {
+      const [W, H, D] = TANK_WATER[type], tank = createFurniture(type, scene), generic = tank.getChildMeshes().find(mesh => mesh.name === 'aquarium-fish');
+      const tankFish = () => tank.getChildren().filter(node => node.name.startsWith('tank-fish-'));
+      tank.metadata.setFish(['koi', 'nonsense', 'starfish', 'jelly', 'glowfin', 'eel', 'puffer', 'angelfish', 'sturgeon']);
+      assert.deepEqual(tankFish().map(node => node.name), ['koi', 'starfish', 'jelly', 'glowfin', 'eel', 'puffer', 'angelfish', 'sturgeon'].map(id => `tank-fish-${id}`), type);
+      assert.equal(generic.isEnabled(), false, 'the three fish make way');
+      const meshes = tankFish().flatMap(node => node.getChildMeshes());
+      assert.ok(meshes.every(mesh => !mesh.isPickable && mesh.metadata.castShadow === false && mesh.metadata.effect === 'aquarium-life'), 'fish never catch taps or cast shadows');
+      const spots = () => tankFish().map(node => node.position.asArray().join());
+      tank.metadata.animate(2.4, false, true); const rest = spots();
+      tank.metadata.animate(7, false, true); assert.deepEqual(spots(), rest, 'reduced motion keeps them still');
+      let straight = 0;
+      for (let seconds = 0.2; seconds < 40; seconds += 0.61) {
+        tank.metadata.animate(seconds, false, false);
+        for (const node of tankFish().filter(node => ['koi', 'sturgeon', 'glowfin'].some(id => node.name.endsWith(id)) && Math.sin(node.rotation.y) === 0)) {
+          assert.equal(node.scaling.x, node.scaling.y, `${node.name} keeps its full length swimming straight`); straight++;
+        }
+        for (const mesh of meshes) {
+          mesh.computeWorldMatrix(true); const { minimumWorld: low, maximumWorld: high } = mesh.getBoundingInfo().boundingBox;
+          assert.ok(low.x >= -W / 2 && high.x <= W / 2 && low.y - 0.22 >= 0.85 && high.y - 0.22 <= 0.88 + H && low.z >= -D / 2 && high.z <= D / 2, `${mesh.parent.name} stays in the ${type} water at ${seconds}`);
+        }
+      }
+      assert.notDeepEqual(spots(), rest, 'the fish swim');
+      assert.ok(straight > 10, 'fish swim straight most of the time');
+      tank.metadata.setFish([]);
+      assert.equal(tankFish().length, 0); assert.equal(generic.isEnabled(), true, 'an empty tank has its three fish back');
+      tank.dispose();
+    }
+  } finally {
+    disposeFurnitureAssets(scene); scene.dispose(); engine.dispose();
+    if (hadCanvas) globalThis.OffscreenCanvas = canvas; else delete globalThis.OffscreenCanvas;
+  }
 });
 
 test('the easel keeps its chosen picture after a reload, and a new easel starts with the first', () => {

@@ -11,17 +11,24 @@ export const SPECIES = Object.freeze([
   { id: 'perch', name: 'Reed Perch', tier: 'common', size: [12, 26], look: { shape: 'deep', body: '#a8b76b', belly: '#f0e6b8', fin: '#d98d5f', mark: 'stripes' }, about: 'Hides in the cattails and grumbles when found.' },
   { id: 'bluegill', name: 'Button Bluegill', tier: 'common', size: [8, 18], look: { shape: 'round', body: '#7e9fb0', belly: '#f2d49a', fin: '#5f7f93' }, about: 'Round as a coat button, twice as shiny.' },
   { id: 'carp', name: 'Mossy Carp', tier: 'common', size: [25, 55], look: { shape: 'deep', body: '#8c8a5a', belly: '#d8cc98', fin: '#6f6d48', whiskers: true }, about: 'Has lived under the lily pads longer than the cottage.' },
+  { id: 'puffer', name: 'Button Puffer', tier: 'common', size: [6, 14], look: { shape: 'puffer', body: '#e8c77a', belly: '#fbf1d2', fin: '#d9a24f', mark: 'spots' }, about: 'Puffs up into a tiny lantern when it is surprised.' },
   { id: 'dace', name: 'Speckled Dace', tier: 'uncommon', size: [10, 20], look: { shape: 'slim', body: '#c9b08a', belly: '#f4ead3', fin: '#a88a64', mark: 'spots' }, about: 'Freckled all over, like it napped in the sun.' },
   { id: 'trout', name: 'Lantern Trout', tier: 'uncommon', size: [22, 45], look: { shape: 'long', body: '#9aae8a', belly: '#f2c9b8', fin: '#7c8f6c', mark: 'spots', glow: '#f6c37a' }, about: 'A pink stripe glows along its side at dusk.' },
   { id: 'bream', name: 'Honey Bream', tier: 'uncommon', size: [18, 38], look: { shape: 'deep', body: '#d6a55c', belly: '#f6e3b0', fin: '#b98640' }, about: 'Golden and slow, it smells faintly of toast.' },
+  { id: 'angelfish', name: 'Lilac Angelfish', tier: 'uncommon', size: [10, 22], look: { shape: 'angel', body: '#c9b6e4', belly: '#f3ecfa', fin: '#9f86c9', mark: 'stripes', stripe: '#6d5a93' }, about: 'Tall and thin as a folded letter, and just as polite.' },
   { id: 'koi', name: 'Moonlit Koi', tier: 'rare', size: [30, 60], look: { shape: 'koi', body: '#f4efe6', belly: '#fffaf1', fin: '#e9e0d2', mark: 'patches', patch: '#e2674c', whiskers: true }, about: 'Pale as the moon, with maple-red patches.' },
   { id: 'catfish', name: 'Starlight Catfish', tier: 'rare', size: [35, 80], look: { shape: 'long', body: '#4f5b73', belly: '#aeb6c8', fin: '#3d475c', mark: 'stars', whiskers: true }, about: 'Its back is dusted with tiny silver stars.' },
   { id: 'salmon', name: 'Rosy Salmon', tier: 'rare', size: [40, 75], look: { shape: 'long', body: '#d9857a', belly: '#f6d3c7', fin: '#b86a60', mark: 'spots' }, about: 'Swims upstream just to see the waterfall.' },
+  { id: 'betta', name: 'Ribbon Betta', tier: 'rare', size: [6, 12], look: { shape: 'betta', body: '#c8465c', belly: '#f1b7a8', fin: '#7d4fb0' }, about: 'Its fins trail behind it like a silk scarf.' },
+  { id: 'starfish', name: 'Wishing Starfish', tier: 'rare', size: [12, 30], look: { shape: 'star', body: '#f08f5f', belly: '#ffd9a8', fin: '#e57048', mark: 'spots' }, about: 'Fell from the sky one night and decided to stay.' },
   { id: 'eel', name: 'Glass Eel', tier: 'epic', size: [45, 110], look: { shape: 'eel', body: '#bfe3dc', belly: '#eefaf6', fin: '#9fd0c6', glow: '#dff7f1' }, about: 'So clear you can see the pond through it.' },
   { id: 'aurora', name: 'Aurora Koi', tier: 'epic', size: [40, 70], look: { shape: 'koi', body: '#8fc7c2', belly: '#e9f3ee', fin: '#c49ad8', mark: 'patches', patch: '#c49ad8', whiskers: true, glow: '#b8f0e2' }, about: 'Shimmers teal to lilac as it turns.' },
   { id: 'sturgeon', name: 'Twilight Sturgeon', tier: 'epic', size: [80, 160], look: { shape: 'sturgeon', body: '#6c6f8e', belly: '#c7c3d6', fin: '#55587a', mark: 'plates', whiskers: true }, about: 'Ancient, patient, armoured like a knight.' },
+  { id: 'jelly', name: 'Moon Jelly', tier: 'epic', size: [15, 40], look: { shape: 'jelly', body: '#c7d6f5', belly: '#f4f0ff', fin: '#e2c8f2', glow: '#d9e4ff' }, about: 'Drifts like a paper lantern and hums very softly.' },
+  { id: 'prism', name: 'Prism Angelfish', tier: 'epic', size: [14, 28], look: { shape: 'angel', body: '#8fd3e8', belly: '#fff4fb', fin: '#f3a6d8', mark: 'rainbow', glow: '#ffd6f5' }, about: 'Throws little rainbows across the pond floor.' },
   { id: 'whiskers', name: 'Old Golden Whiskers', tier: 'legendary', size: [90, 180], look: { shape: 'deep', body: '#e9b949', belly: '#fbe7a6', fin: '#d49a2c', whiskers: true, glow: '#ffe28a' }, about: 'The pond’s grandparent. Grants one wish, or so they say.' },
   { id: 'celestial', name: 'Celestial Koi', tier: 'legendary', size: [60, 110], look: { shape: 'koi', body: '#2f3d6b', belly: '#8b9ad0', fin: '#f1c96b', mark: 'stars', whiskers: true, glow: '#f7e3a1' }, about: 'Carries a little piece of the night sky.' },
+  { id: 'glowfin', name: 'Rainbow Glowfin', tier: 'legendary', size: [20, 45], look: { shape: 'betta', body: '#ff9ecb', belly: '#fff7d6', fin: '#8fe0ff', mark: 'rainbow', glow: '#ffe9a8' }, about: 'Every colour at once, glowing like a festival.' },
 ].map(entry => Object.freeze({ ...entry, look: Object.freeze(entry.look) })));
 
 export const BAIT_RANGES = Object.freeze([
@@ -32,7 +39,7 @@ export const BAIT_RANGES = Object.freeze([
   { id: 'star', label: 'Star lure', from: 90, to: Infinity, weights: [5, 20, 35, 28, 12] },
 ].map(Object.freeze));
 export const MIN_BAIT_MINUTES = BAIT_RANGES[0].from;
-export const BAIT_LIMIT = 30, LOG_LIMIT = 12;
+export const BAIT_LIMIT = 30, LOG_LIMIT = 12, TANK_LIMIT = 8;
 
 export const tierOf = id => TIERS.find(tier => tier.id === id);
 export const speciesOf = id => SPECIES.find(entry => entry.id === id) || null;
@@ -51,7 +58,7 @@ export function rollCatch(minutes, random, journal = null) {
   return { species: species.id, size: Math.round(size * 10) / 10 };
 }
 
-export function emptyPond() { return { bait: [{ minutes: 10, at: 0 }], journal: {}, log: [] }; }
+export function emptyPond() { return { bait: [{ minutes: 10, at: 0 }], journal: {}, log: [], tank: [] }; }
 
 const isStamp = value => Number.isSafeInteger(value) && value >= 0;
 export function normalizePond(raw) {
@@ -63,7 +70,16 @@ export function normalizePond(raw) {
     if (saved && Number.isSafeInteger(saved.count) && saved.count > 0 && Number.isFinite(saved.best) && saved.best > 0 && isStamp(saved.first)) pond.journal[entry.id] = { count: saved.count, best: saved.best, first: saved.first };
   }
   if (Array.isArray(raw.log)) pond.log = raw.log.filter(c => c && speciesOf(c.species) && Number.isFinite(c.size) && baitRange(c.minutes) && isStamp(c.at)).slice(-LOG_LIMIT).map(({ species, size, minutes, at }) => ({ species, size, minutes, at }));
+  if (Array.isArray(raw.tank)) pond.tank = [...new Set(raw.tank.filter(id => pond.journal[id]))].slice(0, TANK_LIMIT);
   return pond;
+}
+
+export function toggleTank(pond, id) {
+  if (!pond.journal[id]) return null;
+  if (pond.tank.includes(id)) { pond.tank = pond.tank.filter(entry => entry !== id); return false; }
+  if (pond.tank.length >= TANK_LIMIT) return null;
+  pond.tank = [...pond.tank, id];
+  return true;
 }
 
 export function addBait(pond, minutes, at) {

@@ -19,7 +19,7 @@ import { speciesOf, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
 import { placeAsset } from '../../models/assets.js';
 import { POND, POND_PATH, pondRim as rim, createLakeBank, createLakeGrass } from './lake-ground.js';
-import { buildFishModel } from './fish-model.js';
+import { buildFishModel } from '../../models/fish-model.js';
 
 const cardSide = new Vector3(), DOCK_Y = .42, STAND = new Vector3(0, DOCK_Y, 1.35), HOME_BOBBER = new Vector3(-.15, 0, .2);
 const PALETTES = {
