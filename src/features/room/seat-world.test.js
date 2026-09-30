@@ -88,6 +88,7 @@ test('wind grass grows outside the room, only its tips bend, and it holds still 
   assert.ok(positions.length / 9 > 10000, `${positions.length / 9} blades`);
   for (let v = 0; v < positions.length / 3; v++) {
     const x = positions[v * 3], z = positions[v * 3 + 2];
+    if (uvs[v * 2 + 1] > 1.5) continue;
     if (v % 3 < 2) { assert.equal(uvs[v * 2], 0); assert.ok(!(Math.abs(x) < 6.4 && z > -4.9), `blade inside the room at ${x}, ${z}`); } else assert.ok(uvs[v * 2] > 0);
   }
   const { engine, world } = setup();
@@ -123,6 +124,27 @@ test('the dusk moon rises in open sky beside the tower, clear of the volcano and
   }
   world.setTheme('day');
   assert.ok(bearing() < -0.5, 'the day sun keeps its heading over the volcano side');
+  engine.dispose();
+});
+
+test('wildflowers bloom in drifts on the grass tips, in three colors that dim at dusk', () => {
+  const { positions, uvs } = grassBlades(), kinds = new Map();
+  let tipY = 0;
+  for (let v = 0; v < positions.length / 3; v++) {
+    const kind = uvs[v * 2 + 1];
+    if (kind < 1.5) { if (v % 3 === 2) tipY = positions[v * 3 + 1]; continue; }
+    assert.ok(uvs[v * 2] > 0, 'flowers sway with the blade tips');
+    assert.ok(positions[v * 3 + 1] > tipY - 0.2, 'each flower sits at the top of its blade');
+    kinds.set(kind, (kinds.get(kind) ?? 0) + 1);
+  }
+  assert.deepEqual([...kinds.keys()].sort(), [2, 3, 4]);
+  assert.ok([...kinds.values()].every(count => count / 6 > 80), `flowers per color ${[...kinds.values()].map(count => count / 6)}`);
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const paint = world.meshes.find(mesh => mesh.name === 'seat-world-grass').material, lightness = () => paint._colors3.petal.r + paint._colors3.petal.g + paint._colors3.petal.b;
+  world.setTheme('day'); const day = lightness();
+  world.setTheme('dusk');
+  assert.ok(day > 2.8 && lightness() < day * 0.75, `petals ${day.toFixed(2)} by day, ${lightness().toFixed(2)} at dusk`);
   engine.dispose();
 });
 
