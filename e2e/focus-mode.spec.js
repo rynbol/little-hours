@@ -46,6 +46,7 @@ test('entry closes pet care and a room pet tap leaves focus mode before reopenin
   expect(await page.evaluate(() => window.__littleHours.counts().engines)).toBe(1);
   expect(await page.evaluate(() => window.__littleHours.petCloseup)).toBeNull();
   await page.locator('#focus-mode-enter').click(); await expect(focusing(page)).toHaveCount(1);
+  await page.evaluate(() => window.__littleHours.settled());
   await expect.poll(() => page.evaluate(() => Boolean(window.__littleHours.screenPoint('pet')?.visible))).toBe(true);
   const point = await page.evaluate(() => window.__littleHours.screenPoint('pet'));
   await page.mouse.click(point.x, point.y);
@@ -104,7 +105,7 @@ test('another tab can pause the timer or replace the room without leaving focus 
 
 test('phone focus mode leaves mini view, fills the viewport and keeps an accessible exit', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('#mini-button').click(); await expect(page.locator('#stage')).toHaveClass(/is-mini/);
+  await page.locator('#room-more-toggle').click(); await page.locator('#mini-button').click(); await expect(page.locator('#stage')).toHaveClass(/is-mini/);
   await page.locator('#focus-mode-enter').click();
   await expect(focusing(page)).toHaveCount(1);
   await expect(page.locator('#stage')).not.toHaveClass(/is-mini/);

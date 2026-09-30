@@ -11,6 +11,20 @@ export default {
     const shown = []; for (const selector of copy) if (await app.visible(selector)) shown.push(selector);
     check('the room page shows no decorative copy', shown.length === 0, shown);
 
+    check('room activities stay in the room without a Little moments menu', await app.js(`!document.querySelector('.little-moments') && !document.querySelector('#room-canvas').getAttribute('aria-label').includes('Little moments')`));
+    const tea = (await app.room()).layout.items.find(item => item.type === 'side-table');
+    const teaPoint = await app.point({ item: tea.id });
+    check('the tea table is visible and tappable', teaPoint?.visible);
+    const invited = `window.__littleHours.room.diagnostics().companion.requestedItemId === ${JSON.stringify(tea.id)}`;
+    await app.waitFor(`[0, 1].includes(window.__littleHours.room.diagnostics().companion.sit)`, { what: 'the avatar to finish sitting or standing' });
+    await app.click(teaPoint.x, teaPoint.y);
+    if (!await app.waitFor(invited, { what: 'a tap inviting the avatar for tea', timeout: 1500 }).catch(() => false)) {
+      await app.waitFor(`[0, 1].includes(window.__littleHours.room.diagnostics().companion.sit)`, { what: 'the avatar to finish sitting or standing' });
+      await app.click(teaPoint.x, teaPoint.y);
+    }
+    await app.waitFor(invited, { what: 'a tap inviting the avatar for tea' });
+    check('tapping furniture still starts the companion interaction', await app.js(`window.__littleHours.room.diagnostics().companion.requestedItemId === ${JSON.stringify(tea.id)}`));
+
     await app.clickSel('[data-panel="atmosphere"]');
     await app.waitFor(`document.querySelectorAll('[data-theme-choice]').length === 3`, { what: 'the ambience panel' });
     await app.clickSel('[data-theme-choice="rain"]');
@@ -25,7 +39,7 @@ export default {
     await app.waitFor(`document.getElementById('room-panel').hidden`, { what: 'Escape to close the panel' });
     check('Escape closes the panel and returns focus to its button', await app.js(`document.activeElement?.dataset.panel === 'atmosphere'`));
 
-    await app.clickSel('[data-panel="performance"]');
+    await t.steps.openMore(app); await app.clickSel('[data-panel="performance"]');
     await app.waitFor(`document.querySelectorAll('[data-quality]').length === 3`, { what: 'the quality panel' });
     const metrics = await app.waitFor(`document.querySelector('#performance-metrics')?.children.length || 0`, { what: 'live measurements', timeout: 8000 }).catch(() => 0);
     check('the quality panel shows live measurements', metrics === 6, metrics);
@@ -34,12 +48,12 @@ export default {
     check('Save energy sets the room quality', (await app.room()).quality === 'battery' && await app.attr('[data-quality="battery"]', 'aria-pressed') === 'true', (await app.room()).quality);
     await app.clickSel('#close-panel');
 
-    await app.clickSel('#sound-button');
+    await app.clickSel('#focus-options > summary'); await app.clickSel('#sound-button');
     await sleep(500);
     const sound = { pressed: await app.attr('#sound-button', 'aria-pressed'), toast: await app.text('#toast') };
     check('the rain button turns sound on, or says audio is missing', (sound.pressed === 'true' && !await app.js(`document.getElementById('volume').disabled`)) || /Audio isn’t available/.test(sound.toast || ''), sound);
 
-    await app.clickSel('#mini-button');
+    await t.steps.openMore(app); await app.clickSel('#mini-button');
     check('Mini view shrinks the room', await app.js(`document.getElementById('stage').classList.contains('is-mini')`) && await app.text('#mini-button span') === 'Full room');
     await steps.openAvatar(app);
     check('opening the avatar editor leaves the mini view', !await app.js(`document.getElementById('stage').classList.contains('is-mini')`) && await app.text('#mini-button span') === 'Mini view');
@@ -62,8 +76,8 @@ export default {
     await app.js(`document.querySelector('.skip-link').focus()`);
     await app.key('Enter');
     await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the skip link to leave the house page' });
-    check('the skip link leaves the house page and focuses the timer', await app.js(`document.activeElement?.id === 'start-button'`) && await app.visible('#focus-card'));
     await app.settle();
+    check('the skip link leaves the house page and focuses the timer', await app.js(`document.activeElement?.id === 'start-button'`) && await app.visible('#focus-card'));
 
     await steps.openDecorate(app);
     const start = await app.room();

@@ -1,14 +1,16 @@
 import { remainingAt, formatTime, spokenTime, sessionPhase, displayedRemaining, DIAL_MINUTES, sessionStarted, isFocusing, sessionLifecycle } from '../../core/session.js';
 import { clockNow } from '../../core/test-pins.js';
+import { focusGardenPlantId } from '../../core/garden-plants.js';
+import { gardenPlantArt } from '../house/index.js';
 import { plantPhase } from '../../core/room-types.js';
-import { petName, focusPetId } from '../../core/pet-bonds.js';
-import { petEntry } from '../../core/pets.js';
 import { localDate } from '../../core/state.js';
+import { focusOutlook } from '../../core/focus-outlook.js';
 import { focusCoins } from '../../core/house.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
-import { sproutArt } from '../../ui/ui-art.js';
+import { coinArt, sproutArt } from '../../ui/ui-art.js';
 import { petGiftArt } from '../pet/index.js';
+import { createFocusQuickbar } from './focus-quickbar.js';
 import './focus-mode.css';
 import './session.css';
 
@@ -90,15 +92,40 @@ export function createTimerUI(app) {
   $('#focus-mode-exit').addEventListener('click', () => leaveFocusMode());
   app.signal.addEventListener('abort', () => leaveFocusMode({ restoreFocus: false }), { once: true });
 
+  const gardenButton = document.createElement('button'); gardenButton.id = 'focus-garden';
+  $('#focus-reward').after(gardenButton);
+  const openGarden = (plantId = focusGardenPlantId(app.state)) => {
+    if (app.nav.travelling || app.avatar.active) return;
+    if (app.panels.current) app.panels.close();
+    app.roomUI.leaveMini(); app.nav.setHouseOpen(true, 'orchard', plantId);
+  };
+  gardenButton.addEventListener('click', () => openGarden());
+  const quickbar = createFocusQuickbar({ signal: app.signal, onToggle: toggleRunning, onSettings: () => { expand(); $('#focus-card').focus({ preventScroll: true }); } });
+  const growthTrack = (before, after, total) => `<span class="focus-growth-track" aria-hidden="true" style="--growth-now:${Math.min(100, before / total * 100)}%;--growth-after:${after / total * 100}%"><i></i><i></i></span>`;
+  function openGoal(goal) {
+    if (app.nav.travelling || app.avatar.active) return;
+    if (app.panels.current) app.panels.close();
+    app.roomUI.leaveMini();
+    if (goal.kind === 'room') app.nav.setHouseOpen(true, goal.id);
+    else app.pet.previewAdoption(goal.id);
+  }
+
   function renderFocusReward() {
     const { state } = app;
-    const reward = focusCoins(state.session.duration / 60_000);
-    const together = focusPetId(state);
-    const wish = petEntry(state.petWish);
-    const company = petName(state, together);
-    const progress = wish ? (state.house.coins >= wish.price ? `${wish.name} is ready to come home` : `${wish.price - state.house.coins} coins to welcome ${wish.name}`) : reward ? `+${Math.floor(reward / 5)} ♡ · ${company}` : '♡ from 5 min';
-    $('#focus-reward').innerHTML = `<span class="reward-icon">${sproutArt()}</span><span><strong>${reward ? `+${reward} coins` : 'Coins from 5 min'}</strong><small></small></span>`;
-    $('#focus-reward small').textContent = progress;
+    const { coins, hearts, pet, plant, goal } = focusOutlook(state);
+    $('#focus-reward').innerHTML = `<div class="focus-earnings"><span>${coinArt()}<strong>${coins ? `+${coins} coins` : 'Coins from 5 min'}</strong></span><span class="focus-hearts"><b>${hearts ? `+${hearts} ♡` : '♡'}</b><span></span></span></div>`;
+    $('.focus-hearts > span').textContent = pet.name;
+    if (goal) {
+      const button = document.createElement('button'); button.id = 'focus-goal';
+      button.innerHTML = `<span><strong></strong><b aria-hidden="true">↗</b></span><small></small>${growthTrack(goal.saved, goal.after, goal.price)}`;
+      button.querySelector('strong').textContent = goal.kind === 'pet' ? `Welcome ${goal.name}` : goal.name;
+      button.querySelector('small').textContent = goal.ready ? 'Ready' : goal.reachable ? 'Within reach after this session' : `${goal.price - goal.saved} coins to go`;
+      button.setAttribute('aria-label', `${goal.name}, ${goal.saved} of ${goal.price} coins saved${!goal.ready && goal.reachable ? ', available after this session' : ''}`);
+      button.addEventListener('click', () => openGoal(goal)); $('#focus-reward').append(button);
+    }
+    gardenButton.innerHTML = `${gardenPlantArt(plant && { species: plant.species, minutes: plant.before })}<span><strong></strong><small></small>${plant ? growthTrack(plant.before, plant.after, plant.total) : ''}</span><b aria-hidden="true">↗</b>`;
+    gardenButton.querySelector('strong').textContent = plant?.name || 'Grow a little garden';
+    gardenButton.querySelector('small').textContent = plant ? plant.blooms ? 'Blooms this session ♡' : `${plant.total - plant.before} min to bloom` : state.garden.plants.length ? 'Choose what grows next' : 'Your first seed is free';
     $('#focus-reward').hidden = state.session.kind === 'break';
   }
 
@@ -159,6 +186,15 @@ export function createTimerUI(app) {
       reveal.querySelector('strong').textContent = gift.label; reveal.querySelector('span').textContent = `From ${pet.name} ♡`;
       $('#celebration-bond').after(reveal);
     }
+    $('#celebration-garden')?.remove();
+    if (completion.garden) {
+      const growth = completion.garden, reveal = document.createElement('div'); reveal.id = 'celebration-garden'; reveal.className = 'garden-reveal';
+      reveal.innerHTML = `${gardenPlantArt({ species: growth.species, minutes: growth.after })}<div><strong></strong><small></small><button type="button">Visit garden ↗</button></div>`;
+      reveal.querySelector('strong').textContent = growth.bloomed ? `${growth.name} bloomed` : `${growth.name} is growing`;
+      reveal.querySelector('small').textContent = growth.bloomed ? 'Grown by you ♡' : `${growth.after} / ${growth.total} min`;
+      reveal.querySelector('button').addEventListener('click', () => { modal.close(); openGarden(growth.id); });
+      $('.celebration-coins').after(reveal);
+    }
     if (!modal.open) modal.show();
     app.feedback.celebrate($('.celebration-flower'));
     announce(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'} completed. ${coins} coins earned.`);
@@ -168,7 +204,6 @@ export function createTimerUI(app) {
     syncFocusMode();
     const { state } = app, travelling = app.nav.travelling, editingAvatar = app.avatar.active;
     const isBreak = state.session.kind === 'break', phase = sessionLifecycle(state.session), focusing = isFocusing(state.session);
-    app.moments?.refresh();
     const ms = displayedRemaining(state.session);
     const formatted = formatTime(ms);
     app.pet?.refreshCare();
@@ -180,6 +215,7 @@ export function createTimerUI(app) {
     const renderKey = `${state.session.id}:${isBreak}:${phase}:${formatted}:${presence}:${state.session.duration}:${today}:${minutes}:${editingAvatar}:${travelling}:${pending}:${state.history.length}`;
     // The clock polls for deadlines twice a second, but idle rooms and unchanged
     // displayed seconds do not need another set of DOM mutations.
+    gardenButton.disabled = travelling || editingAvatar || pending;
     $('#start-button').disabled = travelling || editingAvatar || pending;
     $('#avatar-button').disabled = travelling;
     $('#decorate-button').disabled = travelling || !app.room;
@@ -216,7 +252,9 @@ export function createTimerUI(app) {
     }
     renderJournal();
     const label = isBreak ? phase === 'completed' ? 'Start focusing' : 'End break' : focusing ? 'Pause a moment' : phase === 'completed' ? 'Begin another session' : phase === 'paused' ? 'Keep going' : 'Start focusing';
+    quickbar.render({ time: formatted, remaining: spokenTime(ms), label, running: focusing, paused: phase === 'paused', completed: phase === 'completed', disabled: travelling || editingAvatar || pending });
     $('#start-button span').textContent = label;
+    gardenButton.disabled = travelling || editingAvatar || pending;
     $('#start-button').disabled = travelling || editingAvatar || pending;
     $('#reset-session').hidden = isBreak || phase === 'ready' || phase === 'completed';
     $('#reset-session').disabled = editingAvatar || pending;
@@ -354,7 +392,7 @@ export function createTimerUI(app) {
   $('#task').addEventListener('change', flushTask);
   $('#session-celebration').addEventListener('close', () => $('#start-button').focus({ preventScroll: true }));
   app.signal.addEventListener('abort', () => { clearTimeout(taskTimer); $('#replace-session')?.close(); }, { once: true });
-  $('#focus-toggle').addEventListener('click', () => {
+  $('#focus-toggle').addEventListener('click', async () => {
     if (app.panels.current === 'pet') { app.panels.close(); expand(); return; }
     if (app.panels.current) app.panels.close();
     // On a phone the timer lives below the room. A tap should take you there,
@@ -365,7 +403,7 @@ export function createTimerUI(app) {
       return;
     }
     if (app.nav.houseOpen || app.nav.connected) {
-      if (app.nav.houseOpen) app.nav.setHouseOpen(false);
+      if (app.nav.houseOpen) await app.nav.setHouseOpen(false);
       if (app.nav.connected) app.nav.setConnectedView(false);
       expand(); return;
     }
@@ -373,9 +411,9 @@ export function createTimerUI(app) {
     else { focusCollapsed = !focusCollapsed; syncDock(); }
     if (!focusCollapsed) revealDock();
   });
-  $('.skip-link').addEventListener('click', event => {
+  $('.skip-link').addEventListener('click', async event => {
     event.preventDefault();
-    if (app.nav.houseOpen) app.nav.setHouseOpen(false);
+    if (app.nav.houseOpen) await app.nav.setHouseOpen(false);
     if (app.nav.connected) app.nav.setConnectedView(false);
     if (app.decorate.active) app.decorate.setEditMode(false);
     if (app.panels.current) app.panels.close();

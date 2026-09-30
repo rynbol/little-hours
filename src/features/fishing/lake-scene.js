@@ -18,6 +18,7 @@ import { createPetModel } from '../pet/index.js';
 import { speciesOf, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
 import { placeAsset } from '../../models/assets.js';
+import { POND, POND_PATH, pondRim as rim, createLakeBank, createLakeGrass } from './lake-ground.js';
 
 const cardSide = new Vector3(), DOCK_Y = .42, STAND = new Vector3(0, DOCK_Y, 1.35), HOME_BOBBER = new Vector3(-.15, 0, .2);
 const PALETTES = {
@@ -25,8 +26,7 @@ const PALETTES = {
   day: { top: '#6fa9d8', mid: '#aed5ea', low: '#f5ead6', sun: '#fff6dc', sunDir: [.35, .45, -1], deep: '#3d7b93', shallow: '#95cfc6', glint: '#ffffff', leaf: ['#6f9a60', '#86ad6c', '#a0c282'], blossom: ['#f0b9c6', '#f7d0d7', '#e7a3b6'], hill: ['#8aa9c2', '#a3bdd0', '#bdd0dc'], grass: '#a3c27f', meadow: '#93b572', sand: '#e0cba3', trunk: '#76584a', light: 1, stars: 0 },
   rain: { top: '#56627a', mid: '#8491a3', low: '#c2c9ce', sun: '#e9eef0', sunDir: [0, .35, -1], deep: '#3a5463', shallow: '#76979d', glint: '#eef4f6', leaf: ['#5f7c62', '#708f71', '#84a282'], blossom: ['#c9a2b0', '#d8b6c0', '#bb90a1'], hill: ['#72808f', '#8795a2', '#9eabb5'], grass: '#7f9a74', meadow: '#728d69', sand: '#b9ab94', trunk: '#5e4a3d', light: .84, stars: 0 },
 };
-const POND = { x: 0, z: -3.2, rx: 8.6, rz: 7.2 }, HEAD = new Vector3(STAND.x, DOCK_Y + 2.45, STAND.z), FOCUS_EYE = new Vector3(3.3, 3.1, 7.6);
-const rim = (a, k) => [POND.x + Math.cos(a) * POND.rx * k, POND.z + Math.sin(a) * POND.rz * k];
+const HEAD = new Vector3(STAND.x, DOCK_Y + 2.45, STAND.z), FOCUS_EYE = new Vector3(3.3, 3.1, 7.6);
 const hash = n => { const s = Math.sin(n * 78.233 + 12.9898) * 43758.5453; return s - Math.floor(s); };
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
 const easeOut = t => 1 - (1 - Math.min(1, Math.max(0, t))) ** 3;
@@ -163,17 +163,6 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   };
   const rock = (x, z, s, seed) => asset(['rock-a', 'rock-b'][seed % 2], { x, y: -.05, z, yaw: seed * 2.1, scale: s * 1.15 });
 
-  const bank = () => {
-    const RINGS = [[.97, -.08, 'sand'], [1.02, .03, 'sand'], [1.07, .1, 'grass'], [1.25, .13, 'grass'], [1.7, .14, 'meadow'], [2.6, .15, 'grass'], [4.5, .15, 'meadow'], [8, .15, 'meadow']], SEG = 120;
-    const positions = [], colors = [], indices = [], normals = [];
-    for (let r = 0; r < RINGS.length; r++) for (let i = 0; i < SEG; i++) {
-      const a = i / SEG * Math.PI * 2, [k, y, tone] = RINGS[r], wobble = r < 3 ? (hash(i * 3.1) - .5) * .04 + Math.sin(a * 5 + 1) * .02 : 0, [x, z] = rim(a, k + wobble);
-      const c = Color3.FromHexString(palette[tone]).scale(.95 + hash(i * 7 + r * 31) * .1);
-      positions.push(x, y, z); normals.push(0, 1, 0); colors.push(c.r, c.g, c.b, 1);
-      if (r) { const n = r * SEG + i, m = r * SEG + (i + 1) % SEG; indices.push(n - SEG, n, m - SEG, m - SEG, n, m); }
-    }
-    const data = new VertexData(); Object.assign(data, { positions, normals, colors: new Float32Array(colors), indices }); baked.push(data);
-  };
   const flowers = (x, z, count, seed) => {
     const tint = [['#f3c3d0', '#f9e2e7'], ['#f6e3a8', '#fff3cf'], ['#c9b8e6', '#e4d9f4'], ['#f7f1e6', '#fdf9f1']][seed % 4];
     ball(x, .14, z, .8, .36, .7, palette.leaf[seed % 3], 7);
@@ -201,7 +190,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     for (const side of [-.55, .55]) box(x + Math.cos(yaw) * side, .22, z - Math.sin(yaw) * side, .07, .44, .4, '#6f5240', [0, yaw, 0]);
   };
 
-  bank();
+  baked.push(Object.assign(new VertexData(), createLakeBank(palette)), Object.assign(new VertexData(), createLakeGrass(palette)));
   ball(0, -1.8, -46, 110, 4.4, 24, palette.meadow, 18);
   const haze = Color3.FromHexString(palette.low).scale(.7).add(Color3.FromHexString(palette.mid).scale(.3));
   const ridge = (z, base, rise, crowns, hex, fade, seed, half = 170) => {
@@ -256,7 +245,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   const posts = [[-.72, 1.02], [-.72, 5.2], [.72, 5.2], [-3.4, 4.9]];
   for (const [x, z] of posts) { cyl(x, .95, z, .09, .11, 1.9, '#6f5240'); box(x, 1.93, z, .16, .05, .16, '#4f3d31'); }
   box(1.25, .75, 5.5, .08, 1.1, .08, '#6f5240'); box(1.25, 1.18, 5.52, .95, .42, .07, '#b98d63', [0, -.25, 0]); box(1.25, 1.18, 5.56, .8, .3, .02, '#e8d6b8', [0, -.25, 0]);
-  for (let i = 0; i < 8; i++) { const t = i / 7; cyl(-.35 - t * 3.6, .17, 5.9 + Math.sin(t * Math.PI) * 1.1 - t * 1.4, .5, .52, .05, ['#e3d7c1', '#d6c8ae'][i % 2]); }
+  POND_PATH.forEach(([x, z], i) => cyl(x, .17, z, .5, .52, .05, ['#e3d7c1', '#d6c8ae'][i % 2]));
   for (const [x, z, s] of [[4.2, 4.6, 1.2], [-6.6, 4.4, 1.1], [7.4, 3.2, .9]]) asset('bush', { x, z, yaw: x, scale: s });
   boat(1.75, 2.6, .5); bench(-4.6, 3.9, -.35);
   const tackle = [.46, DOCK_Y + .09, 2.15];

@@ -40,8 +40,19 @@ export function createPanels(app) {
 
   function close() {
     const previous = current; current = null; render();
-    document.querySelector(`[data-panel="${previous}"]`)?.focus();
+    const trigger = document.querySelector(`[data-panel="${previous}"]`);
+    (trigger?.closest('#room-more') ? $('#room-more-toggle') : trigger)?.focus();
   }
+
+  $('#room-more').addEventListener('beforetoggle', event => {
+    if (event.newState !== 'open') return;
+    const box = $('#room-more-toggle').getBoundingClientRect(), menu = $('#room-more');
+    menu.style.left = `${Math.max(16, Math.min(innerWidth - 226, box.right - 210))}px`;
+    menu.style.bottom = `${Math.max(16, Math.min(innerHeight - 240, innerHeight - box.top + 8))}px`;
+  }, { signal: app.signal });
+  $('#room-more').addEventListener('click', event => {
+    if (event.target.closest('button')) { $('#room-more').hidePopover(); if (event.target.closest('#mini-button, #reset-view')) $('#room-more-toggle').focus(); }
+  }, { signal: app.signal });
 
   document.querySelectorAll('[data-panel]').forEach(button => button.addEventListener('click', () => {
     // Like Decorate, the avatar editor waits until a walk or a room change ends.

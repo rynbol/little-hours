@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freshState, restoreState, createStateStore, storageKey } from './state.js';
 import { createSession } from './session.js';
-import { bondLevel, normalizePetBonds, focusPetId } from './pet-bonds.js';
+import { bondHearts, bondLevel, normalizePetBonds, focusPetId, MAX_HEARTS } from './pet-bonds.js';
 import { createBackup, readBackup } from '../features/backup/backup.js';
 
 function fixture(state = freshState()) {
@@ -92,7 +92,9 @@ test('completion preserves its pet and minutes through a replacement transaction
   const f = fixture(); f.store.setRunning(true); f.advance(25 * 60000);
   const id = f.store.state.session.id;
   const result = f.store.update(draft => { draft.pet = 'dog'; draft.session = createSession(50); draft.petBonds.cat.name = 'Maple'; });
-  assert.deepEqual(result.completion, { id, kind: 'focus', at: new Date('2026-09-27T10:25:00').getTime(), minutes: 25, coins: 25, pet: { id: 'cat', name: 'Miso', hearts: 5, bondTitle: 'Getting to know you', gifts: [{ id: 'daisy', label: 'A daisy for you' }] } });
+  const { buddy, ...completion } = result.completion;
+  assert.ok(['garden', 'pond', 'woods'].includes(buddy.place));
+  assert.deepEqual(completion, { id, kind: 'focus', at: new Date('2026-09-27T10:25:00').getTime(), minutes: 25, coins: 25, garden: null, pet: { id: 'cat', name: 'Miso', hearts: 5, bondTitle: 'Getting to know you', gifts: [{ id: 'daisy', label: 'A daisy for you' }] } });
   assert.equal(result.state.petBonds.cat.affection, 5);
   assert.equal(result.state.petBonds.dog.affection, 0);
   assert.equal(result.state.session.duration, 50 * 60000);
@@ -122,4 +124,9 @@ test('the next focus preview and command choose the same pet after completion', 
   assert.equal(focusPetId(f.store.state), 'dog');
   f.store.setRunning(true);
   assert.equal(f.store.state.session.petId, 'dog');
+});
+
+test('the bond shows as fifteen hearts, four points each, with the friendship steps on whole hearts', () => {
+  assert.equal(MAX_HEARTS, 15);
+  assert.deepEqual([0, 5, 8, 24, 60, 200].map(affection => bondHearts({ affection })), [0, 1.25, 2, 6, 15, 15]);
 });

@@ -4,10 +4,12 @@ import { roomDesign } from '../../core/layout.js';
 import { DOOR_OPEN_SECONDS } from '../companion/index.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
+import { coinArt } from '../../ui/ui-art.js';
 import { roomDesignArt } from '../decorate/index.js';
 import { createHouseView } from './house-view.js';
 import { studyTrees } from '../../core/garden.js';
 import './room-navigation.css';
+import { travelTo } from '../../ui/place-transition.js';
 
 export function createHouseNavigation(app) {
   let houseOpen = false, connectedView = null, connectionsKey = '', travelTimer = 0, peekFrame = 0, arrivalTimer = 0, travelling = false, doorWalking = false, preparing = false;
@@ -26,8 +28,16 @@ export function createHouseNavigation(app) {
     return true;
   }
 
-  function setHouseOpen(open, selectedId) {
-    if (travelling || open === houseOpen) return;
+  function setHouseOpen(open, selectedId, plantId) {
+    if (travelling) return;
+    const currentGarden = document.body.classList.contains('is-garden');
+    const garden = selectedId ? selectedId === 'orchard' || /^plot-[0-5]$/.test(selectedId) : open && houseOpen && currentGarden;
+    if (open !== houseOpen || open && garden !== currentGarden) return travelTo(open ? garden ? 'garden' : 'island' : 'home', () => showHouse(open, selectedId, plantId), () => Boolean((open ? app.houseUI : app.room)?.diagnostics()?.scene.isReady()));
+    showHouse(open, selectedId, plantId);
+  }
+  function showHouse(open, selectedId, plantId) {
+    if (travelling) return;
+    if (open === houseOpen) { if (open && selectedId) app.houseUI.show(selectedId); if (open && plantId) app.houseUI.selectGardenPlant(plantId); return; }
     if (open) {
       closePicker(false);
       setConnectedView(false);
@@ -38,8 +48,9 @@ export function createHouseNavigation(app) {
     document.body.classList.toggle('is-house', open);
     $('#room-section').hidden = open;
     app.room?.setSuspended(open);
-    if (open) { app.houseUI.show(selectedId); $('#back-to-room').focus({ preventScroll: true }); }
+    if (open) { app.houseUI.show(selectedId); (document.body.classList.contains('is-garden') ? $('#garden-back') : $('#back-to-room'))?.focus({ preventScroll: true }); }
     else { app.houseUI.hide(); $('#rooms-button').focus({ preventScroll: true }); }
+    if (open && plantId) app.houseUI.selectGardenPlant(plantId);
     app.timer.syncDock();
   }
   const picker = $('#room-picker'), switcher = $('#room-switcher-toggle');
@@ -61,7 +72,7 @@ export function createHouseNavigation(app) {
 
   function renderConnections(updateModel = true) {
     connectedView?.setFocused(isFocusing(app.state.session));
-    const key = JSON.stringify([app.state.house, app.state.history.length, app.state.theme, app.state.avatar, Boolean(connectedView), isFocusing(app.state.session)]);
+    const key = JSON.stringify([app.state.house, app.state.history, app.state.garden, app.state.theme, app.state.avatar, Boolean(connectedView), isFocusing(app.state.session)]);
     if (connectionsKey === key) return;
     connectionsKey = key;
     const focusedId = picker.contains(document.activeElement) ? document.activeElement.dataset.houseGo : null;
@@ -73,19 +84,19 @@ export function createHouseNavigation(app) {
     $('.room-route-map').innerHTML = rooms.map((room, i) => `<i class="${i === index ? 'is-current' : ''}"></i>`).join('');
     $('#previous-room').setAttribute('aria-label', index > 0 ? `Go to ${roomDisplayName(rooms[index - 1])}` : 'Previous room');
     $('#next-room').setAttribute('aria-label', index < rooms.length - 1 ? `Go to ${roomDisplayName(rooms[index + 1])}` : 'Next room');
-    for (const [i, entry] of rooms.entries()) {
+    for (const entry of rooms) {
       const button = document.createElement('button'), current = entry.id === app.state.house.activeId, name = roomDisplayName(entry), design = roomDesign(entry.layout);
       button.className = 'room-card'; button.dataset.houseGo = entry.id; button.dataset.roomStyle = design.style || 'retreat';
       button.setAttribute('aria-current', current ? 'location' : 'false'); button.setAttribute('aria-label', `${name}${current ? ', you’re here' : ''}`);
-      button.innerHTML = `<span class="room-card-window"><span class="room-card-number" aria-hidden="true">0${i + 1}</span><span class="room-card-art">${roomDesignArt(design)}</span><span class="room-card-mark">${icon(current ? 'check' : 'arrow')}</span></span><span class="room-card-name"></span><span class="room-card-location">${current ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor'}</span>`;
+      button.innerHTML = `<span class="room-card-art">${roomDesignArt(design)}</span><span class="room-card-copy"><span class="room-card-name"></span><span class="room-card-location">${current ? 'You’re here' : entry.id === 'loft' ? 'Upstairs' : 'Ground floor'}</span></span><span class="room-card-mark" aria-hidden="true">${icon(current ? 'check' : 'arrow')}</span>`;
       button.querySelector('.room-card-name').textContent = name;
-      button.addEventListener('click', () => selectDestination(entry.id)); cards.append(button);
+      button.addEventListener('click', () => selectDestination(entry.id, true)); cards.append(button);
     }
     const next = nextExpansion(app.state.house), grow = $('#room-grow'); grow.replaceChildren();
     if (next) {
       const button = document.createElement('button'); button.className = 'room-grow-button'; button.dataset.houseGo = next.id;
       button.setAttribute('aria-label', `Plan ${next.short}, ${next.price} coins`);
-      button.innerHTML = `<span class="room-grow-icon">${icon('plus')}</span><span class="room-grow-name"></span><span class="room-grow-price">${icon('sun')} ${next.price}</span>`;
+      button.innerHTML = `<span class="room-grow-icon">${icon('plus')}</span><span class="room-grow-name"></span><span class="room-grow-price">${coinArt()} ${next.price}</span>`;
       button.querySelector('.room-grow-name').textContent = next.short;
       button.addEventListener('click', () => { closePicker(false); setHouseOpen(true, next.id); }); grow.append(button);
     }
@@ -96,14 +107,14 @@ export function createHouseNavigation(app) {
     syncTravelControls();
     if (focusedId && picker.open) picker.querySelector(`[data-house-go="${focusedId}"]`)?.focus({ preventScroll: true });
   }
-  const withGarden = () => ({ ...app.state.house, pet: app.state.pet, garden: studyTrees(app.state.history) });
+  const withGarden = () => ({ ...app.state.house, pet: app.state.pet, garden: studyTrees(app.state.history), plants: app.state.garden.plants });
   function setConnectedView(open) {
     if (travelling || open === Boolean(connectedView)) return;
     if (open && app.panels.current) app.panels.close();
     if (open && app.decorate.active) app.decorate.setEditMode(false);
     if (open) {
       $('#house-in-room').hidden = false;
-      connectedView = createHouseView($('#house-in-room'), { house: withGarden(), selectedId: app.state.house.activeId, theme: app.state.theme, avatar: app.state.avatar, focused: isFocusing(app.state.session), onSelect: id => id === 'pond' ? app.lake?.open() : selectDestination(id) });
+      connectedView = createHouseView($('#house-in-room'), { house: withGarden(), selectedId: app.state.house.activeId, theme: app.state.theme, avatar: app.state.avatar, focused: isFocusing(app.state.session), onSelect: id => id === 'pond' ? app.lake?.open() : id === 'orchard' || /^plot-[0-5]$/.test(id) ? setHouseOpen(true, id) : selectDestination(id) });
     } else { connectedView.dispose(); connectedView = null; $('#house-in-room').hidden = true; }
     $('#room-canvas').hidden = open;
     document.body.classList.toggle('is-connected', open); app.roomUI.renderHeading();
@@ -115,7 +126,7 @@ export function createHouseNavigation(app) {
     app.roomUI.leaveMini();
     if (app.panels.current) app.panels.close();
   }
-  async function selectDestination(id) {
+  async function selectDestination(id, walk = false) {
     if (travelling || preparing) return;
     if (id !== app.state.house.activeId) {
       if (app.panels.current === 'avatar') app.panels.close();
@@ -124,8 +135,9 @@ export function createHouseNavigation(app) {
       if (isFocusing(app.state.session)) { app.toast('Pause your focus session before walking to another room.', true); return; }
     }
     closePicker(false);
-    if (id !== app.state.house.activeId) visitRoom(id, false);
-    else { leaveNavigationViews(); switcher.focus({ preventScroll: true }); }
+    leaveNavigationViews();
+    if (id !== app.state.house.activeId) { if (walk) visitDoor(id); else visitRoom(id, false); }
+    else switcher.focus({ preventScroll: true });
   }
   async function visitRoom(id, decorate = app.decorate.active, fromDoor = false) {
     if (preparing || (travelling && !fromDoor)) return;
@@ -139,8 +151,7 @@ export function createHouseNavigation(app) {
     }
     const entry = app.state.house.rooms.find(room => room.id === id);
     if (!entry) { setHouseOpen(true, id); return; }
-    if (!fromDoor) leaveNavigationViews();
-    if (houseOpen) setHouseOpen(false);
+    if (!fromDoor) setConnectedView(false);
     if (app.decorate.active) app.decorate.setEditMode(false);
     const originId = app.state.house.activeId;
     const arrive = async () => {
@@ -160,6 +171,7 @@ export function createHouseNavigation(app) {
       $('#stage').classList.remove('room-arrival'); void $('#stage').offsetWidth; $('#stage').classList.add('room-arrival');
       clearTimeout(arrivalTimer); arrivalTimer = setTimeout(() => $('#stage').classList.remove('room-arrival'), 650);
     };
+    if (houseOpen) return travelTo('home', () => { showHouse(false); arrive(); }, () => Boolean(app.room?.diagnostics().scene.isReady()));
     if (id === app.state.house.activeId || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { arrive(); return; }
     const direction = app.state.house.rooms.findIndex(room => room.id === id) < app.state.house.rooms.findIndex(room => room.id === app.state.house.activeId) ? -1 : 1;
     $('#stage').style.setProperty('--room-travel-direction', direction);
@@ -177,7 +189,8 @@ export function createHouseNavigation(app) {
     const entry = app.state.house.rooms.find(room => room.id === id);
     // A door to a room not built yet: walk over, peek through, then plan it.
     const link = entry || houseConnections(app.state.house).find(slot => slot.id === id);
-    if (!entry && (!link || window.matchMedia('(prefers-reduced-motion: reduce)').matches)) { setHouseOpen(true, id); return; }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { if (entry) visitRoom(id, false); else setHouseOpen(true, id); return; }
+    if (!entry && !link) { setHouseOpen(true, id); return; }
     const planRoom = () => { cancelDoorTravel(); setHouseOpen(true, id); };
     closePicker(false);
     doorWalking = true; travelling = true; syncTravelControls();
@@ -234,10 +247,10 @@ export function createHouseNavigation(app) {
   picker.addEventListener('cancel', event => { event.preventDefault(); closePicker(); });
   picker.addEventListener('keydown', event => {
     if (event.key === 'Escape') event.stopPropagation();
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || !event.target.closest('.room-card')) return;
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key) || !event.target.closest('.room-card')) return;
     event.preventDefault();
     const cards = [...picker.querySelectorAll('.room-card')], index = cards.indexOf(document.activeElement);
-    const next = event.key === 'Home' ? 0 : event.key === 'End' ? cards.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + cards.length) % cards.length;
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? cards.length - 1 : (index + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + cards.length) % cards.length;
     cards[next]?.focus();
   });
   let backdropDown = false;

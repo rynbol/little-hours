@@ -77,7 +77,7 @@ export default {
     await app.click(door.x, door.y);
     await app.waitFor(`document.body.classList.contains('is-door-walking')`, { what: 'the door walk', timeout: 3000 });
     check('the Avatar button is disabled during a door walk', await app.js(`document.getElementById('avatar-button').disabled`));
-    const button = await app.box('#avatar-button');
+    await steps.openMore(app); const button = await app.box('#avatar-button');
     await app.click(button.x, button.y); await sleep(150);
     check('clicking Avatar during a door walk does not open the editor', !await editing(app) && !await app.visible('#room-panel'));
     await app.waitFor(`window.__littleHours.state.house.activeId === 'garden' && !document.body.classList.contains('is-travelling')`, { what: 'arrival in the garden', timeout: 20000 });

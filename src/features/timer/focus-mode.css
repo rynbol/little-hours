@@ -13,7 +13,7 @@ body.is-focus-mode .focus-card,
 body.is-focus-mode .app-footer,
 body.is-focus-mode .skip-link { display: none !important; }
 body.is-focus-mode .workspace { display: block; min-height: 0; padding: 0; }
-body.is-focus-mode #stage { position: fixed; inset: 0; z-index: 40; width: 100vw; height: 100vh; height: 100svh; border: 0; border-radius: 0; background: radial-gradient(ellipse at 50% 45%, #b18d9b1a, transparent 52%), linear-gradient(155deg, #211d29, #29232f 58%, #201e2b); }
+body.is-focus-mode #stage { position: fixed; inset: 0; z-index: 40; width: 100vw; height: 100vh; height: 100svh; border: 0; border-radius: 0; background: radial-gradient(ellipse at 25% 30%, var(--world-glow), transparent 60%), linear-gradient(165deg, var(--world-top), var(--world-bottom)); }
 body.is-focus-mode #stage::before { display: none; }
 body.is-focus-mode #room-canvas { inset: 0; }
 body.is-focus-mode #room-canvas canvas { touch-action: none; }
@@ -22,8 +22,7 @@ body.is-focus-mode .companion-status,
 body.is-focus-mode .room-hint,
 body.is-focus-mode .speech-layer,
 body.is-focus-mode .loading-note,
-body.is-focus-mode .room-travel,
-body.is-focus-mode .little-moments { display: none; }
+body.is-focus-mode .room-travel { display: none; }
 .focus-mode-hud { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 .focus-mode-timer { position: absolute; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 7px 15px 8px; border: 1px solid #f4e9e33d; border-radius: 999px; background: #201d28a8; color: #f3eae1; box-shadow: 0 6px 28px #0c091342; backdrop-filter: blur(12px); font-family: 'Manrope', sans-serif; font-size: 17px; font-weight: 450; letter-spacing: .3px; line-height: 1.3; font-variant-numeric: tabular-nums; }
 .focus-mode-exit { position: absolute; top: max(22px, env(safe-area-inset-top)); right: max(22px, env(safe-area-inset-right)); width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid #f4e9e33d; border-radius: 50%; background: #201d28a8; color: #f3eae1; backdrop-filter: blur(12px); pointer-events: auto; transition: background .2s ease; }

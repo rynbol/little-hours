@@ -2,7 +2,7 @@ const active = app => app.js('window.__littleHours.state.house.activeId');
 const isOpen = app => app.js('document.getElementById("room-picker").open');
 
 export default {
-  about: 'room picker keyboard and dismiss, quick travel, single-room growth, phone sheet, and cancelling a door walk',
+  about: 'room picker keyboard and dismiss, room preview art, door travel, single-room growth, phone sheet, and cancelling a door walk',
   async run(t) {
     const { check, steps, sleep } = t;
     let app = await t.open({ seed: 'three-rooms' });
@@ -10,7 +10,11 @@ export default {
     check('the first room has no previous destination', await app.js('document.getElementById("previous-room").disabled') && await app.text('#room-route-count') === '1 / 3');
     await steps.openRoomPicker(app);
     check('the current room receives focus and an accessible current marker', await app.js('document.activeElement.dataset.houseGo === "studio"') && await app.attr('[data-house-go="studio"]', 'aria-current') === 'location');
+    check('each destination shows a decoded render of its own room design', await app.js(`[...document.querySelectorAll('.room-card-art img')].every(img => img.complete && img.naturalWidth === 720 && img.src.includes('/rooms/'))`) && await app.js(`document.querySelectorAll('.room-card-art svg').length === 0`));
     await t.shot(app, 'desktop');
+    await app.key('ArrowDown');
+    check('down arrow moves through the vertical room list', await app.js('document.activeElement.dataset.houseGo === "garden"'));
+    await app.key('Home');
     await app.key('ArrowRight');
     check('right arrow moves to the next room without travelling', await app.js('document.activeElement.dataset.houseGo === "garden"') && await active(app) === 'studio');
     await app.key('End');
@@ -22,12 +26,11 @@ export default {
     await app.click(10, 10);
     check('tapping the backdrop dismisses the picker', !await isOpen(app));
     await steps.openRoomPicker(app);
-    const began = Date.now();
     await app.clickSel('[data-house-go="garden"]');
     await app.waitFor('document.body.classList.contains("is-travelling")', { what: 'the room transition to start' });
-    check('selection closes the sheet and locks the route during transition', !await isOpen(app) && await app.js('document.getElementById("next-room").disabled && document.body.classList.contains("is-travelling") && !document.body.classList.contains("is-door-walking")'));
-    await app.waitFor('window.__littleHours.state.house.activeId === "garden" && !document.body.classList.contains("is-travelling")');
-    check('room switching finishes in under 1.5 seconds', Date.now() - began < 1500 * t.slow, `${Date.now() - began} ms`);
+    check('selection closes the sheet and locks the route during transition', !await isOpen(app) && await app.js('document.getElementById("next-room").disabled && document.body.classList.contains("is-travelling") && document.body.classList.contains("is-door-walking")'));
+    await app.waitFor('window.__littleHours.state.house.activeId === "garden" && !document.body.classList.contains("is-travelling")', { timeout: 30000, what: 'arrival in the garden wing' });
+    check('the avatar finishes walking before the saved room changes', await active(app) === 'garden');
     check('arrival restores controls, location and heading focus', await app.text('#room-route-count') === '2 / 3' && await app.js('!document.getElementById("next-room").disabled && document.activeElement.id === "room-title"'));
     await app.clickSel('#next-room');
     await app.waitFor('window.__littleHours.state.house.activeId === "loft" && !document.body.classList.contains("is-travelling")');
@@ -69,8 +72,9 @@ export default {
     check('one room disables both travel arrows', await app.js('document.getElementById("previous-room").disabled && document.getElementById("next-room").disabled'));
     await steps.openRoomPicker(app);
     check('unbuilt rooms are offered as plans, separate from destinations', await app.js('document.querySelectorAll(".room-card").length === 1 && Boolean(document.querySelector("#room-grow [data-house-go= garden]"))'));
+    check('one room uses a compact dialog without oversized empty artwork', (await app.box('#room-picker')).height < 340);
     await t.shot(app, 'one-room');
-    await app.clickSel('#room-grow button');
+    await app.clickSel('#room-grow button'); await app.settle();
     check('planning goes straight to the house page', !await isOpen(app) && await app.js('document.body.classList.contains("is-house")') && await app.text('#house-detail h2') === 'Greenhouse');
     await t.close(app);
 

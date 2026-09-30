@@ -2,7 +2,7 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { buildPaths } from './house-paths.js';
 import { placeAsset } from '../../models/assets.js';
 
-export const ISLAND = Object.freeze({ cx: 2.85, cz: .1, rx: 9.95, rz: 4.65, power: 4.2 });
+export const ISLAND = Object.freeze({ cx: 2.85, cz: .1, rx: 10.15, rz: 5.2, power: 2.9 });
 export const STREAMS = Object.freeze([
   [[11.75, 1.3], [12.1, 1.75], [12.5, 2.15], [12.95, 2.5]],
   [[-3.85, 3.5], [-4.15, 3.9], [-4.45, 4.25], [-4.8, 4.62]],
@@ -10,8 +10,8 @@ export const STREAMS = Object.freeze([
 ]);
 const TOP = -.175, SEGMENTS = 72, RINGS = 7;
 const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
-const lawn = ['#a6b68c', '#aebd92', '#9fb187', '#b4c296'];
-const rim = '#8ea477', lip = '#7a9368';
+const lawn = ['#91ba76', '#a4c780', '#7da66c', '#b5ce8b'];
+const rim = '#82a96b', lip = '#6e945f';
 
 export function edgePoint(a, scale = 1) {
   const { cx, cz, rx, rz, power } = ISLAND, c = Math.cos(a), s = Math.sin(a);
@@ -52,8 +52,8 @@ export function buildIsland(api) {
 
   const profile = [
     { y: TOP, scale: 1, color: rim },
-    { y: TOP - .07, scale: 1.028, color: rim },
-    { y: TOP - .2, scale: 1.03, color: lip, tongue: .34 },
+    { y: TOP - .1, scale: 1.02, color: rim },
+    { y: TOP - .25, scale: 1.018, color: lip, tongue: .22 },
   ];
   const ring = profile.map((step, r) => Array.from({ length: SEGMENTS + 1 }, (_, j) => {
     const jj = j % SEGMENTS, [x, z] = edgePoint(angle(jj), step.scale);

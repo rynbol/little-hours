@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { onIsland, STREAMS, waterfalls } from './house-island.js';
+import { onIsland, edgePoint, ISLAND, STREAMS, waterfalls } from './house-island.js';
+import { placeAsset } from '../../models/assets.js';
 import { HOUSE_POSITIONS } from './house-model.js';
 import { GARDEN_CENTER } from './house-garden.js';
 
@@ -22,4 +23,18 @@ test('each stream runs from the lawn over the edge and falls clear of the island
     const [, top] = points[rim], [x, bottom, z] = points.at(-1);
     assert.ok(top > -.2 && bottom < -3.4 && !onIsland(x, z), `falls from ${top} to ${bottom}`);
   }
+});
+
+test('the authored cliff meets the lawn all around its curved rim', () => {
+  const { positions } = placeAsset('island-cliff');
+  const occupied = new Set();
+  for (let i = 0; i < positions.length; i += 3) {
+    const [x, y, z] = positions.slice(i, i + 3);
+    if (y < -.36) continue;
+    const angle = Math.atan2(z - ISLAND.cz, x - ISLAND.cx);
+    const [ex, ez] = edgePoint(angle);
+    assert.ok(Math.abs(Math.hypot(x - ISLAND.cx, z - ISLAND.cz) - Math.hypot(ex - ISLAND.cx, ez - ISLAND.cz)) < .3, `cliff rim at ${x}, ${z} must follow the lawn`);
+    occupied.add(Math.floor((angle + Math.PI) / (Math.PI * 2) * 24) % 24);
+  }
+  assert.equal(occupied.size, 24, 'the cliff supports every part of the shore');
 });

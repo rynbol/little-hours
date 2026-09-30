@@ -75,7 +75,7 @@ body:not(.is-avatar-editing) .room-hint { color: #b5a3b1; font-size: 10px; botto
 #task:focus { border-color: #b47a86; outline-color: #b47a86; }
 .timer-area { margin: 18px 0 16px; text-align: center; }
 .timer-dial { width: 188px; height: 188px; margin: 0 auto 15px; position: relative; display: grid; place-items: center; }
-.timer-ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform: rotate(-90deg); }
+.timer-ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform: rotate(-90deg); outline: none; }
 .timer-ring circle { fill: none; stroke-width: 2.5; }
 .timer-ring .timer-track { stroke: #e5d8cc; }
 .timer-ring .timer-progress { stroke: #b97885; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 0; transition: stroke-dashoffset .55s linear, stroke .3s; }
@@ -429,7 +429,7 @@ body .stage-presence, body .companion-status { position: absolute; width: 1px; h
 body .session-label { opacity: .75; }
 body .focus-reward { padding: 8px 11px; align-items: center; }
 body .time-toggle { min-width: 0; width: 38px; padding: 5px; }
-body .house-page .eyebrow, body .house-page .room-subtitle, body .house-fine-print, body .house-progress-copy, body .preset-note, body .moments-footnote,
+body .house-page .eyebrow, body .house-page .room-subtitle, body .house-fine-print, body .house-progress-copy, body .preset-note,
 body .room-travel small, body .celebration-note, body .pet-actions .performance-note, body .quality-options ~ .performance-note { display: none; }
 body .house-address, body .house-scene-caption, body .house-map-hint, body .house-room-link .house-slot-label, body .house-room-tag small, body .house-paper-top, body .house-description, body .house-owned-art small,
 body .house-underworld p, body .house-next-note:not(:has(#show-next-room)), body .house-postcard-heading .eyebrow, body .house-postcard-actions p { display: none; }

@@ -1,3 +1,4 @@
+import { travelTo } from './ui/place-transition.js';
 import './ui/style.css';
 import './ui/ui.css';
 import { createUIFeedback } from './ui/ui-feedback.js';
@@ -8,22 +9,24 @@ import { shellMarkup } from './app/shell.js';
 import { createPanels } from './app/panels.js';
 import { storageKey } from './core/state.js';
 import { createSharedStateStore } from './core/shared-store.js';
-import { isFocusing } from './core/session.js';
 import { roomDesign } from './core/layout.js';
 import { clockNow, isPinned, pinnedStorage } from './core/test-pins.js';
 import { createRoom, createRoomUI } from './features/room/index.js';
 import { createAudio, wireSoundControls } from './features/audio/index.js';
 import { createSavesPanel } from './features/backup/index.js';
 import { createSpeech, createCompanionUI } from './features/companion/index.js';
-import { createMomentsUI, createDelights } from './features/moments/index.js';
+import { createDelights } from './features/moments/index.js';
 import { createPetUI } from './features/pet/index.js';
 import { createHouseUI, createHouseNavigation } from './features/house/index.js';
 import { createAvatarPanel } from './features/avatar/index.js';
 import './features/avatar/wardrobe.css';
 import './features/pet/pet.css';
+import './ui/atmosphere.css';
+import './ui/calm-ui.css';
 import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
+import { createBuddyUI } from './features/buddy/index.js';
 import { installTestHook } from './dev/test-hook.js';
 import { stockBait } from './core/fishing.js';
 
@@ -41,7 +44,7 @@ $('#task').value = store.state.task;
 
 const toast = createToast();
 const app = {
-  state: store.state, store, audio, room: null, roomReady: false, speech: null, moments: null, houseUI: null,
+  state: store.state, store, audio, room: null, roomReady: false, speech: null, houseUI: null,
   signal: listeners.signal, storageWarningShown: false,
   feedback: createUIFeedback(document, { signal: listeners.signal }),
   toast: toast.show, hideToast: toast.hide, acceptUpdate,
@@ -56,6 +59,7 @@ app.nav = createHouseNavigation(app);
 app.roomUI = createRoomUI(app);
 app.panels = createPanels(app);
 app.lake = createFishingUI(app);
+app.buddy = createBuddyUI(app);
 wireSoundControls(app);
 
 function applyState(next, force = false) {
@@ -84,6 +88,7 @@ function applyState(next, force = false) {
   app.decorate.syncLayout(force);
   app.companion.syncIntent();
   app.roomUI.syncControls();
+  app.buddy?.sync();
 }
 async function acceptUpdate(update) {
   const result = await update;
@@ -114,6 +119,7 @@ try {
       app.roomReady = true; app.timer.render();
       $('#loading-note').hidden = true;
       setDecorEntry(true);
+      app.buddy?.start();
       // Back after half an hour or more: a small hello.
       if (app.state.seenAt && clockNow() - app.state.seenAt > 30 * 60_000) setTimeout(() => { app.companion.welcome(); app.pet.welcome(); }, 1200);
     },
@@ -123,6 +129,7 @@ try {
     onPet: app.pet.feedback,
     onPetCarry: app.pet.onPetCarry,
     onFrame() { app.speech?.update(); app.delights?.update(); },
+    onBuddy: event => app.buddy?.onRoom(event),
     onDoorProgress: app.nav.onDoorProgress,
     onCompanionState: app.companion.onCompanionState,
     ...app.decorate.roomEvents,
@@ -138,7 +145,6 @@ try {
   $('#room-canvas').appendChild(speechLayer);
   app.speech = createSpeech(speechLayer, { anchor: who => app.room?.anchor(who), reducedMotion: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
   app.delights = createDelights($('#room-canvas'), { room: app.room, signal: listeners.signal, unavailable: () => app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact });
-  app.moments = createMomentsUI($('#stage'), { room: app.room, signal: listeners.signal, getState: () => ({ items: app.state.layout.items, focusing: isFocusing(app.state.session), unavailable: app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact }) });
 } catch (error) {
   $('#loading-note').textContent = 'The room couldn’t load. Try reloading; your focus timer is still ready.';
   console.error('Could not create the room:', error);
@@ -149,7 +155,7 @@ app.houseUI = createHouseUI($('#house-page'), {
   store, acceptUpdate, art: roomDesignArt, icon, notice: app.toast,
   onClose: () => app.nav.setHouseOpen(false),
   onEnter: app.nav.visitRoom,
-  onFocus: () => { app.nav.setHouseOpen(false); app.timer.expand(); $('#start-button').focus(); },
+  onFocus: () => travelTo('home', () => { app.nav.setHouseOpen(false); app.timer.expand(); $('#start-button').focus(); }),
   onPond: () => app.lake.open(),
 });
 document.addEventListener('keydown', event => {
@@ -187,7 +193,7 @@ document.addEventListener('visibilitychange', () => {
 }, { signal: listeners.signal });
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
-if (import.meta.env.DEV) installTestHook({ get pet() { return app.pet; }, get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get connected() { return app.nav.connected; } });
+if (import.meta.env.DEV) installTestHook({ get pet() { return app.pet; }, get buddy() { return app.buddy; }, get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get connected() { return app.nav.connected; } });
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');
@@ -198,7 +204,7 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   app.nav.dispose(); app.decorate.dispose();
   app.houseUI?.dispose();
   app.lake.dispose();
-  app.moments?.dispose();
+  app.buddy.dispose();
   app.delights?.dispose();
   app.room?.dispose?.();
   audio.dispose();

@@ -82,7 +82,8 @@ test('completion awards the pet that began focusing and the room stays usable', 
   expect(accessibility.violations).toEqual([]);
   expect(await page.locator('#session-celebration').evaluate(el => el.matches(':modal'))).toBe(false);
   await page.locator('#session-celebration .start-button').click();
-  await expect(page.locator('#focus-reward')).toContainText('+5 ♡ · Mochi');
+  await expect(page.locator('#focus-reward .focus-hearts b')).toHaveText('+5 ♡');
+  await expect(page.locator('#focus-reward .focus-hearts > span')).toHaveText('Mochi');
   const state = await saved(page);
   expect(state.petBonds.cat.minutes).toBe(25); expect(state.petBonds.dog.minutes).toBe(0);
   await page.reload();
@@ -96,17 +97,16 @@ test('an open care card shows completed focus while a control has focus', async 
   await page.locator('#pet-button').click();
   await expect(page.locator('#close-panel')).toBeFocused();
   await page.clock.fastForward('25:01');
-  await expect(page.locator('.pet-bond-heading')).toContainText('25 min together');
-  await expect(page.locator('.pet-bond-heading')).toContainText('5');
+  const bond = page.getByRole('meter', { name: 'Bond with Miso' });
+  await expect(bond).toHaveAttribute('aria-valuetext', '1 of 15 hearts');
+  await expect(bond.locator('i').nth(1)).toHaveAttribute('style', '--fill:0.25');
   await page.locator('#session-celebration .start-button').click();
   await page.locator('[data-pet-ritual="cuddle"]').click();
   await page.clock.fastForward('00:12');
   await page.locator('[data-pet-ritual="play"]').click();
-  const bond = page.getByRole('progressbar', { name: 'Bond with Miso' });
-  await expect(bond).toHaveAttribute('aria-valuemin', '8');
-  await expect(bond).toHaveAttribute('aria-valuemax', '24');
-  await expect(bond).toHaveAttribute('aria-valuenow', '8');
-  await expect(bond.locator('i')).toHaveAttribute('style', 'width:0%');
+  await expect(bond).toHaveAttribute('aria-valuetext', '2 of 15 hearts');
+  await expect(bond.locator('i').nth(1)).toHaveAttribute('style', '--fill:1');
+  await expect(bond.locator('i').nth(2)).toHaveAttribute('style', '--fill:0');
 });
 
 test('pet name drafts survive a selection change in another tab without renaming that pet', async ({ page, context }) => {
@@ -120,12 +120,12 @@ test('pet name drafts survive a selection change in another tab without renaming
   await expect(page.locator('.pet-card-identity h2')).toHaveText('Mochi');
   await expect(page.locator('#pet-name')).toHaveValue('Mochi');
   await page.locator('#pet-name').press('Enter');
-  expect((await saved(page)).petBonds.dog.name).toBe('Mochi');
+  await expect.poll(async () => (await saved(page)).petBonds.dog.name).toBe('Mochi');
   await page.locator('#pet-collection > summary').click(); await page.locator('[data-pet-choice="cat"]').click();
   if (await page.locator('#pet-name-form').isHidden()) await page.locator('#pet-edit-name').click();
   await expect(page.locator('#pet-name')).toHaveValue('Maple');
   await page.locator('#pet-name').press('Enter');
-  expect((await saved(page)).petBonds.cat.name).toBe('Maple');
+  await expect.poll(async () => (await saved(page)).petBonds.cat.name).toBe('Maple');
   await other.close();
 });
 
@@ -136,25 +136,26 @@ test('a meal requested at the focus deadline takes precedence over celebration',
     if (!localStorage.getItem('little-hours-v1')) localStorage.setItem('little-hours-v1', JSON.stringify({ house: { coins: 5 } }));
   });
   await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
-  await page.locator('#start-button').click(); await page.locator('#pet-button').click(); await page.locator('#pet-feed').click();
+  await page.locator('#start-button').click(); await expect(page.locator('#start-button')).toHaveText(/Pause/); await page.locator('#pet-button').click(); await page.locator('#pet-feed').click();
   await page.clock.pauseAt(new Date('2026-09-27T12:01:00'));
   await page.clock.setSystemTime(new Date('2026-09-27T12:26:00'));
   await page.locator('#pet-meal-supper').click();
+  await expect.poll(async () => (await saved(page)).petBonds.cat.care.meals).toBe(1);
   const state = await saved(page);
   expect(state.house.coins).toBe(25); expect(state.petBonds.cat.care.meals).toBe(1); expect(state.petBonds.cat.sessions).toBe(1);
   expect(await page.evaluate(() => window.__littleHours.room.diagnostics().pet.care?.kind)).toBe('treat');
   await page.clock.resume();
 });
 
-test('care keeps its room column with a collapsed timer and closes for room view changes', async ({ page }) => {
+test('care opens centred with a collapsed timer and closes for room view changes', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await page.locator('#focus-toggle').click(); await expect(page.locator('body')).toHaveClass(/focus-collapsed/);
   await page.locator('#pet-button').click();
-  const bounds = await page.evaluate(() => ({ room: document.querySelector('#room-section').getBoundingClientRect().right, card: document.querySelector('#room-panel').getBoundingClientRect().left }));
-  expect(bounds.card).toBeGreaterThan(bounds.room);
+  const offset = await page.evaluate(() => { const card = document.querySelector('#room-panel').getBoundingClientRect(); return Math.round(Math.abs(card.left + card.width / 2 - innerWidth / 2) + Math.abs(card.top + card.height / 2 - innerHeight / 2)); });
+  expect(offset).toBeLessThanOrEqual(2);
   await page.locator('.home-wide').click(); await expect(page.locator('#room-panel')).toBeHidden();
-  await page.locator('.home-wide').click(); await page.locator('#pet-button').click(); await page.locator('#mini-button').click();
+  await page.locator('.home-wide').click(); await page.locator('#pet-button').click(); await page.locator('#room-more-toggle').click(); await page.locator('#mini-button').click();
   await expect(page.locator('#room-panel')).toBeHidden(); await expect(page.locator('#stage')).toHaveClass(/is-mini/);
 });
 
