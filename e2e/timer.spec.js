@@ -143,8 +143,10 @@ test('pausing just as another tab finishes the session keeps the celebration ope
   const start = page.locator('#start-button');
   await start.click(); await expect(start).toHaveAccessibleName('Pause a moment');
   const { session } = await saved(page);
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 1000)));
   await page.clock.setSystemTime(new Date(session.endsAt + 1000));
   await page.evaluate(() => { document.getElementById('start-button').click(); dispatchEvent(new StorageEvent('storage', { key: 'little-hours-v1' })); });
+  await page.clock.resume();
   await expect(coins(page)).toHaveText('25');
   await expect(start).toBeEnabled();
   await expect(page.locator('#session-celebration')).toBeVisible();

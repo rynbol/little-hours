@@ -65,7 +65,7 @@ test('the pill runs the session while the sheet stays reachable and follows it',
   await page.clock.fastForward('05:00');
   await expect(toggle(page).locator('time')).toHaveText(/^(19:5\d|20:00)$/);
   await toggle(page).click(); await expect(sheet(page)).toBeVisible();
-  await expect(page.locator('#timer')).toHaveText(await toggle(page).locator('time').textContent());
+  await expect.poll(() => page.evaluate(() => document.getElementById('timer').textContent === document.querySelector('#timer-sheet-toggle time').textContent)).toBe(true);
   await expect(page.locator('#timer')).toHaveAttribute('role', 'timer');
   await expect(page.locator('[data-minutes="50"]')).toBeDisabled();
   await start.click();
