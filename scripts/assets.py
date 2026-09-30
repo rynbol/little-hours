@@ -180,7 +180,7 @@ def gradient(low, high, bottom, top, jitter=.04, seed=0):
 
 LEAVES = {
     'sage': ('#3d6647', '#9cc466'), 'olive': ('#48683a', '#b6cd5c'), 'deep': ('#33593f', '#86b45e'),
-    'blossom': ('#b5798f', '#f8d7da'), 'pine': ('#4d6e58', '#9dbb8a'), 'willow': ('#6a8a5a', '#b4c98e'),
+    'blossom': ('#b5798f', '#f8d7da'), 'pine': ('#2e4d3f', '#7fa468'), 'willow': ('#6a8a5a', '#b4c98e'),
 }
 BARK = ('#5e4535', '#8a6a52')
 
@@ -279,25 +279,31 @@ def blossom_tree(seed, size=1.0):
 
 def pine_tree(seed, size=1.0):
     rng = random.Random(seed)
-    wood = branch([Vector((0, 0, -.05)), Vector((0, 0, .5 * size))], .08 * size, tip=.8)
+    wood = branch([Vector((0, 0, -.05)), Vector((0, 0, 1.9 * size))], .08 * size, tip=.25)
     paint(wood, gradient(*BARK, 0, .5 * size))
-    tiers = []
-    for k in range(4):
-        radius, base = (.62 - k * .13) * size, (.35 + k * .38) * size
-        bpy.ops.mesh.primitive_cone_add(vertices=14, radius1=radius, radius2=0, depth=.72 * size, location=(0, 0, base + .36 * size))
-        cone = bpy.context.object
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-        for v in cone.data.vertices:
-            if v.co.z < base + .05 * size:
-                v.co.z -= .08 * size * (1 + noise.noise(v.co * 4 + Vector((seed + k, 0, 0))))
-                v.co.x *= 1 + .08 * noise.noise(v.co * 5)
-                v.co.y *= 1 + .08 * noise.noise(v.co * 5 + Vector((3, 0, 0)))
-        cone.rotation_euler.z = rng.uniform(0, math.tau)
-        tiers.append(cone)
-    needles = join(tiers, 'needles')
-    apply_all(needles)
-    paint(needles, gradient(*LEAVES['pine'], .2 * size, 2 * size, jitter=.06, seed=seed))
-    radial_normals(needles, Vector((0, 0, .6 * size)), .45)
+    boughs, tiers = [], 5
+    for k in range(tiers):
+        t = k / (tiers - 1)
+        ring, height, count = (.66 - .5 * t) * size, (.42 + 1.5 * t) * size, int(9 - 4 * t)
+        for i in range(count):
+            a = (i + .5 * k) / count * math.tau + rng.uniform(-.15, .15)
+            out = Vector((math.cos(a), math.sin(a), 0))
+            r = (.2 - .08 * t) * size * rng.uniform(.9, 1.1)
+            boughs.append(lobe(out * ring * .7 + Vector((0, 0, height)), Vector((r * 1.5, r * 1.5, r * .6)), seed * 17 + k * 11 + i, 2))
+            boughs.append(lobe(out * ring + Vector((0, 0, height - .12 * size)), Vector((r * 1.1, r * 1.1, r * .45)), seed * 23 + k * 7 + i, 1))
+        boughs.append(lobe(Vector((0, 0, height + .06 * size)), Vector((ring * .55, ring * .55, .18 * size)), seed + k, 2))
+    boughs.append(lobe(Vector((0, 0, 2.05 * size)), Vector((.1, .1, .22)) * size, seed + 9, 2))
+    needles = join(boughs, 'needles')
+    fuse(needles, .05 * size, 1800)
+    low, high = (hex_rgb(c) for c in LEAVES['pine'])
+    sun, top = Vector((-.4, -.5, .77)).normalized(), high.lerp(hex_rgb('#e4eaa0'), .35)
+    def colour(co, vertex):
+        t = max(0, min(1, co.z / (2.1 * size)))
+        facing = vertex.normal.dot(sun)
+        c = low.lerp(high, .25 + .5 * t + .25 * max(0, facing)).lerp(top, smoothstep(.4, .95, facing) * .6)
+        return c * (.95 + .1 * noise.noise(co * 6 + Vector((seed, 0, 0))))
+    paint(needles, colour)
+    radial_normals(needles, Vector((0, 0, 1.1 * size)), .35)
     return [wood, needles]
 
 
@@ -320,14 +326,7 @@ def willow_tree(seed, size=1.0):
 def sapling(seed, size=1.0):
     wood = branch([Vector((0, 0, -.03)), Vector((.02, 0, .3 * size)), Vector((0, .02, .55 * size))], .025 * size, tip=.5, resolution=4)
     paint(wood, gradient('#8a6a52', '#b89a74', 0, .5 * size))
-    leaves = [puff(Vector((0, 0, .6 * size)), Vector((.16, .16, .13)) * size, seed, lump=.12, subdivisions=2)]
-    for k in range(3):
-        a = k / 3 * math.tau
-        leaves.append(puff(Vector((math.cos(a) * .12, math.sin(a) * .12, .5 * size)) * 1, Vector((.11, .11, .08)) * size, seed + k, lump=.12, subdivisions=1))
-    for obj in leaves:
-        paint(obj, gradient('#7fa06a', '#b8cf92', .4 * size, .75 * size))
-    crown = join(leaves, 'crown')
-    radial_normals(crown, Vector((0, 0, .5 * size)), .6)
+    crown = foliage(Vector((0, 0, .58 * size)), Vector((.2, .2, .16)) * size, 4, seed, hex_rgb('#5f8a4f'), hex_rgb('#bcd48e'), .13 * size, 500)
     return [wood, crown]
 
 
@@ -337,17 +336,30 @@ def bush(seed, size=1.0, leaves='olive'):
 
 
 def rock(seed, size=1.0):
-    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1)
+    rng = random.Random(seed)
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=1)
     obj = bpy.context.object
     offset = Vector((seed * 2.3, seed, 0))
+    cuts = []
+    for k in range(9):
+        z = rng.uniform(-.1, .55) if k else .85
+        a = rng.uniform(0, math.tau)
+        n = Vector((math.cos(a) * math.sqrt(1 - z * z), math.sin(a) * math.sqrt(1 - z * z), z))
+        cuts.append((n, rng.uniform(.62, .8)))
     for v in obj.data.vertices:
-        n = v.co.normalized()
-        v.co = Vector((n.x * .6, n.y * .5, n.z * .34 + .12)) * size * (1 + .22 * noise.noise(n * 1.8 + offset))
-    stone, moss = hex_rgb('#8f8483'), hex_rgb('#8ea477')
-    light = hex_rgb('#d2c6b8')
+        p = v.co.normalized() * (1 + .12 * noise.noise(v.co * 1.6 + offset) + .04 * noise.noise(v.co * 5 + offset))
+        for n, depth in cuts:
+            over = p.dot(n) - depth
+            if over > 0:
+                p -= n * over
+        v.co = Vector((p.x * .62, p.y * .52, max(-.05, p.z) * .4 + .1)) * size
+    stone, light, moss, lichen = hex_rgb('#7d7773'), hex_rgb('#cdc3b3'), hex_rgb('#7f9a5c'), hex_rgb('#b9b58a')
     def colour(co, vertex):
-        base = stone.lerp(light, max(0, min(1, co.z / (.45 * size))))
-        return base.lerp(moss, .75) if vertex.normal.z > .75 and co.z > .3 * size else base
+        h = max(0, min(1, co.z / (.5 * size)))
+        grain = .5 + .5 * noise.noise(co * 7 + offset)
+        base = stone.lerp(light, .25 + .55 * h * grain).lerp(lichen, .25 * smoothstep(.55, .8, noise.noise(co * 3 + offset) * .5 + .5))
+        cap = smoothstep(.6, .9, vertex.normal.z) * smoothstep(.15, .3, co.z / size) * smoothstep(-.1, .35, noise.noise(co * 2.6 + offset))
+        return base.lerp(moss, .85 * cap)
     paint(obj, colour)
     return [obj]
 
