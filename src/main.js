@@ -37,7 +37,7 @@ const deviceStorage = pinnedStorage || {
 const store = createSharedStateStore(deviceStorage);
 const audio = createAudio(deviceStorage);
 const listeners = new AbortController();
-let hiddenSince = 0;
+let hiddenSince = 0, updating = 0;
 
 document.querySelector('#app').innerHTML = shellMarkup(audio.prefs);
 $('#task').value = store.state.task;
@@ -46,7 +46,7 @@ const toast = createToast();
 const app = {
   state: store.state, store, audio, room: null, roomReady: false, speech: null, houseUI: null,
   signal: listeners.signal, storageWarningShown: false,
-  feedback: createUIFeedback(document, { signal: listeners.signal }),
+  feedback: createUIFeedback(document, { signal: listeners.signal, saving: () => updating > 0 }),
   toast: toast.show, hideToast: toast.hide, acceptUpdate,
 };
 app.timer = createTimerUI(app);
@@ -91,7 +91,8 @@ function applyState(next, force = false) {
   app.buddy?.sync();
 }
 async function acceptUpdate(update) {
-  const result = await update;
+  updating++;
+  const result = await Promise.resolve(update).finally(() => updating--);
   if (listeners.signal.aborted) return result;
   applyState(store.refresh());
   if (result.completion) {

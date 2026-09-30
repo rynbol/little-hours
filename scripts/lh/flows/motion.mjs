@@ -1,6 +1,8 @@
 const RECORD = `(() => { window.__moves = []; if (window.__recording) return true; window.__recording = true; const animate = Element.prototype.animate; Element.prototype.animate = function (...args) { window.__moves.push(this); return animate.apply(this, args); }; return true; })()`;
 const MOVED = selector => `window.__moves.filter(el => el.isConnected && el.matches(${JSON.stringify(selector)})).length`;
 const CLEAR = `window.__moves.length = 0`;
+const SLOW_SAVES = `(() => { const locks = navigator.locks, request = locks.request.bind(locks); window.__fastSaves = request; window.__slowSaves = 0; locks.request = (name, fn) => { window.__slowSaves++; return request(name, () => new Promise(done => setTimeout(done, 800)).then(fn)).finally(() => window.__slowSaves--); }; return true; })()`;
+const FAST_SAVES = `(() => { navigator.locks.request = window.__fastSaves; return true; })()`;
 
 async function press(app, sleep, selector) {
   await app.js(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({ block: 'center' })`);
@@ -38,8 +40,12 @@ export default {
     check('the new share of a heart pops into the meter', await app.js(MOVED('.pet-hearts i')) > 0);
     check('the care note floats in', await app.js(MOVED('#pet-ritual-status')) === 1, await app.text('#pet-ritual-status'));
     check('a re-render keeps open rows open without replaying them', await app.js(`document.querySelector('#pet-friendship').open`) && await app.js(MOVED('.pet-milestones li')) === 0);
+    await app.js(SLOW_SAVES);
     await press(app, sleep, '#pet-play');
-    check('Play spins the ball', await app.js(MOVED('#pet-play svg')) === 1);
+    await app.waitFor(`window.__slowSaves === 0`, { what: 'the slowed Play save to land' });
+    await sleep(150);
+    await app.js(FAST_SAVES);
+    check('Play spins the ball, even when the save lands late and rebuilds the card', await app.js(MOVED('#pet-play svg')) === 1, await app.js(`[${MOVED('#pet-play svg')}, window.__moves.filter(el => el.matches('#pet-play svg')).length]`));
     await press(app, sleep, '#pet-feed');
     check('Feed hops the bowl and the meals slide in', await app.js(MOVED('#pet-feed svg')) === 1 && await app.js(MOVED('#pet-meals > button')) > 0);
     await press(app, sleep, '#pet-edit-name');

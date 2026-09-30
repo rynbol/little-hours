@@ -19,7 +19,7 @@ const REACTIONS = [
 ];
 const PIP_DIALOGS = '#buddy-album, #buddy-card';
 
-export function createUIFeedback(root, { signal } = {}) {
+export function createUIFeedback(root, { signal, saving = () => false } = {}) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const animations = new Set(), particles = new Set(), keyed = new WeakMap();
   const app = root.querySelector('#app');
@@ -141,7 +141,7 @@ export function createUIFeedback(root, { signal } = {}) {
     const replaced = () => {
       if (!allowed()) return;
       if (!target.isConnected) { const next = usable(locateAgain(element)); if (next) play(next); return; }
-      if (performance.now() < until) requestAnimationFrame(replaced);
+      if (performance.now() < until || saving()) requestAnimationFrame(replaced);
     };
     requestAnimationFrame(replaced);
     if (element.matches('summary') && !element.parentElement.open) opening = element.parentElement;
