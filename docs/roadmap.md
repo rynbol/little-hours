@@ -18,6 +18,49 @@ Make a game good enough to spread on the App Store, on San Francisco tech Twitte
 | Graphics tools | Drawing in JS and adding libraries are both allowed when they help. |
 | Server for sync | **Not decided.** We will discuss it before chunk 3. |
 
+## The revamp
+
+Agreed on September 29, 2026, after a review of every view on main at `fa785c2`. The revamp comes before chunks 3 to 6. It changes how the game looks and feels. It does not change the save format that chunk 2 made final.
+
+### What is wrong now
+
+- **Four art styles.** The room is warm, lamp-lit and detailed. The island is pastel with plain white walls. The garden is pale sage on a flat cream background. The pond is flat-shaded low poly in hard light, and the red-roofed house behind it is not the player's house.
+- **A web app on top of a game.** The room page has a header, four ways to change rooms (My house, Whole house, the Rooms arrows and the picker), a bottom bar and a cream card with Session settings and Your progress. On a phone the room fills about a third of the screen.
+- **Too many small collections.** One finished session pays into coins, the garden, Pip, pet hearts and pet gifts at the same time. Pets also have belongings and friendship. Pip has 20 finds and 6 colours, the pond has a journal and bait. Nothing is *the* reward, and most rewards arrive as a text card.
+- **Two companions with the same job.** Your pet (Miso, the ginger cat, by default; Mochi, Dango, Hoshi and Kiki can be adopted) gives gifts at 25, 75 and 150 study minutes. Pip brings a find after every session. Both reward studying.
+- **The room is the best part, but it does not change while you study.** The room already has fireflies, motes, stars and candles; the avatar works at the desk, waters plants, has tea, reads and rests; the pet wanders and Pip plays. Apart from the Greenhouse plant, minute 1 and minute 89 look the same, and completion arrives as a card. Dusk, day and rain are a player setting, not time.
+
+### Decisions
+
+| Question | Decision |
+| --- | --- |
+| Art style | **One style everywhere: the room's.** Warm local light, soft shapes, consistent ground shadows, detailed furniture. The island, garden and pond follow it. |
+| The pond and garden | The house behind the pond is the player's own house. Long term, the pond and garden are closer views of the same island, not separate worlds. |
+| Rooms or one big house | **Rooms stay, in one continuous house.** Zoomed out, the whole cutaway house is alive on the island. Tap or pinch a room and the camera glides in until it fills the screen, with no fade. The avatar walks through real doorways and stairs. Only the current room draws at full detail. |
+| The room page | **The room is the whole screen.** The timer is a small on-screen pill with the time and Start. A desk candle or clock was rejected because at about 10 px on screen it cannot be read. The room shows time passing as mood (see Focus). Tap your pet or Pip in the room. One button for the house. |
+| Focus | **Time passes in the room.** The window sky moves from dusk to night, the candle burns down, the tea stops steaming, your pet falls asleep. The Greenhouse plant already grows during a session; this extends that idea to every room. A long session looks different from a short one. |
+| The reward | **Pip brings back real things.** Pip already leaves when focus starts and flies back with a find after the completion card. What is new: the find is a piece of furniture for the room, not an album keepsake. The room becomes a record of study time. Coins stay in the background. |
+| Caught fish | **Fish you catch live in an aquarium in your room.** The aquarium shows each fish you have actually caught, using the same fish models as the pond. A new catch swims into the tank. It is another way the room records your time, and it gives fishing a reason beyond the journal. |
+| Completion | **A short scene in the room replaces the card.** Pip's fly-back already exists. The candle goes out, Pip flies in through the window with the find, your pet comes to look. It can be skipped and it honours reduced motion. It is the first shot of the trailer. |
+| Companions | **Your pet stays, Pip explores.** Your pet (Miso by default) keeps you company while you study. Pip goes away and comes back. Pet gifts and belongings stop overlapping with Pip. |
+| Breaks | **Breaks go outside.** Timed 5- and 15-minute breaks already exist, and the garden and pond are open during them. What is new: a reason and a nudge to go outside on a break, and a clear way back to studying. |
+| First session | Nothing exists yet for a first session; the only greeting is a welcome back after 30 minutes away. A new player gets a short 5-minute session, a guaranteed good find and the completion scene. |
+
+### Cut
+
+The Rooms arrows and Whole house, Session settings and Your progress, Pip's colours, the pet's belongings and friendship sections, and the bait economy. The fish journal is under review, because the aquarium may replace it. Cuts must keep old saves loading.
+
+### Order
+
+1. **One art style.** Rebuild the pond in the room's style with the player's own house, then bring the garden and island in line. Each step ends with before and after images for approval.
+2. **The room as the whole screen**, with a small timer pill.
+3. **Time passing during focus.**
+4. **Pip's finds as furniture and the completion scene.** The aquarium of caught fish belongs to this step. The fish models come from PR #11 and the aquarium from the `claude/aquarium-fish` work.
+5. **Companion roles, breaks outside and the first session.**
+6. **One continuous house** with the zoomed-out and zoomed-in views.
+
+Friends see each other's windows lit while studying and dark on a break. That is chunks 3 and 4 below and still waits for the sync server decision.
+
 ## The work, in chunks
 
 Each chunk is one large piece of work. Each one ends with a preview for approval before it goes to main.
@@ -84,3 +127,5 @@ Changed on September 26, 2026: solo first, friends later (chunks 3 and 4). The i
 
 - Which server for sync and accounts. Decide before chunk 3.
 - Group size for study sessions with friends.
+- Whether the one continuous house (revamp step 6) should come before the room changes (steps 2 to 5).
+- Whether the aquarium replaces the fish journal.

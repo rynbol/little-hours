@@ -1,3 +1,8 @@
 export { createHouseUI } from './house-ui.js';
 export { createHouseNavigation } from './house-navigation.js';
 export { gardenPlantArt } from './garden-art.js';
+export { buildClosedHouse } from './house-exterior.js';
+export { gableData } from './house-model.js';
+export { buildGardenTree } from './garden-trees.js';
+export { buildRoseArch } from './garden-retreat.js';
+export { houseFrame } from './house-framing.js';
