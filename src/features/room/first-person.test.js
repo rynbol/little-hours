@@ -36,9 +36,9 @@ test('the seat eye sits just behind and above the avatar head, facing the desk',
   assert.deepEqual(rounded(lookDirection(new Vector3(0, 0, -1), Math.PI / 2, 0)), [-1, 0, 0]);
 });
 
-test('looking around stops at the edges of the room in view', () => {
-  assert.deepEqual(clampLook(3, 3), { yaw: 0.95, pitch: 0.24 });
-  assert.deepEqual(clampLook(-3, -3), { yaw: -1.5, pitch: -0.85 });
+test('looking around turns all the way round but stops at the floor and ceiling', () => {
+  assert.deepEqual(clampLook(7, 3), { yaw: 7, pitch: 0.24 });
+  assert.deepEqual(clampLook(-7, -3), { yaw: -7, pitch: -0.85 });
   assert.deepEqual(clampLook(0.1, -0.1), { yaw: 0.1, pitch: -0.1 });
 });
 
@@ -75,20 +75,20 @@ test('focus flies into the chair, hides the body once inside it, and flies back 
   engine.dispose();
 });
 
-test('dragging while seated turns the head, holds at the limit, and turns straight back', () => {
+test('dragging while seated turns the head a full circle, holds at the ceiling, and turns straight back', () => {
   const { view, listeners, engine } = stage();
   view.enter(true); view.update(0.016, true, 1.6);
   listeners.pointerdown({ pointerId: 1, clientX: 100, clientY: 100 });
-  listeners.pointermove({ pointerId: 1, clientX: 5000, clientY: 100 });
+  listeners.pointermove({ pointerId: 1, clientX: 100 + Math.round(2 * Math.PI / 0.0042), clientY: 5000 });
   view.update(0.016, true, 1.6);
-  assert.deepEqual(view.look, { yaw: 0.95, pitch: -0.2 });
-  listeners.pointermove({ pointerId: 1, clientX: 4900, clientY: 100 });
+  assert.deepEqual({ yaw: round(view.look.yaw, 2), pitch: view.look.pitch }, { yaw: 6.58, pitch: 0.24 });
+  listeners.pointermove({ pointerId: 1, clientX: 100 + Math.round(2 * Math.PI / 0.0042), clientY: 4900 });
   view.update(0.016, true, 1.6);
-  assert.equal(round(view.look.yaw), 0.53);
+  assert.equal(round(view.look.pitch), -0.18);
   listeners.pointerup({ pointerId: 1 });
-  listeners.pointermove({ pointerId: 1, clientX: 0, clientY: 100 });
+  listeners.pointermove({ pointerId: 1, clientX: 0, clientY: 0 });
   view.update(0.016, true, 1.6);
-  assert.equal(round(view.look.yaw), 0.53);
+  assert.equal(round(view.look.pitch), -0.18);
   engine.dispose();
 });
 
