@@ -19,7 +19,7 @@ export default {
     await app.js(RECORD);
     await app.clickSel('#pet-button');
     await app.waitFor(`!document.getElementById('room-panel').hidden`, { what: 'the pet card' });
-    await sleep(400);
+    await app.waitFor(`document.getElementById('room-panel').getAnimations().length === 0`, { what: 'the pet card to finish rising in' });
     const box = await app.js(`(() => { const r = document.querySelector('#room-panel').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2 - innerWidth / 2), y: Math.round(r.top + r.height / 2 - innerHeight / 2) }; })()`);
     check('on a desktop the pet card opens in the middle of the screen', Math.abs(box.x) <= 2 && Math.abs(box.y) <= 2, box);
     check('the pet card rises in as it opens', await app.js(MOVED('#room-panel')) > 0);
