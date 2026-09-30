@@ -532,7 +532,8 @@ export function vistaPalette(theme, progress) {
 
 export const windowsLit = (theme, progress) => theme === 'day' ? 0 : Math.min(1, (VISTA_THEMES[theme] || VISTA_THEMES.dusk).light + progress * 0.7);
 export const spiritsAloft = (theme, progress) => theme === 'day' ? 0 : Math.round(4 + progress * (SPIRITS - 4));
-export const moonRise = progress => 0.14 + progress * 0.36;
+export const MOON_BEARING = 0.08;
+export const moonRise = progress => 0.3 + progress * 0.3;
 
 export function createSeatWorld(scene, parent) {
   const root = new TransformNode('seat-world', scene); root.parent = parent; root.setEnabled(false);
@@ -557,7 +558,7 @@ export function createSeatWorld(scene, parent) {
     flockRoot = new TransformNode('seat-world-flock-flight', scene); flockRoot.parent = root; flockRoot.position.y = FLOCK.y;
     flock = make('flock', buildBirds, unlit, flockRoot);
     moon = make('moon', buildMoon); shooting = make('shooting', buildShootingStar); spirits = make('spirits', buildSpirit);
-    moon.metadata.glow = spirits.metadata.glow = true;
+    spirits.metadata.glow = true;
     spirits.thinInstanceSetBuffer('matrix', spiritMatrices, 16, false); spirits.alwaysSelectAsActiveMesh = true;
   }
   let shell = null, shellKey = '', theme = 'dusk', progress = 0, colorKey = '', seconds = 0;
@@ -574,10 +575,10 @@ export function createSeatWorld(scene, parent) {
     mesh.updateVerticesData('color', colors);
   }
   function placeMoon() {
-    const rise = theme === 'day' ? 0.95 : moonRise(progress), heading = -Math.PI / 2 - 0.55, d = 165;
-    glow.x = Math.cos(heading); glow.z = Math.sin(heading);
+    const rise = theme === 'day' ? 0.95 : moonRise(progress), sun = -Math.PI / 2 - 0.55, heading = theme === 'day' ? sun : MOON_BEARING - Math.PI / 2, d = 165;
+    glow.x = Math.cos(sun); glow.z = Math.sin(sun);
     moon.position.set(Math.cos(heading) * Math.cos(rise) * d, Math.sin(rise) * d, Math.sin(heading) * Math.cos(rise) * d);
-    moon.lookAt(Vector3.Zero()); moon.scaling.setAll(theme === 'day' ? 0.8 : 1.2);
+    moon.lookAt(Vector3.Zero()); moon.scaling.setAll(theme === 'day' ? 0.8 : 1.6);
     moon.setEnabled(theme !== 'rain');
   }
   function recolor() {

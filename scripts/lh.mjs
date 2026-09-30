@@ -38,6 +38,7 @@ Options:
   --scale <n>        device pixel ratio (default 2 for perf, 1 for shots)
   --turn <n>         house shots: press the turn buttons n times first (negative turns left)
   --closed           house shots: close the house first
+  --look <degrees>   focus shots: drag the view round by this many degrees first
   --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
   --still            prefers-reduced-motion: reduce
   --headed           show the browser window
@@ -241,7 +242,11 @@ async function shots() {
       await sleep(800); await app.settle(); await views[name].go(app);
       for (let i = 0; i < Math.abs(Number(options.turn || 0)); i++) { await app.clickSel(Number(options.turn) < 0 ? '#house-turn-left' : '#house-turn-right'); await sleep(60); }
       if (options.closed) await app.clickSel('[data-house-open]');
-      if (options.turn || options.closed) await app.settle();
+      for (let left = Number(options.look || 0) * Math.PI / 180 / 0.0042; Math.abs(left) > 1; left -= Math.sign(left) * Math.min(Math.abs(left), 300)) {
+        const step = Math.sign(left) * Math.min(Math.abs(left), 300), y = viewport.height / 2;
+        await app.drag({ x: viewport.width / 2, y }, { x: viewport.width / 2 + step, y });
+      }
+      if (options.turn || options.closed || options.look) await app.settle();
       await sleep(Number(options.wait || 600));
       const file = await app.shot(join(out, `${name}-${list.length > 1 ? (side === list[0] ? 'this' : String(options.against).replace(/[^\w.-]+/g, '_')) : 'this'}.jpg`));
       console.log(`${side.label} ${name}: ${file}${app.errors.length ? `  page errors: ${app.errors.join(' | ').slice(0, 200)}` : ''}`);

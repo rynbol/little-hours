@@ -113,6 +113,19 @@ test('cumulus bank up in the view from the chair, and the day sun stays out of t
   engine.dispose();
 });
 
+test('the dusk moon rises in open sky beside the tower, clear of the volcano and castle', () => {
+  const { engine, world } = setup();
+  world.setTheme('dusk'); world.setEnabled(true);
+  const moon = world.meshes.find(mesh => mesh.name === 'seat-world-moon'), bearing = () => Math.atan2(moon.position.x, -moon.position.z);
+  for (const progress of [0, 1]) {
+    world.setProgress(progress);
+    assert.ok(Math.abs(bearing() - 0.08) < 0.01, `moon bearing ${bearing().toFixed(2)} at progress ${progress}`);
+  }
+  world.setTheme('day');
+  assert.ok(bearing() < -0.5, 'the day sun keeps its heading over the volcano side');
+  engine.dispose();
+});
+
 test('cloud shadows drift over the ground and the grass by day, soften in rain and stay off at dusk', () => {
   const { engine, world } = setup();
   world.setEnabled(true);
