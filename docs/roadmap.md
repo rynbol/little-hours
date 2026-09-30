@@ -27,8 +27,8 @@ Agreed on September 29, 2026, after a review of every view on main at `fa785c2`.
 - **Four art styles.** The room is warm, lamp-lit and detailed. The island is pastel with plain white walls. The garden is pale sage on a flat cream background. The pond is flat-shaded low poly in hard light, and the red-roofed house behind it is not the player's house.
 - **A web app on top of a game.** The room page has a header, four ways to change rooms (My house, Whole house, the Rooms arrows and the picker), a bottom bar and a cream card with Session settings and Your progress. On a phone the room fills about a third of the screen.
 - **Too many small collections.** One finished session pays into coins, the garden, Pip, pet hearts and pet gifts at the same time. Pets also have belongings and friendship. Pip has 20 finds and 6 colours, the pond has a journal and bait. Nothing is *the* reward, and most rewards arrive as a text card.
-- **Two companions with the same job.** Miso gives gifts and Pip brings finds.
-- **The room is the best part, but nothing happens in it.** Rewards appear in the garden, the pond or a card. Focus shows the same room with a timer pill.
+- **Two companions with the same job.** Your pet (Miso, the ginger cat, by default; Mochi, Dango, Hoshi and Kiki can be adopted) gives gifts at 25, 75 and 150 study minutes. Pip brings a find after every session. Both reward studying.
+- **The room is the best part, but it does not change while you study.** The room already has fireflies, motes, stars and candles; the avatar works at the desk, waters plants, has tea, reads and rests; the pet wanders and Pip plays. Apart from the Greenhouse plant, minute 1 and minute 89 look the same, and completion arrives as a card. Dusk, day and rain are a player setting, not time.
 
 ### Decisions
 
@@ -37,14 +37,14 @@ Agreed on September 29, 2026, after a review of every view on main at `fa785c2`.
 | Art style | **One style everywhere: the room's.** Warm local light, soft shapes, consistent ground shadows, detailed furniture. The island, garden and pond follow it. |
 | The pond and garden | The house behind the pond is the player's own house. Long term, the pond and garden are closer views of the same island, not separate worlds. |
 | Rooms or one big house | **Rooms stay, in one continuous house.** Zoomed out, the whole cutaway house is alive on the island. Tap or pinch a room and the camera glides in until it fills the screen, with no fade. The avatar walks through real doorways and stairs. Only the current room draws at full detail. |
-| The room page | **The room is the whole screen.** The timer is a small on-screen pill with the time and Start. A desk candle or clock was rejected because at about 10 px on screen it cannot be read. The room shows time passing as mood (see Focus). Tap Miso or Pip in the room. One button for the house. |
-| Focus | **Time passes in the room.** The window sky moves from dusk to night, the candle burns down, the tea stops steaming, Miso falls asleep. A long session looks different from a short one. |
-| The reward | **Pip brings back real things.** Pip leaves when a session starts and returns with a find that is a piece of furniture for the room. The room becomes a record of study time. Coins stay in the background. |
+| The room page | **The room is the whole screen.** The timer is a small on-screen pill with the time and Start. A desk candle or clock was rejected because at about 10 px on screen it cannot be read. The room shows time passing as mood (see Focus). Tap your pet or Pip in the room. One button for the house. |
+| Focus | **Time passes in the room.** The window sky moves from dusk to night, the candle burns down, the tea stops steaming, your pet falls asleep. The Greenhouse plant already grows during a session; this extends that idea to every room. A long session looks different from a short one. |
+| The reward | **Pip brings back real things.** Pip already leaves when focus starts and flies back with a find after the completion card. What is new: the find is a piece of furniture for the room, not an album keepsake. The room becomes a record of study time. Coins stay in the background. |
 | Caught fish | **Fish you catch live in an aquarium in your room.** The aquarium shows each fish you have actually caught, using the same fish models as the pond. A new catch swims into the tank. It is another way the room records your time, and it gives fishing a reason beyond the journal. |
-| Completion | **A short scene in the room.** The candle goes out, Pip flies in through the window with the find, Miso comes to look. It can be skipped and it honours reduced motion. It is the first shot of the trailer. |
-| Companions | **Miso stays, Pip explores.** Miso keeps you company while you study. Pip goes away and comes back. Pet gifts and belongings stop overlapping with Pip. |
-| Breaks | **Breaks go outside.** A break is the time to fish, water the garden or walk the island, with a clear way back to studying. |
-| First session | A new player gets a short 5-minute session, a guaranteed good find and the completion scene. |
+| Completion | **A short scene in the room replaces the card.** Pip's fly-back already exists. The candle goes out, Pip flies in through the window with the find, your pet comes to look. It can be skipped and it honours reduced motion. It is the first shot of the trailer. |
+| Companions | **Your pet stays, Pip explores.** Your pet (Miso by default) keeps you company while you study. Pip goes away and comes back. Pet gifts and belongings stop overlapping with Pip. |
+| Breaks | **Breaks go outside.** Timed 5- and 15-minute breaks already exist, and the garden and pond are open during them. What is new: a reason and a nudge to go outside on a break, and a clear way back to studying. |
+| First session | Nothing exists yet for a first session; the only greeting is a welcome back after 30 minutes away. A new player gets a short 5-minute session, a guaranteed good find and the completion scene. |
 
 ### Cut
 
