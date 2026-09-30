@@ -317,25 +317,6 @@ def willow_tree(seed, size=1.0):
     return [wood, canopy, curtain]
 
 
-def cloud(seed, puffs=5):
-    rng = random.Random(seed)
-    spots = [(0, 0, .3, .95), (rng.uniform(-.35, -.15), .1, .75, .55), (rng.uniform(.2, .4), -.1, .65, .5)]
-    for k in range(puffs):
-        side = -1 if k % 2 else 1
-        r = max(.3, .7 - k // 2 * .18) * rng.uniform(.9, 1.1)
-        spots.append((side * (.7 + k // 2 * .5 + rng.uniform(-.08, .08)), rng.uniform(-.2, .2), r * .35, r))
-    parts = [lobe(Vector((x, y, z)), Vector((r, r * .9, r * .9)), seed + i, 3) for i, (x, y, z, r) in enumerate(spots)]
-    body = join(parts, 'cloud')
-    for v in body.data.vertices:
-        if v.co.z < 0:
-            v.co.z *= .12
-    body.data.update()
-    top, under = hex_rgb('#fffdfb'), hex_rgb('#d6cbe2')
-    paint(body, lambda co, vertex: under.lerp(top, max(0, min(1, co.z / .9)) ** .6))
-    body.data.polygons.foreach_set('use_smooth', [True] * len(body.data.polygons))
-    return [body]
-
-
 def sapling(seed, size=1.0):
     wood = branch([Vector((0, 0, -.03)), Vector((.02, 0, .3 * size)), Vector((0, .02, .55 * size))], .025 * size, tip=.5, resolution=4)
     paint(wood, gradient('#8a6a52', '#b89a74', 0, .5 * size))
@@ -518,10 +499,14 @@ def island_cliff():
         depth = max(0, min(1, (-z - .6) / 4.4))
         base = (warm if band % 2 else pale).lerp(cool, depth * .8).lerp(deep, max(0, depth - .55) * 1.4)
         base = base * (.94 + .1 * noise.noise(co * Vector((.8, .8, 3))))
-        if z > -.42:
-            return lawn
-        if z > -.62:
-            return soil.lerp(lawn, max(0, (z + .62) / .2) ** 2)
+        ground = Vector((co.x * 1.3, co.y * 1.3, 0))
+        grass = -.42 - .38 * max(0, noise.noise(ground)) - .12 * max(0, noise.noise(ground * 3.1))
+        earth = grass - .18 - .22 * (.5 + .5 * noise.noise(ground * 1.7 + Vector((5, 0, 0))))
+        if z > grass:
+            return lawn.lerp(moss, min(1, (-.42 - z) / .4) * .7) * (.95 + .08 * noise.noise(co * 4))
+        if z > earth:
+            outcrop = smoothstep(.25, .55, noise.noise(co * Vector((2.2, 2.2, 4))))
+            return soil.lerp(moss * .8, max(0, (z - earth) / (grass - earth)) ** 3 * .6).lerp(pale, outcrop * .7) * (.92 + .1 * noise.noise(co * 6))
         if vertex.normal.z > .45 and depth < .75:
             return base.lerp(moss, min(1, (vertex.normal.z - .45) * 3) * (1 - depth))
         return base
@@ -626,8 +611,6 @@ BUILDS = {
     'island-cliff': lambda: island_cliff(),
     'islet-a': lambda: islet(1),
     'islet-b': lambda: islet(6, .8),
-    'cloud-a': lambda: cloud(2),
-    'cloud-b': lambda: cloud(7, 3),
 }
 
 FLAT = {'rock-a', 'rock-b'}
@@ -639,7 +622,7 @@ if __name__ == '__main__':
     for name in names:
         reset()
         objects = BUILDS[name]()
-        bake_occlusion(objects, .45 if name.startswith('tree') or name in ('bush', 'sapling') else .2 if name.startswith('cloud') else .4 if name == 'island-cliff' else .3 if name.startswith('islet') else .75)
+        bake_occlusion(objects, .45 if name.startswith('tree') or name in ('bush', 'sapling') else .4 if name == 'island-cliff' else .3 if name.startswith('islet') else .75)
         export(objects, name, flat=name in FLAT)
         if shot:
             preview(os.path.join(shot, name + '.png'), -.2 if 'cliff' in name else .42)

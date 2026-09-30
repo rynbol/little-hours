@@ -3,7 +3,7 @@ import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Vector2, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
-import { onIsland, STREAMS } from './house-island.js';
+import { edgePoint, onIsland, ISLAND, STREAMS } from './house-island.js';
 import { inPond, DOCK } from './house-pond.js';
 import { pathDistance, PATH_WIDTH } from './house-paths.js';
 import { PLANT_SPOTS } from './garden-model.js';
@@ -37,11 +37,25 @@ export function grassBlades() {
   return blades;
 }
 
+export const RIM_BLADES = 1800;
+export function rimBlades() {
+  const blades = [], { cx, cz } = ISLAND;
+  for (let i = 0; i < RIM_BLADES; i++) {
+    const a = (i + hash(i * 2.7) * .8) / RIM_BLADES * Math.PI * 2, [rx, rz] = edgePoint(a), dx = rx - cx, dz = rz - cz, l = Math.hypot(dx, dz);
+    const inset = .015 + hash(i * 4.3) * .06, ex = rx - dx / l * inset, ez = rz - dz / l * inset;
+    if (STREAMS.some(course => Math.hypot(ex - course.at(-1)[0], ez - course.at(-1)[1]) < .5)) continue;
+    const [nx, nz] = edgePoint(a + .01), height = .14 + hash(i * 6.1) * .2;
+    blades.push({ x: ex, z: ez, height, lean: Math.atan2(nz - ez, nx - ex), tone: hash(i * 7.9), patch: .2 + hash(i * 1.1) * .5, drop: [dx / l * height * .7, -height * (.55 + hash(i * 3.9) * .5), dz / l * height * .7] });
+  }
+  return blades;
+}
+
 function bladeGeometry(blades) {
   const positions = new Float32Array(blades.length * 9), uvs = new Float32Array(blades.length * 6), colors = new Float32Array(blades.length * 12);
-  blades.forEach(({ x, z, height, lean, tone, patch }, i) => {
+  blades.forEach(({ x, z, height, lean, tone, patch, drop }, i) => {
     const w = GRASS.width * (.7 + tone * .6), cx = Math.cos(lean) * w, cz = Math.sin(lean) * w, tip = .06 * height;
-    positions.set([x - cx, GROUND, z - cz, x + cx, GROUND, z + cz, x + Math.cos(lean + 1.4) * tip, GROUND + height, z + Math.sin(lean + 1.4) * tip], i * 9);
+    const top = drop ? [x + drop[0], GROUND + drop[1], z + drop[2]] : [x + Math.cos(lean + 1.4) * tip, GROUND + height, z + Math.sin(lean + 1.4) * tip];
+    positions.set([x - cx, GROUND, z - cz, x + cx, GROUND, z + cz, ...top], i * 9);
     uvs.set([tone * 6.28, 0, tone * 6.28, 0, tone * 6.28, 1], i * 6);
     const warm = .5 + patch * .35 + (tone - .5) * .3;
     for (let k = 0; k < 3; k++) colors.set([warm, tone, height, 1], i * 12 + k * 4);
@@ -85,7 +99,7 @@ export const GRASS_TONES = Object.freeze({
 });
 
 export function createIslandGrass(scene, theme = 'day') {
-  const blades = grassBlades();
+  const blades = [...grassBlades(), ...rimBlades()];
   const mesh = new Mesh('island-grass', scene); bladeGeometry(blades).applyToMesh(mesh);
   const material = new ShaderMaterial('island-grass-paint', scene, { vertexSource: VERTEX, fragmentSource: FRAGMENT }, {
     attributes: ['position', 'uv', 'color'], uniforms: ['viewProjection', 'time', 'eye', 'root', 'blade', 'sunlit', 'haze', 'light', 'depth'],

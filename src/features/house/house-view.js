@@ -5,6 +5,8 @@ import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
+import { Constants } from '@babylonjs/core/Engines/constants.js';
+import { FresnelParameters } from '@babylonjs/core/Materials/fresnelParameters.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js';
 import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstrumentation.js';
@@ -75,7 +77,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const motePaint = new StandardMaterial('cottage-firefly-light', scene); motePaint.disableLighting = true; motePaint.emissiveColor = Color3.FromHexString('#efd6a5'); motes.material = motePaint; motes.isPickable = false;
   // A few soft puffs of chimney smoke, one draw call, animated with the motes.
   const smoke = MeshBuilder.CreateSphere('cottage-smoke', { diameter: .5, segments: 8 }, scene);
-  const smokePaint = new StandardMaterial('cottage-smoke-paint', scene); smokePaint.disableLighting = true; smokePaint.emissiveColor = Color3.FromHexString('#f3ebe2'); smokePaint.alpha = .3; smoke.material = smokePaint; smoke.isPickable = false;
+  const smokePaint = new StandardMaterial('cottage-smoke-paint', scene); smokePaint.disableLighting = true; smokePaint.emissiveColor = Color3.FromHexString('#f3ebe2'); smokePaint.alpha = .42; smokePaint.opacityFresnelParameters = new FresnelParameters({ leftColor: Color3.Black(), rightColor: Color3.White(), power: 1.4, bias: 0 }); smokePaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; smoke.material = smokePaint; smoke.isPickable = false;
   const smokeMatrices = new Float32Array(5 * 16), smokeAt = new Vector3(), smokeLocal = new Vector3();
   smoke.thinInstanceSetBuffer('matrix', smokeMatrices, 16, false); smoke.alwaysSelectAsActiveMesh = true;
   const water = createIslandWater(scene, theme);
@@ -125,7 +127,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const seconds = motion.matches ? 0 : now / 1000;
     const wasReacting = roomMotion.activeCount > 0;
     roomMotion.restore();
-    model.animate(seconds, focused, motion.matches); water.animate(seconds); grass.animate(seconds, camera.position); butterflies.animate(seconds, selectedId === 'orchard' && !motion.matches);
+    model.animate(seconds, focused, motion.matches); water.animate(seconds, camera); grass.animate(seconds, camera.position); butterflies.animate(seconds, selectedId === 'orchard' && !motion.matches);
     for (const root of model.live) root.metadata.avatar?.setEnabled(focused);
     stroll.setVisible(!focused || selectedId === 'orchard');
     if (!focused || selectedId === 'orchard') stroll.animate(seconds, motion.matches, selectedId === 'orchard' ? focused ? 'garden-rest' : 'garden' : 'island');

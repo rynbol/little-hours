@@ -90,10 +90,6 @@ export function buildIsland(api) {
       asset('bush', { x: x - .55, y: TOP, z: z - .45, yaw: s, scale: .5 });
     }
   });
-  for (const { points } of waterfalls()) {
-    const [fx, fy, fz] = points.at(-1);
-    asset('cloud-b', { x: fx, y: fy - .1, z: fz, yaw: .45 + hash(fx) * .6, scale: .6 });
-  }
 
   buildPaths(api);
 

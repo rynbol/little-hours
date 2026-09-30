@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { grassBlades, grassy } from './house-grass.js';
+import { grassBlades, grassy, rimBlades, RIM_BLADES } from './house-grass.js';
 import { HOUSE_POSITIONS } from './house-model.js';
 import { inPond, POND } from './house-pond.js';
 import { pathDistance, PATH_WIDTH, PATHS } from './house-paths.js';
-import { onIsland } from './house-island.js';
+import { onIsland, STREAMS } from './house-island.js';
 
 test('the meadow is dense but stays inside one draw budget', () => {
   const count = grassBlades().length;
@@ -26,4 +26,15 @@ test('the lawn beside the house is grassy and the pond and path are not', () => 
   assert.equal(grassy(POND.x, POND.z), false);
   assert.equal(grassy(...PATHS[0][2]), false);
   assert.equal(grassy(0, 0), false);
+});
+
+test('a fringe of grass hangs over the island edge, clear of the waterfalls', () => {
+  const fringe = rimBlades();
+  assert.ok(fringe.length > RIM_BLADES * .9, `only ${fringe.length} fringe blades`);
+  for (const { x, z, drop } of fringe) {
+    assert.ok(onIsland(x, z) && !onIsland(x, z, .1), `${x}, ${z} is not at the edge`);
+    assert.ok(drop[1] < 0, 'fringe blades hang down');
+    assert.ok(!onIsland(x + drop[0], z + drop[2]), 'fringe tips reach past the edge');
+    for (const course of STREAMS) assert.ok(Math.hypot(x - course.at(-1)[0], z - course.at(-1)[1]) >= .5, 'no grass over a waterfall');
+  }
 });
