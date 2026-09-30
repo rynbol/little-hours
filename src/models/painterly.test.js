@@ -31,11 +31,12 @@ test('in the room, ambient light alone reads as shade and window sun reads as li
   }
 });
 
-test('room furniture darkens where it meets the floor, and the island is left unshaded', () => {
+test('room furniture darkens where it meets the floor, walls are mottled, and the island is left alone', () => {
   for (const theme of ['day', 'dusk', 'rain']) {
-    const [strength, height] = PAINTERLY_LOOKS[`room-${theme}`].ground;
+    const [strength, height, mottle] = PAINTERLY_LOOKS[`room-${theme}`].ground;
+    assert.ok(mottle > 0.1 && mottle < 0.5, `room-${theme} plaster is gently mottled`);
     assert.ok(strength > 0.3 && strength < 0.8, `room-${theme} contact shade is visible but not black`);
     assert.ok(height >= 1, `room-${theme} contact shade reaches up a sofa side`);
-    assert.equal(PAINTERLY_LOOKS[theme].ground[0], 0, `${theme} island below y=0 stays unshaded`);
+    assert.deepEqual(PAINTERLY_LOOKS[theme].ground, [0, 1, 0], `${theme} island stays unshaded and unmottled`);
   }
 });
