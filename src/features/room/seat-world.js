@@ -95,8 +95,17 @@ function terrainHeight(x, z) {
   const basin = 15 * smooth(24, 112, r);
   const rolling = (Math.sin(x * 0.07) * Math.cos(z * 0.06) * 1.6 + Math.sin(x * 0.029 + 1) * Math.cos(z * 0.034 + 2) * 3.2) * smooth(26, 45, r);
   const mound = 6 * (1 - smooth(9, 26, Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1])));
-  const ranges = smooth(108, 150, r) * (26 + Math.sin(a * 7) * 9 + Math.sin(a * 17 + 1) * 5 + Math.max(0, Math.sin(a * 3 + 0.4)) * 16);
+  const crest = (k, phase, power) => (1 - Math.abs(Math.sin(a * k + phase))) ** power;
+  const ranges = smooth(108, 150, r) * (20 + crest(5, 0.3, 1.4) * 18 + crest(13, 2, 2) * 9 + crest(29, 1, 2.5) * 3 + Math.max(0, Math.sin(a * 3 + 0.4)) * 16);
   return cliff + basin + rolling + mound + ranges;
+}
+
+export const SNOW_LINE = 47;
+const SUN_TOWARD = [-0.3, 0.81, -0.49];
+function sunFacing(x, z) {
+  const step = 1.5, dx = (terrainHeight(x + step, z) - terrainHeight(x - step, z)) / (2 * step), dz = (terrainHeight(x, z + step) - terrainHeight(x, z - step)) / (2 * step);
+  const length = Math.hypot(dx, 1, dz), lit = (-dx * SUN_TOWARD[0] + SUN_TOWARD[1] - dz * SUN_TOWARD[2]) / length;
+  return 0.62 + Math.max(0, lit) * 0.55;
 }
 
 const riverAt = t => { const a = -Math.PI * 1.05 + t * Math.PI * 1.1; const r = 58 + Math.sin(t * 9) * 7; return [Math.cos(a) * r, Math.sin(a) * r]; };
@@ -129,11 +138,13 @@ function buildSky(shape) {
 }
 
 function buildLand(shape) {
-  const rings = [0, 6, 8.5, 10, 12, 14, 16.5, 19, 22, 26, 31, 36, 42, 50, 60, 72, 86, 100, 112, 124, 136, 148, 160, 172], segments = 120, start = shape.roles.length;
+  const rings = [0, 6, 8.5, 10, 12, 14, 16.5, 19, 22, 26, 31, 36, 42, 50, 60, 72, 86, 100, 112, 124, 136, 142, 148, 154, 160, 166, 172], segments = 240, start = shape.roles.length;
   for (const r of rings) for (let s = 0; s < segments; s++) {
     const a = s / segments * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r, y = terrainHeight(x, z) - 0.06;
-    const role = r < 9 ? 'meadow' : r < 22 ? (y > -2 ? 'grass' : 'cliff') : r < 104 ? ((s + rings.indexOf(r)) % 3 ? 'valley' : 'field') : r < 136 ? 'mid' : 'far';
-    shape.vertex(x, y, z, role, 0.86 + ((s * 7 + r) % 5) * 0.04);
+    const snowy = r > 104 && y > SNOW_LINE;
+    const role = r < 9 ? 'meadow' : r < 22 ? (y > -2 ? 'grass' : 'cliff') : r < 104 ? ((s + rings.indexOf(r)) % 3 ? 'valley' : 'field') : snowy ? 'snow' : r < 136 ? 'mid' : 'far';
+    const id = shape.vertex(x, y, z, role, r > 104 ? sunFacing(x, z) : 0.86 + ((s * 7 + r) % 5) * 0.04);
+    if (r > 104) shape.fogs[id] *= snowy ? 0.5 : 0.78;
   }
   for (let ring = 0; ring < rings.length - 1; ring++) for (let s = 0; s < segments; s++) {
     const a = start + ring * segments + s, b = start + ring * segments + (s + 1) % segments;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, VISTA_THEMES } from './seat-world.js';
+import { createSeatWorld, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, VISTA_THEMES } from './seat-world.js';
 
 const setup = () => { const engine = new NullEngine(), scene = new Scene(engine); return { engine, scene, world: createSeatWorld(scene, new TransformNode('room', scene)) }; };
 const litWindows = world => {
@@ -123,5 +123,22 @@ test('cloud shadows drift over the ground and the grass by day, soften in rain a
   }
   world.animate(4, false);
   assert.ok(paints.every(paint => paint._floats.time > 0));
+  engine.dispose();
+});
+
+test('the far ranges in view wear snow above the snow line and turn sunlit and shaded flanks', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true); world.setTheme('day');
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
+  const snow = [], flanks = [];
+  for (let i = 0; i < shape.roles.length; i++) {
+    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2];
+    if (Math.hypot(x, z) < 104 || Math.abs(Math.atan2(x, -z) + 0.3) > 0.8) continue;
+    if (shape.roles[i] === 'snow') snow.push(y);
+    if (shape.roles[i] === 'far') flanks.push(shape.shades[i]);
+  }
+  assert.ok(snow.length > 40, `${snow.length} snow vertices in view`);
+  assert.ok(snow.every(y => y > SNOW_LINE));
+  assert.ok(Math.max(...flanks) - Math.min(...flanks) > 0.3, 'flanks differ in light');
   engine.dispose();
 });
