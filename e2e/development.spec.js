@@ -7,8 +7,9 @@ const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('littl
 test('development bait preserves the starter and never ships in production', async ({ page }, testInfo) => {
   await page.goto('/'); await ready(page);
   await page.locator('#focus-options > summary').click(); await page.locator('#task').fill('A quiet afternoon');
-  const state = await saved(page), production = Boolean(testInfo.project.metadata.production);
-  expect(state.pond.bait).toHaveLength(production ? 1 : 15);
+  const production = Boolean(testInfo.project.metadata.production);
+  await expect.poll(async () => (await saved(page))?.pond.bait.length).toBe(production ? 1 : 15);
+  const state = await saved(page);
   expect(state.pond.bait[0]).toEqual({ minutes: 10, at: 0 });
   if (!production) for (const range of BAIT_RANGES) expect(state.pond.bait.filter(bait => baitRange(bait.minutes).id === range.id)).toHaveLength(3);
   expect(state.house.coins).toBe(0);
