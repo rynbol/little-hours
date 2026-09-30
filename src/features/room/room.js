@@ -43,6 +43,7 @@ import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
 import { ROOM_LIGHTS } from './room-lighting.js';
+import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -165,6 +166,7 @@ export function createRoom(container, options = {}) {
   // filtered samples from shadowing the floor itself. Hardware PCF gives
   // smooth edges instead of Poisson grain; Babylon falls back to Poisson
   // sampling on WebGL1.
+  const sunbeam = createSunbeam(scene);
   const shadow = new ShadowGenerator(2048, sun); shadow.usePercentageCloserFiltering = true; shadow.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
   shadow.bias = 0.002; shadow.normalBias = 0.02; shadow.darkness = 0.24;
   shadow.getShadowMap().refreshRate = 0;
@@ -754,7 +756,7 @@ export function createRoom(container, options = {}) {
       for (const object of placedObjects.values()) object.dispose(false, false);
       placedObjects.clear(); settlingPieces.clear();
       if (nextStyle !== 'retreat') architecture = createArchitecture(nextStyle, scene);
-      classicArchitecture.setEnabled(nextStyle === 'retreat');
+      classicArchitecture.setEnabled(nextStyle === 'retreat'); aimSunbeam();
       decor.plants.setEnabled(nextStyle === 'retreat' && decorVisible.plants);
       decor.lights.setEnabled(nextStyle === 'retreat');
       moths.setEnabled(nextStyle !== 'metro');
@@ -1101,6 +1103,11 @@ export function createRoom(container, options = {}) {
     bulb.emissiveColor = decorVisible.lights ? glow : Color3.Black(); candleFlame.emissiveColor = glow; moteGlow.emissiveColor = glow.clone();
     for (const mesh of sillFlames) mesh.setEnabled(decorVisible.lights);
   }
+  function aimSunbeam() {
+    const light = ROOM_LIGHTS[theme], window = architecture?.window;
+    sunbeam.shine(window ? { ...window, z: -4.6, arch: window.radius ? { y: window.y, radius: window.radius } : null } : CLASSIC_WINDOW, sun.direction.asArray(), architecture?.floorTop ?? 0);
+    sunbeam.setLight(light.sunColor, light.beam);
+  }
   function setTheme(name) {
     if (savedAvatarEffects) restoreAvatarEffects();
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
@@ -1112,7 +1119,7 @@ export function createRoom(container, options = {}) {
     sun.diffuse = color(light.sunColor); sun.intensity = light.sun;
     sun.position.set(...light.position); sun.direction.set(...light.direction).normalize();
     hemisphere.diffuse = color(light.sky); hemisphere.groundColor = color(light.ground); hemisphere.intensity = light.ambient;
-    painterly.setTheme(`room-${theme}`);
+    painterly.setTheme(`room-${theme}`); aimSunbeam();
     windowGlow.intensity = daylight ? 0.22 : night ? 1.25 : 0.65;
     applyBulbs(); applyAccents();
     bloom.intensity = daylight ? 0.18 : night ? 0.40 : 0.26;
@@ -1684,6 +1691,7 @@ export function createRoom(container, options = {}) {
   syncFurniture(); setTheme(theme); resize();
   function animate(now) {
     const seconds = now / 1000;
+    sunbeam.animate(reducedMotion ? 0 : seconds);
     const companionDelta = companionTime ? Math.max(0, Math.min(.1, (now - companionTime) / 1000)) : 0;
     companionTime = now;
     animateAvatarCamera(companionDelta);
