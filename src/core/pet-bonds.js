@@ -27,6 +27,9 @@ export function bondLevel(bond) {
   const level = BOND_LEVELS[index], next = BOND_LEVELS[index + 1];
   return { ...level, index, next, progress: next ? (points - level.at) / (next.at - level.at) : 1, points };
 }
+export const HEART_POINTS = 4;
+export const MAX_HEARTS = BOND_LEVELS.at(-1).at / HEART_POINTS;
+export const bondHearts = bond => Math.min(MAX_HEARTS, count(bond?.affection) / HEART_POINTS);
 export function newPetBond(id) {
   return { name: petEntry(id)?.name || 'Miso', affection: 0, minutes: 0, sessions: 0, ribbon: 0, gift: null, ritualDay: '', rituals: [], memories: [], care: normalizePetCare(null) };
 }

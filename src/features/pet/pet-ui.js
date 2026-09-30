@@ -22,7 +22,7 @@ export function createPetUI(app) {
       }
       if (app.panels.current !== 'pet') app.panels.open('pet');
     }
-    if (by === 'companion') app.speech?.say('pet', (PET_LINES[species] || PET_LINES.cat).friend);
+    if (by === 'companion' || by === 'buddy') app.speech?.say('pet', (PET_LINES[species] || PET_LINES.cat).friend);
   }
   function renderName() {
     app.roomUI.renderLabel();

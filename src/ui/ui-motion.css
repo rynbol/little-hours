@@ -46,18 +46,18 @@
     transition: opacity .18s ease, translate .2s ease, display .2s allow-discrete, overlay .2s allow-discrete;
   }
   :is(#room-more, #lake-tackle, #house-room-menu):popover-open { opacity: 1; translate: 0 0; }
-  :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card) {
+  :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card, #buddy-album, #buddy-card) {
     opacity: 0; translate: 0 8px;
     transition: opacity .18s ease, translate .2s ease, display .2s allow-discrete, overlay .2s allow-discrete;
   }
-  :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card)[open] { opacity: 1; translate: 0 0; }
+  :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card, #buddy-album, #buddy-card)[open] { opacity: 1; translate: 0 0; }
   #lake-journal { translate: none; }
-  :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card)::backdrop { opacity: 0; transition: opacity .2s ease, display .2s allow-discrete, overlay .2s allow-discrete; }
-  :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card)[open]::backdrop { opacity: 1; }
+  :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card, #buddy-album, #buddy-card)::backdrop { opacity: 0; transition: opacity .2s ease, display .2s allow-discrete, overlay .2s allow-discrete; }
+  :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card, #buddy-album, #buddy-card)[open]::backdrop { opacity: 1; }
   @starting-style {
     :is(#room-more, #lake-tackle, #house-room-menu):popover-open { opacity: 0; translate: 0 6px; }
-    :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card)[open] { opacity: 0; translate: 0 8px; }
+    :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card, #buddy-album, #buddy-card)[open] { opacity: 0; translate: 0 8px; }
     #lake-journal[open] { translate: none; }
-    :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card)[open]::backdrop { opacity: 0; }
+    :is(#garden-collection-dialog, #house-postcard-dialog, #lake-journal, #lake-card, #buddy-album, #buddy-card)[open]::backdrop { opacity: 0; }
   }
 }

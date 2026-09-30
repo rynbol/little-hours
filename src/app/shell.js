@@ -37,6 +37,7 @@ export const shellMarkup = (audioPrefs) => `
           <nav class="room-tools" aria-label="Room controls">
             <button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Ambience</span></button>
             <button class="tool" id="pet-button" data-panel="pet" aria-expanded="false" aria-controls="room-panel">${icon('cat')}<span id="pet-button-label">Miso</span></button>
+            <button class="tool" id="buddy-tool" aria-haspopup="dialog">${icon('leaf')}<span id="buddy-tool-label">Pip</span></button>
             <button class="tool" id="room-more-toggle" popovertarget="room-more" aria-label="More room controls"><span aria-hidden="true">···</span><span>More</span></button>
             <div id="room-more" popover><button class="tool" id="reset-view" aria-label="Reset room view">${icon('reset')}<span>Reset view</span></button><button class="tool" id="avatar-button" data-panel="avatar" aria-expanded="false" aria-controls="room-panel">${icon('avatar')}<span>Avatar</span></button>
             <button class="tool" id="mini-button" aria-pressed="false">${icon('mini')}<span>Mini view</span></button>

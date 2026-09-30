@@ -35,8 +35,12 @@ export default {
     check('tapping the cat floats two hearts up one after another', oneByOne(tap.counts), tap.counts);
     check('petting shows no words', tap.said === null, tap.said);
     check('a room cuddle grows the saved bond once', await app.js('window.__littleHours.state.petBonds.cat.affection === 2'));
-    const again = await petAgain(app, sleep, await app.point('pet'), 4, t.slow);
-    check('four more taps stack a heart each', again.hearts >= 5, again);
+    check('on a desktop the tap opens the pet card in the middle of the screen', await app.js(`(() => { const panel = document.getElementById('room-panel'), r = panel.getBoundingClientRect(); return !panel.hidden && Math.abs(r.left + r.width / 2 - innerWidth / 2) < 3; })()`));
+    const phone = await t.open({ seed: 'three-rooms', width: 390, height: 844, scale: 2, label: 'phone taps' });
+    await phone.settle();
+    await tapPet(phone, sleep, t.slow);
+    const again = await petAgain(phone, sleep, await phone.point('pet'), 4, t.slow);
+    check('on a phone, where the card sits below the room, four more taps stack a heart each', again.hearts >= 5, again);
     check('more taps hold the lean instead of starting it over', again.ages.every(age => age >= .3 && age < 2.6), again.ages);
     await t.shot(app, 'cat-hearts');
     if (await app.js(`document.getElementById('room-panel').hidden`)) await app.clickSel('#pet-button');
