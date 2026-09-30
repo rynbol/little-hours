@@ -273,7 +273,7 @@ export function createFishingUI(app, { onClose } = {}) {
     returnFocus = document.activeElement;
     phase = 'idle'; caught = null; chosen = null;
     root.hidden = false; document.body.classList.add('is-lake'); document.getElementById('app').inert = true;
-    building = requestAnimationFrame(() => { building = setTimeout(() => { building = 0; if (!root.hidden) scene = createLakeScene(root.querySelector('.lake-stage'), { theme: app.state.theme, avatar: app.state.avatar, pet: app.state.pet, reducedMotion: reduced() }); }); });
+    building = requestAnimationFrame(() => { building = setTimeout(() => { building = 0; if (!root.hidden) scene = createLakeScene(root.querySelector('.lake-stage'), { theme: app.state.theme, avatar: app.state.avatar, pet: app.state.pet, house: app.state.house, reducedMotion: reduced() }); }); });
     root.dataset.theme = app.state.theme;
     status(''); $('#lake-chances').open = false; renderTray();
     $('#lake-card').close(); $('#lake-journal').close(); $('#lake-bite').hidden = true;

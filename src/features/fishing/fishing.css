@@ -1,4 +1,4 @@
-.lake { --lake-paper: #fbf5ea; --lake-paper-deep: #f1e6d4; --lake-ink: #4b3b40; --lake-soft: #85716f; --lake-edge: #e4d5c1; --lake-sage: #5f7456; --lake-shadow: 0 10px 30px rgba(52, 34, 38, .2), 0 2px 0 rgba(255, 255, 255, .7) inset; position: fixed; inset: 0; z-index: 60; overflow: hidden; color: var(--lake-ink); background: #2a2440; font-family: 'DM Sans', sans-serif; }
+.lake { --lake-paper: #fbf5ea; --lake-paper-deep: #f1e6d4; --lake-ink: #4b3b40; --lake-soft: #85716f; --lake-edge: #e4d5c1; --lake-sage: #5f7456; --lake-shadow: 0 10px 30px rgba(52, 34, 38, .2), 0 2px 0 rgba(255, 255, 255, .7) inset; position: fixed; inset: 0; z-index: 60; overflow: hidden; color: var(--lake-ink); background: radial-gradient(ellipse at 18% 28%, var(--world-glow), transparent 55%), linear-gradient(170deg, var(--world-top), var(--world-bottom)); font-family: 'DM Sans', sans-serif; }
 body.is-lake { overflow: hidden; }
 .lake[hidden], .lake [hidden] { display: none !important; }
 .lake-canvas { animation: lake-fade .5s ease both; }
