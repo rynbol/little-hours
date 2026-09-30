@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, sunRayShape } from './seat-world.js';
+import { createSeatWorld, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape } from './seat-world.js';
 
 const setup = () => { const engine = new NullEngine(), scene = new Scene(engine); return { engine, scene, world: createSeatWorld(scene, new TransformNode('room', scene)) }; };
 const litWindows = world => {
@@ -176,11 +176,10 @@ test('sunbeams fan down from the sun over the valley by day, dim in rain and van
   assert.ok(rays.every(([bottom, top]) => gap(top, SUN_POINT) < gap(bottom, SUN_POINT) && top[1] > bottom[1] + 30));
   const { engine, world } = setup();
   world.setEnabled(true);
-  const rayMesh = world.meshes.find(mesh => mesh.name === 'seat-world-rays');
+  const rayMesh = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects');
   for (const [theme, strength] of [['day', 1], ['rain', 0.35], ['dusk', 0]]) {
     world.setTheme(theme);
-    assert.equal(rayMesh.material._floats.strength, strength);
-    assert.equal(rayMesh.isEnabled(false), strength > 0);
+    assert.equal(rayMesh.material._floats.rays, strength);
   }
   world.setTheme('day'); world.animate(5, true);
   assert.equal(rayMesh.material._floats.time, 0);
@@ -205,5 +204,19 @@ test('the castle keep rises into a tall sanctum spire above its curtain wall', (
   const heights = role => shape.roles.flatMap((r, i) => r === role ? [shape.positions[i * 3 + 1]] : []);
   const stone = heights('castle'), roofs = heights('castleRoof');
   assert.ok(Math.max(...roofs) - Math.min(...stone) > 27);
+  engine.dispose();
+});
+
+test('smoke leaves the volcano crater, widens downwind and glows with ember light after dark', () => {
+  const { positions } = plumeShape(), at = k => positions.slice(k * 6, k * 6 + 6), last = positions.length / 6 - 1;
+  const width = k => Math.hypot(at(k)[0] - at(k)[3], at(k)[2] - at(k)[5]), middle = k => (at(k)[0] + at(k)[3]) / 2;
+  assert.ok(Math.abs(middle(0) + 82) < 1 && Math.abs(at(0)[1] - 43) < 0.5, 'starts at the crater');
+  assert.ok(middle(last) > middle(0) + 20 && width(last) > width(0) * 2);
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const paint = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects').material;
+  world.setTheme('day'); const day = paint._floats.glow;
+  world.setTheme('dusk'); assert.ok(paint._floats.glow > day);
+  world.animate(3, true); assert.equal(paint._floats.time, 0);
   engine.dispose();
 });
