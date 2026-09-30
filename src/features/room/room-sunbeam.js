@@ -46,14 +46,16 @@ export function createSunbeam(scene) {
   paint.backFaceCulling = false; paint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; paint.disableDepthWrite = true;
   paint.setFloat('time', 0); paint.setFloat('strength', 0); paint.setColor3('tint', Color3.White());
   mesh.material = paint; mesh.isPickable = false; mesh.metadata = { castShadow: false }; mesh.alwaysSelectAsActiveMesh = true;
+  let strength = 0, presence = 1;
+  const show = () => { paint.setFloat('strength', strength * presence); mesh.setEnabled(strength * presence > 0); };
   return {
     mesh,
     shine(window, direction, floor) {
       const { positions, uvs, uv2s, indices } = sunbeamShape(window, direction, floor), data = new VertexData();
       Object.assign(data, { positions, uvs, uvs2: uv2s, indices }); data.applyToMesh(mesh, true);
     },
-    setLight(hex, strength) { paint.setColor3('tint', Color3.FromHexString(hex)); paint.setFloat('strength', strength); mesh.setEnabled(strength > 0); },
-    animate(seconds) { paint.setFloat('time', seconds); },
+    setLight(hex, next) { paint.setColor3('tint', Color3.FromHexString(hex)); strength = next; show(); },
+    animate(seconds, visible = 1) { paint.setFloat('time', seconds); if (visible !== presence) { presence = visible; show(); } },
     dispose() { paint.dispose(); mesh.dispose(); },
   };
 }

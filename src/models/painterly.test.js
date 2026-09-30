@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PAINTERLY_LOOKS } from './painterly.js';
+import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
+import { Scene } from '@babylonjs/core/scene.js';
+import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
+import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
+import '@babylonjs/core/Shaders/default.fragment.js';
+import '@babylonjs/core/Shaders/default.vertex.js';
+import { PAINTERLY_LOOKS, createPainterly } from './painterly.js';
+import { createStorybook } from './storybook.js';
 import { ISLAND_ATMOSPHERES, ISLAND_SUN } from '../features/house/island-atmosphere.js';
 import { ROOM_LIGHTS } from '../features/room/room-lighting.js';
 
@@ -39,4 +49,18 @@ test('room furniture darkens where it meets the floor, walls are mottled, and th
     assert.ok(height >= 1, `room-${theme} contact shade reaches up a sofa side`);
     assert.deepEqual(PAINTERLY_LOOKS[theme].ground, [0, 1, 0], `${theme} island stays unshaded and unmottled`);
   }
+});
+
+test('the painterly and storybook looks compile together on one material', async () => {
+  const declarations = async dress => {
+    const engine = new NullEngine(), scene = new Scene(engine);
+    new FreeCamera('eye', new Vector3(0, 1, -4), scene); new HemisphericLight('sky', new Vector3(0, 1, 0), scene);
+    dress(scene);
+    const box = MeshBuilder.CreateBox('box', {}, scene); box.material = new StandardMaterial('paint', scene);
+    for (let tries = 0; tries < 5 && !box.material.isReady(box); tries++) await new Promise(resolve => setTimeout(resolve, 5));
+    const count = box.subMeshes[0].effect._fragmentSourceCode.match(/vec3 finalDiffuse\s*=/g).length;
+    engine.dispose();
+    return count;
+  };
+  assert.equal(await declarations(scene => { createPainterly(scene, 'room-dusk'); createStorybook(scene); }), await declarations(() => {}));
 });

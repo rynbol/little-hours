@@ -26,7 +26,7 @@ vec3 plLight(vec3 light, vec3 n, vec3 v, vec3 p) {
 }
 `;
 
-const LIGHT_HOOK = /vec3 finalDiffuse=/g;
+const LIGHT_HOOK = /vec3 finalDiffuse\s*=/g;
 
 export class PainterlyPlugin extends MaterialPluginBase {
   constructor(material, state) {

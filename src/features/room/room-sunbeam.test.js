@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sunbeamShape, CLASSIC_WINDOW, BEAM_SLICES } from './room-sunbeam.js';
+import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
+import { Scene } from '@babylonjs/core/scene.js';
+import { sunbeamShape, CLASSIC_WINDOW, BEAM_SLICES, createSunbeam } from './room-sunbeam.js';
 import { ROOM_LIGHTS } from './room-lighting.js';
 
 const corners = (shape, slice) => [0, 1, 2, 3].map(k => shape.positions.slice((slice * 4 + k) * 3, (slice * 4 + k) * 3 + 3));
@@ -29,4 +31,14 @@ test('only daylight casts a visible beam', () => {
   assert.ok(ROOM_LIGHTS.day.beam > 0);
   assert.equal(ROOM_LIGHTS.dusk.beam, 0);
   assert.equal(ROOM_LIGHTS.rain.beam, 0);
+});
+
+test('the beam fades out as the seat view takes over and returns at full strength after', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), beam = createSunbeam(scene);
+  beam.setLight('#fff1d2', .45);
+  beam.animate(1, .5); assert.equal(beam.mesh.material._floats.strength, .225); assert.ok(beam.mesh.isEnabled(false));
+  beam.animate(2, 0); assert.equal(beam.mesh.isEnabled(false), false);
+  beam.setLight('#fff1d2', .45); assert.equal(beam.mesh.isEnabled(false), false);
+  beam.animate(3, 1); assert.ok(beam.mesh.isEnabled(false)); assert.equal(beam.mesh.material._floats.strength, .45);
+  engine.dispose();
 });
