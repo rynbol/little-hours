@@ -19,6 +19,7 @@ import { speciesOf, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
 import { placeAsset } from '../../models/assets.js';
 import { POND, POND_PATH, pondRim as rim, createLakeBank, createLakeGrass } from './lake-ground.js';
+import { buildFishModel } from './fish-model.js';
 
 const cardSide = new Vector3(), DOCK_Y = .42, STAND = new Vector3(0, DOCK_Y, 1.35), HOME_BOBBER = new Vector3(-.15, 0, .2);
 const PALETTES = {
@@ -361,47 +362,12 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   };
 
   let fish = null;
-  function buildFish(id, size) {
-    const species = speciesOf(id), look = species.look, stretch = { slim: [1, .3], deep: [1, .5], round: [.9, .62], long: [1.15, .3], koi: [1.05, .36], eel: [1.9, .13], sturgeon: [1.4, .24] }[look.shape];
-    const root = new TransformNode('lake-fish', scene), body = MeshBuilder.CreateSphere('lake-fish-body', { diameter: 1, segments: 18 }, scene);
-    body.scaling.set(stretch[0], stretch[1], stretch[1] * .55); body.parent = root;
-    const pos = body.getVerticesData('position'), nor = body.getVerticesData('normal'), colors = new Float32Array(pos.length / 3 * 4);
-    const C = hex => Color3.FromHexString(hex), bodyC = C(look.body), belly = C(look.belly), patch = look.patch ? C(look.patch) : null, dark = C('#3d3a33');
-    for (let i = 0; i < pos.length / 3; i++) {
-      const x = pos[i * 3], y = pos[i * 3 + 1], ny = nor[i * 3 + 1];
-      let c = Color3.Lerp(bodyC, belly, ease((-ny + .15) * 1.6));
-      if (look.mark === 'spots' && hash(Math.floor(x * 22) * 7.1 + Math.floor(y * 22) * 3.3) > .8 && ny > -.3) c = Color3.Lerp(c, dark, .45);
-      if (look.mark === 'stripes' && Math.sin(x * 26) > .55 && ny > -.4) c = Color3.Lerp(c, C('#4e5a34'), .5);
-      if (look.mark === 'patches' && Math.sin(x * 9 + 1) * Math.cos(y * 8 + x * 4) > .25 && ny > -.5) c = patch;
-      if (look.mark === 'stars' && hash(Math.floor(x * 30) + Math.floor(y * 30) * 17.7 + Math.floor(pos[i * 3 + 2] * 30) * 3.1) > .9 && ny > -.2) c = C('#fff6d8');
-      if (look.mark === 'plates' && Math.abs(Math.sin(x * 28)) > .85 && Math.abs(ny) < .5) c = C('#d9d4e6');
-      colors.set([c.r, c.g, c.b, 1], i * 4);
-    }
-    body.setVerticesData('color', colors);
-    const skin = new StandardMaterial('lake-fish-skin', scene); skin.specularColor.setAll(.35); skin.specularPower = 40;
-    if (look.glow) skin.emissiveColor = C(look.glow).scale(.28);
-    body.material = skin;
-    const finPaint = new StandardMaterial('lake-fish-fin', scene); finPaint.diffuseColor = C(look.fin); finPaint.alpha = .92; finPaint.backFaceCulling = false; finPaint.specularColor.setAll(.1);
-    if (look.glow) finPaint.emissiveColor = C(look.glow).scale(.25);
-    const tailPivot = new TransformNode('lake-fish-tail', scene); tailPivot.parent = root; tailPivot.position.x = -stretch[0] * .46;
-    if (look.shape !== 'eel') for (const side of [-1, 1]) {
-      const lobe = MeshBuilder.CreateDisc('lake-fish-lobe', { radius: stretch[1] * .62, tessellation: 3 }, scene);
-      lobe.material = finPaint; lobe.parent = tailPivot; lobe.position.set(-stretch[1] * .35, side * stretch[1] * .28, 0); lobe.rotation.z = Math.PI + side * .45; lobe.scaling.set(1.1, .7, 1);
-    }
-    const dorsal = MeshBuilder.CreateDisc('lake-fish-dorsal', { radius: stretch[1] * .5, tessellation: 3 }, scene);
-    dorsal.material = finPaint; dorsal.parent = root; dorsal.position.set(-.05, stretch[1] * .45, 0); dorsal.rotation.z = Math.PI / 2 + .5; dorsal.scaling.set(.9, 1.4, 1);
-    const eyePaint = new StandardMaterial('lake-fish-eye', scene); eyePaint.diffuseColor = C('#1f1b18'); eyePaint.specularColor.setAll(.9);
-    for (const side of [-1, 1]) { const eye = MeshBuilder.CreateSphere('lake-fish-eye', { diameter: Math.max(.05, stretch[1] * .17), segments: 6 }, scene); eye.material = eyePaint; eye.parent = root; eye.position.set(stretch[0] * .36, stretch[1] * .1, side * stretch[1] * .22); }
-    if (look.whiskers) for (const side of [-1, 1]) {
-      const whisker = MeshBuilder.CreateTube('lake-fish-whisker', { path: [new Vector3(stretch[0] * .47, -stretch[1] * .08, side * .03), new Vector3(stretch[0] * .56, -stretch[1] * .3, side * .1), new Vector3(stretch[0] * .5, -stretch[1] * .6, side * .14)], radius: .008, tessellation: 4 }, scene);
-      whisker.material = finPaint; whisker.parent = root;
-    }
-    const scale = Math.max(.42, Math.min(1.5, size / 38)) * .62;
-    root.scaling.setAll(scale);
-    root.getChildMeshes().forEach(mesh => { mesh.isPickable = false; if (look.glow) glow.addIncludedOnlyMesh?.(mesh); });
-    return { root, tail: tailPivot, species, scale };
-  }
-
+  const buildFish = (id, size) => buildFishModel(scene, speciesOf(id), size, glow);
+  const shadow = MeshBuilder.CreateDisc('lake-fish-shadow', { radius: .5, tessellation: 20 }, scene);
+  const shadowPaint = new StandardMaterial('lake-fish-shadow-paint', scene); shadowPaint.disableLighting = true; shadowPaint.emissiveColor = Color3.FromHexString(palette.deep).scale(.22); shadowPaint.alpha = 0; shadowPaint.backFaceCulling = false;
+  const shadowTail = MeshBuilder.CreateDisc('lake-fish-shadow-tail', { radius: .24, tessellation: 3 }, scene); shadowTail.parent = shadow; shadowTail.position.x = -.52; shadowTail.rotation.z = Math.PI; shadowTail.material = shadowPaint;
+  shadow.material = shadowPaint; shadow.rotation.x = Math.PI / 2; shadow.scaling.set(1, .34, 1); shadow.isPickable = shadowTail.isPickable = false; shadow.setEnabled(false);
+  const lurk = { from: new Vector3(), at: new Vector3(), heading: 0, start: 0, end: 0, nibbleAt: -9, fade: 0, size: .8 };
   const tip = new Vector3(), tipLocal = new Vector3(), base = new Vector3(), dir = new Vector3(), bend = new Vector3(), bobberAt = new Vector3(), castFrom = new Vector3(), castTo = new Vector3(), reelFrom = new Vector3(), hover = new Vector3(), world = new Matrix();
   let clock = 0, phase = 'idle', phaseAt = 0, leapDone = null, castDone = null, rise = 4, catchInfo = null, stowAt = -1, jumpAt = -9, jumps = 0, fidget = null, fidgetAt = 5, fidgets = 0;
   const struggle = { tension: 0, line: 1, pull: 0, mood: 'tug', holding: false };
@@ -541,6 +507,29 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
       if (k >= 1) { fish.root.dispose(false, true); fish = null; stowAt = -1 }
     }
 
+    let lurking = false;
+    if (phase === 'wait' && lurk.end > lurk.start) {
+      const k = ease((clock - lurk.start) / (lurk.end - lurk.start)), nudge = clock - lurk.nibbleAt < .5 ? Math.sin((clock - lurk.nibbleAt) / .5 * Math.PI) * .3 : 0;
+      const r = 2.2 * (1 - k) + .4 - nudge, swing = (reducedMotion ? 0 : Math.sin(clock * 1.3) * .5) * (1 - k);
+      const c = Math.cos(swing), sn = Math.sin(swing);
+      lurk.at.set(castTo.x + (lurk.from.x * c - lurk.from.z * sn) * r, 0, castTo.z + (lurk.from.x * sn + lurk.from.z * c) * r);
+      lurk.heading = Math.atan2(lurk.at.z - castTo.z, castTo.x - lurk.at.x); lurk.size = .8; lurking = true;
+    } else if (phase === 'bite') {
+      lurk.at.set(castTo.x + Math.sin(clock * 9) * .06, 0, castTo.z + Math.cos(clock * 7) * .05); lurking = true;
+    } else if (phase === 'reel' && fish) {
+      lurk.at.set(fish.root.position.x, 0, fish.root.position.z); lurk.heading = fish.root.rotation.y; lurk.size = Math.max(.6, fish.scale * fish.length * 1.3);
+      lurking = fish.root.position.y < -.02;
+    } else if (phase === 'escape') {
+      lurk.at.x += Math.cos(lurk.heading) * dt * 3; lurk.at.z -= Math.sin(lurk.heading) * dt * 3;
+    }
+    lurk.fade = Math.max(0, Math.min(1, lurk.fade + dt * (lurking ? 2.5 : -3)));
+    shadow.setEnabled(lurk.fade > 0);
+    if (lurk.fade > 0) {
+      shadow.position.set(lurk.at.x, .05, lurk.at.z); shadow.rotation.y = lurk.heading; shadow.scaling.set(lurk.size, lurk.size * .34, 1);
+      shadowTail.rotation.x = reducedMotion ? 0 : Math.sin(clock * (phase === 'reel' ? 14 : 6)) * .5;
+      shadowPaint.alpha = .58 * lurk.fade;
+    }
+
     const focusing = fish && (phase === 'leap' || phase === 'shown');
     const aspect = engine.getAspectRatio(camera), wide = aspect > 1.1; camera.fov = aspect < 1 ? 1.12 : .7;
     const framed = wide ? cardSide.set(hover.x + .55, hover.y - .05, hover.z - .23) : cardSide.set(hover.x, hover.y - .45, hover.z);
@@ -594,7 +583,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
 
   engine.runRenderLoop(() => {
     if (disposed) return;
-    const now = performance.now(), dt = Math.min(.05, (now - last) / 1000); last = now;
+    const now = performance.now(), dt = Math.min(.25, (now - last) / 1000); last = now;
     update(dt); scene.render();
   });
   const resize = () => engine.resize();
@@ -605,7 +594,11 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
       castTo.set(target.x, 0, target.z); setPhase('cast');
       return new Promise(resolve => { castDone = resolve; if (reducedMotion) { phaseAt = clock - 1.7; } });
     },
-    nibble() { if (phase !== 'wait') return; ripple(castTo.x, castTo.z, .45, 1); bobberAt.y -= .03; bobber.position.y -= .04; },
+    approach(ms) {
+      const a = clockRandom() * Math.PI * 2; lurk.from.set(Math.cos(a), 0, -Math.abs(Math.sin(a)) - .2).normalize();
+      lurk.start = clock; lurk.end = clock + ms / 1000; lurk.heading = Math.atan2(lurk.from.z, -lurk.from.x);
+    },
+    nibble() { if (phase !== 'wait') return; lurk.nibbleAt = clock; ripple(castTo.x, castTo.z, .45, 1); bobberAt.y -= .03; bobber.position.y -= .04; },
     bite() { if (phase !== 'wait') return; setPhase('bite'); lively.reactAt = clock; petPose.petAge = 0; ripple(castTo.x, castTo.z, 1.2, 1); splash(castTo, 10, .6); },
     hook(rolled) {
       reelFrom.copyFrom(bobber.position); reelFrom.y = 0; setPhase('reel'); splash(reelFrom, 10, .7);
@@ -629,6 +622,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
       if (fish) { splash(fish.root.position, snapped ? 18 : 10, .7); ripple(fish.root.position.x, fish.root.position.z, 1.3, 0); fish.root.dispose(false, true); fish = null; }
       if (phase === 'reel') castTo.copyFrom(bobber.position);
       if (snapped) lively.reactAt = clock;
+      lurk.heading += Math.PI;
       setPhase('escape'); splash(castTo, 8, .5);
     },
     reset() { setPhase('idle'); },
