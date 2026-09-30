@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, lanternsAloft, moonRise, vistaPalette, windowsLit, TRAIN_SECONDS } from './seat-world.js';
+import { createSeatWorld, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, VISTA_THEMES } from './seat-world.js';
 
 const setup = () => { const engine = new NullEngine(), scene = new Scene(engine); return { engine, scene, world: createSeatWorld(scene, new TransformNode('room', scene)) }; };
 const litWindows = world => {
@@ -17,11 +17,11 @@ test('the valley lights up and the moon climbs as a focus session goes on', () =
   assert.equal(windowsLit('dusk', 0), 0.35);
   assert.equal(windowsLit('dusk', 1), 1);
   assert.equal(windowsLit('day', 1), 0);
-  assert.equal(lanternsAloft('dusk', 0), 2);
-  assert.equal(lanternsAloft('dusk', 1), 26);
-  assert.equal(lanternsAloft('day', 1), 0);
+  assert.equal(spiritsAloft('dusk', 0), 4);
+  assert.equal(spiritsAloft('dusk', 1), 34);
+  assert.equal(spiritsAloft('day', 1), 0);
   assert.ok(moonRise(1) > moonRise(0));
-  assert.equal(vistaPalette('dusk', 0).zenith, '#101637');
+  assert.equal(vistaPalette('dusk', 0).zenith.toLowerCase(), VISTA_THEMES.dusk.zenith);
   assert.equal(vistaPalette('dusk', 1).zenith.toLowerCase(), '#070b24');
   assert.equal(vistaPalette('rain', 1).zenith, '#3f4a5e');
 
@@ -58,14 +58,27 @@ test('the vista is built ahead of the first sit but shown only when the chair as
   world.prepare();
   assert.ok(world.meshes.length >= 7 && !world.root.isEnabled(false), 'preparing builds the vista without showing it');
   world.setEnabled(true);
-  const train = world.meshes.find(mesh => mesh.name === 'seat-world-train').parent;
-  world.animate(TRAIN_SECONDS * 0.2, false);
-  const moving = train.rotation.y;
+  const flock = world.meshes.find(mesh => mesh.name === 'seat-world-flock').parent;
+  world.animate(FLOCK_SECONDS * 0.2, false);
+  const moving = flock.rotation.y;
   world.animate(1, false);
-  assert.notEqual(train.rotation.y, moving);
-  const still = train.rotation.y;
+  assert.notEqual(flock.rotation.y, moving);
+  const still = flock.rotation.y;
   world.animate(5, true);
-  assert.equal(train.rotation.y, still);
+  assert.equal(flock.rotation.y, still);
   assert.ok(world.meshes.length <= 9, `${world.meshes.length} vista meshes`);
+  engine.dispose();
+});
+
+test('the castle, the volcano and the watchtower all stand inside the view from the chair', () => {
+  const { engine, world } = setup();
+  world.prepare();
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
+  for (const role of ['castle', 'rock', 'rune']) {
+    let x = 0, z = 0, count = 0;
+    shape.roles.forEach((each, i) => { if (each === role) { x += shape.positions[i * 3]; z += shape.positions[i * 3 + 2]; count++; } });
+    const bearing = Math.atan2(x / count, -z / count);
+    assert.ok(count > 0 && bearing > -0.95 && bearing < 0.45, `${role} sits ${bearing.toFixed(2)} rad off the window`);
+  }
   engine.dispose();
 });

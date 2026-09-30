@@ -8,19 +8,21 @@ import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 
 export const VISTA_THEMES = Object.freeze({
   dusk: {
-    zenith: '#101637', high: '#2b2d5c', horizon: '#c07c95', glow: '#f4b184', haze: '#5d5282', below: '#2a2a4c',
-    far: '#4a4a78', mid: '#343a62', valley: '#27324c', field: '#2e3b52', cliff: '#3a3a52', grass: '#34503f', meadow: '#40604a',
-    trunk: '#3b2e33', leaf: '#2e4a40', leafLight: '#3e5d4a', walls: ['#c9a58a', '#b98f86', '#a9a3a0', '#d4b894'], roofs: ['#7b4a4a', '#4f5577', '#6a5a78', '#8a5a44'],
-    stone: '#6b6480', water: '#3f4a7c', glint: '#f2d7b0', window: '#ffc978', windowWarm: '#ffa860', windowDark: '#2b2d44', lamp: '#ffdca0',
-    star: '#fff4d8', moon: '#fff1d0', cloud: '#8c7ea8', cloudShade: '#5b5484', rail: '#2a2436', train: '#6b3f4a', trainRoof: '#3a2c3c', lantern: '#ffb467',
-    light: 0.35, night: { zenith: '#070b24', high: '#171b44', horizon: '#6a4f86', glow: '#b67a8e', haze: '#3a3766', cloud: '#4c4777', cloudShade: '#35325c' },
+    zenith: '#1a1d48', high: '#4a3c78', horizon: '#f2a070', glow: '#ffc27a', haze: '#7a5f8c', below: '#3a3354',
+    far: '#5c5082', mid: '#40496c', valley: '#34485a', field: '#3d5462', cliff: '#463f56', grass: '#3a5646', meadow: '#476a4e',
+    trunk: '#3b2e33', leaf: '#2c4a40', leafLight: '#4a6a50', walls: ['#c9a58a', '#b98f86', '#a9a3a0', '#d4b894'], roofs: ['#6a3f3a', '#4a3a3a', '#7a4a3a', '#3f4a5a'],
+    stone: '#6b6480', water: '#50608e', glint: '#f2d7b0', window: '#ffc978', windowWarm: '#ffa860', windowDark: '#2b2d44', lamp: '#ffdca0',
+    star: '#fff4d8', moon: '#fff1d0', cloud: '#f2aa92', cloudShade: '#6a5a8c',
+    castle: '#4c4668', castleRoof: '#2e2c4a', rock: '#3a3042', ember: '#ff6a3a', smoke: '#6a5a78', ruin: '#6c6478', moss: '#3f5a48', rune: '#ffb060', bird: '#221c30', spirit: '#d8ffb8', snow: '#cdb8d8',
+    light: 0.35, night: { zenith: '#070b24', high: '#171b44', horizon: '#6a4f86', glow: '#b67a8e', haze: '#3a3766', cloud: '#5a4f80', cloudShade: '#35325c' },
   },
   day: {
-    zenith: '#4f8fcf', high: '#86b9df', horizon: '#f2e3c4', glow: '#fff2cc', haze: '#bcd3dc', below: '#9ab7a4',
-    far: '#9ab4c8', mid: '#7fa3a6', valley: '#6f9a6e', field: '#8db27a', cliff: '#a09080', grass: '#6f9e5c', meadow: '#8fba6a',
-    trunk: '#6e5040', leaf: '#4f8055', leafLight: '#6f9e62', walls: ['#f2e2c4', '#efc9b4', '#dcd6cc', '#f5dca6'], roofs: ['#c0674f', '#5b7a9c', '#8a6f9e', '#d08a52'],
-    stone: '#b8aa98', water: '#6fa8c8', glint: '#fff8e8', window: '#3d5570', windowWarm: '#3d5570', windowDark: '#3d5570', lamp: '#f4e2b8',
-    star: '#86b9df', moon: '#f6f3ea', cloud: '#fffaf0', cloudShade: '#dfe4ea', rail: '#6a5a50', train: '#b24a42', trainRoof: '#5a4a48', lantern: '#f7c889',
+    zenith: '#2f74c8', high: '#6fa9e0', horizon: '#d9ecef', glow: '#fff4d6', haze: '#a4c4df', below: '#8fb08a',
+    far: '#7090c0', mid: '#6c9a86', valley: '#7aa84c', field: '#a0c45a', cliff: '#8c8a7c', grass: '#76a843', meadow: '#8cbf4e',
+    trunk: '#5e4634', leaf: '#3a7338', leafLight: '#7ab04a', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
+    stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
+    star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffffff', cloudShade: '#c4d3e6',
+    castle: '#8d93a6', castleRoof: '#4d6680', rock: '#6e6462', ember: '#c8604a', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#e8ffd0', snow: '#f4f6fa',
     light: 0, night: null,
   },
   rain: {
@@ -28,7 +30,8 @@ export const VISTA_THEMES = Object.freeze({
     far: '#687684', mid: '#56646f', valley: '#46545a', field: '#50605e', cliff: '#5a5a60', grass: '#4a6452', meadow: '#56705a',
     trunk: '#3e3a3a', leaf: '#3c5448', leafLight: '#4a6454', walls: ['#b8ab9c', '#a8958e', '#9ea0a2', '#bcae90'], roofs: ['#6a4848', '#4a5468', '#5a5068', '#7a5a4a'],
     stone: '#747880', water: '#5a6a7c', glint: '#c8ccd0', window: '#ffc27a', windowWarm: '#ffaa66', windowDark: '#3a4050', lamp: '#ffd49a',
-    star: '#5c6878', moon: '#c8ccd0', cloud: '#8a939e', cloudShade: '#6a7480', rail: '#34343c', train: '#6a3c40', trainRoof: '#3a3238', lantern: '#ffb467',
+    star: '#5c6878', moon: '#c8ccd0', cloud: '#8a939e', cloudShade: '#6a7480',
+    castle: '#5a606c', castleRoof: '#3a4450', rock: '#4a4a50', ember: '#8a5a50', smoke: '#6a707a', ruin: '#6a6e70', moss: '#4a6050', rune: '#a0c8d0', bird: '#2a2e36', spirit: '#c8e0c8', snow: '#b8c0c8',
     light: 0.55, night: null,
   },
 });
@@ -41,8 +44,12 @@ export const SHELL_PAINT = Object.freeze({
 });
 
 export const SEAT_WINDOW = Object.freeze({ x: 0, y: 3.05, width: 4.2, height: 3.1 });
-export const TRAIN_SECONDS = 46;
-const LANTERNS = 26, LANTERN_SECONDS = 70, SHOOTING_SECONDS = 23;
+export const FLOCK_SECONDS = 38;
+const SPIRITS = 34, SPIRIT_SECONDS = 40, SHOOTING_SECONDS = 23;
+const ahead = (across, distance) => [across, -distance];
+const bearing = (x, z) => Math.atan2(x, -z);
+export const CASTLE_AT = Object.freeze(ahead(-22, 100));
+const VOLCANO_AT = ahead(-82, 96), TOWER_AT = ahead(13, 56);
 
 const seeded = seed => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const hex = value => Color3.FromHexString(value);
@@ -73,21 +80,26 @@ function createShape() {
       shape.quad(a, b, b + segments, a + segments);
     }
   };
+  shape.spire = (x, y, z, half, height, role) => {
+    const apex = shape.vertex(x, y + height, z, role, 1.1), base = [[-1, 1, 1], [1, 1, 0.92], [1, -1, 0.7], [-1, -1, 0.8]].map(([u, v, s]) => shape.vertex(x + u * half, y, z + v * half, role, s));
+    for (let k = 0; k < 4; k++) shape.tri(apex, base[k], base[(k + 1) % 4]);
+  };
   return shape;
 }
 
 function terrainHeight(x, z) {
   const r = Math.hypot(x, z), a = Math.atan2(z, x);
   const cliff = -8 * smooth(8.5, 20, r + Math.sin(a * 5) * 1.6);
-  const basin = 17 * smooth(24, 112, r);
-  const rolling = Math.sin(x * 0.07) * Math.cos(z * 0.06) * 1.6 * smooth(26, 45, r);
+  const basin = 15 * smooth(24, 112, r);
+  const rolling = (Math.sin(x * 0.07) * Math.cos(z * 0.06) * 1.6 + Math.sin(x * 0.029 + 1) * Math.cos(z * 0.034 + 2) * 3.2) * smooth(26, 45, r);
+  const mound = 6 * (1 - smooth(9, 26, Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1])));
   const ranges = smooth(108, 150, r) * (26 + Math.sin(a * 7) * 9 + Math.sin(a * 17 + 1) * 5 + Math.max(0, Math.sin(a * 3 + 0.4)) * 16);
-  return cliff + basin + rolling + ranges;
+  return cliff + basin + rolling + mound + ranges;
 }
 
 const riverAt = t => { const a = -Math.PI * 1.05 + t * Math.PI * 1.1; const r = 58 + Math.sin(t * 9) * 7; return [Math.cos(a) * r, Math.sin(a) * r]; };
 const nearRiver = (x, z) => { let best = Infinity; for (let i = 0; i <= 80; i++) { const [rx, rz] = riverAt(i / 80); best = Math.min(best, Math.hypot(x - rx, z - rz)); } return best; };
-export const TRAIN_LINE = Object.freeze({ radius: 70, y: 5.2, center: -Math.PI / 2, span: 1.9, cars: 6, gap: 0.066 });
+export const FLOCK = Object.freeze({ radius: 44, y: 19, center: -Math.PI / 2, span: 1.9, birds: 9 });
 
 function buildSky(shape) {
   const radius = 180, rings = 18, segments = 40;
@@ -133,81 +145,148 @@ function buildLand(shape) {
   }
 }
 
-function buildVillage(shape) {
-  const random = seeded(31), clusters = [[-Math.PI / 2, 0.55, 170, 46, 104], [Math.PI, 0.45, 60, 34, 70], [Math.PI / 2, 0.5, 70, 38, 90], [0.1, 0.4, 30, 40, 80]];
-  const houses = [];
-  for (const [center, spread, count, near, far] of clusters) for (let i = 0; i < count; i++) {
-    const a = center + (random() + random() - 1) * spread, r = near + (far - near) * random() ** 0.8, x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (nearRiver(x, z) < 5.5 || Math.abs(r - TRAIN_LINE.radius) < 4 || houses.some(([hx, hz, s]) => Math.hypot(hx - x, hz - z) < s + 1.6)) continue;
-    const size = 2 + random() * 2.2; houses.push([x, z, size]);
-    const w = size * (1.2 + random() * 0.6), d = size * (0.9 + random() * 0.4), h = size * (1 + random() * 0.9), yaw = Math.atan2(x, z) + Math.PI + (random() - 0.5) * 0.5;
+function buildHamlet(shape) {
+  const random = seeded(31), houses = [];
+  for (let i = 0; i < 90 && houses.length < 26; i++) {
+    const a = -Math.PI / 2 + 0.3 + (random() + random() - 1) * 0.3, r = 34 + random() * 18, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (nearRiver(x, z) < 5 || houses.some(([hx, hz, s]) => Math.hypot(hx - x, hz - z) < s + 1.4)) continue;
+    const size = 1.5 + random() * 1.1; houses.push([x, z, size]);
+    const w = size * (1.2 + random() * 0.5), d = size * (0.9 + random() * 0.3), h = size * (0.8 + random() * 0.5), yaw = Math.atan2(x, z) + Math.PI + (random() - 0.5) * 0.6;
     const ground = terrainHeight(x, z), wall = `walls${Math.floor(random() * 4)}`, roof = `roofs${Math.floor(random() * 4)}`;
     shape.box(x, ground + h / 2, z, w, h, d, yaw, wall, 0.9 + random() * 0.15);
     const cos = Math.cos(yaw), sin = Math.sin(yaw), at = (lx, ly, lz, role, s = 1, t = 0) => shape.vertex(x + lx * cos + lz * sin, ground + ly, z - lx * sin + lz * cos, role, s, t);
-    const eave = w / 2 + 0.25, ridge = h + size * (0.55 + random() * 0.35), overhang = d / 2 + 0.2;
+    const eave = w / 2 + 0.3, ridge = h + size * (0.7 + random() * 0.3), overhang = d / 2 + 0.3;
     shape.quad(at(-eave, h, overhang, roof, 1), at(eave, h, overhang, roof, 1), at(eave, ridge, 0, roof, 1.15), at(-eave, ridge, 0, roof, 1.15));
     shape.quad(at(eave, h, -overhang, roof, 0.7), at(-eave, h, -overhang, roof, 0.7), at(-eave, ridge, 0, roof, 0.85), at(eave, ridge, 0, roof, 0.85));
     shape.tri(at(eave, h, overhang, wall, 0.8), at(eave, h, -overhang, wall, 0.8), at(eave, ridge, 0, wall, 0.8));
     shape.tri(at(-eave, h, -overhang, wall, 0.75), at(-eave, h, overhang, wall, 0.75), at(-eave, ridge, 0, wall, 0.75));
-    if (random() < 0.6) shape.box(x + (w * 0.25) * cos, ground + ridge - 0.1, z - (w * 0.25) * sin, 0.35, size * 0.7, 0.35, yaw, 'stone');
-    const floors = Math.max(1, Math.floor(h / 1.25)), columns = Math.max(1, Math.round(w / 1.1));
-    for (let f = 0; f < floors; f++) for (let c = 0; c < columns; c++) {
-      if (random() < 0.18) continue;
-      const u = -w / 2 + (c + 0.5) * w / columns, v = f * h / floors + h / floors * 0.3, ww = 0.5, wh = 0.62, z0 = d / 2 + 0.03, t = random(), role = random() < 0.3 ? 'windowWarm' : 'window';
+    if (random() < 0.5) shape.box(x + (w * 0.25) * cos, ground + ridge - 0.1, z - (w * 0.25) * sin, 0.3, size * 0.6, 0.3, yaw, 'stone');
+    const columns = Math.max(2, Math.round(w / 0.9));
+    for (let c = 0; c < columns; c++) {
+      const u = -w / 2 + (c + 0.5) * w / columns, v = h * 0.3, ww = 0.42, wh = 0.5, z0 = d / 2 + 0.03, t = random(), role = random() < 0.3 ? 'windowWarm' : 'window';
       shape.quad(at(u - ww / 2, v, z0, role, 1, t), at(u + ww / 2, v, z0, role, 1, t), at(u + ww / 2, v + wh, z0, role, 1, t), at(u - ww / 2, v + wh, z0, role, 1, t));
     }
-  }
-  const lamps = seeded(5);
-  for (let i = 0; i < 60; i++) {
-    const [x, z] = riverAt(i / 60), side = i % 2 ? 1 : -1, px = x + side * 4.2 * Math.cos(i), pz = z + side * 4.2 * Math.sin(i), y = terrainHeight(px, pz);
-    shape.box(px, y + 0.6, pz, 0.08, 1.2, 0.08, 0, 'rail');
-    shape.blob(px, y + 1.3, pz, 0.22, 0.22, 0.22, 'lamp', 'lamp', 1, 2, 6);
-    if (lamps() < 0.3) shape.box(px, y + 0.02, pz, 1.2, 0.02, 1.2, 0, 'glint', 0.4);
   }
   const [bx, bz] = riverAt(0.47), bridgeYaw = Math.atan2(bx, bz);
   for (let i = -3; i <= 3; i++) { const cos = Math.cos(bridgeYaw), sin = Math.sin(bridgeYaw); shape.box(bx + i * 1.1 * cos, terrainHeight(bx, bz) + 0.5 + Math.cos(i / 3 * 1.2) * 1.2, bz - i * 1.1 * sin, 1.15, 0.5, 2.2, bridgeYaw, 'stone'); }
 }
 
-function buildGarden(shape) {
+function buildCastle(shape) {
+  const [cx, cz] = CASTLE_AT, g = terrainHeight(cx, cz) - 0.5, random = seeded(43);
+  const tower = (x, z, w, h, roof) => { shape.box(cx + x, g + h / 2, cz + z, w, h, w, 0, 'castle'); shape.box(cx + x, g + h + 0.15, cz + z, w * 1.18, 0.3, w * 1.18, 0, 'castle', 1.1); shape.spire(cx + x, g + h + 0.3, cz + z, w * 0.62, roof, 'castleRoof'); };
+  const ring = Array.from({ length: 10 }, (_, i) => { const a = i / 10 * Math.PI * 2; return [Math.cos(a) * 10, Math.sin(a) * 7.5]; });
+  ring.forEach(([x0, z0], i) => {
+    const [x1, z1] = ring[(i + 1) % 10], length = Math.hypot(x1 - x0, z1 - z0);
+    shape.box(cx + (x0 + x1) / 2, g + 1.7, cz + (z0 + z1) / 2, length + 0.4, 3.4, 0.9, Math.atan2(-(z1 - z0), x1 - x0), 'castle', 0.92);
+    if (i % 2 === 0) tower(x0, z0, 1.7, 5 + random() * 1.5, 2.6);
+  });
+  shape.box(cx, g + 5.5, cz, 7.5, 11, 6, 0, 'castle');
+  shape.box(cx, g + 13, cz, 4.6, 4, 4, 0, 'castle', 1.05);
+  shape.spire(cx, g + 15, cz, 3, 5.5, 'castleRoof');
+  for (const [x, z, w, h, roof] of [[-4.6, 0.6, 2.2, 14, 4.2], [4.6, 0.6, 2.2, 13, 4], [-2.6, -3.8, 1.6, 10, 3.2], [3, -3.4, 1.7, 11.5, 3.4], [0, 3.6, 1.5, 7.5, 2.6]]) tower(x, z, w, h, roof);
+  const face = (x, y, z, columns, rows, width) => {
+    for (let row = 0; row < rows; row++) for (let c = 0; c < columns; c++) {
+      if (random() < 0.15) continue;
+      const u = x - width / 2 + (c + 0.5) * width / columns, v = y + row * 1.5, t = random(), role = random() < 0.35 ? 'windowWarm' : 'window';
+      shape.quad(shape.vertex(u - 0.22, v, z, role, 1, t), shape.vertex(u + 0.22, v, z, role, 1, t), shape.vertex(u + 0.22, v + 0.6, z, role, 1, t), shape.vertex(u - 0.22, v + 0.6, z, role, 1, t));
+    }
+  };
+  face(cx, g + 3.5, cz + 3.05, 6, 5, 6.6); face(cx, g + 11.8, cz + 2.05, 3, 2, 3.8);
+  face(cx - 4.6, g + 6, cz + 1.75, 1, 5, 1.4); face(cx + 4.6, g + 6, cz + 1.75, 1, 5, 1.4);
+}
+
+function buildVolcano(shape) {
+  const [vx, vz] = VOLCANO_AT, base = 10, height = 34, radius = 36, rim = 4.5, rings = 9, segments = 30, start = shape.roles.length;
+  const streaks = [0.9, 1.5, 2.3];
+  for (let k = 0; k <= rings; k++) {
+    const t = k / rings, y = base + height * t ** 1.35;
+    for (let s = 0; s < segments; s++) {
+      const a = s / segments * Math.PI * 2, jag = 1 + 0.05 * Math.sin(a * 6) + 0.03 * Math.sin(a * 14 + 1), r = (radius * (1 - t) + rim * t) * jag;
+      const lava = t > 0.88 || (t > 0.45 && streaks.some(streak => Math.abs(Math.atan2(Math.sin(a - streak), Math.cos(a - streak))) < 0.035 * (1.4 - t)));
+      shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', 0.68 + 0.32 * Math.max(0, Math.cos(a - 2.1)) + (k % 2) * 0.04);
+    }
+  }
+  for (let k = 0; k < rings; k++) for (let s = 0; s < segments; s++) {
+    const a = start + k * segments + s, b = start + k * segments + (s + 1) % segments;
+    shape.quad(a, a + segments, b + segments, b);
+  }
+  const top = base + height, crater = shape.vertex(vx, top - 2, vz, 'ember', 1.2), lip = start + rings * segments;
+  for (let s = 0; s < segments; s++) shape.tri(crater, lip + s, lip + (s + 1) % segments);
+}
+
+function buildWatchtower(shape) {
+  const [tx, tz] = TOWER_AT, g = terrainHeight(tx, tz) - 0.3;
+  let y = g;
+  for (const [w, h, twist] of [[3.4, 3, 0], [2.6, 5, 0.25], [2.1, 4.5, 0.5], [1.7, 3.5, 0.8]]) {
+    shape.box(tx, y + h / 2, tz, w, h, w, twist, 'ruin', 0.95); shape.box(tx, y + h, tz, w + 0.3, 0.25, w + 0.3, twist, 'moss');
+    y += h;
+  }
+  shape.box(tx, y + 0.3, tz, 3.2, 0.5, 3.2, 0.8, 'ruin', 1.05);
+  for (const [dx, dz] of [[-1.3, -1.3], [1.3, -1.3], [1.3, 1.3], [-1.3, 1.3]]) shape.box(tx + dx, y + 1.4, tz + dz, 0.3, 1.8, 0.3, 0, 'ruin', 0.9);
+  const cy = y + 2.1, c = [shape.vertex(tx, cy + 1.6, tz, 'rune', 1.2), shape.vertex(tx, cy - 1.2, tz, 'rune', 0.8)];
+  const ring = [[0.8, 0], [0, 0.8], [-0.8, 0], [0, -0.8]].map(([dx, dz], k) => shape.vertex(tx + dx, cy, tz + dz, 'rune', k % 2 ? 1 : 0.9));
+  for (let k = 0; k < 4; k++) { shape.tri(c[0], ring[k], ring[(k + 1) % 4]); shape.tri(c[1], ring[(k + 1) % 4], ring[k]); }
+}
+
+function buildRuins(shape) {
+  const random = seeded(71);
+  for (let site = 0; site < 12; site++) {
+    const across = -8 + (random() - 0.5) * 60, distance = 26 + random() * 34, [x, z] = ahead(across, distance);
+    if (nearRiver(x, z) < 4) continue;
+    const g = terrainHeight(x, z) - 0.2, yaw = random() * Math.PI, cos = Math.cos(yaw), sin = Math.sin(yaw);
+    if (site % 4 === 0) {
+      for (const side of [-1, 1]) { shape.box(x + side * 2 * cos, g + 2.4, z - side * 2 * sin, 0.9, 4.8, 0.9, yaw, 'ruin'); shape.box(x + side * 2 * cos, g + 4.9, z - side * 2 * sin, 1.1, 0.25, 1.1, yaw, 'moss'); }
+      shape.box(x, g + 5.3, z, 5.2, 0.8, 1, yaw, 'ruin', 1.05); shape.box(x, g + 5.75, z, 5.2, 0.15, 1, yaw, 'moss');
+      continue;
+    }
+    for (let k = 0; k < 2 + Math.floor(random() * 3); k++) {
+      const px = x + (random() - 0.5) * 5, pz = z + (random() - 0.5) * 5, h = 1 + random() * 3.2, py = terrainHeight(px, pz) - 0.2;
+      shape.box(px, py + h / 2, pz, 0.85, h, 0.85, yaw + random(), 'ruin', 0.9 + random() * 0.15); shape.box(px, py + h + 0.07, pz, 0.95, 0.14, 0.95, yaw, 'moss');
+    }
+    shape.box(x, g + 0.2, z, 4, 0.4, 3, yaw, 'ruin', 0.8);
+  }
+}
+
+function roundTree(shape, x, z, tall, random) {
+  const y = terrainHeight(x, z);
+  shape.box(x, y + tall * 0.3, z, 0.3 + tall * 0.04, tall * 0.6, 0.3 + tall * 0.04, random() * 3, 'trunk');
+  for (let clump = 0; clump < 3; clump++) {
+    const a = random() * Math.PI * 2, off = clump ? tall * 0.18 : 0, size = tall * (clump ? 0.26 : 0.34);
+    shape.blob(x + Math.cos(a) * off, y + tall * (0.72 + clump * 0.08), z + Math.sin(a) * off, size, size * 0.85, size, 'leaf', 'leafLight', 0.55, 4, 8);
+  }
+}
+
+function buildForest(shape) {
   const random = seeded(11);
-  for (let i = 0; i < 46; i++) {
-    const a = random() * Math.PI * 2, r = 12 + random() * 14, x = Math.cos(a) * r, z = Math.sin(a) * r, y = terrainHeight(x, z);
-    if (Math.abs(x) < 7.6 && Math.abs(z) < 6.4) continue;
-    const tall = 3 + random() * 5, round = random() < 0.45;
-    shape.box(x, y + tall * 0.3, z, 0.35, tall * 0.6, 0.35, random() * 3, 'trunk');
-    if (round) { shape.blob(x, y + tall * 0.75, z, tall * 0.35, tall * 0.32, tall * 0.35, 'leaf', 'leafLight', 0.6); continue; }
-    for (let tier = 0; tier < 3; tier++) {
-      const ty = y + tall * (0.35 + tier * 0.22), tr = tall * (0.38 - tier * 0.1), apex = shape.vertex(x, ty + tall * 0.42, z, 'leafLight', 1.05), base = [];
-      for (let s = 0; s < 7; s++) base.push(shape.vertex(x + Math.cos(s / 7 * Math.PI * 2) * tr, ty, z + Math.sin(s / 7 * Math.PI * 2) * tr, 'leaf', 0.7 + (s % 2) * 0.12));
-      for (let s = 0; s < 7; s++) shape.tri(apex, base[(s + 1) % 7], base[s]);
+  for (let i = 0; i < 40; i++) {
+    const a = random() * Math.PI * 2, r = 12 + random() * 14, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if ((Math.abs(x) < 7.6 && Math.abs(z) < 6.4) || (bearing(x, z) > -0.9 && bearing(x, z) < 0.35)) continue;
+    roundTree(shape, x, z, 3.5 + random() * 4.5, random);
+  }
+  for (const [across, distance, spread, count] of [[-34, 44, 9, 16], [-6, 40, 6, 9], [26, 34, 7, 12], [48, 72, 12, 18], [-52, 78, 12, 18], [8, 64, 8, 10], [36, 90, 10, 12]]) {
+    for (let i = 0; i < count; i++) {
+      const [x, z] = ahead(across + (random() - 0.5) * spread * 2, distance + (random() - 0.5) * spread * 1.4);
+      if (nearRiver(x, z) < 4 || Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1]) < 13) continue;
+      if (random() < 0.25) {
+        const y = terrainHeight(x, z), tall = 4 + random() * 3;
+        shape.box(x, y + tall * 0.2, z, 0.3, tall * 0.4, 0.3, 0, 'trunk');
+        for (let tier = 0; tier < 3; tier++) {
+          const ty = y + tall * (0.3 + tier * 0.22), tr = tall * (0.34 - tier * 0.09), apex = shape.vertex(x, ty + tall * 0.4, z, 'leafLight', 1.05), base = [];
+          for (let s = 0; s < 6; s++) base.push(shape.vertex(x + Math.cos(s / 6 * Math.PI * 2) * tr, ty, z + Math.sin(s / 6 * Math.PI * 2) * tr, 'leaf', 0.7 + (s % 2) * 0.12));
+          for (let s = 0; s < 6; s++) shape.tri(apex, base[(s + 1) % 6], base[s]);
+        }
+      } else roundTree(shape, x, z, 3 + random() * 3, random);
     }
   }
 }
 
-function buildViaduct(shape) {
-  const { radius, y, center, span } = TRAIN_LINE, steps = 90;
-  for (let i = 0; i < steps; i++) {
-    const a = center - span / 2 - 0.2 + (span + 0.4) * i / steps, next = a + (span + 0.4) / steps, mid = (a + next) / 2, length = radius * (next - a) + 0.05;
-    const x = Math.cos(mid) * radius, z = Math.sin(mid) * radius, yaw = Math.PI / 2 - mid;
-    shape.box(x, y - 0.3, z, length, 0.6, 2.4, yaw, 'stone', 0.9);
-    for (const side of [-0.5, 0.5]) shape.box(Math.cos(mid) * (radius + side), y + 0.08, Math.sin(mid) * (radius + side), length, 0.12, 0.1, yaw, 'rail');
-    const ground = terrainHeight(x, z);
-    if (i % 3 === 0 && ground < y - 1) shape.box(x, (ground + y - 0.6) / 2, z, 1.3, y - 0.6 - ground, 1.9, yaw, 'stone', 0.72);
-  }
-}
-
-function buildTrain(shape) {
-  const { radius, cars, gap } = TRAIN_LINE;
-  for (let car = 0; car < cars; car++) {
-    const a = -car * gap, cx = Math.cos(a) * radius, cz = Math.sin(a) * radius, yaw = Math.PI / 2 - a, loco = car === 0;
-    const cos = Math.cos(yaw), sin = Math.sin(yaw), at = (lx, ly, lz, role) => shape.vertex(cx + lx * cos + lz * sin, ly, cz - lx * sin + lz * cos, role);
-    shape.box(cx, 0.95, cz, 4, 1.5, 1.8, yaw, 'train');
-    shape.box(cx, 1.8, cz, 4.1, 0.25, 1.95, yaw, 'trainRoof');
-    if (loco) { shape.box(cx + 1.2 * cos, 2.3, cz - 1.2 * sin, 0.45, 0.8, 0.45, yaw, 'rail'); continue; }
-    for (let w = 0; w < 4; w++) for (const side of [1, -1]) {
-      const u = -1.5 + w, lz = side * 0.92;
-      shape.quad(at(u - 0.3, 1.05, lz, 'window'), at(u + 0.3, 1.05, lz, 'window'), at(u + 0.3, 1.5, lz, 'window'), at(u - 0.3, 1.5, lz, 'window'));
-    }
+function buildBirds(shape) {
+  const { radius, birds } = FLOCK;
+  for (let i = 0; i < birds; i++) {
+    const side = (i - (birds - 1) / 2) * 1.6, back = -Math.abs(side) * 0.9, x = radius + side, y = Math.sin(i * 1.7) * 0.3, z = back, span = 0.75;
+    const body = shape.vertex(x, y, z + 0.25, 'bird'), tail = shape.vertex(x, y, z - 0.2, 'bird');
+    shape.tri(body, shape.vertex(x - span, y + 0.28, z - 0.12, 'bird'), tail);
+    shape.tri(body, tail, shape.vertex(x + span, y + 0.28, z - 0.12, 'bird'));
   }
 }
 
@@ -219,9 +298,10 @@ function buildClouds(shape) {
   }
 }
 
-function buildLantern(shape) {
-  shape.box(0, 0, 0, 0.55, 0.75, 0.55, 0, 'lantern', 1);
-  shape.box(0, -0.42, 0, 0.3, 0.1, 0.3, 0, 'lamp', 1.2);
+function buildSpirit(shape) {
+  const top = shape.vertex(0, 0.45, 0, 'spirit', 1.2), bottom = shape.vertex(0, -0.45, 0, 'spirit', 1);
+  const ring = [[0.28, 0], [0, 0.28], [-0.28, 0], [0, -0.28]].map(([x, z]) => shape.vertex(x, 0, z, 'spirit', 1.1));
+  for (let k = 0; k < 4; k++) { shape.tri(top, ring[k], ring[(k + 1) % 4]); shape.tri(bottom, ring[(k + 1) % 4], ring[k]); }
 }
 
 function buildMoon(shape) {
@@ -306,7 +386,7 @@ export function vistaColor(palette, shape, i, out, glow) {
     const value = Array.isArray(palette[key]) ? palette[key][index] : palette[role] ?? SHELL_ROLES[role] ?? palette.stone;
     color = hex(value).scale(shade);
   }
-  const fog = ['lamp', 'lantern', 'window', 'windowWarm', 'glint', 'star', 'moon'].includes(role) ? shape.fogs[i] * 0.45 : shape.fogs[i];
+  const fog = ['lamp', 'spirit', 'window', 'windowWarm', 'glint', 'star', 'moon', 'ember', 'rune'].includes(role) ? shape.fogs[i] * 0.45 : shape.fogs[i];
   Color3.LerpToRef(color, hex(palette.haze), fog * 0.82, out);
   return out;
 }
@@ -320,7 +400,7 @@ export function vistaPalette(theme, progress) {
 }
 
 export const windowsLit = (theme, progress) => theme === 'day' ? 0 : Math.min(1, (VISTA_THEMES[theme] || VISTA_THEMES.dusk).light + progress * 0.7);
-export const lanternsAloft = (theme, progress) => theme === 'day' ? 0 : Math.round(2 + progress * (LANTERNS - 2));
+export const spiritsAloft = (theme, progress) => theme === 'day' ? 0 : Math.round(4 + progress * (SPIRITS - 4));
 export const moonRise = progress => 0.14 + progress * 0.36;
 
 export function createSeatWorld(scene, parent) {
@@ -329,22 +409,22 @@ export function createSeatWorld(scene, parent) {
   const lit = new StandardMaterial('seat-world-shell', scene); lit.diffuseColor = Color3.White(); lit.specularColor.set(0.03, 0.03, 0.03);
   const shapes = {};
   const make = (name, build, material = unlit, parentNode = root) => { const shape = createShape(); build(shape); shapes[name] = shape; return toMesh(shape, `seat-world-${name}`, scene, parentNode, material); };
-  const lanternMatrices = new Float32Array(LANTERNS * 16);
-  let sky = null, land, cloudRoot, clouds, trainRoot, train, moon, shooting, lanterns;
+  const spiritMatrices = new Float32Array(SPIRITS * 16);
+  let sky = null, land, cloudRoot, clouds, flockRoot, flock, moon, shooting, spirits;
   function build() {
-    sky = make('sky', buildSky); land = make('land', shape => { buildLand(shape); buildVillage(shape); buildGarden(shape); buildViaduct(shape); });
+    sky = make('sky', buildSky); land = make('land', shape => { buildLand(shape); buildHamlet(shape); buildForest(shape); buildRuins(shape); buildCastle(shape); buildWatchtower(shape); buildVolcano(shape); });
     cloudRoot = new TransformNode('seat-world-cloud-drift', scene); cloudRoot.parent = root;
     clouds = make('clouds', buildClouds, unlit, cloudRoot);
-    trainRoot = new TransformNode('seat-world-train-run', scene); trainRoot.parent = root; trainRoot.position.y = TRAIN_LINE.y;
-    train = make('train', buildTrain, unlit, trainRoot);
-    moon = make('moon', buildMoon); shooting = make('shooting', buildShootingStar); lanterns = make('lanterns', buildLantern);
-    moon.metadata.glow = lanterns.metadata.glow = true;
-    lanterns.thinInstanceSetBuffer('matrix', lanternMatrices, 16, false); lanterns.alwaysSelectAsActiveMesh = true;
+    flockRoot = new TransformNode('seat-world-flock-flight', scene); flockRoot.parent = root; flockRoot.position.y = FLOCK.y;
+    flock = make('flock', buildBirds, unlit, flockRoot);
+    moon = make('moon', buildMoon); shooting = make('shooting', buildShootingStar); spirits = make('spirits', buildSpirit);
+    moon.metadata.glow = spirits.metadata.glow = true;
+    spirits.thinInstanceSetBuffer('matrix', spiritMatrices, 16, false); spirits.alwaysSelectAsActiveMesh = true;
   }
   let shell = null, shellKey = '', theme = 'dusk', progress = 0, colorKey = '', seconds = 0;
   const glow = { x: 0, z: -1, lit: 0, stars: 1 };
   const temp = new Color3(), matrix = new Matrix(), scale = new Vector3(1, 1, 1), spot = new Vector3(), turn = new Quaternion();
-  const lanternStarts = Array.from({ length: LANTERNS }, (_, i) => { const random = seeded(101 + i); const a = -Math.PI / 2 + (random() - 0.5) * 1.6, r = 36 + random() * 45; return { x: Math.cos(a) * r, z: Math.sin(a) * r, phase: random(), sway: random() * 6 }; });
+  const spiritStarts = Array.from({ length: SPIRITS }, (_, i) => { const random = seeded(101 + i); const [x, z] = ahead(-10 + (random() - 0.5) * 56, 13 + random() * 40); return { x, z, ground: terrainHeight(x, z), phase: random(), sway: random() * 6 }; });
 
   function paint(mesh, palette, only = null) {
     const shape = mesh.metadata.shape, colors = mesh.getVerticesData('color');
@@ -367,7 +447,7 @@ export function createSeatWorld(scene, parent) {
     const palette = vistaPalette(theme, progress);
     glow.lit = windowsLit(theme, progress); glow.stars = theme === 'dusk' ? 0.55 + progress * 0.45 : 0;
     placeMoon();
-    for (const mesh of [sky, land, clouds, train, moon, shooting, lanterns]) paint(mesh, palette);
+    for (const mesh of [sky, land, clouds, flock, moon, shooting, spirits]) paint(mesh, palette);
   }
   function setShell(style, wallPaint = {}, doors = []) {
     const base = SHELL_PAINT[style] || SHELL_PAINT.retreat, key = JSON.stringify([style, wallPaint, doors]);
@@ -379,29 +459,30 @@ export function createSeatWorld(scene, parent) {
     for (let i = 0; i < shape.roles.length; i++) { const c = hex(palette[shape.roles[i]] || SHELL_ROLES[shape.roles[i]] || base.wall).scale(shape.shades[i]); colors.set([c.r, c.g, c.b, 1], i * 4); }
     shell.updateVerticesData('color', colors);
   }
-  function placeLanterns(reduced) {
-    const aloft = lanternsAloft(theme, progress);
-    for (let i = 0; i < LANTERNS; i++) {
-      const start = lanternStarts[i], life = reduced ? start.phase : (seconds / LANTERN_SECONDS + start.phase) % 1;
-      const rise = i < aloft ? life : -1, y = -16 + rise * 70;
-      spot.set(start.x + Math.sin(life * 6 + start.sway) * 2.5, rise < 0 ? -400 : y, start.z + Math.cos(life * 5 + start.sway) * 2.5);
-      scale.setAll(rise < 0 ? 0 : 1.4 - life * 0.5);
-      Quaternion.RotationYawPitchRollToRef(life * 2 + start.sway, 0, 0, turn);
-      Matrix.ComposeToRef(scale, turn, spot, matrix); matrix.copyToArray(lanternMatrices, i * 16);
+  function placeSpirits(reduced) {
+    const aloft = spiritsAloft(theme, progress);
+    for (let i = 0; i < SPIRITS; i++) {
+      const start = spiritStarts[i], life = reduced ? start.phase : (seconds / SPIRIT_SECONDS + start.phase) % 1;
+      const rise = i < aloft ? life : -1;
+      spot.set(start.x + Math.sin(life * 9 + start.sway) * 1.6, rise < 0 ? -400 : start.ground + 0.8 + rise * 12, start.z + Math.cos(life * 7 + start.sway) * 1.6);
+      scale.setAll(rise < 0 ? 0 : Math.sin(Math.PI * life) * 0.9);
+      Quaternion.RotationYawPitchRollToRef(life * 4 + start.sway, 0, 0, turn);
+      Matrix.ComposeToRef(scale, turn, spot, matrix); matrix.copyToArray(spiritMatrices, i * 16);
     }
-    lanterns.thinInstanceBufferUpdated('matrix');
+    spirits.thinInstanceBufferUpdated('matrix');
   }
   function animate(delta, reduced) {
     if (!root.isEnabled(false)) return;
     seconds += reduced ? 0 : delta;
     cloudRoot.rotation.y = seconds * 0.004;
-    const run = (seconds % TRAIN_SECONDS) / TRAIN_SECONDS * 2;
-    trainRoot.rotation.y = -(TRAIN_LINE.center - TRAIN_LINE.span / 2 + (TRAIN_LINE.span + TRAIN_LINE.cars * TRAIN_LINE.gap) * Math.min(1, run));
-    train.setEnabled(run < 1 && !reduced);
+    const run = (seconds % FLOCK_SECONDS) / FLOCK_SECONDS * 2;
+    flockRoot.rotation.y = -(FLOCK.center - FLOCK.span / 2 + FLOCK.span * Math.min(1, run));
+    flockRoot.position.y = FLOCK.y + Math.sin(seconds * 0.7) * 0.9;
+    flock.setEnabled(run < 1 && !reduced);
     const shot = (seconds % SHOOTING_SECONDS) / SHOOTING_SECONDS, streak = theme === 'dusk' && !reduced && shot < 0.05;
     shooting.setEnabled(streak);
     if (streak) { const n = Math.floor(seconds / SHOOTING_SECONDS), a = -Math.PI / 2 + Math.sin(n * 2.3) * 0.9; shooting.position.set(Math.cos(a) * 150 + shot * 400 * Math.sin(a), 70 + Math.cos(n) * 18 - shot * 160, Math.sin(a) * 150 - shot * 400 * Math.cos(a)); shooting.lookAt(Vector3.Zero()); shooting.rotation.z = -0.45; }
-    placeLanterns(reduced);
+    placeSpirits(reduced);
   }
   return {
     root,
@@ -412,7 +493,7 @@ export function createSeatWorld(scene, parent) {
     setProgress(next) { progress = Math.min(1, Math.max(0, Number(next) || 0)); recolor(); },
     setShell,
     prepare() { if (!sky) { build(); recolor(); } },
-    setEnabled(enabled) { if (enabled && !sky) build(); root.setEnabled(enabled); if (enabled) { recolor(); placeLanterns(true); } },
+    setEnabled(enabled) { if (enabled && !sky) build(); root.setEnabled(enabled); if (enabled) { recolor(); placeSpirits(true); } },
     animate,
     dispose() { root.dispose(false, false); unlit.dispose(); lit.dispose(); },
   };
