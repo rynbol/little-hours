@@ -39,7 +39,6 @@ export default {
     const hooked = await app.js(LAKE);
     check('pressing on the bite hooks the fish and shows the line tension', hooked.phase === 'reel' && hooked.fight?.line <= 1 && await app.visible('#lake-tension'), hooked);
     check('the journal waits until the fight is over', await app.js(`document.querySelector('#lake-journal-button').disabled`));
-    await t.shot(app, 'reeling');
     let held = true, strain = 0, onFish = 0, polls = 0, fought = null;
     const began = Date.now();
     for (const end = Date.now() + 90000 * slow; Date.now() < end;) {
