@@ -1,0 +1,5 @@
+export const ROOM_LIGHTS = Object.freeze({
+  day: { sun: 1.6, sunColor: '#fff1d2', ambient: .9, sky: '#edf4e8', ground: '#a48b6b', darkness: 0, direction: [3, -8, 7], position: [-4, 10, -8] },
+  dusk: { sun: .62, sunColor: '#c5ccec', ambient: .44, sky: '#e1d3ed', ground: '#645441', darkness: 0, direction: [3, -8, -5], position: [-5, 10, 6] },
+  rain: { sun: .82, sunColor: '#d5dfeb', ambient: .7, sky: '#e0e7ed', ground: '#645441', darkness: 0, direction: [3, -8, -5], position: [-5, 10, 6] },
+});

@@ -42,6 +42,7 @@ import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
+import { ROOM_LIGHTS } from './room-lighting.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -62,7 +63,7 @@ export function createRoom(container, options = {}) {
   scene.imageProcessingConfiguration.toneMappingEnabled = true;
   scene.imageProcessingConfiguration.toneMappingType = 1;
   scene.imageProcessingConfiguration.exposure = 1.08;
-  createPainterly(scene, 'interior');
+  const painterly = createPainterly(scene, 'room-dusk');
   const targetHome = new Vector3(0, 2.15, 0), alphaHome = Math.atan2(12.4, 10.5), betaHome = 1.071;
   const camera = new ArcRotateCamera('whole-room-camera', alphaHome, betaHome, 19, targetHome.clone(), scene);
   camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
@@ -1107,17 +1108,15 @@ export function createRoom(container, options = {}) {
     companionRoutine?.setContext({ night });
     paintSky(theme); architecture?.setTheme(theme); roof?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
     if (!night) { shootingStar.setEnabled(false); streakMaterial.alpha = 0; }
-    sun.diffuse = color(daylight ? '#fff1d2' : night ? '#c5ccec' : '#d5dfeb');
-    sun.intensity = daylight ? 1.6 : night ? 0.62 : 0.82;
-    sun.position.set(...(daylight ? [-4, 10, -8] : [-5, 10, 6]));
-    sun.direction.set(...(daylight ? [3, -8, 7] : [3, -8, -5])).normalize();
-    hemisphere.diffuse = color(daylight ? '#edf4e8' : night ? '#e1d3ed' : '#e0e7ed');
-    hemisphere.groundColor = color(daylight ? '#a48b6b' : '#645441');
-    hemisphere.intensity = daylight ? 0.90 : night ? 0.44 : 0.70;
+    const light = ROOM_LIGHTS[theme];
+    sun.diffuse = color(light.sunColor); sun.intensity = light.sun;
+    sun.position.set(...light.position); sun.direction.set(...light.direction).normalize();
+    hemisphere.diffuse = color(light.sky); hemisphere.groundColor = color(light.ground); hemisphere.intensity = light.ambient;
+    painterly.setTheme(`room-${theme}`);
     windowGlow.intensity = daylight ? 0.22 : night ? 1.25 : 0.65;
     applyBulbs(); applyAccents();
     bloom.intensity = daylight ? 0.18 : night ? 0.40 : 0.26;
-    shadow.darkness = daylight ? 0.34 : 0.24;
+    shadow.darkness = light.darkness;
     if (avatarCameraEditing) {
       savedAvatarEffects = [fireflies, skyStars, moths, shootingStar, rain, windowGlow, hearthGlow].map(effect => [effect, effect.isEnabled()]);
       for (const [effect] of savedAvatarEffects) effect.setEnabled(false);
