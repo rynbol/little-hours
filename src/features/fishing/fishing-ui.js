@@ -132,9 +132,14 @@ export function createFishingUI(app, { onClose } = {}) {
     if (phase !== 'bite' && phase !== 'reel') return;
     event?.preventDefault?.();
     if (phase === 'bite') hook();
+    catchUp();
     holding = true; $('#lake-bite').classList.add('is-holding');
   }
-  function letGo() { holding = false; root?.querySelector('#lake-bite')?.classList.remove('is-holding'); }
+  function catchUp(now = performance.now()) {
+    if (phase !== 'reel' || !fight || fight.outcome || now <= lastFrame) return;
+    stepFight(fight, Math.min(.5, (now - lastFrame) / 1000), holding, clockRandom); lastFrame = now;
+  }
+  function letGo() { catchUp(); holding = false; root?.querySelector('#lake-bite')?.classList.remove('is-holding'); }
   function hook() {
     clearTimeout(biteTimer);
     const index = Number($('#lake-bite').dataset.index), bait = pond().bait[index];
@@ -148,7 +153,7 @@ export function createFishingUI(app, { onClose } = {}) {
   }
   function struggle(now) {
     if (phase !== 'reel' || !fight) return;
-    stepFight(fight, Math.min(.5, (now - lastFrame) / 1000), holding, clockRandom); lastFrame = now;
+    catchUp(now);
     scene?.fight(fight, holding);
     const meter = $('#lake-tension'), on = onFish(fight), tight = !on && fight.tension > fight.zone.at, loose = !on && !tight;
     meter.style.setProperty('--tension', fight.tension); meter.style.setProperty('--zone-at', fight.zone.at); meter.style.setProperty('--zone-width', fight.zone.width);
@@ -292,7 +297,7 @@ export function createFishingUI(app, { onClose } = {}) {
     open, close,
     get isOpen() { return Boolean(root && !root.hidden); },
     render() { if (root && !root.hidden && phase === 'idle') renderTray(); },
-    diagnostics: () => scene ? { ...scene.diagnostics(), ui: phase, fight: fight && { tension: fight.tension, line: fight.line, mood: fight.mood, runs: fight.runs, zone: { ...fight.zone }, strain: fight.strain, slack: fight.slack } } : null,
+    diagnostics: () => scene ? { ...scene.diagnostics(), ui: phase, fight: (catchUp(), fight) && { tension: fight.tension, line: fight.line, mood: fight.mood, runs: fight.runs, zone: { ...fight.zone }, strain: fight.strain, slack: fight.slack } } : null,
     dispose() { disposed = true; closePond(); root?.remove(); root = null; },
   };
 }

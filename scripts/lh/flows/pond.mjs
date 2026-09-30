@@ -33,6 +33,7 @@ export default {
     await app.clickSel('[data-bait="star"]');
     const before = await app.js(POND);
     const reel = await castForBite(app);
+    await app.js(`(() => { const raf = window.requestAnimationFrame.bind(window); window.__slowFrames = true; window.requestAnimationFrame = cb => window.__slowFrames ? raf(() => setTimeout(() => cb(performance.now()), 700)) : raf(cb); return true; })()`);
     await app.press(reel.x, reel.y);
     check('a cast gets a bite with a reel button', Boolean(reel));
     const hooked = await app.js(LAKE);
@@ -52,7 +53,8 @@ export default {
       await new Promise(resolve => setTimeout(resolve, 30));
     }
     if (held) await app.release(reel.x, reel.y);
-    check('reeling while the float is under the fish and easing off above it lands it without a snap', onFish > 0 && strain < 1.2 && fought.ui !== 'idle', { strain, onFish, poll: Math.round((Date.now() - began) / polls), fought });
+    await app.js(`(window.__slowFrames = false, true)`);
+    check('reeling while the float is under the fish and easing off above it lands it without a snap, even with 0.7 s frames', onFish > 0 && strain < 1.2 && fought.ui !== 'idle', { strain, onFish, poll: Math.round((Date.now() - began) / polls), fought });
     await app.waitFor(`document.querySelector('#lake-card').open`, { what: 'the catch card', timeout: 30000 }).catch(async error => { throw new Error(error.message + JSON.stringify(fought)); });
     const after = await app.js(POND), name = await app.text('#lake-card-name');
     check('the fish leaps out and its card names it', (await app.js(LAKE)).phase === 'shown' && Boolean(name), name);
