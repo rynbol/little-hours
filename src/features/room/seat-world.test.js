@@ -306,3 +306,12 @@ test('the volcano rises in uneven shoulders to a broken crater rim and darkens t
   assert.ok(Math.max(...reaches) / Math.min(...reaches) > 1.25, 'the foot spreads in uneven shoulders');
   engine.dispose();
 });
+
+test('the moon carries faint maria rather than dark cartoon craters', () => {
+  const { engine, world } = setup();
+  world.setTheme('dusk'); world.setEnabled(true);
+  const moon = world.meshes.find(mesh => mesh.name === 'seat-world-moon'), colors = moon.getVerticesData('color'), light = [];
+  for (let i = 0; i < colors.length / 4; i++) light.push(colors[i * 4] + colors[i * 4 + 1] + colors[i * 4 + 2]);
+  assert.ok(Math.min(...light) > Math.max(...light) * 0.85, `darkest ${Math.min(...light).toFixed(2)} of brightest ${Math.max(...light).toFixed(2)}`);
+  engine.dispose();
+});

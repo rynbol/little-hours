@@ -345,8 +345,8 @@ function buildMoon(shape) {
   const center = shape.vertex(0, 0, 0, 'moon', 1.05);
   const ring = []; for (let s = 0; s < 28; s++) { const a = s / 28 * Math.PI * 2; ring.push(shape.vertex(Math.cos(a) * 6.5, Math.sin(a) * 6.5, 0, 'moon', 0.92)); }
   for (let s = 0; s < 28; s++) shape.tri(center, ring[s], ring[(s + 1) % 28]);
-  for (const [x, y, r] of [[-1.8, 1.4, 1.3], [2, -1.2, 1.6], [0.8, 2.6, 0.8]]) {
-    const c = shape.vertex(x, y, 0.05, 'moon', 0.8), rim = []; for (let s = 0; s < 10; s++) { const a = s / 10 * Math.PI * 2; rim.push(shape.vertex(x + Math.cos(a) * r, y + Math.sin(a) * r, 0.05, 'moon', 0.84)); }
+  for (const [x, y, r] of [[-1.8, 1.4, 1.3], [2, -1.2, 1.6], [0.8, 2.6, 0.8], [-0.6, -2.8, 1.1], [2.9, 1.6, 0.6]]) {
+    const c = shape.vertex(x, y, 0.05, 'moon', 0.9), rim = []; for (let s = 0; s < 10; s++) { const a = s / 10 * Math.PI * 2, wobble = 1 + 0.25 * Math.sin(a * 3 + x); rim.push(shape.vertex(x + Math.cos(a) * r * wobble, y + Math.sin(a) * r * wobble * 0.85, 0.05, 'moon', 0.95)); }
     for (let s = 0; s < 10; s++) shape.tri(c, rim[s], rim[(s + 1) % 10]);
   }
 }
