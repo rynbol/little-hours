@@ -8,6 +8,8 @@ names = [a for a in args if not a.startswith('--')] or sorted(f[:-3].replace('_'
 for name in names:
     kit.reset()
     model = importlib.import_module(name.replace('-', '_'))
+    if not hasattr(model, 'build'):
+        continue
     kit.export(name, model.build(), getattr(model, 'AO', 0.7))
     if shot:
         kit.preview(os.path.join(shot, name + '.png'), getattr(model, 'EYE', (0.35, 0.45, 1.0)))

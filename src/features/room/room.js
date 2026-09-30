@@ -44,6 +44,7 @@ import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
 import { createStorybook } from '../../models/storybook.js';
+import { createSeatWorld } from './seat-world.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -82,6 +83,7 @@ export function createRoom(container, options = {}) {
   const instrumentation = new SceneInstrumentation(scene);
   const color = value => Color3.FromHexString(value);
   const world = new TransformNode('room', scene);
+  const seatWorld = createSeatWorld(scene, world);
   const classicArchitecture = new TransformNode('architecture-retreat', scene); classicArchitecture.parent = world;
   const decor = { plants: new TransformNode('window-greenery', scene), lights: new TransformNode('fairy-lights', scene), rug: new TransformNode('legacy-rug', scene) };
   Object.values(decor).forEach(group => { group.parent = world; });
@@ -595,7 +597,7 @@ export function createRoom(container, options = {}) {
   function refreshShadows() {
     shadow.getShadowMap().renderList = scene.meshes.filter(mesh => !(drag?.active && mesh === petModel?.body && drag.id === petBed(layout)?.id) && mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && (!drag?.active || itemAncestor(mesh)?.metadata.itemId !== drag.id) && mesh !== rain && mesh !== marker && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
     for (const mesh of glowingMeshes) bloom.removeIncludedOnlyMesh(mesh); glowingMeshes.clear();
-    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && !mesh.metadata?.companion && !['tea-steam', 'wall-highlight'].includes(mesh.metadata?.effect) && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
+    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && !mesh.metadata?.companion && (!mesh.metadata?.seatWorld || mesh.metadata.glow) && !['tea-steam', 'wall-highlight'].includes(mesh.metadata?.effect) && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
     bloom.mainTexture.renderList = [...glowingMeshes];
     requestRender(true);
   }
@@ -1107,7 +1109,7 @@ export function createRoom(container, options = {}) {
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
     const daylight = theme === 'day', night = theme === 'dusk';
     companionRoutine?.setContext({ night });
-    paintSky(theme); architecture?.setTheme(theme); roof?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
+    paintSky(theme); seatWorld.setTheme(theme); architecture?.setTheme(theme); roof?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
     if (!night) { shootingStar.setEnabled(false); streakMaterial.alpha = 0; }
     sun.diffuse = color(daylight ? '#fff1d2' : night ? '#c5ccec' : '#d5dfeb');
     sun.intensity = daylight ? 1.6 : night ? 0.62 : 0.82;
@@ -1520,7 +1522,7 @@ export function createRoom(container, options = {}) {
     const forward = desk.getDirection(new Vector3(0, 0, -1));
     return { eye: seatEye(head.getAbsolutePosition(), forward), forward, aspect: canvasAspect };
   }
-  const seatView = createFirstPersonView(scene, canvas, { roomCamera: camera, seat: seatPose, roomFrame: roomFraming, onLook: () => requestRender(), onChange(change) { syncCameraControl(); syncCompanionVisibility(); syncDetails(); refreshShadows(); if (change.state === 'room') warmSeatShaders(); options.onSeatChange?.(change); } });
+  const seatView = createFirstPersonView(scene, canvas, { roomCamera: camera, seat: seatPose, roomFrame: roomFraming, onLook: () => requestRender(), onChange(change) { syncCameraControl(); syncCompanionVisibility(); syncDetails(); syncSeatWorld(); refreshShadows(); if (change.state === 'room') warmSeatShaders(); options.onSeatChange?.(change); } });
   let cameraControl = false;
   function syncCameraControl() {
     const wanted = !options.engineFactory && seatView.state === 'room' && !editing && !avatarCameraControl && !downPosition?.pet;
@@ -1530,6 +1532,15 @@ export function createRoom(container, options = {}) {
   }
   syncCameraControl();
   let seatShaderWarm = 0, seatShadersStale = true;
+  function syncSeatWorld() {
+    const inside = seatView.inside;
+    if (inside) seatWorld.setShell(architectureStyle, surfacePaint(architectureStyle, 'walls', layout.walls) || {}, (passages?.links || []).map(link => link.z));
+    seatWorld.setEnabled(inside);
+    passages?.root.setEnabled(!editing && !inside);
+    roof?.root?.setEnabled(!inside);
+    skyStars.setEnabled(theme === 'dusk' && !inside);
+    for (const mesh of scene.meshes) if (mesh.material && (mesh.material === retreatView || mesh.material === architecture?.viewMaterial)) mesh.isVisible = !inside;
+  }
   function syncDetails() {
     for (const object of placedObjects.values()) {
       const type = object.metadata.furnitureType; if (!hasDetail(type)) continue;
@@ -1540,6 +1551,7 @@ export function createRoom(container, options = {}) {
   }
   let detailsWanted = '';
   function fetchDetails() {
+    if (!readyReported) return;
     const types = [...new Set(layout.items.map(item => item.type))].filter(hasDetail), key = types.join();
     if (key === detailsWanted) return; detailsWanted = key;
     loadDetails(types).then(() => { if (disposed) return; syncDetails(); if (seatView.inside) refreshShadows(); });
@@ -1733,6 +1745,7 @@ export function createRoom(container, options = {}) {
     animateAvatarCamera(companionDelta);
     if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
     storybook.amount = seatView.blend;
+    seatWorld.animate(companionDelta, reducedMotion);
     passages?.animate(companionDelta, houseHover, reducedMotion, lockedDoor, openingDoor);
     const celebrating = celebrationAge < 3.2;
     celebrationAge = celebrating ? celebrationAge + companionDelta : Infinity;
@@ -1927,6 +1940,7 @@ export function createRoom(container, options = {}) {
     turnAvatar(angle, reset = false) { if (!avatarCameraEditing || avatarPoseTransition) return; avatarPreviewTarget = reset ? 0 : avatarPreviewTarget + angle; requestRender(); },
     enterSeat() { if (editing || avatarCameraEditing) return false; const ok = seatView.enter(reducedMotion); requestRender(); return ok; },
     leaveSeat({ animate = false } = {}) { seatView.leave({ instant: !animate || reducedMotion || suspended || !visible || seatView.state === 'leaving' }); requestRender(); return seatView.state; },
+    setFocusProgress(value) { seatWorld.setProgress(value); requestRender(); },
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { if (value === 'working') celebrationAge = Infinity; focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet, interactWithItem,
     setPet(species) { const next = PETS[species] ? species : 'cat'; if (next === petSpecies) return; if (petRoutine.pose.held) releasePet(); petSpecies = next; buildPet(); requestRender(); },
@@ -1943,7 +1957,7 @@ export function createRoom(container, options = {}) {
     buddyState() { return { mode: buddyFlight.mode, visible: buddyFrame.visible, activity: buddyFrame.activity, plan: buddyPlan?.kind ?? null, arrived: buddyArrived !== Infinity, holding: buddyFrame.holding, x: buddyFrame.x, y: buddyFrame.y, z: buddyFrame.z }; },
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { if (avatarCameraEditing) return; camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, seat: { state: seatView.state, look: seatView.look, camera: seatView.camera, storybook: storybook.amount }, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition || seatView.state === 'entering' || seatView.state === 'leaving'), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, petBelongings, petBond, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
-    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); clearTimeout(seatShaderWarm); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); buddyModel?.dispose(); petBelongings.dispose(); seatView.dispose(); storybook.dispose(); disposeDetails(scene); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    diagnostics() { return { scene, engine, camera, seat: { state: seatView.state, look: seatView.look, camera: seatView.camera, storybook: storybook.amount, world: { enabled: seatWorld.root.isEnabled(false), theme: seatWorld.theme, progress: seatWorld.progress } }, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition || seatView.state === 'entering' || seatView.state === 'leaving'), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, petBelongings, petBond, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); clearTimeout(seatShaderWarm); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); buddyModel?.dispose(); petBelongings.dispose(); seatView.dispose(); seatWorld.dispose(); storybook.dispose(); disposeDetails(scene); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

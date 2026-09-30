@@ -5,7 +5,9 @@ import { Scene } from '@babylonjs/core/scene.js';
 import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, DETAIL_SOURCES } from './detail.js';
 import { SURFACE_KIND } from './storybook.js';
 import { getFurniture } from '../core/catalog.js';
+import { createFurniture } from './furniture.js';
 
+const bounds = node => { const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity]; for (const mesh of node.getChildMeshes()) { mesh.computeWorldMatrix(true); const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox; minimumWorld.asArray().forEach((v, i) => { low[i] = Math.min(low[i], v); }); maximumWorld.asArray().forEach((v, i) => { high[i] = Math.max(high[i], v); }); } return [...low, ...high]; };
 const extent = mesh => { mesh.computeWorldMatrix(true); const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox; return { min: minimumWorld.asArray(), max: maximumWorld.asArray() }; };
 
 test('every detailed model belongs to a piece of furniture in the catalogue', () => {
@@ -50,4 +52,15 @@ test('nothing is built for a model that has not loaded', () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   assert.equal(createDetail('bookcase', scene), null);
   engine.dispose();
+});
+
+test('every detailed model keeps the size and place of the dollhouse piece it stands in for', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine), types = Object.keys(DETAIL_SOURCES);
+  await loadDetails(types);
+  for (const type of types) {
+    const piece = createFurniture(type, scene), detail = createDetail(type, scene); detail.parent = piece;
+    const body = bounds(piece.metadata.body), model = bounds(detail);
+    model.forEach((value, i) => assert.ok(Math.abs(value - body[i]) < 0.15, `${type} ${['left', 'bottom', 'back', 'right', 'top', 'front'][i]} is ${value.toFixed(2)}, the dollhouse piece ${body[i].toFixed(2)}`));
+  }
+  disposeDetails(scene); engine.dispose();
 });

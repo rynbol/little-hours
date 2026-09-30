@@ -103,17 +103,15 @@ def lathe(profile, position, colour, segments=28, surface='plain', layer='paint'
 
 def cylinder(radius_top, radius_bottom, height, position, colour, segments=28, bevel=0.0, **kw):
     b = min(bevel, height * 0.4, radius_top * 0.5 or bevel, radius_bottom * 0.5 or bevel)
-    profile = [(0, -height / 2)]
     if b > 0:
-        for k in range(4):
-            a = k / 3 * math.pi / 2
-            profile.append((radius_bottom - b + math.sin(a) * b, -height / 2 + b - math.cos(a) * b))
-        for k in range(4):
-            a = k / 3 * math.pi / 2
-            profile.append((radius_top - b + math.cos(a) * b, height / 2 - b + math.sin(a) * b))
+        bottom = [(radius_bottom - b + math.sin(k / 3 * math.pi / 2) * b, -height / 2 + b - math.cos(k / 3 * math.pi / 2) * b) for k in range(4)]
+        top = [(radius_top - b + math.cos(k / 3 * math.pi / 2) * b, height / 2 - b + math.sin(k / 3 * math.pi / 2) * b) for k in range(4)]
     else:
-        profile += [(radius_bottom, -height / 2), (radius_top, height / 2)]
-    profile.append((0, height / 2))
+        bottom, top = [(radius_bottom, -height / 2)], [(radius_top, height / 2)]
+    (r0, y0), (r1, y1) = bottom[-1], top[0]
+    rings = max(1, min(8, round((y1 - y0) / 0.08)))
+    side = [(r0 + (r1 - r0) * k / rings, y0 + (y1 - y0) * k / rings) for k in range(1, rings)]
+    profile = [(0, -height / 2), (bottom[0][0] * 0.5, -height / 2)] + bottom + side + top + [(top[-1][0] * 0.5, height / 2), (0, height / 2)]
     return lathe(profile, position, colour, segments, **kw)
 
 

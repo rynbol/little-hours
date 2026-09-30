@@ -256,6 +256,7 @@ export function createTimerUI(app) {
     ring.setAttribute('aria-valuenow', minutesSet); ring.setAttribute('aria-valuetext', `${minutesSet} minutes`);
     ring.setAttribute('aria-disabled', String(!settable)); ring.tabIndex = settable ? 0 : -1;
     if (!isBreak) app.room?.setPlantPhase(plantPhase(state.session.duration, remainingAt(state.session)));
+    if (!isBreak) app.room?.setFocusProgress?.(1 - remainingAt(state.session) / state.session.duration);
     $('#timer-dial').dataset.phase = isBreak ? 'break' : state.session.running ? 'focusing' : ms === 0 ? 'complete' : presence;
     const actionIcon = focusing ? 'pause' : 'arrow';
     if ($('#start-button').dataset.icon !== actionIcon) {

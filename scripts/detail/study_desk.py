@@ -111,7 +111,7 @@ def mug(x, y, z):
     parts = [lathe(outer, (0, 0, 0), '#e7dec7', segments=36, surface='ceramic', frame=f),
              cylinder(0.089, 0.089, 0.004, (0, 0.165, 0), '#6b4a33', segments=36, frame=f),
              cylinder(0.097, 0.092, 0.022, (0, 0.11, 0), '#c98f66', segments=36, surface='ceramic', frame=f),
-             torus(0.055, 0.016, (0.105, 0.1, 0), '#e7dec7', rotation=(math.pi / 2, 0, 0), arc=math.pi * 1.1, major_segments=18, surface='ceramic', frame=f)]
+             torus(0.055, 0.016, (0.105, 0.1, 0), '#e7dec7', rotation=(0, 0, -math.pi / 2), arc=math.pi, major_segments=14, surface='ceramic', frame=f)]
     parts.append(cylinder(0.12, 0.12, 0.01, (0, -0.003, 0), '#9c7a5b', segments=36, bevel=0.004, surface='wood', frame=f))
     return parts
 
