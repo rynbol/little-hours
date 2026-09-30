@@ -27,7 +27,6 @@ body.is-focus-mode .room-travel { display: none; }
 .focus-mode-exit svg { width: 17px; height: 17px; }
 .focus-mode-exit:hover, .focus-mode-exit:focus-visible { background: #403643e8; }
 @media (max-width: 999px) {
-  .focus-mode-button { grid-column: 1 / -1; }
   .focus-mode-timer { bottom: max(18px, env(safe-area-inset-bottom)); font-size: 16px; }
   .focus-mode-exit { top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); }
 }

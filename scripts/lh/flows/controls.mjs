@@ -7,9 +7,8 @@ export default {
     const { check, steps, sleep } = t;
     const app = await t.open({ seed: 'three-rooms' });
     await app.settle();
-    const copy = ['.focus-intro', '.timer-caption', '.daily-note'];
-    const shown = []; for (const selector of copy) if (await app.visible(selector)) shown.push(selector);
-    check('the room page shows no decorative copy', shown.length === 0, shown);
+    const copy = await app.js(`['.card-top', '.focus-intro', '.timer-caption', '.daily-note', '#session-label'].filter(selector => document.querySelector(selector))`);
+    check('the room page shows no decorative copy', copy.length === 0, copy);
 
     check('room activities stay in the room without a Little moments menu', await app.js(`!document.querySelector('.little-moments') && !document.querySelector('#room-canvas').getAttribute('aria-label').includes('Little moments')`));
     const tea = (await app.room()).layout.items.find(item => item.type === 'side-table');
@@ -48,7 +47,7 @@ export default {
     check('Save energy sets the room quality', (await app.room()).quality === 'battery' && await app.attr('[data-quality="battery"]', 'aria-pressed') === 'true', (await app.room()).quality);
     await app.clickSel('#close-panel');
 
-    await app.clickSel('#sound-button');
+    await t.steps.openTimer(app); await app.clickSel('#sound-button');
     await sleep(500);
     const sound = { pressed: await app.attr('#sound-button', 'aria-pressed'), toast: await app.text('#toast') };
     check('the rain button turns sound on, or says audio is missing', (sound.pressed === 'true' && !await app.js(`document.getElementById('volume').disabled`)) || /Audio isn’t available/.test(sound.toast || ''), sound);
@@ -62,6 +61,7 @@ export default {
     await app.clickSel('#start-button');
     await sleep(1600);
     await app.clickSel('#start-button');
+    await t.steps.openTimer(app);
     check('a paused session offers Start over', await app.visible('#reset-session'));
     await app.clickSel('#reset-session');
     await app.waitFor(`document.getElementById('timer').textContent === '25:00' && document.getElementById('reset-session').hidden`, { what: 'the reset to save' });
@@ -72,7 +72,7 @@ export default {
     await app.key('Enter');
     await app.waitFor(`!document.body.classList.contains('is-house')`, { what: 'the skip link to leave the house page' });
     await app.settle();
-    check('the skip link leaves the house page and focuses the timer', await app.js(`document.activeElement?.id === 'start-button'`) && await app.visible('#focus-card'));
+    check('the skip link leaves the house page and focuses the timer', await app.js(`document.activeElement?.id === 'start-button'`) && await app.visible('#focus-quickbar'));
 
     await steps.openDecorate(app);
     const start = await app.room();

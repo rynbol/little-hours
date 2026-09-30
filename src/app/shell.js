@@ -1,5 +1,5 @@
 import { icon } from '../ui/icons.js';
-import { blossomArt, coinArt } from '../ui/ui-art.js';
+import { coinArt } from '../ui/ui-art.js';
 
 export const shellMarkup = (audioPrefs) => `
   <a class="skip-link" href="#start-button">Skip to focus timer</a>
@@ -32,6 +32,7 @@ export const shellMarkup = (audioPrefs) => `
             <button class="tool" id="buddy-tool" aria-haspopup="dialog">${icon('leaf')}<span id="buddy-tool-label">Pip</span></button>
           </nav>
         </div>
+        <div class="timer-pill" id="focus-quickbar" role="group" aria-label="Focus timer"><button id="timer-sheet-toggle" popovertarget="focus-card" aria-expanded="false" aria-label="Focus timer, 25 minutes remaining">${icon('clock')}<time>25:00</time><span aria-hidden="true">⌃</span></button><button id="start-button" aria-label="Start focusing" data-running="false"><span>Start</span>${icon('arrow')}</button></div>
         <div class="room-panel" id="room-panel" hidden></div>
         <section class="builder-panel" id="builder-panel" aria-label="Room decorator" hidden>
           <div class="builder-heading"><div class="collection-tabs" aria-label="Decoration collections"><button data-collection-tab="collection" aria-pressed="true">Furniture</button><button data-collection-tab="presets" aria-pressed="false">Room designs</button></div><div class="builder-meta"><span id="item-count"></span><button class="quiet-button" id="undo-layout" disabled>${icon('reset')} Undo</button></div></div>
@@ -42,18 +43,16 @@ export const shellMarkup = (audioPrefs) => `
         </section>
       </section>
       <section id="house-page" class="house-page" aria-label="Your growing house" hidden></section>
-      <aside class="focus-card" id="focus-card" tabindex="-1" aria-labelledby="focus-title">
-        <div class="card-top"><span class="eyebrow">A MOMENT FOR YOU</span><span class="tiny-flower" aria-hidden="true">${blossomArt()}</span></div>
-        <h2 id="focus-title" class="sr-only">Focus timer</h2><p class="focus-intro">Make space for one good thing.</p>
+      <aside class="focus-card" id="focus-card" popover aria-labelledby="focus-title">
+        <h2 id="focus-title" class="sr-only">Focus timer</h2><button class="icon-button" id="close-timer-sheet" popovertarget="focus-card" popovertargetaction="hide" aria-label="Close focus timer">${icon('close')}</button>
         <div class="timer-area">
           <div class="timer-dial" id="timer-dial">
             <svg class="timer-ring" id="timer-ring" viewBox="0 0 200 200" role="slider" tabindex="0" aria-label="Focus length" aria-valuemin="1" aria-valuemax="120" aria-valuenow="25" aria-valuetext="25 minutes"><circle class="timer-track" cx="100" cy="100" r="91"/><circle class="timer-progress" id="timer-progress" cx="100" cy="100" r="91" pathLength="100"/><circle class="timer-seed" cx="100" cy="9" r="5"/></svg>
-            <div class="timer-center"><span id="session-label" class="session-label">SETTLE IN</span><div id="timer" class="timer" role="timer" aria-label="25 minutes remaining">25:00</div><span class="timer-caption" id="timer-caption">a small beginning</span></div>
+            <div class="timer-center"><div id="timer" class="timer" role="timer" aria-label="25 minutes remaining">25:00</div></div>
           </div>
           <div class="durations" role="group" aria-label="Focus duration"><button data-minutes="25" aria-pressed="true">25 <span>min</span></button><button data-minutes="50" aria-pressed="false">50 <span>min</span></button><button data-minutes="90" aria-pressed="false">90 <span>min</span></button></div>
         </div>
-        <div class="focus-actions"><button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
-        <button class="focus-mode-button" id="focus-mode-enter" aria-label="Focus mode" title="Focus mode" aria-expanded="false" aria-controls="focus-mode-hud" disabled>${icon('mini')}<span>Focus mode</span></button></div>
+        <button class="focus-mode-button" id="focus-mode-enter" aria-expanded="false" aria-controls="focus-mode-hud" disabled>${icon('mini')}<span>Focus mode</span></button>
         <button class="reset-session" id="reset-session" hidden>Start over</button>
         <p class="session-kind" id="session-kind" hidden></p>
         <div class="session-result" id="session-result" hidden><p id="session-result-copy"></p><div class="break-actions" role="group" aria-label="Take a break"><button class="quiet-button" data-break-minutes="5">5 min break</button><button class="quiet-button" data-break-minutes="15">15 min break</button></div></div>
@@ -61,7 +60,6 @@ export const shellMarkup = (audioPrefs) => `
         <label class="field-label sr-only" for="task">What you’re working on</label>
         <input id="task" maxlength="180" placeholder="What are you working on?" autocomplete="off" />
         <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="${audioPrefs.volume}" aria-label="Rain volume" disabled /><label class="chime-toggle"><span>Chime at the end</span><input type="checkbox" id="chime-toggle" ${audioPrefs.chime ? 'checked' : ''} /></label></div>
-        <div class="daily-note" id="daily-note">Good things begin with a little time.</div>
       </aside>
     </main>
   </div>

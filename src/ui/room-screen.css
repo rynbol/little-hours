@@ -35,16 +35,30 @@ body:not(.is-decorating):not(.is-avatar-editing):not(.is-pet-care):not(.is-conne
   & :is(.room-tools, .heading-actions) svg { color: var(--hud-ink); }
   & .room-panel { bottom: 76px; }
 
-  @media (min-width: 1000px) {
-    & #focus-card { position: fixed; z-index: 15; top: 76px; right: 16px; max-height: calc(100svh - 92px); overflow-y: auto; }
-  }
-  @media (max-width: 999px) {
-    &:not(.is-house) .workspace { padding-top: 100svh; }
-    & .room-bottom { bottom: calc(max(var(--hud-gutter), env(safe-area-inset-bottom)) + 74px); }
-  }
+  & #focus-quickbar { position: fixed; z-index: 20; left: 50%; bottom: max(var(--hud-gutter), env(safe-area-inset-bottom)); translate: -50% 0; display: flex; gap: 2px; padding: 1px; border: 1px solid var(--hud-line); border-radius: 999px; background: var(--hud-surface); box-shadow: 0 6px 28px #0c091342; backdrop-filter: blur(12px); }
+  & #focus-quickbar button { display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 8px 16px; border: 0; border-radius: 999px; background: transparent; color: var(--hud-ink); font: inherit; font-size: 13px; white-space: nowrap; }
+  & #focus-quickbar svg { width: 17px; height: 17px; }
+  & #timer-sheet-toggle:is(:hover, :focus-visible) { background: var(--hud-hover); }
+  & #timer-sheet-toggle time { font-size: 18px; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
+  & #timer-sheet-toggle > span { font-size: 14px; }
+  & #start-button { background: #9a4d5c; color: #fff9ef; }
+  & #start-button:is(:hover, :focus-visible) { background: #86404e; }
+  & #start-button[data-running='true'] { background: #5d6f52; }
+  & #focus-quickbar button:disabled { opacity: .5; }
+
+  & #focus-card { position: fixed; inset: auto 0 calc(max(var(--hud-gutter), env(safe-area-inset-bottom)) + 56px); width: min(340px, calc(100vw - 16px)); max-width: none; max-height: calc(100svh - 136px); margin: 0 auto; overflow-y: auto; overscroll-behavior: contain; padding: 22px 20px 20px; }
+  & #close-timer-sheet { position: absolute; top: 8px; right: 8px; z-index: 2; width: 44px; height: 44px; border: 0; background: transparent; }
+  & #focus-card #task { margin-top: 10px; }
+
   @media (max-width: 720px) {
     & .heading-actions .room-coins { padding: 0 8px 0 10px; }
     & .heading-actions > :is(#rooms-button, #decorate-button, #room-more-toggle) { padding: 8px 10px; }
-    & .room-tools > .tool { padding: 6px 12px; }
+    & .room-tools > .tool { width: 44px; padding: 0; justify-content: center; }
+    & .room-tools > .tool > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    & #focus-quickbar { left: auto; right: max(var(--hud-gutter), env(safe-area-inset-right)); translate: none; }
+    & #focus-quickbar button { gap: 6px; padding: 8px 12px; }
+    & #focus-card { inset: auto 8px calc(max(var(--hud-gutter), env(safe-area-inset-bottom)) + 56px); width: auto; border-radius: 24px; }
   }
 }
+
+#focus-quickbar { display: none; }

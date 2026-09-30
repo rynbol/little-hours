@@ -6,7 +6,7 @@ import { focusCoins } from '../../core/house.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 import { petGiftArt } from '../pet/index.js';
-import { createFocusQuickbar } from './focus-quickbar.js';
+import { createTimerPill } from './focus-quickbar.js';
 import './focus-mode.css';
 import './session.css';
 
@@ -24,11 +24,12 @@ export function createTimerUI(app) {
   async function action(command, message) {
     if (pending) return;
     pending = true; render();
+    const celebrationWasOpen = $('#session-celebration').open;
     try {
       await flushTask();
       const result = await app.acceptUpdate(command());
       if (!result.completion) {
-        if (sessionLifecycle(app.state.session) !== 'completed') $('#session-celebration').close();
+        if (celebrationWasOpen && sessionLifecycle(app.state.session) !== 'completed') $('#session-celebration').close();
         if (message) announce(message);
       }
       return result;
@@ -44,7 +45,7 @@ export function createTimerUI(app) {
     document.body.classList.remove('is-focus-mode');
     app.room?.resize?.();
     if (focusRestore) {
-      const target = [focusReturn, $('#focus-mode-enter'), $('#start-button')].find(node => node?.isConnected && !node.disabled && node.getClientRects().length);
+      const target = [focusReturn, $('#focus-mode-enter'), $('#timer-sheet-toggle'), $('#start-button')].find(node => node?.isConnected && !node.disabled && node.getClientRects().length);
       target?.focus({ preventScroll: true });
     }
     focusReturn = null;
@@ -105,11 +106,11 @@ export function createTimerUI(app) {
     if (app.panels.current) app.panels.close();
     app.roomUI.leaveMini(); app.nav.setHouseOpen(true, 'orchard', plantId);
   };
-  const quickbar = createFocusQuickbar({ signal: app.signal, onToggle: toggleRunning, onSettings: () => { expand(); $('#focus-card').focus({ preventScroll: true }); } });
+  const pill = createTimerPill();
 
   function showCelebration(completion) {
     if (completion.kind !== 'focus') return;
-    leaveFocusMode({ restoreFocus: false });
+    leaveFocusMode({ restoreFocus: false }); pill.closeSheet();
     const modal = $('#session-celebration');
     const { minutes, coins, pet } = completion;
     $('#celebration-copy').textContent = `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} with ${pet.name}.`;
@@ -166,8 +167,6 @@ export function createTimerUI(app) {
     $('#timer').setAttribute('aria-label', `${spokenTime(ms)} remaining`);
     $('#focus-mode-timer').setAttribute('aria-label', `${spokenTime(ms)} remaining`);
     document.title = state.session.running ? `${formatted} · Little Hours` : 'Little Hours — a little place to focus';
-    $('#session-label').textContent = state.session.running ? 'IN YOUR OWN TIME' : ms < state.session.duration && ms > 0 ? 'A LITTLE BREATHER' : ms === 0 ? 'YOU DID THAT' : 'SETTLE IN';
-    $('#timer-caption').textContent = state.session.running ? 'one thing at a time' : ms === 0 ? 'a little progress, made' : ms < state.session.duration ? 'ready when you are' : 'a small beginning';
     const minutesSet = state.session.duration / 60_000, settable = !isBreak && !pending && !state.session.running && [0, state.session.duration].includes(remainingAt(state.session)) && !editingAvatar;
     $('#timer-progress').style.strokeDashoffset = String(100 * (1 - (settable ? minutesSet / 120 : ms / state.session.duration)));
     $('.timer-seed').style.transform = settable ? `rotate(${90 + minutesSet * 3}deg)` : '';
@@ -178,15 +177,8 @@ export function createTimerUI(app) {
     if (!isBreak) app.room?.setPlantPhase(plantPhase(state.session.duration, remainingAt(state.session)));
     if (!isBreak) app.room?.setFocusProgress?.(1 - remainingAt(state.session) / state.session.duration);
     $('#timer-dial').dataset.phase = isBreak ? 'break' : state.session.running ? 'focusing' : ms === 0 ? 'complete' : presence;
-    const actionIcon = focusing ? 'pause' : 'arrow';
-    if ($('#start-button').dataset.icon !== actionIcon) {
-      $('#start-button svg').outerHTML = icon(actionIcon);
-      $('#start-button').dataset.icon = actionIcon;
-    }
     const label = isBreak ? phase === 'completed' ? 'Start focusing' : 'End break' : focusing ? 'Pause a moment' : phase === 'completed' ? 'Begin another session' : phase === 'paused' ? 'Keep going' : 'Start focusing';
-    quickbar.render({ time: formatted, remaining: spokenTime(ms), label, running: focusing, paused: phase === 'paused', completed: phase === 'completed', disabled: travelling || editingAvatar || pending });
-    $('#start-button span').textContent = label;
-    $('#start-button').disabled = travelling || editingAvatar || pending;
+    pill.render({ time: formatted, remaining: spokenTime(ms), label, running: focusing, paused: phase === 'paused', completed: phase === 'completed', disabled: travelling || editingAvatar || pending });
     $('#reset-session').hidden = isBreak || phase === 'ready' || phase === 'completed';
     $('#reset-session').disabled = editingAvatar || pending;
     $('#session-kind').hidden = phase === 'ready' || focusing;
@@ -195,10 +187,6 @@ export function createTimerUI(app) {
     const record = state.history.find(entry => entry.id === state.session.id);
     $('#session-result-copy').textContent = record ? `${record.minutes} ${record.minutes === 1 ? 'minute' : 'minutes'} completed${record.task ? ` · ${record.task}` : ''}. +${focusCoins(record.minutes)} coins.` : 'Session complete. Ready when you are.';
     document.querySelectorAll('[data-break-minutes]').forEach(button => { button.disabled = pending || editingAvatar || travelling; });
-    if (isBreak) {
-      $('#session-label').textContent = 'TAKE YOUR TIME';
-      $('#timer-caption').textContent = phase === 'completed' ? 'ready when you are' : 'a little room to breathe';
-    }
     const presenceBadge = $('#stage-presence');
     if (presenceBadge.dataset.presence !== presence) {
       const [status, symbol] = presence === 'focusing' ? ['Focusing', 'clock'] : presence === 'break' ? ['On a break', 'moon'] : ['In your room', 'home'];
@@ -212,7 +200,6 @@ export function createTimerUI(app) {
       button.setAttribute('aria-pressed', Number(button.dataset.minutes) * 60000 === state.session.duration);
       button.disabled = state.session.running || editingAvatar || isBreak || pending;
     });
-    app.companion.renderNote();
   }
 
   async function tick() {
@@ -225,18 +212,10 @@ export function createTimerUI(app) {
 
   function syncDock() {
     syncFocusMode();
-    $('#focus-card').hidden = app.nav.houseOpen || Boolean(app.nav.connected) || app.decorate.active;
+    if (app.nav.houseOpen || app.nav.connected || app.decorate.active) pill.closeSheet();
   }
 
-  function revealDock() {
-    if (window.matchMedia('(min-width: 1000px)').matches) return;
-    const card = $('#focus-card');
-    const rect = card.getBoundingClientRect();
-    if (rect.top >= 12 && rect.bottom <= window.innerHeight - 12) return;
-    card.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
-  }
-
-  function expand() { if (app.panels.current === 'pet') app.panels.close(); syncDock(); revealDock(); }
+  function expand() { if (app.panels.current === 'pet') app.panels.close(); syncDock(); }
 
   async function toggleRunning() {
     const { state } = app;

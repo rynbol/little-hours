@@ -8,7 +8,7 @@ test('phone focus stays within reach and survives pause, reload and resume', asy
   await page.setViewportSize({ width: 390, height: 844 }); await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.clock.install({ time: new Date('2026-09-29T12:00:00') });
   await page.goto('/'); await ready(page);
-  const bar = page.locator('#focus-quickbar'), start = page.locator('#quick-focus-start');
+  const bar = page.locator('#focus-quickbar'), start = page.locator('#start-button');
   await expect(bar).toBeVisible(); await expect(bar.locator('time')).toHaveText('25:00');
   await page.screenshot({ path: '.lh/evidence/calm-phone-arrival.png' });
   await start.click(); await expect(start).toHaveText(/Pause/); await page.clock.fastForward('05:00'); await start.click();
@@ -16,8 +16,8 @@ test('phone focus stays within reach and survives pause, reload and resume', asy
   const remaining = await bar.locator('time').textContent();
   await page.reload(); await ready(page);
   await expect(bar.locator('time')).toHaveText(remaining); await start.click(); await expect(start).toHaveAccessibleName('Pause a moment');
-  await start.click(); await page.locator('#quick-focus-settings').click();
-  await expect(page.locator('#focus-card')).toBeFocused(); await expect(bar).toBeHidden();
+  await start.click(); await page.locator('#timer-sheet-toggle').click();
+  await expect(page.locator('#focus-card')).toBeVisible(); await expect(bar).toBeVisible();
   await page.screenshot({ path: '.lh/evidence/calm-phone-timer.png' });
   expect((await new AxeBuilder({ page }).include('#focus-card').withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze()).violations).toEqual([]);
   await page.locator('#rooms-button').click(); await expect(bar).toBeHidden();
@@ -42,8 +42,8 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 1024, height: 76
     await page.setViewportSize(viewport); await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/'); await ready(page);
     await expect(page.locator('.app-header, .app-footer, #home-connections')).toHaveCount(0);
-    const tools = await page.locator('.room-tools').boundingBox();
-    expect(tools.y + tools.height).toBeLessThan(viewport.height - (viewport.width < 1000 ? 76 : 0));
+    const tools = await page.locator('.room-tools').boundingBox(), pill = await page.locator('#focus-quickbar').boundingBox();
+    expect(tools.y + tools.height).toBeLessThanOrEqual(viewport.height); expect(tools.x + tools.width).toBeLessThanOrEqual(pill.x);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
     await page.locator('#room-more-toggle').click();
     const menu = await page.locator('#room-more').boundingBox();

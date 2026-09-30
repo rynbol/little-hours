@@ -34,7 +34,7 @@ export default {
     const start = await app.room();
     await steps.openDecorate(app);
     check('Decorate opens the builder panel', await app.visible('#builder-panel') && await app.attr('#decorate-button', 'aria-pressed') === 'true' && (await app.room()).editing);
-    check('the timer card steps aside while decorating', !await app.visible('#focus-card'));
+    check('the timer pill steps aside while decorating', !await app.visible('#focus-quickbar'));
     check('Undo starts disabled', await app.js(`document.getElementById('undo-layout').disabled`));
 
     const name = await app.text('[data-furniture="plant"] .furniture-name');
@@ -96,7 +96,7 @@ export default {
 
     await steps.closeDecorate(app);
     check('Done decorating leaves Decorate', !await app.visible('#builder-panel') && await app.attr('#decorate-button', 'aria-pressed') === 'false' && !(await app.room()).editing);
-    check('the timer card comes back', await app.visible('#focus-card'));
+    check('the timer pill comes back', await app.visible('#focus-quickbar'));
     check('the change is saved in the browser', same(((await app.saved()).layout.items || []).find(item => item.id === id), turned), ((await app.saved()).layout.items || []).find(item => item.id === id));
     await app.reload(); await app.settle();
     check('after a reload the new piece is where it was left', same(itemOf(await app.room(), id), turned), itemOf(await app.room(), id));
@@ -109,7 +109,7 @@ export default {
     const still = await app.js(`(() => { const panel = document.getElementById('builder-panel'); return { shown: !panel.hidden, opacity: getComputedStyle(panel).opacity, moving: [panel, document.getElementById('stage'), document.getElementById('room-canvas')].flatMap(el => el.getAnimations({ subtree: true })).filter(a => a.playState === 'running').length }; })()`);
     check('reduced motion: the panel appears at once, with nothing moving', still.shown && still.opacity === '1' && still.moving === 0, still);
     await app.clickSel('#decorate-button'); await frames(app);
-    check('reduced motion: leaving is instant too', !await app.visible('#builder-panel') && await app.visible('#focus-card'));
+    check('reduced motion: leaving is instant too', !await app.visible('#builder-panel') && await app.visible('#focus-quickbar'));
     await t.close(app);
 
     app = await t.open({ seed: 'three-rooms', width: 390, height: 844, scale: 2, label: 'phone' });

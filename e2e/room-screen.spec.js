@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const ready = page => expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
-const chrome = '.room-title-row, .heading-actions, .room-tools';
+const chrome = '.room-title-row, .heading-actions, .room-tools, #focus-quickbar';
 
 async function open(page, viewport, theme = 'dusk') {
   await page.setViewportSize(viewport); await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -14,7 +14,7 @@ const geometry = page => page.evaluate(selector => {
   const box = element => { const rect = element.getBoundingClientRect(); return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height }; };
   const centre = { left: innerWidth / 3, right: innerWidth * 2 / 3, top: innerHeight / 3, bottom: innerHeight * 2 / 3 };
   const overlaps = rect => rect.left < centre.right && rect.right > centre.left && rect.top < centre.bottom && rect.bottom > centre.top;
-  const buttons = [...document.querySelectorAll('.room-heading button, .room-tools button')].filter(button => button.getClientRects().length).map(box);
+  const buttons = [...document.querySelectorAll('.room-heading button, .room-tools button, #focus-quickbar button')].filter(button => button.getClientRects().length).map(box);
   return {
     stage: box(document.getElementById('stage')),
     scrolls: document.documentElement.scrollWidth > innerWidth,

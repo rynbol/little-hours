@@ -105,7 +105,7 @@ body:not(.is-avatar-editing) .room-panel[data-panel-kind='pet'] { position: stic
 @media (max-width: 999px) {
   body:not(.is-avatar-editing) .room-panel[data-panel-kind='pet'] { position: relative; top: auto; width: min(440px, 100%); max-height: none; margin: 0 auto; overflow: visible; }
   body.is-pet-care .workspace { gap: 8px; padding-top: 8px; }
-  body.is-pet-care .room-section { position: sticky; top: 64px; z-index: 2; background: #241f2b; }
+  body.is-pet-care .room-section { position: sticky; top: 0; z-index: 2; background: #241f2b; }
   body.is-pet-care .room-heading, body.is-pet-care .room-bottom { display: none; }
   body.is-pet-care:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(230px, 34svh, 380px); }
   body.is-pet-care .room-panel[data-panel-kind='pet'] { margin-bottom: 24px; z-index: 1; }
