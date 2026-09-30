@@ -82,3 +82,19 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     expect(house.y).toBeLessThan(viewport.height / 4); expect(house.x).toBeGreaterThan(0);
   });
 }
+
+const roomWidthShown = page => page.evaluate(() => {
+  const { camera, passages } = window.__littleHours.room.diagnostics(), view = camera.getViewMatrix(true);
+  const xs = [];
+  for (const x of [-6.19, passages ? 8.25 : 6.19]) for (const y of [-0.32, 6.02]) for (const z of [-4.78, 4.78]) {
+    const m = view.m; xs.push(m[0] * x + m[4] * y + m[8] * z + m[12]);
+  }
+  return (camera.orthoRight - camera.orthoLeft) / (Math.max(...xs) - Math.min(...xs));
+});
+
+test('a phone crops the room sides so it fills more of the tall screen, while a desktop shows the whole room', async ({ page }) => {
+  await open(page, { width: 390, height: 844 });
+  expect(await roomWidthShown(page)).toBeCloseTo(0.8 / 0.94, 2);
+  await open(page, { width: 1440, height: 900 });
+  expect(await roomWidthShown(page)).toBeGreaterThanOrEqual(1 / 0.94 - 0.01);
+});

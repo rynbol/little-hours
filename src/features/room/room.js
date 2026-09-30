@@ -1511,7 +1511,8 @@ export function createRoom(container, options = {}) {
   function roomFraming() {
     const view = camera.getViewMatrix(true); let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const corner of passages && !editing ? connectedCorners : roomCorners) { Vector3.TransformCoordinatesToRef(corner, view, projectedCorner); minX = Math.min(minX, projectedCorner.x); maxX = Math.max(maxX, projectedCorner.x); minY = Math.min(minY, projectedCorner.y); maxY = Math.max(maxY, projectedCorner.y); }
-    const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2, viewHeight = Math.max(maxY - minY, (maxX - minX) / canvasAspect) / 0.94;
+    const portraitZoom = canvasAspect < 1 && !editing ? 0.8 : 1;
+    const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2, viewHeight = Math.max(maxY - minY, (maxX - minX) / canvasAspect) * portraitZoom / 0.94;
     return { centerX, centerY, height: viewHeight };
   }
   scene.onBeforeRenderObservable.add(() => { if (fitAlpha !== camera.alpha || fitBeta !== camera.beta) fitRoom(); });
