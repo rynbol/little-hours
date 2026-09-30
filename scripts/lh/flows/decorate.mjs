@@ -61,6 +61,7 @@ export default {
 
     await app.key('Escape'); await frames(app);
     check('Escape deselects the piece', (await app.room()).selectedId === null);
+    await app.settle();
     const where = await app.point({ item: id });
     check('the new piece is on screen', where?.visible, where);
     await app.click(where.x, where.y); await frames(app);
