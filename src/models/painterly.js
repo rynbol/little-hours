@@ -18,7 +18,7 @@ float plStroke(vec3 p, vec3 n) {
 vec3 plLight(vec3 light, vec3 n, vec3 v, vec3 p) {
   float level = max(max(light.r, light.g), light.b);
   vec3 hue = light / max(level, 0.0001);
-  float lit = smoothstep(0.2, 0.46, level + (plNoise(p * 3.0) - 0.5) * 0.08);
+  float lit = smoothstep(plBand.x, plBand.y, level + (plNoise(p * 3.0) - 0.5) * 0.08);
   vec3 tone = hue * mix(plShadow, vec3(1.0), lit) * (0.66 + 0.38 * lit + 0.1 * smoothstep(0.85, 1.3, level));
   float facing = 1.0 - max(dot(n, v), 0.0);
   tone += plRim * pow(facing, 3.0) * smoothstep(-0.3, 0.7, n.y) * (0.25 + 0.35 * lit);
@@ -39,32 +39,32 @@ export class PainterlyPlugin extends MaterialPluginBase {
     return {
       ubo: [
         { name: 'plLook', size: 1, type: 'float' }, { name: 'plShadow', size: 3, type: 'vec3' }, { name: 'plRim', size: 3, type: 'vec3' },
-        { name: 'plHaze', size: 3, type: 'vec3' }, { name: 'plDepth', size: 4, type: 'vec4' },
+        { name: 'plHaze', size: 3, type: 'vec3' }, { name: 'plDepth', size: 4, type: 'vec4' }, { name: 'plBand', size: 2, type: 'vec2' },
       ],
-      fragment: 'uniform float plLook; uniform vec3 plShadow, plRim, plHaze; uniform vec4 plDepth;',
+      fragment: 'uniform float plLook; uniform vec3 plShadow, plRim, plHaze; uniform vec4 plDepth; uniform vec2 plBand;',
     };
   }
   bindForSubMesh(uniformBuffer) {
-    const { look, shadow, rim, haze, depth } = this.state;
+    const { look, shadow, rim, haze, depth, band } = this.state;
     uniformBuffer.updateFloat('plLook', look);
     uniformBuffer.updateFloat3('plShadow', ...shadow); uniformBuffer.updateFloat3('plRim', ...rim); uniformBuffer.updateFloat3('plHaze', ...haze);
-    uniformBuffer.updateFloat4('plDepth', ...depth);
+    uniformBuffer.updateFloat4('plDepth', ...depth); uniformBuffer.updateFloat2('plBand', ...band);
   }
   getCustomCode(shaderType) {
     if (shaderType !== 'fragment') return null;
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: PAINTERLY_FRAGMENT,
       [`!${LIGHT_HOOK.source}`]: '\n#ifdef LIGHT0\ndiffuseBase=plLight(diffuseBase,normalW,viewDirectionW,vPositionW);\n#endif\nbaseColor.rgb*=mix(vec3(1.0),vec3(0.95+0.1*plStroke(vPositionW,normalW)),plLook);\nvec3 finalDiffuse=',
-      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: 'float plFar=smoothstep(plDepth.x,plDepth.y,length(vEyePosition.xyz-vPositionW)),plLow=1.0-smoothstep(plDepth.z,plDepth.w,vPositionW.y);\ncolor.rgb=mix(color.rgb,plHaze,plLook*clamp(plFar*0.3+plLow*0.55,0.0,0.7));',
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: 'float plFar=smoothstep(plDepth.x,plDepth.y,length(vEyePosition.xyz-vPositionW)),plLow=1.0-smoothstep(plDepth.z,plDepth.w,vPositionW.y);\ncolor.rgb=mix(color.rgb,plHaze,plLook*clamp(plFar*0.3+plLow*0.38,0.0,0.6));',
     };
   }
 }
 
 export const PAINTERLY_LOOKS = Object.freeze({
-  day: { shadow: [0.62, 0.7, 0.92], rim: [1, 0.96, 0.82], haze: [0.8, 0.88, 0.96] },
-  dusk: { shadow: [0.56, 0.54, 0.86], rim: [1, 0.8, 0.62], haze: [0.44, 0.45, 0.66] },
-  rain: { shadow: [0.62, 0.7, 0.8], rim: [0.86, 0.92, 0.96], haze: [0.58, 0.68, 0.74] },
-  interior: { shadow: [0.74, 0.62, 0.8], rim: [1, 0.8, 0.56], haze: [0.3, 0.24, 0.3], depth: [900, 1000, -900, -800] },
+  day: { band: [0.8, 1.02], shadow: [0.62, 0.7, 0.92], rim: [1, 0.96, 0.82], haze: [0.8, 0.88, 0.96] },
+  dusk: { band: [0.7, 0.92], shadow: [0.56, 0.54, 0.86], rim: [1, 0.8, 0.62], haze: [0.44, 0.45, 0.66] },
+  rain: { band: [0.74, 0.86], shadow: [0.62, 0.7, 0.8], rim: [0.86, 0.92, 0.96], haze: [0.58, 0.68, 0.74] },
+  interior: { band: [0.2, 0.46], shadow: [0.74, 0.62, 0.8], rim: [1, 0.8, 0.56], haze: [0.3, 0.24, 0.3], depth: [900, 1000, -900, -800] },
 });
 
 const states = new WeakMap();
@@ -73,7 +73,7 @@ const dress = (material, state) => material instanceof StandardMaterial && !mate
 
 export function createPainterly(scene, theme = 'day') {
   if (!registered) { RegisterMaterialPlugin('Painterly', material => { const state = states.get(material.getScene()); return state ? dress(material, state) : null; }); registered = true; }
-  const state = { look: 1, depth: [26, 44, -5.5, -1.4], ...PAINTERLY_LOOKS[theme] || PAINTERLY_LOOKS.day };
+  const state = { look: 1, depth: [26, 44, -6.5, -1.8], ...PAINTERLY_LOOKS[theme] || PAINTERLY_LOOKS.day };
   states.set(scene, state);
   scene.materials.forEach(material => dress(material, state));
   return {

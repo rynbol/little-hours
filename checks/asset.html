@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Little Hours asset close-up</title>
+<link rel="stylesheet" href="../src/features/house/island-ui.css">
+<style>html,body{margin:0;height:100%;overflow:hidden;background:linear-gradient(#4f8fd8,#d9ebf1)}canvas{position:fixed;inset:0;width:100%;height:100%}</style></head>
+<body><div id="sky"></div><canvas id="stage"></canvas><script type="module">
+if (!import.meta.env.DEV) throw new Error('Development check only');
+import { Engine } from '@babylonjs/core/Engines/engine.js';
+import { Scene } from '@babylonjs/core/scene.js';
+import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera.js';
+import { Camera } from '@babylonjs/core/Cameras/camera.js';
+import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
+import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
+import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
+import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
+import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { placeAsset } from '../src/models/assets.js';
+import { createPainterly } from '../src/models/painterly.js';
+import { ISLAND_ATMOSPHERES, islandSkyArt } from '../src/features/house/island-atmosphere.js';
+const params = new URLSearchParams(location.search), theme = params.get('theme') || 'day', light = ISLAND_ATMOSPHERES[theme];
+document.getElementById('sky').className = 'island-sky';
+document.getElementById('sky').innerHTML = islandSkyArt(theme, innerWidth, innerHeight);
+const engine = new Engine(document.getElementById('stage'), true, { alpha: true, preserveDrawingBuffer: true });
+const scene = new Scene(engine); scene.useRightHandedSystem = true; scene.clearColor = new Color4(0, 0, 0, 0);
+createPainterly(scene, theme);
+Object.assign(scene.imageProcessingConfiguration, { toneMappingEnabled: true, toneMappingType: 1, exposure: 1.12, contrast: 1.12 });
+const sky = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene);
+sky.intensity = light.fill; sky.diffuse = Color3.FromHexString(light.sky); sky.groundColor = Color3.FromHexString(light.ground);
+const sun = new DirectionalLight('afternoon', new Vector3(-1, -2, -1), scene);
+sun.intensity = light.key; sun.diffuse = Color3.FromHexString(light.sun);
+const paint = new StandardMaterial('house-paint', scene);
+paint.diffuseColor = Color3.White(); paint.specularColor.setAll(0); paint.emissiveColor.setAll(.08);
+const names = (params.get('assets') || 'tree-round-a').split(','), spacing = Number(params.get('spacing') || 3);
+names.forEach((name, i) => {
+  const shape = placeAsset(name, { x: (i - (names.length - 1) / 2) * spacing }), data = new VertexData();
+  Object.assign(data, shape); const mesh = new Mesh(name, scene); data.applyToMesh(mesh); mesh.material = paint;
+});
+const bounds = scene.meshes.reduce((box, mesh) => { const { minimumWorld: lo, maximumWorld: hi } = mesh.getBoundingInfo().boundingBox; return { lo: Vector3.Minimize(box.lo, lo), hi: Vector3.Maximize(box.hi, hi) }; }, { lo: new Vector3(Infinity, Infinity, Infinity), hi: new Vector3(-Infinity, -Infinity, -Infinity) });
+const camera = new ArcRotateCamera('close-up', Math.PI / 2.8 + Number(params.get('turn') || 0), 1.02, 40, Vector3.Center(bounds.lo, bounds.hi), scene);
+camera.mode = Camera.ORTHOGRAPHIC_CAMERA; camera.minZ = .1; camera.maxZ = 200;
+const reach = Math.max(bounds.hi.x - bounds.lo.x, bounds.hi.y - bounds.lo.y, bounds.hi.z - bounds.lo.z) * .62, aspect = innerWidth / innerHeight;
+Object.assign(camera, { orthoLeft: -reach * aspect, orthoRight: reach * aspect, orthoTop: reach, orthoBottom: -reach });
+await scene.whenReadyAsync();
+scene.render(); scene.render();
+document.body.dataset.ready = 'true';
+</script></body></html>

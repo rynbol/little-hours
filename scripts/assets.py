@@ -1,5 +1,5 @@
 import array, base64, bpy, bmesh, json, math, os, random, subprocess, sys
-from mathutils import Vector, noise
+from mathutils import Matrix, Vector, noise
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'src', 'models', 'assets')
@@ -179,7 +179,7 @@ def gradient(low, high, bottom, top, jitter=.04, seed=0):
 
 
 LEAVES = {
-    'sage': ('#4c6e5a', '#a3c27c'), 'olive': ('#557050', '#b2c877'), 'deep': ('#44634f', '#8fb474'),
+    'sage': ('#3d6647', '#9cc466'), 'olive': ('#48683a', '#b6cd5c'), 'deep': ('#33593f', '#86b45e'),
     'blossom': ('#b5798f', '#f8d7da'), 'pine': ('#4d6e58', '#9dbb8a'), 'willow': ('#6a8a5a', '#b4c98e'),
 }
 BARK = ('#5e4535', '#8a6a52')
@@ -193,6 +193,37 @@ def lobe(at, radius, seed, subdivisions=3):
         n = v.co.normalized()
         k = 1 + .14 * noise.noise(n * 1.2 + offset) + .06 * noise.noise(n * 2.6 + offset)
         v.co = Vector((n.x * radius.x, n.y * radius.y, n.z * radius.z * (.78 if n.z < 0 else 1))) * k
+    return obj
+
+
+def foliage(centre, reach, count, seed, low, high, size=.3, faces=3200, soften=.6):
+    rng = random.Random(seed)
+    sun = Vector((-.4, -.5, .77)).normalized()
+    top = high.lerp(hex_rgb('#f4f0a8'), .4)
+    parts = []
+    for k in range(count):
+        z = 1 - (k + .5) / count * 2
+        a = k * 2.39996 + rng.uniform(-.2, .2)
+        ring = math.sqrt(max(0, 1 - z * z))
+        at = centre + Vector((math.cos(a) * ring * reach.x, math.sin(a) * ring * reach.y, z * reach.z * (.8 if z < 0 else 1))) * rng.uniform(.55, .8)
+        r = size * rng.uniform(.9, 1.15)
+        parts.append(lobe(at, Vector((r, r, r * .85)), seed * 31 + k, 2))
+        out = (at - centre).normalized()
+        for i in range(11):
+            u, w = rng.uniform(-.35, 1), rng.uniform(0, math.tau)
+            d = Vector((math.sqrt(1 - u * u) * math.cos(w), math.sqrt(1 - u * u) * math.sin(w), u))
+            d = (d + out * .6).normalized()
+            q = r * rng.uniform(.3, .42)
+            parts.append(lobe(at + d * r * .78, Vector((q, q, q * .85)), seed * 97 + k * 13 + i, 1))
+    obj = join(parts, 'canopy')
+    fuse(obj, size * .06, faces)
+    def colour(co, vertex):
+        t = max(0, min(1, (co.z - centre.z + reach.z) / (2 * reach.z)))
+        facing = (co - centre).normalized().dot(sun)
+        c = low.lerp(high, smoothstep(0, 1, t) * .8 + .2 * max(0, facing)).lerp(top, smoothstep(.2, .9, facing) * t * .7)
+        return c * (.96 + .08 * noise.noise(co * 5 + Vector((seed, 0, 0))))
+    paint(obj, colour)
+    radial_normals(obj, centre, soften)
     return obj
 
 
@@ -210,27 +241,17 @@ def park_tree(seed, leaves, size=1.0, lobes=8, wide=1.0, tall=1.0, girth=.17):
         a = k / 3 * math.tau + seed + .5
         d = Vector((math.cos(a), math.sin(a), 0))
         parts.append(branch([fork, fork + d * .25 * size + Vector((0, 0, .3 * size)), centre + d * .55 * size + Vector((0, 0, -.1 * size))], .07 * size, tip=.4, resolution=4))
-    puffs, tips = [lobe(centre, reach * .72, seed, 2)], []
+    tips = []
     for k in range(lobes):
         z = 1 - (k + .5) / lobes * 1.7
         a = k * 2.39996 + rng.uniform(-.3, .3)
         ring = math.sqrt(max(0, 1 - z * z))
         at = centre + Vector((math.cos(a) * ring * reach.x, math.sin(a) * ring * reach.y, z * reach.z)) * .62
-        radius = rng.uniform(.36, .48) * size * wide
-        puffs.append(lobe(at, Vector((1, 1, .85)) * radius, seed + k + 1, 2))
-        tips.append((at, radius))
+        tips.append((at, rng.uniform(.36, .48) * size * wide))
     wood = join(parts, 'wood')
     paint(wood, gradient(*BARK, 0, height * 1.4))
     low, high = (hex_rgb(c) for c in LEAVES[leaves])
-    middle, top, sun = low.lerp(high, .55), high.lerp(hex_rgb('#f1f0b8'), .35), Vector((-.4, -.5, .77)).normalized()
-    def colour(co, vertex):
-        t = max(0, min(1, (co.z - centre.z + reach.z) / (2 * reach.z) + .06 * noise.noise(co * 3)))
-        base = low.lerp(middle, min(1, t * 1.6)) if t < .62 else middle.lerp(top, (t - .62) / .38)
-        return base.lerp(top, max(0, (co - centre).normalized().dot(sun)) * .25)
-    for obj in puffs:
-        paint(obj, colour)
-    canopy = join(puffs, 'canopy')
-    canopy.data.polygons.foreach_set('use_smooth', [False] * len(canopy.data.polygons))
+    canopy = foliage(centre, reach, int(9 + 4 * wide), seed, low, high, .5 * size, 1500, .7)
     return wood, canopy, tips, centre.z
 
 
@@ -330,16 +351,8 @@ def sapling(seed, size=1.0):
 
 
 def bush(seed, size=1.0, leaves='olive'):
-    rng = random.Random(seed)
-    puffs = [lobe(Vector((0, 0, .2 * size)), Vector((.4, .4, .32)) * size, seed)]
-    for k in range(4):
-        a = k / 4 * math.tau + rng.uniform(-.4, .4)
-        puffs.append(lobe(Vector((math.cos(a) * .3, math.sin(a) * .3, rng.uniform(.1, .2))) * size, Vector((1, 1, .8)) * rng.uniform(.24, .3) * size, seed + k))
-    for obj in puffs:
-        paint(obj, gradient(*LEAVES[leaves], 0, .55 * size, jitter=.08, seed=seed))
-    shrub = join(puffs, 'bush')
-    radial_normals(shrub, Vector((0, 0, 0)), .55)
-    return [shrub]
+    low, high = (hex_rgb(c) for c in LEAVES[leaves])
+    return [foliage(Vector((0, 0, .26 * size)), Vector((.42, .38, .24)) * size, 6, seed, low, high, .24 * size, 900)]
 
 
 def rock(seed, size=1.0):
@@ -421,100 +434,142 @@ def outline(count):
 
 
 CLIFF_PROFILE = [
-    (-.3, 1.018, '#a69777'), (-.65, 1.015, '#b7a486'), (-1.2, .98, '#c1ae94'),
-    (-1.9, .88, '#b7aa94'), (-2.7, .73, '#aaa397'), (-3.5, .53, '#9b9a95'),
-    (-4.2, .32, '#909393'), (-4.9, .12, '#87908e'), (-5.4, .035, '#808c88'),
+    (-.3, 1.018), (-.65, 1.015), (-1.2, .975), (-1.8, .88), (-2.4, .7),
+    (-2.9, .47), (-3.25, .24), (-3.45, .08),
 ]
+STRATA = .42
+
+
+def strata_band(z):
+    return math.floor((-z + .12 * noise.noise(Vector((z * 3, 0, 0)))) / STRATA)
+
+
+def rock_lobe(at, radius, depth, seed, sides=9):
+    bpy.ops.mesh.primitive_cone_add(vertices=sides, radius1=.08, radius2=1, depth=1, rotation=(0, 0, seed))
+    lobe = bpy.context.object
+    bpy.ops.object.transform_apply(rotation=True)
+    for v in lobe.data.vertices:
+        t = .5 - v.co.z
+        wob = 1 + .28 * noise.noise(Vector((v.co.x * 2, v.co.y * 2, seed)))
+        v.co = Vector((v.co.x * radius.x * wob * (1 - .3 * t * t), v.co.y * radius.y * wob * (1 - .3 * t * t), -t * depth))
+    lobe.location = at
+    bpy.ops.object.transform_apply(location=True)
+    return lobe
 
 
 def island_cliff():
-    data = outline(120)
-    cx, cz, rz = data['island']['cx'], data['island']['cz'], data['island']['rz']
-    mesh = bpy.data.meshes.new('cliff')
+    data = outline(160)
+    cx, cz, rx, rz = data['island']['cx'], data['island']['cz'], data['island']['rx'], data['island']['rz']
+    mesh = bpy.data.meshes.new('rim')
     bm = bmesh.new()
     rows = []
-    for r, (y, scale, _) in enumerate(CLIFF_PROFILE):
+    for y, scale in ((-.3, 1.018), (-.65, 1.015), (-1.3, .96), (-1.7, .82)):
         forward = rz * (1 - min(1, scale)) * .67
         rows.append([bm.verts.new((cx + (x - cx) * scale, cz + (z - cz) * scale + forward, y)) for x, z in data['points']])
     count = len(data['points'])
     for r in range(len(rows) - 1):
         for j in range(count):
             bm.faces.new((rows[r][j], rows[r][(j + 1) % count], rows[r + 1][(j + 1) % count], rows[r + 1][j]))
-    tip = bm.verts.new((cx + .2, cz + rz * .67, -5.55))
-    for j in range(count):
-        bm.faces.new((rows[-1][j], rows[-1][(j + 1) % count], tip))
-    bm.normal_update()
     bm.to_mesh(mesh)
-    cliff = bpy.data.objects.new('cliff', mesh)
-    bpy.context.collection.objects.link(cliff)
-    active(cliff)
+    rim = bpy.data.objects.new('rim', mesh)
+    bpy.context.collection.objects.link(rim)
+    active(rim)
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.normals_make_consistent(inside=False)
     bpy.ops.object.mode_set(mode='OBJECT')
-    fine = cliff.modifiers.new('fine', 'SUBSURF')
+    fine = rim.modifiers.new('fine', 'SUBSURF')
     fine.levels = 2
-    fine.subdivision_type = 'CATMULL_CLARK'
-    apply_all(cliff)
-    for v in cliff.data.vertices:
-        fixed = max(0, min(1, (-.4 - v.co.z) / .45))
-        if fixed:
-            radial = Vector((v.co.x - cx, v.co.y - cz, 0)).normalized()
-            cells = noise.voronoi(v.co * Vector((.8, .8, 1.3)), distance_metric='DISTANCE')[0]
-            push = .22 * noise.noise(v.co * Vector((.35, .35, .6))) + .14 * (.45 - cells[0])
-            v.co += radial * push * .6 * fixed
-    faces = len(cliff.data.polygons)
-    budget = cliff.modifiers.new('facets', 'DECIMATE')
-    budget.ratio = 3600 / faces
-    apply_all(cliff)
+    apply_all(rim)
+    rng = random.Random(9)
+    front = cz + rz * .12
+    lobes = [rock_lobe(Vector((cx, front, -1.25)), Vector((rx * .97, rz * .97, 1)), 3.9, 0, 18)]
+    for k in range(7):
+        a = k / 7 * math.tau + rng.uniform(-.25, .25)
+        reach = rng.uniform(.35, .7)
+        at = Vector((cx + math.cos(a) * rx * reach * .7, front + rz * .2 + math.sin(a) * rz * reach * .55, -1.6))
+        size = rng.uniform(2.4, 3.8) * (1.2 - reach * .5)
+        lobes.append(rock_lobe(at, Vector((size, size * .8, 1)), min(3.9, rng.uniform(3, 4.6) * (1.2 - reach * .5)), k + 1))
+    mass = join(lobes, 'mass')
+    fuse(mass, .11, 400000)
+    insets = [rng.uniform(0, .3) for _ in range(24)]
+    for v in mass.data.vertices:
+        radial = Vector((v.co.x - cx, (v.co.y - front) * 1.6, 0))
+        radial = radial.normalized() if radial.length > .01 else Vector((0, 0, 0))
+        z = v.co.z + .12 * noise.noise(Vector((v.co.x * .6, v.co.y * .6, 0)))
+        band = max(0, min(23, strata_band(z)))
+        within = ((-z) / STRATA) % 1
+        angle = math.atan2(v.co.y - front, v.co.x - cx)
+        ledge = insets[band] * (.5 + .5 * noise.noise(Vector((angle * 2.2, band * 1.7, 0)))) + .12 * smoothstep(.75, 1, within)
+        dist, _ = noise.voronoi(Vector((v.co.x * 1.1, v.co.y * 1.1, band * 3.7)), distance_metric='DISTANCE')
+        column = .22 * smoothstep(.0, .3, dist[1] - dist[0]) - .11
+        side = max(0, min(1, 1 - abs(v.normal.z) * 1.2))
+        v.co += radial * (column + .05 * noise.noise(v.co * Vector((.5, .5, .9))) - ledge) * side
+    budget = mass.modifiers.new('facets', 'DECIMATE')
+    budget.ratio = min(1, 9000 / len(mass.data.polygons))
+    apply_all(mass)
+    cliff = join([rim, mass], 'cliff')
     cliff.data.polygons.foreach_set('use_smooth', [True] * len(cliff.data.polygons))
-    bands = [(y, hex_rgb(c)) for y, _, c in CLIFF_PROFILE]
-    grass = hex_rgb('#7d986e')
+    warm, pale, cool, deep = hex_rgb('#9a8b74'), hex_rgb('#c2b597'), hex_rgb('#7f8594'), hex_rgb('#5d6577')
+    moss, lawn, soil = hex_rgb('#6d8f3f'), hex_rgb('#7aa046'), hex_rgb('#6e5842')
     def colour(co, vertex):
-        z = co.z + .08 * noise.noise(co * 2.2)
-        for (y0, c0), (y1, c1) in zip(bands, bands[1:]):
-            if z >= y1:
-                base = c0.lerp(c1, (y0 - z) / (y0 - y1))
-                break
-        else:
-            base = bands[-1][1]
-        if z > -.7:
-            return grass.lerp(base, max(0, min(1, (-.3 - z) / .4)))
+        z = co.z + .12 * noise.noise(Vector((co.x * .6, co.y * .6, 0)))
+        band = strata_band(z)
+        depth = max(0, min(1, (-z - .6) / 4.4))
+        base = (warm if band % 2 else pale).lerp(cool, depth * .8).lerp(deep, max(0, depth - .55) * 1.4)
+        base = base * (.94 + .1 * noise.noise(co * Vector((.8, .8, 3))))
+        if z > -.42:
+            return lawn
+        if z > -.62:
+            return soil.lerp(lawn, max(0, (z + .62) / .2) ** 2)
+        if vertex.normal.z > .45 and depth < .75:
+            return base.lerp(moss, min(1, (vertex.normal.z - .45) * 3) * (1 - depth))
         return base
     paint(cliff, colour)
-    rng = random.Random(4)
     roots, vines = [], []
-    for i in range(16):
-        x, z = data['points'][(i * 37 + rng.randrange(4)) % count]
+    for i in range(34):
+        x, z = data['points'][(i * 47 + rng.randrange(5)) % count]
         out = Vector((x - cx, z - cz, 0)).normalized()
-        top = Vector((x, z, -.32)) + out * .06
-        long = rng.uniform(.4, 1.2)
-        sway = Vector((rng.uniform(-.2, .2), rng.uniform(-.2, .2), 0))
-        spine = [top, top + out * .14 + sway * .4 + Vector((0, 0, -long * .45)), top + out * .02 + sway + Vector((0, rz * .04, -long))]
-        (vines if i % 3 == 0 else roots).append(branch(spine, .04 if i % 3 else .03, tip=.2, resolution=4))
-    for group, low, high in ((roots, '#5a4436', '#7a5c47'), (vines, '#5f7d52', '#95b27a')):
+        top = Vector((x, z, -.4)) + out * .08
+        long = rng.uniform(.35, 1.4)
+        sway = Vector((rng.uniform(-.15, .15), rng.uniform(-.15, .15), 0))
+        spine = [top, top + out * .1 + sway * .4 + Vector((0, 0, -long * .45)), top + out * .03 + sway + Vector((0, rz * .03, -long))]
+        (vines if i % 3 else roots).append(branch(spine, .05 if i % 3 else .045, tip=.2, resolution=4))
+    for group, low, high in ((roots, '#4f3d31', '#6f5543'), (vines, '#4f6f37', '#8fb25a')):
         strand = join(group, 'strands')
         strand.data.polygons.foreach_set('use_smooth', [False] * len(strand.data.polygons))
-        paint(strand, gradient(low, high, -2, -.3))
+        paint(strand, gradient(low, high, -1.8, -.4))
         cliff = join([cliff, strand], 'cliff')
     return [cliff]
 
 
+def smoothstep(a, b, x):
+    t = max(0, min(1, (x - a) / (b - a)))
+    return t * t * (3 - 2 * t)
+
+
 def islet(seed, size=1.0):
     rng = random.Random(seed)
-    top = puff(Vector((0, 0, 0)), Vector((.62, .55, .14)) * size, seed, lump=.1, subdivisions=3)
-    paint(top, gradient('#7a9368', '#a9bd8c', -.05 * size, .12 * size))
-    radial_normals(top, Vector((0, 0, -.3 * size)), .5)
-    stone = puff(Vector((0, 0, -.45 * size)), Vector((.58, .5, .5)) * size, seed + 3, lump=.2, subdivisions=3)
-    for v in stone.data.vertices:
-        if v.co.z < -.45 * size:
-            k = (-.45 * size - v.co.z) / (.5 * size)
-            v.co.x *= 1 - .75 * k
-            v.co.y *= 1 - .75 * k
-            v.co.z -= k * .5 * size
-    paint(stone, gradient('#574d6e', '#b39584', -1.3 * size, -.05 * size, jitter=.1, seed=seed))
-    stone.data.polygons.foreach_set('use_smooth', [False] * len(stone.data.polygons))
-    return [top, stone]
+    top = puff(Vector((0, 0, 0)), Vector((.7, .6, .12)) * size, seed, lump=.08, subdivisions=3)
+    for v in top.data.vertices:
+        if v.co.z < 0:
+            v.co.z *= .3
+    paint(top, gradient('#6d9440', '#9fc452', -.03 * size, .1 * size, jitter=.1, seed=seed))
+    mass = [rock_lobe(Vector((0, 0, -.02 * size)), Vector((.66, .56, 1)) * size, 1.1 * size, seed, 11)]
+    for k in range(3):
+        a = k / 3 * math.tau + rng.uniform(0, 1)
+        mass.append(rock_lobe(Vector((math.cos(a) * .3, math.sin(a) * .26, -.2)) * size, Vector((.3, .26, 1)) * size, rng.uniform(.9, 1.5) * size, seed + k + 1, 8))
+    stone = join(mass, 'stone')
+    fuse(stone, .04 * size, 3000)
+    warm, pale, cool = hex_rgb('#9a8b74'), hex_rgb('#c2b597'), hex_rgb('#6f7789')
+    def colour(co, vertex):
+        band = math.floor((-co.z + .04 * noise.noise(co * 4)) / (.16 * size))
+        depth = max(0, min(1, -co.z / (1.4 * size)))
+        return (warm if band % 2 else pale).lerp(cool, depth) * (.94 + .1 * noise.noise(co * 6))
+    paint(stone, colour)
+    stone.data.polygons.foreach_set('use_smooth', [True] * len(stone.data.polygons))
+    tuft = foliage(Vector((.12, .05, .2)) * size, Vector((.2, .18, .14)) * size, 5, seed + 9, hex_rgb('#4c6e3a'), hex_rgb('#a6c65a'), .13 * size, 500)
+    return [top, stone, tuft]
 
 
 def preview(path, lift=.42):
@@ -584,7 +639,7 @@ if __name__ == '__main__':
     for name in names:
         reset()
         objects = BUILDS[name]()
-        bake_occlusion(objects, .45 if name.startswith('tree') else .2 if name.startswith('cloud') else .4 if name == 'island-cliff' else .75)
+        bake_occlusion(objects, .45 if name.startswith('tree') or name in ('bush', 'sapling') else .2 if name.startswith('cloud') else .4 if name == 'island-cliff' else .3 if name.startswith('islet') else .75)
         export(objects, name, flat=name in FLAT)
         if shot:
             preview(os.path.join(shot, name + '.png'), -.2 if 'cliff' in name else .42)

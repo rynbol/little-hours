@@ -1,8 +1,12 @@
 // The one cottage around all the rooms: a front that opens like a dollhouse,
 // roofs that run on from room to room, and a stair hall up to the loft.
 export const STAIR_TOP = -1.03, WALL_TOP = 2.95, FRONT = 2.2, BACK = -2.2, HALF = 2.55, RISE = 1.75, BAY = .7;
-const plaster = '#f8ecd6', stone = '#cdbb9f', timber = '#76553f', cream = '#f6ecd6';
-const shutter = '#8fa487', door = '#8b5d44', slate = ['#5a746c', '#526a62'], ceiling = '#c9a47c', brick = '#ae8b70';
+const plaster = '#f0e2c6', timber = '#6b4a36', cream = '#f3e6cc';
+const shutter = '#7f9c7a', door = '#86573f', ceiling = '#c9a47c', brick = '#ae8b70';
+const stones = ['#b8aa92', '#a5977f', '#c8bba1', '#9a8f7e', '#b0a58f'];
+const shingles = ['#58707a', '#536b76', '#5c7479', '#50677a', '#5a7372', '#566e75'];
+const PLINTH = .5;
+const hash = n => { const s = Math.sin(n * 78.233 + 12.9898) * 43758.5453; return s - Math.floor(s); };
 const EAVE = .32, END = .25, slope = RISE / FRONT;
 export const OPEN_FRONT_RAIL = .32;
 export const HOUSE_POSITIONS = { studio: [-2.55, 0, 0], garden: [2.55, 0, 0], loft: [-2.55, 2.95, 0] };
@@ -48,6 +52,29 @@ function wallWithHoles(u0, u1, top, holes, put) {
   if (u < u1) put(u, 0, u1 - u, top);
 }
 
+function stoneCourses(u0, u1, top, seed, put) {
+  const rows = Math.max(1, Math.round(top / .17)), h = top / rows;
+  for (let row = 0; row < rows; row++) {
+    let u = u0 - (row % 2) * .12 * hash(seed + row);
+    for (let i = 0; u < u1; i++) {
+      const n = seed * 131 + row * 17 + i, w = .24 + hash(n) * .2, a = Math.max(u0, u), b = Math.min(u1, u + w);
+      if (b - a > .03) put(a + .01, row * h + .01, b - a - .02, h - .02, stones[Math.floor(hash(n * 1.7) * stones.length)], .01 + hash(n * 2.3) * .03);
+      u += w;
+    }
+  }
+}
+
+function halfTimber(u0, u1, holes, put) {
+  const posts = new Set([u0 + .07, u1 - .07]);
+  for (const [a, b, v0] of holes) if (v0 > 0) { posts.add(a - .06); posts.add(b + .06); }
+  for (const u of posts) if (u > u0 && u < u1) put(u - .06, PLINTH, .12, WALL_TOP - PLINTH);
+  let u = u0;
+  for (const [a, b, v0] of [...holes].sort((p, q) => p[0] - q[0])) {
+    if (v0 === 0) { if (a > u) put(u, PLINTH, a - u, .1); u = b; }
+  }
+  if (u < u1) put(u, PLINTH, u1 - u, .1);
+}
+
 function windowAt(api, x, y, z, w, h, theme, facing = 'front', flowers = true) {
   const [glass, glow] = windowGlass(theme);
   const along = (u, v, pw, ph, depth, hex, lift = 0, strength = 1) => facing === 'front'
@@ -66,12 +93,16 @@ function windowAt(api, x, y, z, w, h, theme, facing = 'front', flowers = true) {
 
 // One roof slope running along the house, from eave to ridge.
 function slopeRows(api, x0, x1, side) {
-  const rows = 8, run = FRONT + EAVE, length = run * Math.hypot(1, slope) / rows;
+  const rows = 12, run = FRONT + EAVE, length = run * Math.hypot(1, slope) / rows, tilt = [side * (Math.atan(slope) + .05), 0, 0];
   for (let i = 0; i < rows; i++) {
     const t = (i + .5) / rows, z = side * run * (1 - t), y = WALL_TOP + RISE - slope * Math.abs(z) + .1;
-    api.box((x0 + x1) / 2, y, z, x1 - x0, .12, length + .06, slate[i % 2], [side * Math.atan(slope), 0, 0]);
+    let x = x0 - (i % 2) * .18;
+    for (let k = 0; x < x1; k++) {
+      const n = i * 97 + k * 13 + side * 7 + Math.round(x0 * 10), w = .3 + hash(n) * .14, a = Math.max(x0, x), b = Math.min(x1, x + w);
+      if (b - a > .04) api.box((a + b) / 2, y + hash(n * 3.1) * .025, z, b - a - .025, .09, length * 1.35, shingles[Math.floor(hash(n * 1.3) * shingles.length)], tilt);
+      x += w;
+    }
   }
-  // Warm boards under the slates, seen when the front roof tips up.
   api.box((x0 + x1) / 2, WALL_TOP + RISE - slope * run / 2 - .02, side * run / 2, x1 - x0 - .1, .04, run * Math.hypot(1, slope), ceiling, [side * Math.atan(slope), 0, 0]);
 }
 
@@ -86,7 +117,7 @@ function gableEnd(api, x, facing, theme) {
 
 function endWall(api, x, floors) {
   api.box(x - .07, WALL_TOP * floors / 2, 0, .14, WALL_TOP * floors, FRONT - BACK, plaster);
-  api.box(x - .1, .17, 0, .12, .34, FRONT - BACK, stone);
+  stoneCourses(BACK, FRONT, PLINTH, 7, (u, v, w, h, hex, out) => api.box(x - .12 - out, v + h / 2, u + w / 2, .1, h, w, hex));
 }
 
 // Build one part of one room, in room coordinates.
@@ -98,7 +129,8 @@ export function buildExteriorPart(api, part, id, theme, options) {
     // The stair hall gets a narrow window on each floor.
     if (options.bay) holes.push([x0 + .17, x0 + .53, 1.05, 2.05]);
     wallWithHoles(x0, x1, WALL_TOP, holes, (u, v, w, h) => api.box(u + w / 2, v + h / 2, FRONT, w, h, .14, plaster));
-    if (id !== 'loft') wallWithHoles(x0, x1, .34, holes.filter(hole => hole[2] < .34), (u, v, w, h) => api.box(u + w / 2, v + h / 2, FRONT + .03, w, h, .12, stone));
+    if (id !== 'loft') wallWithHoles(x0, x1, PLINTH, holes.filter(hole => hole[2] < PLINTH), (u, v, w, h) => stoneCourses(u, u + w, h, id.length + u * 7, (su, sv, sw, sh, hex, out) => api.box(su + sw / 2, v + sv + sh / 2, FRONT + .04 + out, sw, sh, .1, hex)));
+    halfTimber(x0, x1, holes, (u, v, w, h) => api.box(u + w / 2, v + h / 2, FRONT + .08, w, h, .06, timber));
     // Timber at the outer corners only, so the rooms read as one front.
     for (const [x, outer] of [[x0 + .06, !options.hingeRight], [x1 - .06, options.hingeRight || options.rightEnd]]) if (outer) api.box(x, WALL_TOP / 2, FRONT + .04, .14, WALL_TOP, .16, timber);
     api.box((x0 + x1) / 2, WALL_TOP - .07, FRONT + .04, x1 - x0, .14, .16, timber);
@@ -114,13 +146,14 @@ export function buildExteriorPart(api, part, id, theme, options) {
     }
   } else if (part === 'side') {
     wallWithHoles(BACK, FRONT, WALL_TOP, [[-.55, .55, .95, 2.05]], (u, v, w, h) => api.box(HALF, v + h / 2, u + w / 2, .14, h, w, plaster));
-    if (id !== 'loft') api.box(HALF + .03, .17, 0, .12, .34, FRONT - BACK, stone);
+    if (id !== 'loft') stoneCourses(BACK, FRONT, PLINTH, 3, (u, v, w, h, hex, out) => api.box(HALF + .04 + out, v + h / 2, u + w / 2, .1, h, w, hex));
+    halfTimber(BACK, FRONT, [[-.55, .55, .95, 2.05]], (u, v, w, h) => api.box(HALF + .08, v + h / 2, u + w / 2, .06, h, w, timber));
     api.box(HALF + .04, WALL_TOP - .07, 0, .16, .14, FRONT - BACK, timber);
     api.box(HALF + .04, WALL_TOP / 2, BACK + .06, .16, WALL_TOP, .14, timber);
     windowAt(api, HALF, 1.5, 0, 1.1, 1.1, theme, 'side');
   } else if (part === 'back') {
     api.box((x0 + x1) / 2, WALL_TOP / 2, BACK - .07, x1 - x0 + .14, WALL_TOP, .14, plaster);
-    api.box((x0 + x1) / 2, .17, BACK - .1, x1 - x0 + .14, .34, .12, stone);
+    stoneCourses(x0 - .07, x1 + .07, PLINTH, 5, (u, v, w, h, hex, out) => api.box(u + w / 2, v + h / 2, BACK - .12 - out, w, h, .1, hex));
     api.box(0, -.03, 0, 2 * HALF, .06, FRONT - BACK, ceiling);
     const landing = options.under ? FRONT : STAIR_TOP;
     if (options.bay) api.box(x0 + options.bay / 2, -.03, (BACK + landing) / 2, options.bay, .06, landing - BACK, ceiling);

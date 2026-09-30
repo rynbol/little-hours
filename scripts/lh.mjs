@@ -14,6 +14,7 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
   lh doctor                         check this machine can run trustworthy checks
   lh serve [--ref <git ref>]        start a dev server and keep it running (Ctrl-C stops it)
   lh art                            render room preview assets from the actual game scenes
+  lh asset <name...>                close-up of Blender assets under the house lighting (--theme, --turn)
   lh flows                          list the flows
   lh run <flow...|all>              run flows with real input; exits 1 on any failure
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
@@ -121,6 +122,19 @@ async function roomArt() {
       console.log(`${design}: ${Math.round(bytes.length / 1024)} KB`);
     }
   } finally { await browser.close(); }
+}
+
+async function assetShots() {
+  const server = await start(), out = outDir('asset'), [width, height] = String(options.size || '1200x900').split('x').map(Number);
+  const browser = await launch({ width, height, scale: Number(options.scale || 1), reducedMotion: true });
+  try {
+    const query = new URLSearchParams({ assets: (positional.length ? positional : ['tree-round-a']).join(','), theme: options.theme || 'day', turn: String(options.turn || 0) });
+    await browser.navigate(`${server.url}/checks/asset.html?${query}`);
+    for (let attempt = 0; attempt < 400 && !await browser.js(`document.body.dataset.ready === 'true'`); attempt++) await sleep(50);
+    if (!await browser.js(`document.body.dataset.ready === 'true'`)) throw new Error('The asset close-up did not render');
+    console.log(await browser.shot(join(out, `${positional.join('+') || 'tree-round-a'}-${options.theme || 'day'}.jpg`)));
+  } finally { await browser.close(); }
+  return 0;
 }
 
 async function flowNames() {
@@ -349,7 +363,7 @@ const commands = {
   help: async () => { console.log(HELP); return 0; },
   flows: async () => { for (const name of await flowNames()) console.log(`${name.padEnd(12)} ${(await loadFlow(name)).about}`); return 0; },
   run: async () => runFlows(!positional.length || positional[0] === 'all' ? await flowNames() : positional),
-  art: roomArt, shot: shots, perf, trace: traceCommand, heap, doctor, cleanup, serve: serveForever,
+  art: roomArt, asset: assetShots, shot: shots, perf, trace: traceCommand, heap, doctor, cleanup, serve: serveForever,
 };
 
 if (!commands[command]) { console.error(`Unknown command "${command}".\n\n${HELP}`); process.exit(2); }

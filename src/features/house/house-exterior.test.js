@@ -31,3 +31,12 @@ test('the closed house follows the rooms in the save', () => {
   assert.deepEqual(extent(['studio', 'garden']), { width: 10.74, top: 5.18 });
   assert.deepEqual(extent(['studio', 'garden', 'loft']), { width: 11.44, top: 7.86 });
 });
+
+test('the cottage front is laid in separate stones and the roof in separate shingles', () => {
+  const { boxes } = boxesOf({ rooms: [{ id: 'studio' }] }, 'studio');
+  const plinth = boxes.filter(([x, y, z, w, h]) => z > FRONT && y + h / 2 <= .5 && h < .2);
+  assert.ok(plinth.length > 30, `only ${plinth.length} plinth stones`);
+  assert.ok(new Set(plinth.map(box => box[6])).size >= 3);
+  const roof = boxes.filter(([x, y]) => y > WALL_TOP + .2 && y < WALL_TOP + 1.75);
+  assert.ok(roof.length > 150, `only ${roof.length} roof pieces`);
+});
