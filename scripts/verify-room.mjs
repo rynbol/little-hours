@@ -633,6 +633,8 @@ try {
       const frameAt = (x, y) => scene.pickWithRay(new Ray(new Vector3(x, y, 0), new Vector3(0, 0, -1), 10), mesh => mesh.isEnabled() && mesh.isVisible && mesh.isDescendantOf(shell)).pickedMesh.material.diffuseColor;
       const lightness = color => (Math.max(color.r, color.g, color.b) + Math.min(color.r, color.g, color.b)) / 2;
       for (const [x, y] of [[-2.7, 3.3], [-2, 3.15]]) assert.ok(lightness(frameAt(x, y)) < 0.3, 'the glazing bars seen from the desk are dark iron, not bright gold');
+      const lights = scene.getTransformNodeByName('fairy-lights'), downAt = (x, z) => scene.pickWithRay(new Ray(new Vector3(x, 3, z), new Vector3(0, -1, 0), 3), mesh => mesh.isEnabled() && mesh.isDescendantOf(lights) && !mesh.material.name.includes('flame')).pickedMesh?.material.name;
+      for (const x of [-4.21, -4.02, -3.83, -1.35, -1.11]) assert.deepEqual([downAt(x, -4.05), downAt(x + 0.095, -4.05)], ['paint-#4d5148:{}', 'paint-#bf9762:{"metalness":0.45}'], 'each sill candle has a wick and stands in a brass dish');
     }
     if (style !== 'retreat') {
       assert.ok(shell.getChildMeshes().length <= 6, 'architecture is batched into at most six meshes');

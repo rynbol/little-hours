@@ -344,7 +344,12 @@ export function createRoom(container, options = {}) {
   const lanternGlow = createLanternGlow(scene, lanternBulbs.map(([x, y, z]) => [x, y + 0.16, z]));
   for (let i = 0; i < 5; i++) {
     const x = i < 3 ? -4.21 + i * 0.19 : -1.35 + (i - 3) * 0.24, h = 0.20 + (i % 3) * 0.11;
-    cylinder(0.07, 0.075, h, [x, 1.55 + h / 2, -4.05], material('#e6cc96'), decor.lights); sphere([0.03, 0.070, 0.03], [x, 1.60 + h, -4.05], candleFlame, decor.lights);
+    const wax = material('#e6cc96'), top = 1.565 + h;
+    cylinder(0.12, 0.1, 0.03, [x, 1.555, -4.05], palette.brass, decor.lights);
+    cylinder(0.062, 0.075, h, [x, 1.565 + h / 2, -4.05], wax, decor.lights);
+    for (const [angle, length] of [[0.6 + i, 0.07 + (i % 2) * 0.05], [2.9 + i * 1.3, 0.05]]) cylinder(0.014, 0.018, length, [x + Math.cos(angle) * 0.058, top - length / 2, -4.05 + Math.sin(angle) * 0.058], wax, decor.lights, 6);
+    cylinder(0.006, 0.006, 0.035, [x, top + 0.015, -4.05], palette.dark, decor.lights, 6);
+    sphere([0.03, 0.070, 0.03], [x, top + 0.055, -4.05], candleFlame, decor.lights);
   }
 
   // Merge architecture per material once. Furniture factories similarly batch
