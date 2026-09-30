@@ -24,7 +24,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffffff', cloudShade: '#c4d3e6',
-    castle: '#687088', castleRoof: '#3a5a74', rock: '#6e6462', ember: '#c8604a', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#e8ffd0', snow: '#f4f6fa',
+    castle: '#687088', castleRoof: '#3a5a74', rock: '#6e6462', ember: '#c8604a', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
     light: 0, night: null,
   },
   rain: {
@@ -544,6 +544,8 @@ export function vistaPalette(theme, progress) {
 
 export const windowsLit = (theme, progress) => theme === 'day' ? 0 : Math.min(1, (VISTA_THEMES[theme] || VISTA_THEMES.dusk).light + progress * 0.7);
 export const spiritsAloft = (theme, progress) => theme === 'day' ? 0 : Math.round(4 + progress * (SPIRITS - 4));
+export const BUTTERFLIES = 6;
+export const butterfliesOut = theme => theme === 'day' ? BUTTERFLIES : 0;
 export const MOON_BEARING = 0.08;
 export const moonRise = progress => 0.3 + progress * 0.3;
 
@@ -577,6 +579,7 @@ export function createSeatWorld(scene, parent) {
   const glow = { x: 0, z: -1, lit: 0, stars: 1 };
   const temp = new Color3(), matrix = new Matrix(), scale = new Vector3(1, 1, 1), spot = new Vector3(), turn = new Quaternion();
   const spiritStarts = Array.from({ length: SPIRITS }, (_, i) => { const random = seeded(101 + i); const [x, z] = ahead(-10 + (random() - 0.5) * 56, 13 + random() * 40); return { x, z, ground: terrainHeight(x, z), phase: random(), sway: random() * 6 }; });
+  const butterflyStarts = Array.from({ length: BUTTERFLIES }, (_, i) => { const random = seeded(211 + i); const [x, z] = ahead(-6 + (random() - 0.5) * 12, 9 + random() * 6); return { x, z, sway: random() * 6 }; });
 
   function paint(mesh, palette, only = null) {
     const shape = mesh.metadata.shape, colors = mesh.getVerticesData('color');
@@ -616,8 +619,16 @@ export function createSeatWorld(scene, parent) {
     shell.updateVerticesData('color', colors);
   }
   function placeSpirits(reduced) {
-    const aloft = spiritsAloft(theme, progress);
+    const aloft = spiritsAloft(theme, progress), fluttering = butterfliesOut(theme);
     for (let i = 0; i < SPIRITS; i++) {
+      if (i < fluttering) {
+        const { x, z, sway } = butterflyStarts[i], t = reduced ? 0 : seconds, wander = t * 0.35 + sway, beat = reduced ? 1 : Math.abs(Math.sin(t * 13 + sway * 5));
+        spot.set(x + Math.sin(wander) * 2.2 + Math.sin(wander * 2.3) * 0.8, 0.6 + (sway % 1.5) + Math.sin(t * 2.4 + sway) * 0.3, z + Math.cos(wander * 0.8) * 1.6);
+        scale.set(0.12 + beat * 0.5, 0.14, 0.3);
+        Quaternion.RotationYawPitchRollToRef(Math.atan2(Math.cos(wander) * 2.2, -Math.sin(wander * 0.8) * 1.3), 0, 0, turn);
+        Matrix.ComposeToRef(scale, turn, spot, matrix); matrix.copyToArray(spiritMatrices, i * 16);
+        continue;
+      }
       const start = spiritStarts[i], life = reduced ? start.phase : (seconds / SPIRIT_SECONDS + start.phase) % 1;
       const rise = i < aloft ? life : -1;
       spot.set(start.x + Math.sin(life * 9 + start.sway) * 1.6, rise < 0 ? -400 : start.ground + 0.8 + rise * 12, start.z + Math.cos(life * 7 + start.sway) * 1.6);

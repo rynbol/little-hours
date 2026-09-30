@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape } from './seat-world.js';
+import { createSeatWorld, butterfliesOut, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape } from './seat-world.js';
 
 const setup = () => { const engine = new NullEngine(), scene = new Scene(engine); return { engine, scene, world: createSeatWorld(scene, new TransformNode('room', scene)) }; };
 const litWindows = world => {
@@ -264,5 +264,26 @@ test('smoke leaves the volcano crater, widens downwind and glows with ember ligh
   world.setTheme('day'); const day = paint._floats.glow;
   world.setTheme('dusk'); assert.ok(paint._floats.glow > day);
   world.animate(3, true); assert.equal(paint._floats.time, 0);
+  engine.dispose();
+});
+
+test('butterflies flutter over the meadow by day, beating their wings, and hold still for reduced motion', () => {
+  assert.deepEqual(['day', 'dusk', 'rain'].map(butterfliesOut), [6, 0, 0]);
+  const { engine, world } = setup();
+  world.setTheme('day'); world.setEnabled(true);
+  const spirits = world.meshes.find(mesh => mesh.name === 'seat-world-spirits');
+  const flyers = () => Array.from({ length: 6 }, (_, i) => { const m = spirits._thinInstanceDataStorage.matrixData.slice(i * 16, i * 16 + 16), [x, y, z] = [m[12], m[13], m[14]]; return { y, bearing: Math.atan2(x, -z), wing: Math.hypot(m[0], m[1], m[2]), depth: Math.hypot(m[8], m[9], m[10]) }; });
+  world.animate(3, false);
+  const first = flyers();
+  world.animate(0.05, false);
+  const next = flyers();
+  for (const { y, bearing } of first) assert.ok(y > 0.5 && y < 2.5 && bearing > -0.7 && bearing < 0.4, `a butterfly at height ${y.toFixed(2)}, bearing ${bearing.toFixed(2)}`);
+  assert.ok(first.some((each, i) => Math.abs(each.wing - next[i].wing) > 0.05), 'wings beat from frame to frame');
+  world.animate(2, true);
+  const held = flyers();
+  world.animate(2, true);
+  assert.deepEqual(flyers(), held);
+  world.setTheme('dusk'); world.animate(0.1, false);
+  assert.ok(flyers().every(({ wing, depth }) => Math.abs(wing - depth) < 1e-6), 'no flapping wings at dusk, only round spirits');
   engine.dispose();
 });

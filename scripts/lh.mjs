@@ -39,6 +39,7 @@ Options:
   --turn <n>         house shots: press the turn buttons n times first (negative turns left)
   --closed           house shots: close the house first
   --look <degrees>   focus shots: drag the view round by this many degrees first
+  --probe "<expr>"   shots: print an expression evaluated with the live Babylon scene bound to scene
   --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
   --still            prefers-reduced-motion: reduce
   --headed           show the browser window
@@ -255,6 +256,7 @@ async function shots() {
         const hit = await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene, hit = scene.pick(${x}, ${y}, mesh => mesh.isEnabled() && mesh.isVisible); const mesh = hit?.pickedMesh; return mesh ? [mesh.name, mesh.material?.name, mesh.parent?.name].join(' | ') : 'nothing'; })()`);
         console.log(`  pick ${x},${y}: ${hit}`);
       }
+      if (options.probe) console.log(`  probe: ${await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; return JSON.stringify(${options.probe}); })()`)}`);
     } finally { await app.close(); }
   }
   return 0;
