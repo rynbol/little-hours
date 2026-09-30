@@ -322,7 +322,7 @@ export function createRoom(container, options = {}) {
   const wire = material('#594b39'), bulb = material('#ffdda3', { emissive: '#ffd392', emissiveIntensity: 1.25 });
   // Same paint as the bulbs, kept apart: switched-off lights unlight the bulbs
   // and snuff the sill candles, while the fireflies keep glowing.
-  const candleFlame = material('#ffdda3', { emissive: '#ffd392', emissiveIntensity: 1.25, flame: true }), moteGlow = material('#ffdda3', { emissive: '#ffd392', emissiveIntensity: 1.25, motes: true });
+  const candleFlame = material('#ffdda3', { emissive: '#ffd392', emissiveIntensity: 1.25, flame: true }), candleTip = material('#ff9a4a', { emissive: '#ff8a2e', emissiveIntensity: 1.25, flame: 'tip' }), moteGlow = material('#ffdda3', { emissive: '#ffd392', emissiveIntensity: 1.25, motes: true });
   const wirePoints = []; for (let i = 0; i <= 32; i++) wirePoints.push([-5.57 + i * 0.35, 5.50 - Math.sin(i / 32 * Math.PI) * 0.53, -4.12]); tube(wirePoints, 0.016, wire, decor.lights);
   for (let i = 0; i < 20; i++) { const x = -5.37 + i * 0.56, y = 5.50 - Math.sin((i + 0.35) / 20 * Math.PI) * 0.53; rod([x, y, -4.12], [x, y - 0.13, -4.12], 0.012, wire, decor.lights); sphere([0.057, 0.083, 0.057], [x, y - 0.18, -4.12], bulb, decor.lights); }
   const sideWire = []; for (let i = 0; i <= 24; i++) sideWire.push([-5.49, 5.44 - Math.sin(i / 24 * Math.PI) * 0.49, -4.20 + i * 0.36]); tube(sideWire, 0.014, wire, decor.lights);
@@ -349,7 +349,8 @@ export function createRoom(container, options = {}) {
     cylinder(0.062, 0.075, h, [x, 1.565 + h / 2, -4.05], wax, decor.lights);
     for (const [angle, length] of [[0.6 + i, 0.07 + (i % 2) * 0.05], [2.9 + i * 1.3, 0.05]]) cylinder(0.014, 0.018, length, [x + Math.cos(angle) * 0.058, top - length / 2, -4.05 + Math.sin(angle) * 0.058], wax, decor.lights, 6);
     cylinder(0.006, 0.006, 0.035, [x, top + 0.015, -4.05], palette.dark, decor.lights, 6);
-    sphere([0.03, 0.070, 0.03], [x, top + 0.055, -4.05], candleFlame, decor.lights);
+    sphere([0.026, 0.034, 0.026], [x, top + 0.045, -4.05], candleFlame, decor.lights);
+    cylinder(0, 0.021, 0.07, [x, top + 0.09, -4.05], candleTip, decor.lights, 10);
   }
 
   // Merge architecture per material once. Furniture factories similarly batch
@@ -373,7 +374,7 @@ export function createRoom(container, options = {}) {
   batchStatic(classicArchitecture); Object.values(decor).forEach(group => batchStatic(group, new Set(swayingLanterns)));
   // A tap on the fairy lights, the lanterns or the sill candles switches them.
   for (const mesh of decor.lights.getChildMeshes()) { mesh.isPickable = true; mesh.metadata = { ...mesh.metadata, lightSwitch: true }; }
-  const sillFlames = decor.lights.getChildMeshes().filter(mesh => mesh.material === candleFlame);
+  const sillFlames = decor.lights.getChildMeshes().filter(mesh => mesh.material === candleFlame || mesh.material === candleTip);
   const rainSeeds = Array.from({ length: 40 }, (_, i) => { const x = -4.7 + ((i * 0.618033) % 1) * 3.98; return { x, y: (i * 0.371) % 1, speed: 0.55 + (i % 4) * 0.12, top: archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2)) - 0.12 }; });
   const rainLines = rainSeeds.map(seed => [new Vector3(seed.x, 2, -4.52), new Vector3(seed.x - 0.025, 2.18, -4.52)]);
   const rain = MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, updatable: true }, scene); rain.color = color('#fffdf5'); rain.alpha = 0.6; rain.isPickable = false; rain.setEnabled(false);
@@ -1121,7 +1122,7 @@ export function createRoom(container, options = {}) {
   }
   function applyBulbs() {
     const glow = color('#ffd392').scale(theme === 'day' ? 0.50 : theme === 'dusk' ? 1.25 : 0.80);
-    bulb.emissiveColor = decorVisible.lights ? glow : Color3.Black(); candleFlame.emissiveColor = glow; moteGlow.emissiveColor = glow.clone();
+    bulb.emissiveColor = decorVisible.lights ? glow : Color3.Black(); candleFlame.emissiveColor = glow; candleTip.emissiveColor = color('#ff8a2e').scale(theme === 'day' ? 0.8 : theme === 'dusk' ? 1.25 : 1); moteGlow.emissiveColor = glow.clone();
     for (const mesh of sillFlames) mesh.setEnabled(decorVisible.lights);
     lanternGlow.setLight('#ffc278', decorVisible.lights ? ROOM_LIGHTS[theme].glow : 0);
   }
