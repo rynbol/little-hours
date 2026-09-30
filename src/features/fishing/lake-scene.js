@@ -19,7 +19,7 @@ import { GlowLayer } from '@babylonjs/core/Layers/glowLayer.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import { createMobileCompanion, disposeAvatarTemplates } from '../../models/furniture.js';
 import { createPetModel } from '../pet/index.js';
-import { buildClosedHouse, buildGardenTree, gableData, houseFrame } from '../house/index.js';
+import { buildClosedHouse, gableData, houseFrame } from '../house/index.js';
 import { speciesOf, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
 import { HOUSE_SPOT, lakeWater } from './lake-ground.js';
@@ -29,13 +29,13 @@ import { buildFishModel } from '../../models/fish-model.js';
 
 const cardSide = new Vector3(), DOCK_Y = .42, STAND = new Vector3(0, DOCK_Y, 1.35), HOME_BOBBER = new Vector3(-.15, 0, .2);
 const PALETTES = {
-  dusk: { exposure: 1.05, sky: '#ffe3c5', ground: '#645441', ambient: .55, sun: .72, sunTint: '#ffcf9f', shade: .3, lamp: .9, glow: .5, lit: '#ffc873', deep: '#2f5b72', shallow: '#6a9f9f', skyLow: '#e9b8a0', skyMid: '#8b7aa0', glint: '#ffe2b8', leaf: ['#86a275', '#97b081', '#a9bf8e'], grass: '#95a877', meadow: '#879b6c', sand: '#cdb694', stone: ['#aaa597', '#9d978a', '#b8b1a1'], light: .95 },
-  day: { exposure: 1.1, sky: '#ffe9d2', ground: '#a48b6b', ambient: .66, sun: 1, sunTint: '#ffe3bb', shade: .24, lamp: 0, glow: .35, lit: '#ffd48a', deep: '#4b8a9c', shallow: '#8cc0b6', skyLow: '#f3ead8', skyMid: '#b9d6e0', glint: '#fffaf0', leaf: ['#86a86c', '#9ab97c', '#afc88e'], grass: '#a8bb82', meadow: '#9aae76', sand: '#dcc8a2', stone: ['#c9bfae', '#b8ae9d', '#d6ccb8'], light: 1 },
-  rain: { exposure: 1, sky: '#dfe4e2', ground: '#5c5a52', ambient: .6, sun: .45, sunTint: '#e6e8e4', shade: .18, lamp: .7, glow: .45, lit: '#ffd08a', deep: '#3d5f6c', shallow: '#7fa3a3', skyLow: '#aebbbd', skyMid: '#7e8f98', glint: '#eef4f6', leaf: ['#6f8d6d', '#7f9d7a', '#91ab88'], grass: '#8a9f7c', meadow: '#7d9372', sand: '#b8ad98', stone: ['#a9a69c', '#9a978e', '#b6b3a8'], light: .85 },
+  dusk: { exposure: 1.05, sky: '#ffe3c5', ground: '#645441', ambient: .55, sun: .72, sunTint: '#ffcf9f', shade: .3, lamp: .9, glow: .5, lit: '#ffc873', deep: '#34506f', shallow: '#7fa5ad', skyLow: '#f2b8a2', skyMid: '#8b6d9f', waterSun: [-.35, .1, -1], glint: '#ffe2b8', leaf: ['#86a275', '#97b081', '#a9bf8e'], grass: '#95a877', meadow: '#879b6c', sand: '#cdb694', stone: ['#aaa597', '#9d978a', '#b8b1a1'], light: .95 },
+  day: { exposure: 1.1, sky: '#ffe9d2', ground: '#a48b6b', ambient: .66, sun: 1, sunTint: '#ffe3bb', shade: .24, lamp: 0, glow: .35, lit: '#ffd48a', deep: '#3d7b93', shallow: '#95cfc6', skyLow: '#f5ead6', skyMid: '#aed5ea', waterSun: [.35, .45, -1], glint: '#fffaf0', leaf: ['#86a86c', '#9ab97c', '#afc88e'], grass: '#a8bb82', meadow: '#9aae76', sand: '#dcc8a2', stone: ['#c9bfae', '#b8ae9d', '#d6ccb8'], light: 1 },
+  rain: { exposure: 1, sky: '#dfe4e2', ground: '#5c5a52', ambient: .6, sun: .45, sunTint: '#e6e8e4', shade: .18, lamp: .7, glow: .45, lit: '#ffd08a', deep: '#3a5463', shallow: '#76979d', skyLow: '#c2c9ce', skyMid: '#8491a3', waterSun: [0, .35, -1], glint: '#eef4f6', leaf: ['#6f8d6d', '#7f9d7a', '#91ab88'], grass: '#8a9f7c', meadow: '#7d9372', sand: '#b8ad98', stone: ['#a9a69c', '#9a978e', '#b6b3a8'], light: .85 },
 };
 const HEAD = new Vector3(STAND.x, DOCK_Y + 2.45, STAND.z), GROUND = .15, FENCE = ['#c6b99b', '#b3a585'];
-const LOOK = new Vector3(.5, 0, -5), VIEW = new Vector3(.45, .85, 1).normalize(), SUN = new Vector3(3, -8, -5).normalize();
-const TREES = [[-2.7, 1.36, 1.2, 'oak'], [-2.95, 1.3, .95, 'cherry'], [-.45, 1.42, 1.1, 'oak'], [-.15, 1.4, .95, 'cherry'], [.3, 1.36, 1.15, 'oak'], [.8, 1.36, .9, 'cherry'], [2.25, 1.38, 1.05, 'cherry'], [2.7, 1.38, 1.15, 'oak'], [-1.95, 1.7, 1.1, 'oak']];
+const REFLECTION_EYE = new Vector3(5.6, 7, 16), LOOK = new Vector3(.5, 0, -5), VIEW = new Vector3(.45, .85, 1).normalize(), SUN = new Vector3(3, -8, -5).normalize();
+const TREES = [[-2.7, 1.36, 1.05, 'tree', 0], [-2.95, 1.3, .85, 'blossom', 0], [-.45, 1.42, .95, 'tree', 2], [-.15, 1.4, .85, 'blossom', 1], [.3, 1.36, 1, 'tree', 4], [.8, 1.36, .8, 'fruit', 0], [2.25, 1.38, .85, 'blossom', 3], [2.7, 1.38, 1, 'tree', 1], [-1.95, 1.7, 1, 'tree', 3]];
 const hash = n => { const s = Math.sin(n * 78.233 + 12.9898) * 43758.5453; return s - Math.floor(s); };
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
 const easeOut = t => 1 - (1 - Math.min(1, Math.max(0, t))) ** 3;
@@ -69,11 +69,12 @@ void main() {
   vec3 base = mix(mix(shallow, deep, depth), shallow * 1.25 + vec3(.07, .06, .02), smoothstep(.84, .99, edge) * .55);
   vec3 sky = mix(skyLow, skyMid, clamp(r.y * 2.2, 0., 1.));
   vec3 col = mix(base, sky, clamp(.18 + fres * .75, 0., .88));
-  col += glint * pow(max(dot(r, normalize(sunDir)), 0.), 90.) * 1.1;
-  float twinkle = step(.93, noise(q * 9. + vec2(time * .5, -time * .35))) * (.5 + .5 * sin(time * 5. + q.x * 7.));
-  col += glint * twinkle * .22 * smoothstep(0., 1., dot(r, normalize(sunDir)) + .4);
+  col += glint * pow(max(dot(r, normalize(sunDir)), 0.), 90.) * .75;
+  float twinkle = smoothstep(.9, .99, noise(q * 4. + vec2(time * .5, -time * .35))) * (.5 + .5 * sin(time * 5. + q.x * 7.));
+  col += glint * twinkle * .16 * smoothstep(0., 1., dot(r, normalize(sunDir)) + .4);
   col += vec3(.95, .97, 1.) * min(foam * .9, .6);
-  gl_FragColor = vec4(col, 1.);
+  float fog = smoothstep(16., 42., length(vWorld.xz - eye.xz));
+  gl_FragColor = vec4(mix(col, skyLow, fog * .6), 1.);
 }`;
 const FALL_VERTEX = `precision highp float;
 attribute vec3 position; attribute vec2 uv; uniform mat4 viewProjection; varying vec2 vUv;
@@ -123,7 +124,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   const waterPaint = new ShaderMaterial('lake-water-paint', scene, { vertexSource: WATER_VERTEX, fragmentSource: WATER_FRAGMENT }, { attributes: ['position'], uniforms: ['world', 'viewProjection', 'time', 'eye', 'deep', 'shallow', 'skyLow', 'skyMid', 'glint', 'sunDir', 'ripples'] });
   waterPaint.setColor3('deep', Color3.FromHexString(palette.deep)); waterPaint.setColor3('shallow', Color3.FromHexString(palette.shallow));
   waterPaint.setColor3('skyLow', Color3.FromHexString(palette.skyLow)); waterPaint.setColor3('skyMid', Color3.FromHexString(palette.skyMid));
-  waterPaint.setColor3('glint', Color3.FromHexString(palette.glint)); waterPaint.setVector3('sunDir', SUN.scale(-1));
+  waterPaint.setColor3('glint', Color3.FromHexString(palette.glint)); waterPaint.setVector3('sunDir', new Vector3(...palette.waterSun));
   waterPaint.backFaceCulling = false; water.material = waterPaint; water.isPickable = false;
   const ripples = new Array(40).fill(0); let nextRipple = 2;
   const ripple = (x, z, strength = 1, slot) => { const i = slot ?? nextRipple; if (slot === undefined) nextRipple = 2 + (nextRipple - 1) % 8; ripples.splice(i * 4, 4, x, z, clock, strength); };
@@ -144,12 +145,12 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   const api = {
     box: (x, y, z, w, h, d, hex, tilt = 0, strength = 1) => box(x, y, z, w, h, d, hex, Array.isArray(tilt) ? tilt : [0, 0, tilt], strength),
     ball: (x, y, z, w, h, d, hex, strength = 1, tilt = 0) => ball(x, y, z, w, h, d, hex, 8, strength, tilt),
-    orb: (x, y, z, w, h, d, hex) => ball(x, y, z, w, h, d, hex, w < .12 ? 2 : w < .4 ? 4 : w < .8 ? 6 : 8),
-    cylinder: (x, y, z, top, bottom, h, hex) => cyl(x, y, z, top, bottom, h, hex, [0, 0, 0], 12),
     prism: (x, y, z, w, h, d, hex, sideways) => { const m = new Mesh('p', scene); gableData(x, y, z, w, h, d, sideways).applyToMesh(m); paint(m, hex); },
     disc: (x, y, z, diameter, depth, hex, strength = 1, sideways = false) => cyl(x, y, z, diameter, diameter, depth, hex, sideways ? [0, 0, Math.PI / 2] : [Math.PI / 2, 0, 0], 18, strength),
   };
-  const tree = (species, x, z, s) => buildGardenTree(api, species, x, z, GROUND - .02, s);
+  const tree = (x, z, s, seed) => asset(seed % 5 === 2 ? 'tree-pine' : ['tree-round-a', 'tree-round-b', 'tree-round-c'][seed % 3], { x, y: GROUND - .02, z, yaw: seed * 1.3, scale: s * (seed % 5 === 2 ? 1.6 : 1.9) });
+  const blossom = (x, z, s, seed) => asset(['tree-blossom-a', 'tree-blossom-b'][seed % 2], { x, y: GROUND - .02, z, yaw: seed, scale: s * 1.8 });
+  const bush = (x, y, z, s, yaw) => asset('bush', { x, y, z, yaw, scale: s });
   const boat = (x, z, yaw) => asset('rowboat', { x, y: .2, z, yaw });
   const reeds = (x, z, count, seed) => {
     for (let i = 0; i < count; i++) {
@@ -158,8 +159,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
       if (i % 3 === 0) ball(x + dx + lean * .1, tall - .12, z + dz, .06, .2, .06, '#7a553c', 6);
     }
   };
-  const rock = (x, y, z, s, seed) => ball(x, y + .1 * s, z, s * (1.1 + hash(seed) * .3), s * (.44 + hash(seed * 3) * .2), s * (.9 + hash(seed * 5) * .25), palette.stone[Math.abs(seed) % 3], s > 1.2 ? 10 : 6);
-  const shrub = (x, y, z, s, seed = 0) => { for (let i = 0; i < 4; i++) { const a = i * 2.3 + seed; ball(x + Math.cos(a) * .28 * s * (i > 0), y + (.32 - (i > 0) * .08) * s, z + Math.sin(a) * .22 * s * (i > 0), (i ? .62 : .8) * s, (i ? .5 : .66) * s, (i ? .58 : .76) * s, palette.leaf[Math.abs(i + seed) % 3], 7); } };
+  const rock = (x, z, s, seed, y = -.05) => asset(['rock-a', 'rock-b'][seed % 2], { x, y, z, yaw: seed * 2.1, scale: s * 1.15 });
 
   const flowers = (x, z, count, seed) => {
     const tint = [['#f3c3d0', '#f9e2e7'], ['#f6e3a8', '#fff3cf'], ['#c9b8e6', '#e4d9f4'], ['#f7f1e6', '#fdf9f1']][seed % 4];
@@ -189,17 +189,17 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   }
 
   baked.push(Object.assign(new VertexData(), createLakeBank(palette)), Object.assign(new VertexData(), createLakeGrass(palette)));
-  tree('willow', ...rim(3.2, 1.2), 1.55);
-  for (const [a, k, s, species] of TREES) tree(species, ...rim(a, k), s);
+  { const [x, z] = rim(3.2, 1.2); asset('tree-willow', { x, y: GROUND - .02, z, yaw: .6, scale: 1.1 * 1.7 }); }
+  for (const [a, k, s, kind, seed] of TREES) { const [x, z] = rim(a, k); if (kind === 'fruit') asset('tree-fruit', { x, y: GROUND - .02, z, yaw: 1, scale: s * 1.45 }); else (kind === 'blossom' ? blossom : tree)(x, z, s, seed); }
   picket(rim(.05, 1.26), rim(.45, 1.24), 8);
   const stones = [[-2.95, -2.3], [-1.75, -1.2], [-.95, -.35], [.3, 1.05], [2.15, 2.75]];
-  stones.forEach(([from, to], run) => { for (let a = from, i = 0; a < to; a += .09 + hash(i + run * 17) * .07, i++) { const [x, z] = rim(a, 1 + (hash(i * 5 + run) - .5) * .06); rock(x, -.12, z, .45 + hash(i * 3 + run * 7) * .5, i + run); } });
+  stones.forEach(([from, to], run) => { for (let a = from, i = 0; a < to; a += .09 + hash(i + run * 17) * .07, i++) { const [x, z] = rim(a, 1 + (hash(i * 5 + run) - .5) * .06); asset(['rock-a', 'rock-b'][i % 2], { x, y: -.12, z, yaw: i * 2.1, scale: .45 + hash(i * 3 + run * 7) * .5 }); } });
   const lip = rim(-2.05, 1.1), toward = [(POND.x - lip[0]), (POND.z - lip[1])].map((v, _, d) => v / Math.hypot(...d)), across = [-toward[1], toward[0]];
-  const ledge = (u, v, y, s, seed) => rock(lip[0] + across[0] * u + toward[0] * v, y, lip[1] + across[1] * u + toward[1] * v, s * .85, seed);
-  for (const [u, v, y, s] of [[0, -2.6, .7, 2.6], [-1.9, -1.6, .45, 2.2], [1.9, -1.7, .5, 2.3], [-1.45, -.2, -.25, 1.9], [1.5, -.3, -.2, 2], [-3, -.6, -.3, 1.8], [3.1, -.8, -.3, 1.7], [-3.4, -2.4, .1, 2], [3.3, -2.6, .15, 2.1]]) ledge(u, v, y, s, Math.round(u * 3 + v * 7 + 20));
-  for (const [u, v, s] of [[-1.1, .9, .7], [1.2, 1, .8], [-2.2, 1.2, .55], [2.3, 1.1, .5], [-.6, 1.5, .35]]) ledge(u, v, -.15, s, Math.round(u * 5 + 11));
-  for (const [u, v, s] of [[-2.3, -2.2, .9], [2.4, -2.4, 1], [0, -3.6, 1.3], [-3.6, -2, .8]]) shrub(lip[0] + across[0] * u + toward[0] * v, 1.3, lip[1] + across[1] * u + toward[1] * v, s, Math.round(u));
-  { const [x, z] = [4.7, -8.3]; ball(x, -.2, z, 3.4, .8, 2.5, palette.sand, 14); ball(x, -.05, z, 2.8, .75, 2, palette.grass, 14); rock(x - 1.3, -.05, z + .8, .5, 1); rock(x + 1.4, -.05, z + .5, .4, 2); tree('cherry', x + .2, z - .2, .7); flowers(x - .6, z + .5, 8, 2); }
+  const ledge = (u, v, y, s, yaw, name = 'rock-b') => asset(name, { x: lip[0] + across[0] * u + toward[0] * v, y, z: lip[1] + across[1] * u + toward[1] * v, yaw, scale: s });
+  for (const [u, v, y, s] of [[0, -2.6, .7, 2.6], [-1.9, -1.6, .45, 2.2], [1.9, -1.7, .5, 2.3], [-1.45, -.2, -.25, 1.9], [1.5, -.3, -.2, 2], [-3, -.6, -.3, 1.8], [3.1, -.8, -.3, 1.7], [-3.4, -2.4, .1, 2], [3.3, -2.6, .15, 2.1]]) ledge(u, v, y, s, u * 2.3 + v);
+  for (const [u, v, s] of [[-1.1, .9, .7], [1.2, 1, .8], [-2.2, 1.2, .55], [2.3, 1.1, .5], [-.6, 1.5, .35]]) ledge(u, v, -.15, s, u * 3, 'rock-a');
+  for (const [u, v, s] of [[-2.3, -2.2, .9], [2.4, -2.4, 1], [0, -3.6, 1.3], [-3.6, -2, .8]]) bush(lip[0] + across[0] * u + toward[0] * v, 1.35, lip[1] + across[1] * u + toward[1] * v, s, u);
+  { const [x, z] = [4.7, -8.3]; ball(x, -.2, z, 3.4, .8, 2.5, palette.sand, 14); ball(x, -.05, z, 2.8, .75, 2, palette.grass, 14); rock(x - 1.3, z + .8, .5, 1); rock(x + 1.4, z + .5, .4, 2); blossom(x + .2, z - .2, .55, 1); flowers(x - .6, z + .5, 8, 2); }
   for (const [a, k, n] of [[2.75, 1, 12], [.55, .98, 9], [-.2, .99, 8], [-2.45, 1, 10]]) { const [x, z] = rim(a, k); reeds(x, z, n, Math.round(a * 10)); }
   for (const [x, z, n, seed] of [[-5.6, 3.6, 12, 2], [-3.4, 5.2, 9, 3], [-7.2, -7.4, 10, 0], [-1.3, -9.9, 9, 1], [8.6, 1.4, 12, 2], [10.2, -1.8, 9, 3], [-10.2, .2, 10, 1], [-1.6, -11.6, 10, 2], [11.2, -9.4, 9, 0]]) flowers(x, z, n, seed);
   const pads = [[-2.2, -1.3, .42], [-3.1, -2.4, .34], [-1.3, -3.4, .3], [2.4, -1.8, .4], [3.2, -3, .3], [-4.2, 0, .36], [4.4, .6, .32], [-5.5, -4.3, .45], [6.2, -4.6, .38], [-.4, -6.8, .3], [-2.6, -7.2, .4], [1.9, -8.4, .36]];
@@ -217,7 +217,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   for (const [x, z] of posts) { cyl(x, .95, z, .09, .11, 1.9, '#6f5240'); box(x, 1.93, z, .16, .05, .16, '#4f3d31'); }
   box(1.25, .75, 5.5, .08, 1.1, .08, '#6f5240'); box(1.25, 1.18, 5.52, .95, .42, .07, '#b98d63', [0, -.25, 0]); box(1.25, 1.18, 5.56, .8, .3, .02, '#e8d6b8', [0, -.25, 0]);
   POND_PATH.forEach(([x, z], i) => cyl(x, .17, z, .5, .52, .05, ['#e3d7c1', '#d6c8ae'][i % 2], [0, 0, 0], 16));
-  for (const [x, z, s] of [[4.2, 4.6, 1.2], [-6.6, 4.4, 1.1], [7.4, 3.2, .9]]) shrub(x, GROUND - .05, z, s * .8, Math.round(x));
+  for (const [x, z, s] of [[4.2, 4.6, 1.2], [-6.6, 4.4, 1.1], [7.4, 3.2, .9]]) bush(x, GROUND - .03, z, s, x);
   boat(1.75, 2.6, .5); bench(-4.6, 3.9, -.35);
   const tackle = [.46, DOCK_Y + .09, 2.15];
   box(tackle[0], tackle[1], tackle[2], .36, .18, .24, '#6f8f86', [0, .2, 0]); box(tackle[0], tackle[1] + .1, tackle[2], .38, .03, .26, '#5a766e', [0, .2, 0]);
@@ -230,10 +230,11 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   };
   const scenery = batchOf('lake-scenery', baked), home = homeParts.length ? batchOf('lake-house', homeParts) : null;
   const framing = [{ points: scenery.getVerticesData('position') }, ...(home ? [{ points: home.getVerticesData('position') }] : [])];
-  const rest = { x: 0, y: 0, span: 10 }, aim = { x: 0, y: 0, span: 5.6 }, focusAt = new Vector3();
+  const core = [{ points: water.getVerticesData('position') }, { points: [HOUSE_SPOT.x, GROUND, HOUSE_SPOT.z] }];
+  const rest = { x: 0, y: 0, span: 10 }, aim = { x: 0, y: 0, span: 5.6 }, focusAt = new Vector3(), watch = new Vector3();
   const fit = () => {
     const width = Math.max(1, canvas.clientWidth), height = Math.max(1, canvas.clientHeight), top = 76, bottom = 96, side = 12;
-    const usableHeight = Math.max(120, height - top - bottom), frame = houseFrame(framing, camera.getViewMatrix(true), (width - side * 2) / usableHeight, .98), scale = frame.height / usableHeight;
+    const usableHeight = Math.max(120, height - top - bottom), frame = houseFrame(height > width ? core : framing, camera.getViewMatrix(true), (width - side * 2) / usableHeight, .98), scale = frame.height / usableHeight;
     rest.x = frame.x; rest.y = frame.y + (top - bottom) * scale / 2; rest.span = height * scale;
   };
   fit();
@@ -516,8 +517,10 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     const focusing = fish && (phase === 'leap' || phase === 'shown');
     const aspect = engine.getAspectRatio(camera), wide = aspect > 1.1;
     const framed = wide ? cardSide.set(hover.x + .55, hover.y - .05, hover.z - .23) : cardSide.set(hover.x, hover.y - .45, hover.z);
-    if (focusing) { Vector3.TransformCoordinatesToRef(framed, camera.getViewMatrix(), focusAt); aim.x = focusAt.x; aim.y = focusAt.y; aim.span = wide ? 8 : 12; }
-    const goal = focusing ? aim : rest, rate = reducedMotion ? 1 : 1 - Math.exp(-dt * 2.4);
+    const watching = !focusing && phase !== 'idle';
+    if (watching) { Vector3.LerpToRef(STAND, phase === 'reel' ? bobberAt : castTo, .42, watch); watch.y = 1; }
+    if (focusing || watching) { Vector3.TransformCoordinatesToRef(focusing ? framed : watch, camera.getViewMatrix(), focusAt); aim.x = focusAt.x; aim.y = focusAt.y; aim.span = focusing ? (wide ? 8 : 12) : (wide ? 10 : 12.5); }
+    const goal = focusing || watching ? aim : rest, rate = reducedMotion ? 1 : 1 - Math.exp(-dt * 2.4);
     for (const key of ['x', 'y', 'span']) view[key] += (goal[key] - view[key]) * rate;
     camera.orthoTop = view.y + view.span / 2; camera.orthoBottom = view.y - view.span / 2;
     camera.orthoLeft = view.x - view.span * aspect / 2; camera.orthoRight = view.x + view.span * aspect / 2;
@@ -560,7 +563,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     rise -= dt;
     if (rise < 0 && !reducedMotion) { rise = 2.5 + clockRandom() * 4; ripple((clockRandom() - .5) * 10, -1 - clockRandom() * 7, .7); }
 
-    waterPaint.setFloat('time', clock); waterPaint.setVector3('eye', camera.position); waterPaint.setArray4('ripples', ripples);
+    waterPaint.setFloat('time', clock); waterPaint.setVector3('eye', REFLECTION_EYE); waterPaint.setArray4('ripples', ripples);
     for (const m of fallPaints) m.setFloat('time', clock);
       }
 

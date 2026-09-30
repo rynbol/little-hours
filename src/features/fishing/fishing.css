@@ -15,7 +15,7 @@ body.is-lake { overflow: hidden; }
 .lake-chip svg { width: 20px; height: 20px; }
 .lake-chip b { min-width: 34px; padding: 3px 8px; border-radius: 999px; background: var(--lake-sage); color: #fbf5ea; font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: center; }
 .lake-title { padding: 8px 0; pointer-events: none; }
-.lake-title h1 { margin: 0; color: #493f48; font: 24px Georgia, serif; letter-spacing: -.4px; text-shadow: 0 1px 12px #fff9; }
+.lake-title h1 { margin: 0; color: var(--chrome-ink, #493f48); font: 24px Georgia, serif; letter-spacing: -.4px; text-shadow: 0 1px 8px #0003; }
 .lake-status { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 86px); transform: translateX(-50%); margin: 0; padding: 7px 16px; border-radius: 999px; border: 1px solid var(--lake-edge); background: var(--lake-paper); box-shadow: var(--lake-shadow); font-size: 14px; font-weight: 600; white-space: nowrap; animation: lake-rise .35s ease both; }
 .lake-status:empty { display: none; }
 

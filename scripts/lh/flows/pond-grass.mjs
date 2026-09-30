@@ -15,26 +15,31 @@ const measure = `(() => {
       if (slope > colorSlope) { colorSlope = slope; steepest = [p[a * 3], p[a * 3 + 2], p[b * 3], p[b * 3 + 2]].map(v => Math.round(v * 100) / 100); }
     }
   }
-  const m = scene.getTransformMatrix().m, screen = { left: 1, right: -1, top: -1, bottom: 1 };
-  for (const part of [mesh, house].filter(Boolean)) {
-    const q = part.getVerticesData('position');
-    for (let i = 0; i < q.length; i += 3) {
-      const x = q[i], y = q[i + 1], z = q[i + 2], w = x * m[3] + y * m[7] + z * m[11] + m[15];
-      const sx = (x * m[0] + y * m[4] + z * m[8] + m[12]) / w, sy = (x * m[1] + y * m[5] + z * m[9] + m[13]) / w;
-      screen.left = Math.min(screen.left, sx); screen.right = Math.max(screen.right, sx); screen.bottom = Math.min(screen.bottom, sy); screen.top = Math.max(screen.top, sy);
+  const m = scene.getTransformMatrix().m;
+  const bounds = parts => {
+    const box = { left: 1, right: -1, top: -1, bottom: 1 };
+    for (const part of parts.filter(Boolean)) {
+      const q = part.getVerticesData('position');
+      for (let i = 0; i < q.length; i += 3) {
+        const x = q[i], y = q[i + 1], z = q[i + 2], w = x * m[3] + y * m[7] + z * m[11] + m[15];
+        const sx = (x * m[0] + y * m[4] + z * m[8] + m[12]) / w, sy = (x * m[1] + y * m[5] + z * m[9] + m[13]) / w;
+        box.left = Math.min(box.left, sx); box.right = Math.max(box.right, sx); box.bottom = Math.min(box.bottom, sy); box.top = Math.max(box.top, sy);
+      }
     }
-  }
+    return box;
+  };
+  const screen = bounds([mesh, house]), core = bounds([scene.getMeshByName('lake-water')]), porch = bounds([house]);
   let home = null;
   if (house) {
     const q = house.getVerticesData('position'); let x0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (let i = 0; i < q.length; i += 3) { x0 = Math.min(x0, q[i]); x1 = Math.max(x1, q[i]); y1 = Math.max(y1, q[i + 1]); }
     home = { width: x1 - x0, top: y1 };
   }
-  return { triangles, longest, colorSlope, steepest, batches: scene.meshes.filter(m => m.name === 'lake-scenery').length, overflow: document.documentElement.scrollWidth > innerWidth, orthographic: scene.activeCamera.mode === 1, screen, rooms: window.__littleHours.state.house.rooms.length, home, meshes: scene.meshes.filter(m => m.isEnabled() && m.getTotalIndices()).map(m => [m.name, m.getTotalIndices() / 3]).sort((a, b) => b[1] - a[1]).slice(0, 8) };
+  return { triangles, longest, colorSlope, steepest, batches: scene.meshes.filter(m => m.name === 'lake-scenery').length, overflow: document.documentElement.scrollWidth > innerWidth, orthographic: scene.activeCamera.mode === 1, screen, core, porch, rooms: window.__littleHours.state.house.rooms.length, home, meshes: scene.meshes.filter(m => m.isEnabled() && m.getTotalIndices()).map(m => [m.name, m.getTotalIndices() / 3]).sort((a, b) => b[1] - a[1]).slice(0, 8) };
 })()`;
 
 export default {
-  about: "the pond diorama: smooth meadow shading, a continuous shoreline, the whole plot framed by an orthographic camera at desktop and phone sizes, and the player's own house following the save",
+  about: "the pond diorama: smooth meadow shading, a continuous shoreline, the whole plot framed by an orthographic camera on desktop and the pond framed large on a phone with the house beside it, and the player's own house following the save",
   async run(t) {
     const homes = {};
     for (const [seed, theme, width, height] of [['pond', 'dusk', 1440, 1000], ['pond', 'day', 390, 844], ['pond', 'rain', 1440, 1000], ['one-room', 'dusk', 390, 844]]) {
@@ -43,8 +48,9 @@ export default {
       const ground = await app.js(measure), { screen } = ground, label = `${seed} ${theme} ${width}x${height}`;
       t.check(`${label}: foreground grass has no stretched triangles or radial color streaks`, ground.triangles > 200 && ground.longest < 1.55 && ground.colorSlope < .05, ground);
       t.check(`${label}: meadow stays in one scenery batch without page overflow`, ground.batches === 1 && !ground.overflow, ground);
-      t.check(`${label}: an orthographic camera keeps the whole plot and house on screen`, ground.orthographic && screen.left > -1 && screen.right < 1 && screen.bottom > -1 && screen.top < 1, ground);
-      t.check(`${label}: the plot fills the frame`, Math.max(screen.right - screen.left, screen.top - screen.bottom) > 1.6, ground);
+      const inside = box => box.left > -1 && box.right < 1 && box.bottom > -1 && box.top < 1, portrait = height > width, { core, porch } = ground;
+      t.check(`${label}: an orthographic camera keeps the ${portrait ? 'pond, and some of the house,' : 'whole plot and house'} on screen`, ground.orthographic && (portrait ? inside(core) && porch.left < .6 : inside(screen)), ground);
+      t.check(`${label}: the ${portrait ? 'pond fills' : 'plot fills'} the frame`, portrait ? core.right - core.left > 1.7 : Math.max(screen.right - screen.left, screen.top - screen.bottom) > 1.6, ground);
       homes[seed] = ground;
       await t.shot(app, `meadow-${seed}-${theme}-${width}`);
       await app.clickSel('#lake-back'); await app.settle();
