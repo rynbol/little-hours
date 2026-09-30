@@ -66,7 +66,7 @@ export const PAINTERLY_LOOKS = Object.freeze({
   rain: { ground: [0, 1, 0], band: [0.74, 0.86], shadow: [0.62, 0.7, 0.8], rim: [0.86, 0.92, 0.96], haze: [0.58, 0.68, 0.74] },
   'room-day': { ground: [0.55, 1.3, 0.3], band: [0.96, 1.3], shadow: [1.14, 1.06, 1.16], rim: [1, 0.86, 0.62], haze: [0.3, 0.24, 0.3], depth: [900, 1000, -900, -800] },
   'room-dusk': { ground: [0.55, 1.3, 0.3], band: [0.5, 0.7], shadow: [0.66, 0.58, 0.84], rim: [1, 0.8, 0.56], haze: [0.3, 0.24, 0.3], depth: [900, 1000, -900, -800] },
-  'room-rain': { ground: [0.55, 1.3, 0.3], band: [0.76, 1.02], shadow: [0.88, 0.88, 0.98], rim: [0.9, 0.9, 0.92], haze: [0.3, 0.24, 0.3], depth: [900, 1000, -900, -800] },
+  'room-rain': { ground: [0.55, 1.3, 0.18], band: [0.76, 1.02], shadow: [0.88, 0.88, 0.98], rim: [0.9, 0.9, 0.92], haze: [0.3, 0.24, 0.3], depth: [900, 1000, -900, -800] },
 });
 
 const states = new WeakMap();
