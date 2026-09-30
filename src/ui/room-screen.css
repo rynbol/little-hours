@@ -2,7 +2,7 @@
 .room-coins .ui-art { width: 20px; height: 20px; }
 
 body:not(.is-decorating):not(.is-avatar-editing):not(.is-pet-care):not(.is-connected):not(.is-focus-mode) {
-  --hud-surface: #201d28a8;
+  --hud-surface: #201d28d6;
   --hud-line: #f4e9e33d;
   --hud-ink: #f3eae1;
   --hud-hover: #403643e8;
@@ -16,7 +16,7 @@ body:not(.is-decorating):not(.is-avatar-editing):not(.is-pet-care):not(.is-conne
   & .room-heading { position: fixed; z-index: 20; top: max(var(--hud-gutter), env(safe-area-inset-top)); left: max(var(--hud-gutter), env(safe-area-inset-left)); right: max(var(--hud-gutter), env(safe-area-inset-right)); min-height: 0; padding: 0; gap: 8px; align-items: flex-start; pointer-events: none; }
   & .room-heading > * { pointer-events: auto; }
   & .room-heading-identity { flex: 0 1 auto; }
-  & :is(.room-title-row:not([hidden]), .room-title-form:not([hidden]), .heading-actions, .room-tools) { border: 1px solid var(--hud-line); border-radius: 999px; background: var(--hud-surface); box-shadow: 0 6px 28px #0c091342; backdrop-filter: blur(12px); }
+  & :is(.room-title-row:not([hidden]), .room-title-form:not([hidden]), .heading-actions, .room-tools) { border: 1px solid var(--hud-line); border-radius: 999px; background: var(--hud-surface); box-shadow: 0 6px 28px #0c091342; }
   & .room-title-row:not([hidden]) { gap: 2px; padding: 0 2px 0 16px; }
   & .room-title-form:not([hidden]) { padding: 1px 3px 1px 1px; }
   & .room-heading h1 { overflow: hidden; color: var(--hud-ink); font-size: 18px; line-height: 44px; letter-spacing: -.2px; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
@@ -35,7 +35,7 @@ body:not(.is-decorating):not(.is-avatar-editing):not(.is-pet-care):not(.is-conne
   & :is(.room-tools, .heading-actions) svg { color: var(--hud-ink); }
   & .room-panel { bottom: 76px; }
 
-  & #focus-quickbar { position: fixed; z-index: 20; left: 50%; bottom: max(var(--hud-gutter), env(safe-area-inset-bottom)); translate: -50% 0; display: flex; gap: 2px; padding: 1px; border: 1px solid var(--hud-line); border-radius: 999px; background: var(--hud-surface); box-shadow: 0 6px 28px #0c091342; backdrop-filter: blur(12px); }
+  & #focus-quickbar { position: fixed; z-index: 20; left: 50%; bottom: max(var(--hud-gutter), env(safe-area-inset-bottom)); translate: -50% 0; display: flex; gap: 2px; padding: 1px; border: 1px solid var(--hud-line); border-radius: 999px; background: var(--hud-surface); box-shadow: 0 6px 28px #0c091342; }
   & #focus-quickbar button { display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 8px 16px; border: 0; border-radius: 999px; background: transparent; color: var(--hud-ink); font: inherit; font-size: 13px; white-space: nowrap; }
   & #focus-quickbar svg { width: 17px; height: 17px; }
   & #timer-sheet-toggle:is(:hover, :focus-visible) { background: var(--hud-hover); }
@@ -50,7 +50,7 @@ body:not(.is-decorating):not(.is-avatar-editing):not(.is-pet-care):not(.is-conne
   & #close-timer-sheet { position: absolute; top: 8px; right: 8px; z-index: 2; width: 44px; height: 44px; border: 0; background: transparent; }
   & #focus-card #task { margin-top: 10px; }
 
-  & #focus-card { --hud-subtle: #c7b9c2; --hud-well: #f4e9e314; --hud-rose: #dd98a4; border: 1px solid var(--hud-line); background: #1d1a24e6; color: var(--hud-ink); box-shadow: 0 16px 48px #0c091366; backdrop-filter: blur(16px); }
+  & #focus-card { --hud-subtle: #c7b9c2; --hud-well: #f4e9e314; --hud-rose: #dd98a4; border: 1px solid var(--hud-line); background: #1d1a24f2; color: var(--hud-ink); box-shadow: 0 16px 48px #0c091366; }
   & #close-timer-sheet svg { color: var(--hud-ink); }
   & #focus-card .timer { color: var(--hud-ink); }
   & #focus-card .timer-ring .timer-track { stroke: #f4e9e329; }

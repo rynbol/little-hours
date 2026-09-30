@@ -98,3 +98,10 @@ test('a phone crops the room sides so it fills more of the tall screen, while a 
   await open(page, { width: 1440, height: 900 });
   expect(await roomWidthShown(page)).toBeGreaterThanOrEqual(1 / 0.94 - 0.01);
 });
+
+test('the floating chrome and the open timer sheet never blur the live room behind them', async ({ page }) => {
+  await open(page, { width: 1440, height: 900 });
+  await page.locator('#timer-sheet-toggle').click(); await expect(page.locator('#focus-card')).toBeVisible();
+  const blurred = await page.evaluate(selector => [...document.querySelectorAll(`${selector}, #focus-card, #room-more`)].filter(element => getComputedStyle(element).backdropFilter !== 'none').map(element => element.id || element.className), chrome);
+  expect(blurred).toEqual([]);
+});
