@@ -264,7 +264,10 @@ function buildRuins(shape) {
     }
     for (let k = 0; k < 2 + Math.floor(random() * 3); k++) {
       const px = x + (random() - 0.5) * 5, pz = z + (random() - 0.5) * 5, h = 1 + random() * 3.2, py = terrainHeight(px, pz) - 0.2;
-      shape.box(px, py + h / 2, pz, 0.85, h, 0.85, yaw + random(), 'ruin', 0.9 + random() * 0.15); shape.box(px, py + h + 0.07, pz, 0.95, 0.14, 0.95, yaw, 'moss');
+      const turn = yaw + random(), tone = 0.9 + random() * 0.15;
+      for (const offset of [0, Math.PI / 4]) shape.box(px, py + h / 2, pz, 0.8, h, 0.8, turn + offset, 'ruin', tone - offset * 0.08);
+      shape.box(px, py + 0.12, pz, 1.1, 0.24, 1.1, turn, 'ruin', tone * 0.85);
+      shape.box(px + 0.12, py + h + 0.18, pz - 0.08, 0.5, 0.36, 0.42, turn + 0.4, 'ruin', tone * 1.05); shape.box(px - 0.1, py + h + 0.02, pz + 0.1, 0.62, 0.1, 0.6, turn, 'moss');
     }
     shape.box(x, g + 0.2, z, 4, 0.4, 3, yaw, 'ruin', 0.8);
   }

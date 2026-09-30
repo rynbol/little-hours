@@ -148,6 +148,17 @@ test('wildflowers bloom in drifts on the grass tips, in three colors that dim at
   engine.dispose();
 });
 
+test('ruined columns stand broken, a shard of stone rising above their moss', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata, at = i => shape.positions.slice(i * 3, i * 3 + 3);
+  const moss = [], stone = [];
+  shape.roles.forEach((role, i) => { if (role === 'moss') moss.push(at(i)); else if (role === 'ruin') stone.push(at(i)); });
+  const broken = stone.filter(([x, y, z]) => moss.some(([mx, my, mz]) => Math.hypot(mx - x, mz - z) < 0.7 && y > my + 0.15));
+  assert.ok(broken.length > 300, `${broken.length} stone corners above moss`);
+  engine.dispose();
+});
+
 test('cloud shadows drift over the ground and the grass by day, soften in rain and stay off at dusk', () => {
   const { engine, world } = setup();
   world.setEnabled(true);
