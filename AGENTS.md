@@ -1,6 +1,6 @@
 # Little Hours
 
-Build a browser-first cozy study room. Keep the whole cutaway room visible, like a miniature dollhouse; the user explicitly does not want a first-person camera. Desktop/notch and social features are later stages.
+Build a browser-first cozy study room. Keep the whole cutaway room visible, like a miniature dollhouse, everywhere except Focus mode. Focus mode seats you at the desk in first person: the camera flies into the chair, you look around from it, and it flies back out. Anything visible from the desk deserves close-up detail. Desktop/notch and social features are later stages.
 
 The product is becoming a room-decorating study game: editable preset rooms, a furniture collection, and study stations for the avatar. Model furniture deliberately in JavaScript with reusable procedural geometry. Avoid generated raster artwork as a substitute for furniture models. Smooth interaction is a priority: measure actual browser performance, batch static geometry, and avoid unnecessary rendering work.
 

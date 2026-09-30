@@ -154,6 +154,7 @@ test('two tabs racing an expired session and an ordinary edit keep one reward an
   await Promise.all([page.clock.setSystemTime(new Date(deadline + 1000)), other.clock.setSystemTime(new Date(deadline + 1000))]);
   await Promise.all([start.dispatchEvent('click'), other.locator('#time-toggle').click()]);
   await expect(coins(page)).toHaveText('25'); await expect(coins(other)).toHaveText('25');
+  await expect.poll(async () => (await saved(page)).theme, { message: 'the theme edit lands beside the reward' }).not.toBe(before.theme);
   const state = await saved(page);
   expect(state.history).toHaveLength(1);
   expect(state.history[0].id).toBe(before.session.id);
@@ -161,7 +162,7 @@ test('two tabs racing an expired session and an ordinary edit keep one reward an
   expect(state.pond.bait).toHaveLength(before.pond.bait.length + 1);
   expect(state.petBonds.cat.minutes).toBe(25);
   expect(state.theme).not.toBe(before.theme);
-  expect(Number(await page.locator('#session-celebration').isVisible()) + Number(await other.locator('#session-celebration').isVisible())).toBe(1);
+  await expect.poll(async () => Number(await page.locator('#session-celebration').isVisible()) + Number(await other.locator('#session-celebration').isVisible()), { message: 'one tab celebrates' }).toBe(1);
   await Promise.all([page.reload(), other.reload()]);
   await expect(page.locator('#session-celebration')).toBeHidden();
   await expect(other.locator('#session-celebration')).toBeHidden();

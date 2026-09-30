@@ -16,7 +16,7 @@ import './session.css';
 
 export function createTimerUI(app) {
   let lastSessionRender = '', journalSignature = '', lastDay = '', focusCollapsed = false;
-  let focusMode = false, focusReturn = null, focusRoom = '';
+  let focusMode = 'off', focusReturn = null, focusRestore = true, focusRoom = '';
   let pending = false, taskTimer = 0, taskPending = false, taskDraft = app.state.task, pendingDuration = null, ticking = false, dialMinutes = null;
   const announce = message => { $('#timer-status').textContent = message; };
   function flushTask() {
@@ -42,29 +42,40 @@ export function createTimerUI(app) {
   const focusRoomSignature = () => JSON.stringify([app.state.house.activeId, app.state.layout, app.state.theme, app.state.pet, app.state.avatar, app.state.decor]);
   const focusUnavailable = () => !app.roomReady || app.nav.travelling || app.avatar.active || app.decorate.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.lake.isOpen || $('#room-picker').open || $('#session-celebration').open;
 
-  function leaveFocusMode({ restoreFocus = true } = {}) {
-    if (!focusMode) return false;
-    focusMode = false; focusRoom = '';
+  function finishLeavingFocus() {
+    if (focusMode !== 'leaving') return;
+    focusMode = 'off';
     document.body.classList.remove('is-focus-mode');
-    $('#focus-mode-hud').hidden = true;
-    $('#focus-mode-enter').setAttribute('aria-expanded', 'false');
     app.room?.resize?.();
-    if (restoreFocus) {
+    if (focusRestore) {
       const target = [focusReturn, $('#focus-mode-enter'), $('#start-button')].find(node => node?.isConnected && !node.disabled && node.getClientRects().length);
       target?.focus({ preventScroll: true });
     }
     focusReturn = null;
+  }
+  function leaveFocusMode({ restoreFocus = true, animate = false } = {}) {
+    if (focusMode === 'off') return false;
+    focusRestore = restoreFocus;
+    if (focusMode === 'on') {
+      focusMode = 'leaving'; focusRoom = '';
+      $('#focus-mode-hud').hidden = true;
+      $('#focus-mode-enter').setAttribute('aria-expanded', 'false');
+    }
+    const seat = app.room?.leaveSeat?.({ animate });
+    if (!seat || seat === 'room') finishLeavingFocus();
     return true;
   }
+  const onSeatChange = ({ state }) => { if (state === 'room') finishLeavingFocus(); };
 
   function syncFocusMode() {
     const unavailable = focusUnavailable();
-    if (focusMode && (unavailable || !isFocusing(app.state.session) || focusRoom !== focusRoomSignature())) leaveFocusMode({ restoreFocus: !unavailable });
+    const leave = focusMode === 'on' ? unavailable || !isFocusing(app.state.session) || focusRoom !== focusRoomSignature() : focusMode === 'leaving' && unavailable;
+    if (leave) leaveFocusMode({ restoreFocus: !unavailable });
     $('#focus-mode-enter').disabled = unavailable || app.state.session.kind === 'break' || pending;
   }
 
   async function enterFocusMode() {
-    if (focusMode || focusUnavailable() || app.state.session.kind === 'break' || pending) return;
+    if (focusMode !== 'off' || focusUnavailable() || app.state.session.kind === 'break' || pending) return;
     const returnFocus = document.activeElement;
     app.audio.unlock();
     await flushTask();
@@ -80,16 +91,17 @@ export function createTimerUI(app) {
       app.companion.say(resuming ? 'resume' : 'start', { force: true }); app.delights?.show('start');
       if (!resuming) app.room?.invitePet();
     }
-    focusReturn = returnFocus; focusRoom = focusRoomSignature(); focusMode = true;
+    focusReturn = returnFocus; focusRoom = focusRoomSignature(); focusMode = 'on';
     document.body.classList.add('is-focus-mode');
     $('#focus-mode-hud').hidden = false;
     $('#focus-mode-enter').setAttribute('aria-expanded', 'true');
     app.room?.resize?.();
+    app.room?.enterSeat?.();
     $('#focus-mode-exit').focus({ preventScroll: true });
   }
 
   $('#focus-mode-enter').addEventListener('click', enterFocusMode);
-  $('#focus-mode-exit').addEventListener('click', () => leaveFocusMode());
+  $('#focus-mode-exit').addEventListener('click', () => leaveFocusMode({ animate: true }));
   app.signal.addEventListener('abort', () => leaveFocusMode({ restoreFocus: false }), { once: true });
 
   const gardenButton = document.createElement('button'); gardenButton.id = 'focus-garden';
@@ -244,6 +256,7 @@ export function createTimerUI(app) {
     ring.setAttribute('aria-valuenow', minutesSet); ring.setAttribute('aria-valuetext', `${minutesSet} minutes`);
     ring.setAttribute('aria-disabled', String(!settable)); ring.tabIndex = settable ? 0 : -1;
     if (!isBreak) app.room?.setPlantPhase(plantPhase(state.session.duration, remainingAt(state.session)));
+    if (!isBreak) app.room?.setFocusProgress?.(1 - remainingAt(state.session) / state.session.duration);
     $('#timer-dial').dataset.phase = isBreak ? 'break' : state.session.running ? 'focusing' : ms === 0 ? 'complete' : presence;
     const actionIcon = focusing ? 'pause' : 'arrow';
     if ($('#start-button').dataset.icon !== actionIcon) {
@@ -422,5 +435,5 @@ export function createTimerUI(app) {
   });
   window.addEventListener('resize', syncDock, { signal: app.signal });
 
-  return { renderFocusReward, showCelebration, render, tick, syncDock, expand, toggleRunning, enterFocusMode, leaveFocusMode, syncFocusMode, announce, flushTask, get taskPending() { return taskPending; } };
+  return { renderFocusReward, showCelebration, render, tick, syncDock, expand, toggleRunning, enterFocusMode, leaveFocusMode, onSeatChange, syncFocusMode, announce, flushTask, get taskPending() { return taskPending; } };
 }

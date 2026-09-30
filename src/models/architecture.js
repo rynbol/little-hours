@@ -265,8 +265,9 @@ export const designPaint = style => !recolors[style] ? []
 // leaves/fire untouched. Source templates and other instances stay shared/safe.
 // A color chosen for the piece (`paint`, model color → new color) comes before
 // the design palette, so it looks the same in every room.
+export const furnitureRepaint = (style, paint = null) => [...Object.entries(paint || {}), ...designPaint(style)].map(([from, to]) => ({ from: from.toLowerCase(), to }));
 export function styleFurniture(root, style, paint = null) {
-  const replacements = [...Object.entries(paint || {}), ...designPaint(style)].map(([from, to]) => ({ from: Color3.FromHexString(from), to: Color3.FromHexString(to) }));
+  const replacements = furnitureRepaint(style, paint).map(({ from, to }) => ({ from: Color3.FromHexString(from), to: Color3.FromHexString(to) }));
   if (!replacements.length) return;
   for (const mesh of root.getChildMeshes()) {
     if (mesh.metadata?.effect || (root.metadata.avatar && mesh.isDescendantOf(root.metadata.avatar)) || mesh.metadata?.dynamic) continue;
