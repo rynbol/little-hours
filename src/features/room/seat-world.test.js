@@ -197,3 +197,13 @@ test('the meadow breaks into warm yellow-green patches warmer than the plain gra
   }
   engine.dispose();
 });
+
+test('the castle keep rises into a tall sanctum spire above its curtain wall', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
+  const heights = role => shape.roles.flatMap((r, i) => r === role ? [shape.positions[i * 3 + 1]] : []);
+  const stone = heights('castle'), roofs = heights('castleRoof');
+  assert.ok(Math.max(...roofs) - Math.min(...stone) > 27);
+  engine.dispose();
+});

@@ -24,7 +24,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffffff', cloudShade: '#c4d3e6',
-    castle: '#8d93a6', castleRoof: '#4d6680', rock: '#6e6462', ember: '#c8604a', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#e8ffd0', snow: '#f4f6fa',
+    castle: '#687088', castleRoof: '#3a5a74', rock: '#6e6462', ember: '#c8604a', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#e8ffd0', snow: '#f4f6fa',
     light: 0, night: null,
   },
   rain: {
@@ -189,6 +189,7 @@ function buildHamlet(shape) {
 
 function buildCastle(shape) {
   const [cx, cz] = CASTLE_AT, g = terrainHeight(cx, cz) - 0.5, random = seeded(43);
+  const start = shape.roles.length;
   const tower = (x, z, w, h, roof) => { shape.box(cx + x, g + h / 2, cz + z, w, h, w, 0, 'castle'); shape.box(cx + x, g + h + 0.15, cz + z, w * 1.18, 0.3, w * 1.18, 0, 'castle', 1.1); shape.spire(cx + x, g + h + 0.3, cz + z, w * 0.62, roof, 'castleRoof'); };
   const ring = Array.from({ length: 10 }, (_, i) => { const a = i / 10 * Math.PI * 2; return [Math.cos(a) * 10, Math.sin(a) * 7.5]; });
   ring.forEach(([x0, z0], i) => {
@@ -198,7 +199,10 @@ function buildCastle(shape) {
   });
   shape.box(cx, g + 5.5, cz, 7.5, 11, 6, 0, 'castle');
   shape.box(cx, g + 13, cz, 4.6, 4, 4, 0, 'castle', 1.05);
-  shape.spire(cx, g + 15, cz, 3, 5.5, 'castleRoof');
+  shape.box(cx, g + 15.2, cz, 5.2, 0.4, 4.6, 0, 'castle', 1.1);
+  shape.box(cx, g + 18, cz, 2.8, 5.6, 2.6, 0, 'castle', 1.02);
+  shape.spire(cx, g + 20.8, cz, 1.9, 7.5, 'castleRoof');
+  for (const side of [-1, 1]) { shape.box(cx + side * 2.9, g + 16.5, cz + 1.2, 1, 5, 1, 0, 'castle', 0.95); shape.spire(cx + side * 2.9, g + 19, cz + 1.2, 0.75, 3.4, 'castleRoof'); }
   for (const [x, z, w, h, roof] of [[-4.6, 0.6, 2.2, 14, 4.2], [4.6, 0.6, 2.2, 13, 4], [-2.6, -3.8, 1.6, 10, 3.2], [3, -3.4, 1.7, 11.5, 3.4], [0, 3.6, 1.5, 7.5, 2.6]]) tower(x, z, w, h, roof);
   const face = (x, y, z, columns, rows, width) => {
     for (let row = 0; row < rows; row++) for (let c = 0; c < columns; c++) {
@@ -208,7 +212,8 @@ function buildCastle(shape) {
     }
   };
   face(cx, g + 3.5, cz + 3.05, 6, 5, 6.6); face(cx, g + 11.8, cz + 2.05, 3, 2, 3.8);
-  face(cx - 4.6, g + 6, cz + 1.75, 1, 5, 1.4); face(cx + 4.6, g + 6, cz + 1.75, 1, 5, 1.4);
+  face(cx - 4.6, g + 6, cz + 1.75, 1, 5, 1.4); face(cx + 4.6, g + 6, cz + 1.75, 1, 5, 1.4); face(cx, g + 16.5, cz + 1.35, 2, 2, 1.8);
+  for (let i = start; i < shape.roles.length; i++) if (shape.roles[i].startsWith('castle')) shape.fogs[i] *= 0.72;
 }
 
 function buildVolcano(shape) {
