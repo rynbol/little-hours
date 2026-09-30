@@ -287,3 +287,22 @@ test('butterflies flutter over the meadow by day, beating their wings, and hold 
   assert.ok(flyers().every(({ wing, depth }) => Math.abs(wing - depth) < 1e-6), 'no flapping wings at dusk, only round spirits');
   engine.dispose();
 });
+
+test('the volcano rises in uneven shoulders to a broken crater rim and darkens toward its summit', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
+  const rock = [];
+  for (let i = 0; i < shape.roles.length; i++) {
+    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2];
+    if (shape.roles[i] === 'rock' && Math.hypot(x + 82, z + 96) < 40) rock.push({ y, shade: shape.shades[i], reach: Math.hypot(x + 82, z + 96) });
+  }
+  const mean = list => list.reduce((sum, each) => sum + each.shade, 0) / list.length;
+  const foot = rock.filter(each => each.y < 12), summit = rock.filter(each => each.y > 30);
+  assert.ok(mean(summit) < mean(foot) * 0.8, `summit shade ${mean(summit).toFixed(2)} against foot ${mean(foot).toFixed(2)}`);
+  const rim = shape.roles.map((role, i) => role === 'ember' && Math.hypot(shape.positions[i * 3] + 82, shape.positions[i * 3 + 2] + 96) < 8 ? shape.positions[i * 3 + 1] : null).filter(y => y !== null && y > 40);
+  assert.ok(Math.max(...rim) - Math.min(...rim) > 2, 'the crater rim is broken, not level');
+  const reaches = foot.map(each => each.reach);
+  assert.ok(Math.max(...reaches) / Math.min(...reaches) > 1.25, 'the foot spreads in uneven shoulders');
+  engine.dispose();
+});

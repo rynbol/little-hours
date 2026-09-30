@@ -24,7 +24,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffffff', cloudShade: '#c4d3e6',
-    castle: '#687088', castleRoof: '#3a5a74', rock: '#6e6462', ember: '#c8604a', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
+    castle: '#687088', castleRoof: '#3a5a74', rock: '#6a524a', ember: '#c8604a', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
     light: 0, night: null,
   },
   rain: {
@@ -220,13 +220,15 @@ function buildVolcano(shape) {
   const [vx, vz] = VOLCANO_AT, base = 10, height = 34, radius = 36, rim = 4.5, rings = 12, segments = 72, start = shape.roles.length;
   const streaks = [9, 14, 18, 26];
   for (let k = 0; k <= rings; k++) {
-    const t = k / rings, y = base + height * t ** 1.35;
+    const t = k / rings;
     for (let s = 0; s < segments; s++) {
       const a = s / segments * Math.PI * 2, rib = (1 - Math.abs(Math.sin(a * 9 + Math.sin(a * 2) * 0.8))) ** 2;
-      const jag = 1 + 0.05 * Math.sin(a * 6) + 0.03 * Math.sin(a * 14 + 1) + (rib - 0.4) * 0.09 * (1 - t), r = (radius * (1 - t) + rim * t) * jag;
+      const shoulder = 0.09 * Math.sin(k * 1.3 + a * 2 + 0.5) * Math.sin(Math.PI * t) + 0.07 * Math.sin(a * 3 + 0.7) * (1 - t);
+      const jag = 1 + 0.05 * Math.sin(a * 6) + 0.03 * Math.sin(a * 14 + 1) + (rib - 0.4) * 0.09 * (1 - t) + shoulder, r = (radius * (1 - t) + rim * t) * jag;
+      const y = base + height * t ** 1.35 + Math.sin(a * 5 + 1) * 1.3 * t ** 4;
       const lava = t > 0.9 || (t > 0.3 && streaks.includes(s));
-      const id = shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', 0.6 + 0.3 * Math.max(0, Math.cos(a - 2.1)) + rib * 0.22 + (k % 2) * 0.03);
-      shape.fogs[id] *= 0.7;
+      const id = shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', (0.6 + 0.3 * Math.max(0, Math.cos(a - 2.1)) + rib * 0.22 + (k % 2) * 0.03) * (1 - 0.32 * t ** 1.5));
+      shape.fogs[id] *= 0.6;
     }
   }
   for (let k = 0; k < rings; k++) for (let s = 0; s < segments; s++) {
