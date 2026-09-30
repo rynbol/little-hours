@@ -18,6 +18,48 @@ Make a game good enough to spread on the App Store, on San Francisco tech Twitte
 | Graphics tools | Drawing in JS and adding libraries are both allowed when they help. |
 | Server for sync | **Not decided.** We will discuss it before chunk 3. |
 
+## The revamp
+
+Agreed on September 29, 2026, after a review of every view on main at `fa785c2`. The revamp comes before chunks 3 to 6. It changes how the game looks and feels. It does not change the save format that chunk 2 made final.
+
+### What is wrong now
+
+- **Four art styles.** The room is warm, lamp-lit and detailed. The island is pastel with plain white walls. The garden is pale sage on a flat cream background. The pond is flat-shaded low poly in hard light, and the red-roofed house behind it is not the player's house.
+- **A web app on top of a game.** The room page has a header, four ways to change rooms (My house, Whole house, the Rooms arrows and the picker), a bottom bar and a cream card with Session settings and Your progress. On a phone the room fills about a third of the screen.
+- **Too many small collections.** One finished session pays into coins, the garden, Pip, pet hearts and pet gifts at the same time. Pets also have belongings and friendship. Pip has 20 finds and 6 colours, the pond has a journal and bait. Nothing is *the* reward, and most rewards arrive as a text card.
+- **Two companions with the same job.** Miso gives gifts and Pip brings finds.
+- **The room is the best part, but nothing happens in it.** Rewards appear in the garden, the pond or a card. Focus shows the same room with a timer pill.
+
+### Decisions
+
+| Question | Decision |
+| --- | --- |
+| Art style | **One style everywhere: the room's.** Warm local light, soft shapes, consistent ground shadows, detailed furniture. The island, garden and pond follow it. |
+| The pond and garden | The house behind the pond is the player's own house. Long term, the pond and garden are closer views of the same island, not separate worlds. |
+| Rooms or one big house | **Rooms stay, in one continuous house.** Zoomed out, the whole cutaway house is alive on the island. Tap or pinch a room and the camera glides in until it fills the screen, with no fade. The avatar walks through real doorways and stairs. Only the current room draws at full detail. |
+| The room page | **The room is the whole screen.** The timer is an object in the room (a candle or a desk clock). Tap Miso or Pip in the room. One button for the house. |
+| Focus | **Time passes in the room.** The window sky moves from dusk to night, the candle burns down, the tea stops steaming, Miso falls asleep. A long session looks different from a short one. |
+| The reward | **Pip brings back real things.** Pip leaves when a session starts and returns with a find that is a piece of furniture for the room. The room becomes a record of study time. Coins stay in the background. |
+| Completion | **A short scene in the room.** The candle goes out, Pip flies in through the window with the find, Miso comes to look. It can be skipped and it honours reduced motion. It is the first shot of the trailer. |
+| Companions | **Miso stays, Pip explores.** Miso keeps you company while you study. Pip goes away and comes back. Pet gifts and belongings stop overlapping with Pip. |
+| Breaks | **Breaks go outside.** A break is the time to fish, water the garden or walk the island, with a clear way back to studying. |
+| First session | A new player gets a short 5-minute session, a guaranteed good find and the completion scene. |
+
+### Cut
+
+The Rooms arrows and Whole house, Session settings and Your progress, Pip's colours, the pet's belongings and friendship sections, and the bait economy. The fish journal is under review. Cuts must keep old saves loading.
+
+### Order
+
+1. **One art style.** Rebuild the pond in the room's style with the player's own house, then bring the garden and island in line. Each step ends with before and after images for approval.
+2. **The room as the whole screen**, with the timer as a room object.
+3. **Time passing during focus.**
+4. **Pip's finds as furniture and the completion scene.**
+5. **Companion roles, breaks outside and the first session.**
+6. **One continuous house** with the zoomed-out and zoomed-in views.
+
+Friends see each other's windows lit while studying and dark on a break. That is chunks 3 and 4 below and still waits for the sync server decision.
+
 ## The work, in chunks
 
 Each chunk is one large piece of work. Each one ends with a preview for approval before it goes to main.
@@ -84,3 +126,5 @@ Changed on September 26, 2026: solo first, friends later (chunks 3 and 4). The i
 
 - Which server for sync and accounts. Decide before chunk 3.
 - Group size for study sessions with friends.
+- Whether the one continuous house (revamp step 6) should come before the room changes (steps 2 to 5).
+- Whether the fish journal stays.
