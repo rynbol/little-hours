@@ -11,8 +11,8 @@ export const clampLook = (yaw, pitch) => ({
 });
 
 export function seatFov(aspect) {
-  const minimumHorizontal = 1.3, vertical = 2 * Math.atan(Math.tan(minimumHorizontal / 2) / Math.max(0.2, aspect));
-  return Math.min(1.75, Math.max(1.02, vertical));
+  const minimumHorizontal = 1.5, vertical = 2 * Math.atan(Math.tan(minimumHorizontal / 2) / Math.max(0.2, aspect));
+  return Math.min(1.9, Math.max(1.22, vertical));
 }
 
 export function seatEye(head, forward) {

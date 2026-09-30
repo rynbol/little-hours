@@ -43,9 +43,9 @@ test('looking around turns all the way round but stops at the floor and ceiling'
 });
 
 test('a narrow phone keeps a wide enough view across the desk', () => {
-  assert.equal(round(seatFov(16 / 9)), 1.02);
-  assert.equal(round(seatFov(390 / 844)), 1.75);
-  assert.equal(round(seatFov(1)), 1.3);
+  assert.equal(round(seatFov(16 / 9)), 1.22);
+  assert.equal(round(seatFov(390 / 844)), 1.9);
+  assert.equal(round(seatFov(1)), 1.5);
 });
 
 test('the far frame shows the same room height as the dollhouse camera', () => {
@@ -66,7 +66,7 @@ test('focus flies into the chair, hides the body once inside it, and flies back 
   run(SEAT_SECONDS.enter);
   assert.deepEqual(changes, ['entering', 'entering inside', 'seated inside']);
   assert.deepEqual(rounded(view.camera.position), [-2, 2.12, -2.41]);
-  assert.equal(round(view.camera.fov), 1.02);
+  assert.equal(round(view.camera.fov), 1.22);
 
   view.leave();
   run(SEAT_SECONDS.leave + 0.05);
