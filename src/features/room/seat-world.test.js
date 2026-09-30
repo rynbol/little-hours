@@ -142,3 +142,19 @@ test('the far ranges in view wear snow above the snow line and turn sunlit and s
   assert.ok(Math.max(...flanks) - Math.min(...flanks) > 0.3, 'flanks differ in light');
   engine.dispose();
 });
+
+test('lava runs unbroken from the volcano crater down its ribbed slopes', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
+  const columns = new Map();
+  for (let i = 0; i < shape.roles.length; i++) {
+    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2];
+    if (shape.roles[i] !== 'ember' || Math.hypot(x + 82, z + 96) > 40 || y > 40) continue;
+    const column = Math.round(Math.atan2(z + 96, x + 82) * 100);
+    columns.set(column, [...(columns.get(column) ?? []), y].sort((a, b) => a - b));
+  }
+  const rivers = [...columns.values()].filter(heights => heights.length >= 6 && heights[0] < 20);
+  assert.equal(rivers.length, 4);
+  engine.dispose();
+});

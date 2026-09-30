@@ -209,14 +209,16 @@ function buildCastle(shape) {
 }
 
 function buildVolcano(shape) {
-  const [vx, vz] = VOLCANO_AT, base = 10, height = 34, radius = 36, rim = 4.5, rings = 9, segments = 30, start = shape.roles.length;
-  const streaks = [0.9, 1.5, 2.3];
+  const [vx, vz] = VOLCANO_AT, base = 10, height = 34, radius = 36, rim = 4.5, rings = 12, segments = 72, start = shape.roles.length;
+  const streaks = [9, 14, 18, 26];
   for (let k = 0; k <= rings; k++) {
     const t = k / rings, y = base + height * t ** 1.35;
     for (let s = 0; s < segments; s++) {
-      const a = s / segments * Math.PI * 2, jag = 1 + 0.05 * Math.sin(a * 6) + 0.03 * Math.sin(a * 14 + 1), r = (radius * (1 - t) + rim * t) * jag;
-      const lava = t > 0.88 || (t > 0.45 && streaks.some(streak => Math.abs(Math.atan2(Math.sin(a - streak), Math.cos(a - streak))) < 0.035 * (1.4 - t)));
-      shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', 0.68 + 0.32 * Math.max(0, Math.cos(a - 2.1)) + (k % 2) * 0.04);
+      const a = s / segments * Math.PI * 2, rib = (1 - Math.abs(Math.sin(a * 9 + Math.sin(a * 2) * 0.8))) ** 2;
+      const jag = 1 + 0.05 * Math.sin(a * 6) + 0.03 * Math.sin(a * 14 + 1) + (rib - 0.4) * 0.09 * (1 - t), r = (radius * (1 - t) + rim * t) * jag;
+      const lava = t > 0.9 || (t > 0.3 && streaks.includes(s));
+      const id = shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', 0.6 + 0.3 * Math.max(0, Math.cos(a - 2.1)) + rib * 0.22 + (k % 2) * 0.03);
+      shape.fogs[id] *= 0.7;
     }
   }
   for (let k = 0; k < rings; k++) for (let s = 0; s < segments; s++) {
