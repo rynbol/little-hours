@@ -1,4 +1,4 @@
-.lake { --lake-paper: #fbf5ea; --lake-paper-deep: #f1e6d4; --lake-ink: #4b3b40; --lake-soft: #85716f; --lake-edge: #e4d5c1; --lake-sage: #5f7456; --lake-shadow: 0 10px 30px rgba(52, 34, 38, .2), 0 2px 0 rgba(255, 255, 255, .7) inset; position: fixed; inset: 0; z-index: 60; overflow: hidden; color: var(--lake-ink); background: #2a2440; font-family: 'DM Sans', sans-serif; }
+.lake { --lake-paper: #fbf5ea; --lake-paper-deep: #f1e6d4; --lake-ink: #4b3b40; --lake-soft: #85716f; --lake-edge: #e4d5c1; --lake-sage: #5f7456; --lake-shadow: 0 10px 30px rgba(52, 34, 38, .2), 0 2px 0 rgba(255, 255, 255, .7) inset; position: fixed; inset: 0; z-index: 60; overflow: hidden; color: var(--lake-ink); background: radial-gradient(ellipse at 18% 28%, var(--world-glow), transparent 55%), linear-gradient(170deg, var(--world-top), var(--world-bottom)); font-family: 'DM Sans', sans-serif; }
 body.is-lake { overflow: hidden; }
 .lake[hidden], .lake [hidden] { display: none !important; }
 .lake-canvas { animation: lake-fade .5s ease both; }
@@ -15,7 +15,12 @@ body.is-lake { overflow: hidden; }
 .lake-chip svg { width: 20px; height: 20px; }
 .lake-chip b { min-width: 34px; padding: 3px 8px; border-radius: 999px; background: var(--lake-sage); color: #fbf5ea; font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: center; }
 .lake-title { padding: 8px 0; pointer-events: none; }
-.lake-title h1 { margin: 0; color: #493f48; font: 24px Georgia, serif; letter-spacing: -.4px; text-shadow: 0 1px 12px #fff9; }
+.lake-title h1 { margin: 0; color: var(--chrome-ink, #493f48); font: 24px Georgia, serif; letter-spacing: -.4px; text-shadow: 0 1px 2px #0006, 0 2px 14px #0005; }
+body[data-theme='day'] .lake-title h1 { text-shadow: 0 1px 10px #fffc; }
+.lake .lake-exit { color: #4f473e; }
+.lake .lake-exit:active { transform: translate(calc(var(--pin-half) * -1), -100%); }
+.lake-exit .house-pin-label { max-width: 100px; opacity: 1; padding: 6px 12px 6px 20px; }
+.lake-exit .house-pin { width: 36px; height: 36px; }
 .lake-status { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 86px); transform: translateX(-50%); margin: 0; padding: 7px 16px; border-radius: 999px; border: 1px solid var(--lake-edge); background: var(--lake-paper); box-shadow: var(--lake-shadow); font-size: 14px; font-weight: 600; white-space: nowrap; animation: lake-rise .35s ease both; }
 .lake-status:empty { display: none; }
 

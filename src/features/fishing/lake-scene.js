@@ -1,6 +1,7 @@
 import { Engine } from '@babylonjs/core/Engines/engine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TargetCamera } from '@babylonjs/core/Cameras/targetCamera.js';
+import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
@@ -11,23 +12,31 @@ import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js'
 import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
+import { PointLight } from '@babylonjs/core/Lights/pointLight.js';
+import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js';
+import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 import { GlowLayer } from '@babylonjs/core/Layers/glowLayer.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import { createMobileCompanion, disposeAvatarTemplates } from '../../models/furniture.js';
 import { createPetModel } from '../pet/index.js';
+import { buildGardenTree, buildRoseArch, houseFrame } from '../house/index.js';
 import { speciesOf, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
+import { POND_EXIT, lakeWater } from './lake-ground.js';
 import { placeAsset } from '../../models/assets.js';
 import { POND, POND_PATH, pondRim as rim, createLakeBank, createLakeGrass } from './lake-ground.js';
 import { buildFishModel } from '../../models/fish-model.js';
 
 const cardSide = new Vector3(), DOCK_Y = .42, STAND = new Vector3(0, DOCK_Y, 1.35), HOME_BOBBER = new Vector3(-.15, 0, .2);
 const PALETTES = {
-  dusk: { top: '#2e2a5a', mid: '#8b6d9f', low: '#f2b8a2', sun: '#ffd8a3', sunDir: [-.35, .1, -1], deep: '#34506f', shallow: '#7fa5ad', glint: '#ffe2b8', leaf: ['#7e9d74', '#91ae7e', '#a5c08c'], blossom: ['#e2a9b8', '#eec0c9', '#d696aa'], hill: ['#6f5f8e', '#8a74a2', '#a58bb0'], grass: '#86a36c', meadow: '#7b9863', sand: '#d2b894', trunk: '#6b4f3c', light: 1, stars: 1 },
-  day: { top: '#6fa9d8', mid: '#aed5ea', low: '#f5ead6', sun: '#fff6dc', sunDir: [.35, .45, -1], deep: '#3d7b93', shallow: '#95cfc6', glint: '#ffffff', leaf: ['#6f9a60', '#86ad6c', '#a0c282'], blossom: ['#f0b9c6', '#f7d0d7', '#e7a3b6'], hill: ['#8aa9c2', '#a3bdd0', '#bdd0dc'], grass: '#a3c27f', meadow: '#93b572', sand: '#e0cba3', trunk: '#76584a', light: 1, stars: 0 },
-  rain: { top: '#56627a', mid: '#8491a3', low: '#c2c9ce', sun: '#e9eef0', sunDir: [0, .35, -1], deep: '#3a5463', shallow: '#76979d', glint: '#eef4f6', leaf: ['#5f7c62', '#708f71', '#84a282'], blossom: ['#c9a2b0', '#d8b6c0', '#bb90a1'], hill: ['#72808f', '#8795a2', '#9eabb5'], grass: '#7f9a74', meadow: '#728d69', sand: '#b9ab94', trunk: '#5e4a3d', light: .84, stars: 0 },
+  dusk: { exposure: 1.05, sky: '#ffe3c5', ground: '#645441', ambient: .55, sun: .72, sunTint: '#ffcf9f', shade: .3, lamp: .9, glow: .5, lit: '#ffc873', deep: '#34506f', shallow: '#7fa5ad', skyLow: '#f2b8a2', skyMid: '#8b6d9f', waterSun: [-.35, .1, -1], glint: '#ffe2b8', leaf: ['#86a275', '#97b081', '#a9bf8e'], grass: '#95a877', meadow: '#879b6c', sand: '#cdb694', stone: ['#aaa597', '#9d978a', '#b8b1a1'], light: .95 },
+  day: { exposure: 1.1, sky: '#ffe9d2', ground: '#a48b6b', ambient: .66, sun: 1, sunTint: '#ffe3bb', shade: .24, lamp: 0, glow: .35, lit: '#ffd48a', deep: '#3d7b93', shallow: '#95cfc6', skyLow: '#f5ead6', skyMid: '#aed5ea', waterSun: [.35, .45, -1], glint: '#fffaf0', leaf: ['#86a86c', '#9ab97c', '#afc88e'], grass: '#a8bb82', meadow: '#9aae76', sand: '#dcc8a2', stone: ['#c9bfae', '#b8ae9d', '#d6ccb8'], light: 1 },
+  rain: { exposure: 1, sky: '#dfe4e2', ground: '#5c5a52', ambient: .6, sun: .45, sunTint: '#e6e8e4', shade: .18, lamp: .7, glow: .45, lit: '#ffd08a', deep: '#3a5463', shallow: '#76979d', skyLow: '#c2c9ce', skyMid: '#8491a3', waterSun: [0, .35, -1], glint: '#eef4f6', leaf: ['#6f8d6d', '#7f9d7a', '#91ab88'], grass: '#8a9f7c', meadow: '#7d9372', sand: '#b8ad98', stone: ['#a9a69c', '#9a978e', '#b6b3a8'], light: .85 },
 };
-const HEAD = new Vector3(STAND.x, DOCK_Y + 2.45, STAND.z), FOCUS_EYE = new Vector3(3.3, 3.1, 7.6);
+const HEAD = new Vector3(STAND.x, DOCK_Y + 2.45, STAND.z), GROUND = .15, FENCE = ['#c6b99b', '#b3a585'];
+const REFLECTION_EYE = new Vector3(5.6, 7, 16), LOOK = new Vector3(.5, 0, -5), VIEW = new Vector3(.45, .85, 1).normalize(), SUN = new Vector3(3, -8, -5).normalize();
+const TREES = [[-2.75, 1.34, 1.2, 'oak'], [-2.98, 1.28, .95, 'cherry'], [-1.95, 1.45, 1.1, 'oak'], [-1.6, 1.38, 1.05, 'oak'], [-1.15, 1.36, .95, 'cherry'], [-.5, 1.4, 1.1, 'oak'], [-.12, 1.36, .95, 'cherry'], [.22, 1.38, 1.1, 'oak'], [2.33, 1.4, 1.05, 'oak'], [2.8, 1.36, 1.15, 'oak'], [2.58, 1.42, .95, 'cherry']];
+const EXIT_TAG = new Vector3(POND_EXIT.x, 2.9, POND_EXIT.z);
 const hash = n => { const s = Math.sin(n * 78.233 + 12.9898) * 43758.5453; return s - Math.floor(s); };
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
 const easeOut = t => 1 - (1 - Math.min(1, Math.max(0, t))) ** 3;
@@ -61,12 +70,12 @@ void main() {
   vec3 base = mix(mix(shallow, deep, depth), shallow * 1.25 + vec3(.07, .06, .02), smoothstep(.84, .99, edge) * .55);
   vec3 sky = mix(skyLow, skyMid, clamp(r.y * 2.2, 0., 1.));
   vec3 col = mix(base, sky, clamp(.18 + fres * .75, 0., .88));
-  col += glint * pow(max(dot(r, normalize(sunDir)), 0.), 90.) * 1.1;
-  float twinkle = step(.93, noise(q * 9. + vec2(time * .5, -time * .35))) * (.5 + .5 * sin(time * 5. + q.x * 7.));
-  col += glint * twinkle * .22 * smoothstep(0., 1., dot(r, normalize(sunDir)) + .4);
+  col += glint * pow(max(dot(r, normalize(sunDir)), 0.), 90.) * .75;
+  float twinkle = smoothstep(.9, .99, noise(q * 4. + vec2(time * .5, -time * .35))) * (.5 + .5 * sin(time * 5. + q.x * 7.));
+  col += glint * twinkle * .16 * smoothstep(0., 1., dot(r, normalize(sunDir)) + .4);
   col += vec3(.95, .97, 1.) * min(foam * .9, .6);
   float fog = smoothstep(16., 42., length(vWorld.xz - eye.xz));
-  gl_FragColor = vec4(mix(col, skyLow, fog * .85), 1.);
+  gl_FragColor = vec4(mix(col, skyLow, fog * .6), 1.);
 }`;
 const FALL_VERTEX = `precision highp float;
 attribute vec3 position; attribute vec2 uv; uniform mat4 viewProjection; varying vec2 vUv;
@@ -86,74 +95,62 @@ void main() {
   col = mix(col, foam, clamp(smoothstep(.5, .85, streak) * .8 + smoothstep(.8, 1., vUv.y) * .7 + (1. - smoothstep(.12, .3, vUv.y)) * .25, 0., 1.));
   gl_FragColor = vec4(col, smoothstep(0., .14, vUv.x) * smoothstep(1., .86, vUv.x) * .94);
 }`;
-const SKY_VERTEX = `precision highp float;
-attribute vec3 position; uniform mat4 worldViewProjection; varying vec3 vDir;
-void main() { vDir = position; gl_Position = worldViewProjection * vec4(position, 1.); }`;
-const SKY_FRAGMENT = `precision highp float;
-varying vec3 vDir; uniform vec3 top, mid, low, sun, sunDir; uniform float stars, time;
-float hash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
-void main() {
-  vec3 d = normalize(vDir); float h = d.y;
-  vec3 col = h < .12 ? mix(low, mid, smoothstep(-.02, .12, h)) : mix(mid, top, smoothstep(.12, .6, h));
-  float s = max(dot(d, normalize(sunDir)), 0.);
-  col += sun * (pow(s, 900.) * 1.4 + pow(s, 24.) * .28 + pow(s, 4.) * .08);
-  vec3 cell = floor(d * 220.); float star = step(.9975, hash(cell)) * smoothstep(.15, .5, h) * stars;
-  col += vec3(1., .95, .85) * star * (.55 + .45 * sin(time * 2. + hash(cell + 3.) * 30.));
-  gl_FragColor = vec4(col, 1.);
-}`;
 
-export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat', reducedMotion = false }) {
+export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat', exitTag, reducedMotion = false }) {
   const palette = PALETTES[theme] || PALETTES.dusk;
   const canvas = document.createElement('canvas'); canvas.className = 'lake-canvas';
   canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', 'A quiet pond at the end of a little wooden dock');
   container.appendChild(canvas);
-  const engine = new Engine(canvas, true, { stencil: false, powerPreference: 'high-performance' });
+  const engine = new Engine(canvas, true, { alpha: true, stencil: false, powerPreference: 'high-performance' });
   engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, 2));
   const scene = new Scene(engine); scene.useRightHandedSystem = true;
-  scene.clearColor = Color4.FromHexString(palette.low + 'ff');
+  scene.clearColor = new Color4(0, 0, 0, 0);
   scene.skipPointerMovePicking = true; scene.skipPointerDownPicking = true; scene.skipPointerUpPicking = true;
-  scene.imageProcessingConfiguration.toneMappingEnabled = true; scene.imageProcessingConfiguration.toneMappingType = 1; scene.imageProcessingConfiguration.exposure = 1.08;
-  const camera = new TargetCamera('lake-camera', new Vector3(5.6, 7, 16), scene);
-  camera.fov = .7; camera.minZ = .1; camera.maxZ = 220;
-  const camHome = { eye: camera.position.clone(), look: new Vector3(-.8, -.1, -3.6) }, camLook = camHome.look.clone(), camEye = camHome.eye.clone();
-  camera.setTarget(camLook);
+  scene.imageProcessingConfiguration.toneMappingEnabled = true; scene.imageProcessingConfiguration.toneMappingType = 1; scene.imageProcessingConfiguration.exposure = palette.exposure;
+  const camera = new TargetCamera('lake-camera', VIEW.scale(60).addInPlace(LOOK), scene);
+  camera.mode = Camera.ORTHOGRAPHIC_CAMERA; camera.minZ = .1; camera.maxZ = 140; camera.setTarget(LOOK);
   const skyLight = new HemisphericLight('lake-sky', new Vector3(0, 1, 0), scene);
-  skyLight.intensity = .78 * palette.light; skyLight.groundColor = Color3.FromHexString(palette.deep).scale(.9); skyLight.diffuse = Color3.FromHexString(palette.mid).scale(.5).add(new Color3(.5, .5, .5));
-  const sun = new DirectionalLight('lake-sun', new Vector3(-palette.sunDir[0], -Math.max(.35, palette.sunDir[1]), -palette.sunDir[2]).normalize(), scene);
-  sun.intensity = .95 * palette.light; sun.diffuse = Color3.FromHexString(palette.sun);
-  const fill = new DirectionalLight('lake-fill', new Vector3(-.45, -.6, -1).normalize(), scene);
-  fill.intensity = .62 * palette.light; fill.diffuse = Color3.FromHexString(palette.mid).scale(.45).add(new Color3(.5, .48, .5)); fill.specular = Color3.Black();
-  const glow = new GlowLayer('lake-glow', scene, { mainTextureFixedSize: 512, blurKernelSize: 32 }); glow.intensity = theme === 'day' ? .35 : .75;
+  skyLight.intensity = palette.ambient; skyLight.diffuse = Color3.FromHexString(palette.sky); skyLight.groundColor = Color3.FromHexString(palette.ground); skyLight.specular = Color3.Black();
+  const sun = new DirectionalLight('lake-sun', SUN, scene); sun.position = SUN.scale(-40);
+  sun.intensity = palette.sun; sun.diffuse = Color3.FromHexString(palette.sunTint); sun.specular = Color3.Black();
+  sun.shadowMinZ = 1; sun.shadowMaxZ = 90; sun.autoUpdateExtends = false;
+  sun.orthoLeft = -18; sun.orthoRight = 18; sun.orthoTop = 18; sun.orthoBottom = -18;
+  const sunShadow = new ShadowGenerator(2048, sun); sunShadow.usePercentageCloserFiltering = true; sunShadow.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+  sunShadow.bias = .002; sunShadow.normalBias = .02; sunShadow.darkness = palette.shade;
+  const lamp = new PointLight('lake-lamplight', new Vector3(-.4, 2.3, 4.4), scene);
+  lamp.diffuse = Color3.FromHexString('#ffc47e'); lamp.specular = Color3.Black(); lamp.intensity = palette.lamp; lamp.range = 7; lamp.setEnabled(palette.lamp > 0);
+  const glow = new GlowLayer('lake-glow', scene, { mainTextureFixedSize: 512, blurKernelSize: 32 }); glow.intensity = palette.glow;
 
-  const sky = MeshBuilder.CreateSphere('lake-sky-dome', { diameter: 400, segments: 24, sideOrientation: Mesh.BACKSIDE }, scene);
-  const skyPaint = new ShaderMaterial('lake-sky-paint', scene, { vertexSource: SKY_VERTEX, fragmentSource: SKY_FRAGMENT }, { attributes: ['position'], uniforms: ['worldViewProjection', 'top', 'mid', 'low', 'sun', 'sunDir', 'stars', 'time'] });
-  for (const key of ['top', 'mid', 'low', 'sun']) skyPaint.setColor3(key, Color3.FromHexString(palette[key]));
-  skyPaint.setVector3('sunDir', new Vector3(...palette.sunDir)); skyPaint.setFloat('stars', palette.stars);
-  sky.material = skyPaint; sky.isPickable = false; sky.infiniteDistance = true;
-
-  const water = MeshBuilder.CreateGround('lake-water', { width: POND.rx * 2.4, height: POND.rz * 2.4, subdivisions: 64 }, scene); water.position.z = POND.z;
+  const water = new Mesh('lake-water', scene); Object.assign(new VertexData(), lakeWater()).applyToMesh(water);
   const waterPaint = new ShaderMaterial('lake-water-paint', scene, { vertexSource: WATER_VERTEX, fragmentSource: WATER_FRAGMENT }, { attributes: ['position'], uniforms: ['world', 'viewProjection', 'time', 'eye', 'deep', 'shallow', 'skyLow', 'skyMid', 'glint', 'sunDir', 'ripples'] });
   waterPaint.setColor3('deep', Color3.FromHexString(palette.deep)); waterPaint.setColor3('shallow', Color3.FromHexString(palette.shallow));
-  waterPaint.setColor3('skyLow', Color3.FromHexString(palette.low)); waterPaint.setColor3('skyMid', Color3.FromHexString(palette.mid));
-  waterPaint.setColor3('glint', Color3.FromHexString(palette.glint)); waterPaint.setVector3('sunDir', new Vector3(...palette.sunDir));
-  water.material = waterPaint; water.isPickable = false;
+  waterPaint.setColor3('skyLow', Color3.FromHexString(palette.skyLow)); waterPaint.setColor3('skyMid', Color3.FromHexString(palette.skyMid));
+  waterPaint.setColor3('glint', Color3.FromHexString(palette.glint)); waterPaint.setVector3('sunDir', new Vector3(...palette.waterSun));
+  waterPaint.backFaceCulling = false; water.material = waterPaint; water.isPickable = false;
   const ripples = new Array(40).fill(0); let nextRipple = 2;
   const ripple = (x, z, strength = 1, slot) => { const i = slot ?? nextRipple; if (slot === undefined) nextRipple = 2 + (nextRipple - 1) % 8; ripples.splice(i * 4, 4, x, z, clock, strength); };
 
-  const baked = [];
+  const baked = [], glowing = [];
+  let into = baked, lamps = false;
   const paint = (mesh, hex, strength = 1) => {
-    mesh.computeWorldMatrix(true); const data = VertexData.ExtractFromMesh(mesh); data.transform(mesh.getWorldMatrix()); mesh.dispose();
-    const c = Color3.FromHexString(hex).scale(strength), count = data.positions.length / 3; data.colors = new Float32Array(count * 4); data.uvs = null;
+    mesh.computeWorldMatrix(true); const data = VertexData.ExtractFromMesh(mesh); data.transform(mesh.getWorldMatrix()); mesh.dispose(); data.uvs = null;
+    if (lamps && strength > 1) { glowing.push(data); return; }
+    const c = Color3.FromHexString(hex).scale(strength), count = data.positions.length / 3; data.colors = new Float32Array(count * 4);
     for (let i = 0; i < count; i++) data.colors.set([c.r, c.g, c.b, 1], i * 4);
-    baked.push(data);
+    into.push(data);
   };
-  const box = (x, y, z, w, h, d, hex, rot = [0, 0, 0]) => { const m = MeshBuilder.CreateBox('p', { width: w, height: h, depth: d }, scene); m.position.set(x, y, z); m.rotation.set(...rot); paint(m, hex); };
-  const ball = (x, y, z, w, h, d, hex, segments = 8, strength = 1) => { const m = MeshBuilder.CreateSphere('p', { diameter: 1, segments }, scene); m.position.set(x, y, z); m.scaling.set(w, h, d); paint(m, hex, strength); };
-  const cyl = (x, y, z, top, bottom, h, hex, rot = [0, 0, 0], tessellation = 10) => { const m = MeshBuilder.CreateCylinder('p', { diameterTop: top, diameterBottom: bottom, height: h, tessellation }, scene); m.position.set(x, y, z); m.rotation.set(...rot); paint(m, hex); };
+  const box = (x, y, z, w, h, d, hex, rot = [0, 0, 0], strength = 1) => { const m = MeshBuilder.CreateBox('p', { width: w, height: h, depth: d }, scene); m.position.set(x, y, z); m.rotation.set(...rot); paint(m, hex, strength); };
+  const ball = (x, y, z, w, h, d, hex, segments = 8, strength = 1, tilt = 0) => { const m = MeshBuilder.CreateSphere('p', { diameter: 1, segments }, scene); m.position.set(x, y, z); m.scaling.set(w, h, d); m.rotation.z = tilt; paint(m, hex, strength); };
+  const cyl = (x, y, z, top, bottom, h, hex, rot = [0, 0, 0], tessellation = 10, strength = 1) => { const m = MeshBuilder.CreateCylinder('p', { diameterTop: top, diameterBottom: bottom, height: h, tessellation }, scene); m.position.set(x, y, z); m.rotation.set(...rot); paint(m, hex, strength); };
   const asset = (name, at) => baked.push(Object.assign(new VertexData(), placeAsset(name, at)));
-  const tree = (x, z, s, seed, y = 0) => asset(seed % 5 === 2 ? 'tree-pine' : ['tree-round-a', 'tree-round-b', 'tree-round-c'][seed % 3], { x, y, z, yaw: seed * 1.3, scale: s * (seed % 5 === 2 ? 1.6 : 1.9) });
-  const blossom = (x, z, s, seed) => asset(['tree-blossom-a', 'tree-blossom-b'][seed % 2], { x, z, yaw: seed, scale: s * 1.8 });
-  const willow = (x, z, s) => asset('tree-willow', { x, z, yaw: .6, scale: s * 1.7 });
+  const api = {
+    box: (x, y, z, w, h, d, hex, tilt = 0, strength = 1) => box(x, y, z, w, h, d, hex, Array.isArray(tilt) ? tilt : [0, 0, tilt], strength),
+    ball: (x, y, z, w, h, d, hex, strength = 1, tilt = 0) => ball(x, y, z, w, h, d, hex, 8, strength, tilt),
+    orb: (x, y, z, w, h, d, hex) => ball(x, y, z, w, h, d, hex, w < .12 ? 2 : w < .4 ? 4 : w < .8 ? 6 : 8),
+    cylinder: (x, y, z, top, bottom, h, hex) => cyl(x, y, z, top, bottom, h, hex, [0, 0, 0], 12),
+  };
+  const tree = (species, x, z, s) => buildGardenTree(api, species, x, z, GROUND - .02, s);
+  const bush = (x, y, z, s, yaw) => asset('bush', { x, y, z, yaw, scale: s });
   const boat = (x, z, yaw) => asset('rowboat', { x, y: .2, z, yaw });
   const reeds = (x, z, count, seed) => {
     for (let i = 0; i < count; i++) {
@@ -162,28 +159,17 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
       if (i % 3 === 0) ball(x + dx + lean * .1, tall - .12, z + dz, .06, .2, .06, '#7a553c', 6);
     }
   };
-  const rock = (x, z, s, seed) => asset(['rock-a', 'rock-b'][seed % 2], { x, y: -.05, z, yaw: seed * 2.1, scale: s * 1.15 });
+  const rock = (x, z, s, seed, y = -.05) => asset(['rock-a', 'rock-b'][seed % 2], { x, y, z, yaw: seed * 2.1, scale: s * 1.15 });
 
   const flowers = (x, z, count, seed) => {
     const tint = [['#f3c3d0', '#f9e2e7'], ['#f6e3a8', '#fff3cf'], ['#c9b8e6', '#e4d9f4'], ['#f7f1e6', '#fdf9f1']][seed % 4];
     ball(x, .14, z, .8, .36, .7, palette.leaf[seed % 3], 7);
-    for (let i = 0; i < count; i++) { const a = i * 2.4 + seed, r = .1 + hash(i + seed * 9) * .26; ball(x + Math.cos(a) * r, .32 + hash(i * 5 + seed) * .1, z + Math.sin(a) * r * .8, .17, .13, .17, tint[i % 2], 6, 1.12); }
+    for (let i = 0; i < count; i++) { const a = i * 2.4 + seed, r = .1 + hash(i + seed * 9) * .26; ball(x + Math.cos(a) * r, .32 + hash(i * 5 + seed) * .1, z + Math.sin(a) * r * .8, .17, .13, .17, tint[i % 2], 4, 1.12); }
   };
   const picket = (from, to, count) => {
-    for (let i = 0; i <= count; i++) { const t = i / count, x = from[0] + (to[0] - from[0]) * t, z = from[1] + (to[1] - from[1]) * t; box(x, .45, z, .08, .62, .05, '#f3ebdd'); box(x, .78, z, .06, .06, .05, '#f3ebdd', [0, 0, Math.PI / 4]); }
+    for (let i = 0; i <= count; i++) { const t = i / count, x = from[0] + (to[0] - from[0]) * t, z = from[1] + (to[1] - from[1]) * t; box(x, .45, z, .09, .62, .09, FENCE[0]); box(x, .78, z, .12, .05, .12, FENCE[1]); }
     const yaw = -Math.atan2(to[1] - from[1], to[0] - from[0]), mx = (from[0] + to[0]) / 2, mz = (from[1] + to[1]) / 2, length = Math.hypot(to[0] - from[0], to[1] - from[1]);
-    for (const y of [.34, .6]) box(mx, y, mz, length, .05, .03, '#e6dccb', [0, yaw, 0]);
-  };
-  const cottage = (x, z, yaw, k = 1.45) => {
-    const at = (dx, dz) => [x + (Math.cos(yaw) * dx + Math.sin(yaw) * dz) * k, z + (-Math.sin(yaw) * dx + Math.cos(yaw) * dz) * k];
-    const [cx, cz] = at(0, 0);
-    box(cx, 1.35 * k, cz, 4.4 * k, 2.6 * k, 3.2 * k, '#fbf0dc', [0, yaw, 0]); box(cx, .12 * k, cz, 4.6 * k, .24 * k, 3.4 * k, '#b9a58e', [0, yaw, 0]);
-    for (const side of [-1, 1]) { const [rx, rz] = at(0, side * .9); box(rx, 3.2 * k, rz, 4.9 * k, .14 * k, 2.25 * k, '#9a5f55', [side * .72, yaw, 0]); }
-    box(cx, 2.8 * k, cz, 4.3 * k, .75 * k, 1.7 * k, '#fbf0dc', [0, yaw, 0]);
-    const [chx, chz] = at(1.3, -.5); box(chx, 3.7 * k, chz, .42 * k, 1.1 * k, .42 * k, '#b3796b', [0, yaw, 0]);
-    const [dx, dz] = at(-.6, 1.62); box(dx, .85 * k, dz, .75 * k, 1.35 * k, .06 * k, '#8f6a4f', [0, yaw, 0]);
-    const [px, pz] = at(-.6, 2.05); box(px, .22 * k, pz, 1.3 * k, .12 * k, .8 * k, '#c9b69c', [0, yaw, 0]);
-    return [at(.8, 1.63), at(1.75, 1.63), at(-1.6, 1.63)];
+    for (const y of [.36, .62]) box(mx, y, mz, length, .06, .07, FENCE[0], [0, yaw, 0]);
   };
   const bench = (x, z, yaw) => {
     for (const dz of [-.12, .02, .16]) box(x + Math.sin(yaw) * dz, .46, z + Math.cos(yaw) * dz, 1.3, .05, .1, '#b98d63', [0, yaw, 0]);
@@ -191,48 +177,26 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     for (const side of [-.55, .55]) box(x + Math.cos(yaw) * side, .22, z - Math.sin(yaw) * side, .07, .44, .4, '#6f5240', [0, yaw, 0]);
   };
 
+  const archParts = [], litFrom = glowing.length;
+  into = archParts; lamps = true; buildRoseArch(api, theme, 0, 0); into = baked; lamps = false;
+  const archSeat = Matrix.RotationY(POND_EXIT.yaw).multiply(Matrix.Translation(POND_EXIT.x, GROUND - .04, POND_EXIT.z));
+  for (const data of [...archParts, ...glowing.slice(litFrom)]) data.transform(archSeat);
+
   baked.push(Object.assign(new VertexData(), createLakeBank(palette)), Object.assign(new VertexData(), createLakeGrass(palette)));
-  ball(0, -1.8, -46, 110, 4.4, 24, palette.meadow, 18);
-  const haze = Color3.FromHexString(palette.low).scale(.7).add(Color3.FromHexString(palette.mid).scale(.3));
-  const ridge = (z, base, rise, crowns, hex, fade, seed, half = 170) => {
-    const tone = Color3.Lerp(Color3.FromHexString(hex), haze, fade), foot = tone.scale(.9), positions = [], colors = [], normals = [], indices = [];
-    const columns = Math.round(half * 2 / (crowns ? .6 : 2.5));
-    let crown = -half, radius = 0, puff = 0;
-    for (let i = 0; i <= columns; i++) {
-      const x = -half + i * half * 2 / columns;
-      if (crowns && x > crown + radius) { crown = x; radius = crowns * (.5 + hash(seed + i) * 1.1); puff = .3 + hash(seed * 3 + i) * .35; }
-      const bump = crowns ? Math.sqrt(Math.max(0, 1 - ((x - crown - radius / 2) / (radius / 2)) ** 2)) * radius * puff : 0;
-      const top = base + rise * (.55 + .3 * Math.sin(x * .031 + seed) + .15 * Math.sin(x * .087 + seed * 2)) + bump;
-      positions.push(x, top, z, x, base - 14, z + 6);
-      colors.push(tone.r, tone.g, tone.b, 1, foot.r, foot.g, foot.b, 1);
-      normals.push(0, .5, .87, 0, .5, .87);
-      if (i) indices.push(i * 2 - 2, i * 2, i * 2 - 1, i * 2 - 1, i * 2, i * 2 + 1);
-    }
-    baked.push(Object.assign(new VertexData(), { positions, colors, normals, indices }));
-  };
-  ridge(-140, 3, 9, 0, palette.hill[2], .75, 5, 260);
-  ridge(-105, 0, 7, 4, palette.leaf[0], .58, 9, 220);
-  ridge(-72, -1, 5, 3, palette.leaf[0], .3, 2, 190);
-  ridge(-44, -1.5, 3.2, 2.2, palette.leaf[0], .08, 7, 150);
-  const windows = cottage(5.4, -15.8, -.45);
-  willow(...rim(3.2, 1.16), 1.1);
-  for (const [x, z, s, seed] of [[-7.6, -12.8, 1.1, 0], [-2.6, -14, .85, 4], [9.6, -19, 1.15, 1], [12.2, -8.6, .95, 7], [-12.6, -8, 1, 3]]) tree(x, z, s, seed);
-  for (const [x, z, s] of [[-10.3, -11.2, 1.05], [13.4, -12.6, .9]]) asset('tree-pine', { x, z, yaw: x, scale: s * 1.7 });
-  for (const [x, z, s, seed] of [[1.2, -16.4, .85, 0], [11.4, -3.6, .8, 1], [-11.4, 4.6, .85, 3]]) blossom(x, z, s, seed);
-  asset('tree-fruit', { x: 10.2, z: -14.2, yaw: 1, scale: 1.45 });
-  for (const [x, z, s] of [[-18, -22, 1.1], [-12, -25, .95], [16, -23, 1.2], [21, -27, 1]]) tree(x, z, s, Math.round(x));
-  picket(rim(-.9, 1.5), rim(-.25, 1.35), 10);
+  tree('willow', ...rim(3.2, 1.2), 1.55);
+  for (const [a, k, s, species] of TREES) tree(species, ...rim(a, k), s);
+  picket(rim(1.16, 1.5), rim(1.34, 1.48), 5); picket(rim(1.34, 1.48), rim(1.5, 1.44), 4);
   const stones = [[-2.95, -2.3], [-1.75, -1.2], [-.95, -.35], [.3, 1.05], [2.15, 2.75]];
   stones.forEach(([from, to], run) => { for (let a = from, i = 0; a < to; a += .09 + hash(i + run * 17) * .07, i++) { const [x, z] = rim(a, 1 + (hash(i * 5 + run) - .5) * .06); asset(['rock-a', 'rock-b'][i % 2], { x, y: -.12, z, yaw: i * 2.1, scale: .45 + hash(i * 3 + run * 7) * .5 }); } });
   const lip = rim(-2.05, 1.1), toward = [(POND.x - lip[0]), (POND.z - lip[1])].map((v, _, d) => v / Math.hypot(...d)), across = [-toward[1], toward[0]];
   const ledge = (u, v, y, s, yaw, name = 'rock-b') => asset(name, { x: lip[0] + across[0] * u + toward[0] * v, y, z: lip[1] + across[1] * u + toward[1] * v, yaw, scale: s });
   for (const [u, v, y, s] of [[0, -2.6, .7, 2.6], [-1.9, -1.6, .45, 2.2], [1.9, -1.7, .5, 2.3], [-1.45, -.2, -.25, 1.9], [1.5, -.3, -.2, 2], [-3, -.6, -.3, 1.8], [3.1, -.8, -.3, 1.7], [-3.4, -2.4, .1, 2], [3.3, -2.6, .15, 2.1]]) ledge(u, v, y, s, u * 2.3 + v);
   for (const [u, v, s] of [[-1.1, .9, .7], [1.2, 1, .8], [-2.2, 1.2, .55], [2.3, 1.1, .5], [-.6, 1.5, .35]]) ledge(u, v, -.15, s, u * 3, 'rock-a');
-  for (const [u, v, s] of [[-2.3, -2.2, .9], [2.4, -2.4, 1], [0, -3.6, 1.3], [-3.6, -2, .8]]) asset('bush', { x: lip[0] + across[0] * u + toward[0] * v, y: 1.35, z: lip[1] + across[1] * u + toward[1] * v, yaw: u, scale: s });
-  { const [x, z] = [4.7, -8.3]; ball(x, -.2, z, 3.4, .8, 2.5, palette.sand, 14); ball(x, -.05, z, 2.8, .75, 2, palette.grass, 14); rock(x - 1.3, z + .8, .5, 1); rock(x + 1.4, z + .5, .4, 2); blossom(x + .2, z - .2, .55, 1); flowers(x - .6, z + .5, 8, 2); }
-  for (const [a, k, n] of [[2.75, 1, 12], [.55, .98, 9], [-.2, .99, 8], [-2.45, 1, 10]]) { const [x, z] = rim(a, k); reeds(x, z, n, Math.round(a * 10)); }
-  for (const [x, z, n, seed] of [[3.2, -12.4, 12, 0], [7.9, -12.6, 10, 1], [-5.6, 3.6, 12, 2], [-3.4, 5.2, 9, 3], [-7.2, -7.4, 10, 0], [-1.3, -9.9, 9, 1], [8.6, 1.4, 12, 2], [10.2, -1.8, 9, 3], [-10.2, .2, 10, 1]]) flowers(x, z, n, seed);
-  const pads = [[-2.2, -1.3, .42], [-3.1, -2.4, .34], [-1.3, -3.4, .3], [2.4, -1.8, .4], [3.2, -3, .3], [-4.2, 0, .36], [4.4, .6, .32], [-5.5, -4.3, .45], [6.2, -4.6, .38], [-.4, -6.8, .3], [-2.6, -7.2, .4], [1.9, -8.4, .36]];
+  for (const [u, v, s] of [[-2.3, -2.2, .9], [2.4, -2.4, 1], [0, -3.6, 1.3], [-3.6, -2, .8]]) bush(lip[0] + across[0] * u + toward[0] * v, 1.35, lip[1] + across[1] * u + toward[1] * v, s, u);
+  { const [x, z] = [4.7, -8.3]; ball(x, -.2, z, 3.4, .8, 2.5, palette.sand, 14); ball(x, -.05, z, 2.8, .75, 2, palette.grass, 14); rock(x - 1.3, z + .8, .5, 1); rock(x + 1.4, z + .5, .4, 2); tree('cherry', x + .2, z - .2, .7); flowers(x - .6, z + .5, 8, 2); }
+  for (const [a, k, n] of [[2.75, 1, 12], [.55, .98, 9], [-.2, .99, 8], [2.2, .99, 7], [-.75, 1, 8]]) { const [x, z] = rim(a, k); reeds(x, z, n, Math.round(a * 10)); }
+  for (const [x, z, n, seed] of [[...rim(1.42, 1.54), 10, 2], [...rim(1.15, 1.56), 9, 3], [-7.2, -7.4, 10, 0], [-1.3, -9.9, 9, 1], [8.6, 1.4, 12, 2], [10.2, -1.8, 9, 3], [-10.2, .2, 10, 1], [-1.6, -11.6, 10, 2], [11.2, -9.4, 9, 0]]) flowers(x, z, n, seed);
+  const pads = [[-5.8, -.2, .42], [-4.6, .6, .34], [-5.2, -1.4, .3], [-6.6, -1.6, .36], [-4.1, -.5, .26], [-6.4, .5, .3], [5.2, -1.6, .4], [6.3, -2.6, .34], [4.6, -3, .3], [6, -.9, .28], [5.6, -4, .36], [7, -1.7, .26]];
   pads.forEach(([x, z, r], i) => {
     cyl(x, .045, z, r * 2, r * 2, .02, palette.leaf[i % 3], [0, 0, 0], 16);
     if (i % 3 === 0) { for (let p = 0; p < 7; p++) { const a = p / 7 * Math.PI * 2; ball(x + Math.cos(a) * .08, .12, z + Math.sin(a) * .08, .12, .1, .08, p % 2 ? '#f3c3d0' : '#f9dde4', 6, 1.08); } ball(x, .15, z, .08, .06, .08, '#f4d88a', 6); }
@@ -243,18 +207,33 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     box(side * .66, DOCK_Y - .1, 3.1, .08, .08, 4.5, '#8d6849');
     for (const z of [1, 3]) cyl(side * .72, DOCK_Y / 2 - .25, z, .16, .18, DOCK_Y + .7, '#6f5240');
   }
-  const posts = [[-.72, 1.02], [-.72, 5.2], [.72, 5.2], [-3.4, 4.9]];
+  const posts = [[-.72, 1.02], [-.72, 5.2], [.72, 5.2], rim(1.45, 1.16), rim(1.18, 1.15)];
   for (const [x, z] of posts) { cyl(x, .95, z, .09, .11, 1.9, '#6f5240'); box(x, 1.93, z, .16, .05, .16, '#4f3d31'); }
   box(1.25, .75, 5.5, .08, 1.1, .08, '#6f5240'); box(1.25, 1.18, 5.52, .95, .42, .07, '#b98d63', [0, -.25, 0]); box(1.25, 1.18, 5.56, .8, .3, .02, '#e8d6b8', [0, -.25, 0]);
-  POND_PATH.forEach(([x, z], i) => cyl(x, .17, z, .5, .52, .05, ['#e3d7c1', '#d6c8ae'][i % 2]));
-  for (const [x, z, s] of [[4.2, 4.6, 1.2], [-6.6, 4.4, 1.1], [7.4, 3.2, .9]]) asset('bush', { x, z, yaw: x, scale: s });
-  boat(1.75, 2.6, .5); bench(-4.6, 3.9, -.35);
+  POND_PATH.forEach(([x, z], i) => cyl(x, .17, z, .5, .52, .05, ['#e3d7c1', '#d6c8ae'][i % 2], [0, 0, 0], 16));
+  for (const [x, z, s] of [[7.4, 3.2, .9], [-4.2, 4.6, 1.1]]) bush(x, GROUND - .03, z, s, x);
+  boat(-1.6, 2.7, 2.07); box(-.98, .44, 3.05, .55, .025, .025, '#d9c7a4', [0, -.35, -.25]);
+  { const a = 1.32, [x, z] = rim(a, 1.12); bench(x, z, Math.atan2(-Math.cos(a) / POND.rx, -Math.sin(a) / POND.rz)); }
   const tackle = [.46, DOCK_Y + .09, 2.15];
   box(tackle[0], tackle[1], tackle[2], .36, .18, .24, '#6f8f86', [0, .2, 0]); box(tackle[0], tackle[1] + .1, tackle[2], .38, .03, .26, '#5a766e', [0, .2, 0]);
   cyl(-.42, DOCK_Y + .14, 2.3, .38, .3, .28, '#c7a36f'); cyl(-.42, DOCK_Y + .28, 2.3, .4, .4, .03, '#a4804f');
-  const scenery = new Mesh('lake-scenery', scene), merged = baked.shift(); merged.merge(baked, true); merged.applyToMesh(scenery);
   const sceneryPaint = new StandardMaterial('lake-scenery-paint', scene); sceneryPaint.specularColor.setAll(0);
-  scenery.material = sceneryPaint; scenery.useVertexColors = true; scenery.isPickable = false; scenery.freezeWorldMatrix();
+  const batchOf = (name, parts) => {
+    const mesh = new Mesh(name, scene), merged = parts.shift(); merged.merge(parts, true); merged.applyToMesh(mesh);
+    mesh.material = sceneryPaint; mesh.useVertexColors = true; mesh.isPickable = false; mesh.receiveShadows = true; mesh.freezeWorldMatrix();
+    return mesh;
+  };
+  const scenery = batchOf('lake-scenery', baked), arch = batchOf('lake-exit', archParts);
+  const framing = [{ points: scenery.getVerticesData('position') }];
+  const core = [{ points: water.getVerticesData('position') }, { points: EXIT_TAG.asArray() }];
+  const rest = { x: 0, y: 0, span: 10 }, aim = { x: 0, y: 0, span: 5.6 }, focusAt = new Vector3(), watch = new Vector3();
+  const fit = () => {
+    const width = Math.max(1, canvas.clientWidth), height = Math.max(1, canvas.clientHeight), top = 76, bottom = 96, side = 12;
+    const usableHeight = Math.max(120, height - top - bottom), frame = houseFrame(height > width ? core : framing, camera.getViewMatrix(true), (width - side * 2) / usableHeight, .98), scale = frame.height / usableHeight;
+    rest.x = frame.x; rest.y = frame.y + (top - bottom) * scale / 2; rest.span = height * scale;
+  };
+  fit();
+  const view = { ...rest };
 
   const fallPath = [[-2.4, 1.62], [-1.2, 1.6], [0, 1.55]];
   for (let i = 1; i <= 12; i++) { const t = i / 12; fallPath.push([.2 * t + .95 * t * t, 1.55 * (1 - t ** 1.5) - .04]); }
@@ -280,9 +259,9 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   });
   [fall, pool].forEach((shape, isPool) => { const mesh = new Mesh(isPool ? 'lake-fall-pool' : 'lake-fall', scene); Object.assign(new VertexData(), shape).applyToMesh(mesh); mesh.material = fallPaints[isPool]; mesh.isPickable = false; mesh.freezeWorldMatrix(); });
 
-  const glowing = [], light = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.computeWorldMatrix(true); const data = VertexData.ExtractFromMesh(mesh); data.transform(mesh.getWorldMatrix()); mesh.dispose(); data.uvs = null; glowing.push(data); };
+  const light = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.computeWorldMatrix(true); const data = VertexData.ExtractFromMesh(mesh); data.transform(mesh.getWorldMatrix()); mesh.dispose(); data.uvs = null; glowing.push(data); };
   const wires = [];
-  for (const [from, to] of [[posts[0], posts[1]], [posts[1], posts[2]], [posts[1], posts[3]]]) {
+  for (const [from, to] of [[posts[0], posts[1]], [posts[1], posts[2]], [posts[1], posts[3]], [posts[3], posts[4]]]) {
     const length = Math.hypot(to[0] - from[0], to[1] - from[1]), count = Math.max(4, Math.round(length / .34)), wire = [];
     for (let i = 0; i <= count; i++) {
       const t = i / count, x = from[0] + (to[0] - from[0]) * t, z = from[1] + (to[1] - from[1]) * t, y = 1.9 - Math.sin(t * Math.PI) * length * .09;
@@ -292,9 +271,8 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     wires.push(wire);
   }
   for (const [x, z] of posts) light(MeshBuilder.CreateSphere('p', { diameter: .19, segments: 6 }, scene), x, 2.06, z);
-  for (const [x, z] of windows) { const pane = MeshBuilder.CreateBox('p', { width: .9, height: .87, depth: .08 }, scene); pane.rotation.y = -.45; light(pane, x, 2.25, z); }
   const lanternGlow = new Mesh('lake-lantern', scene), litMerged = glowing.shift(); litMerged.merge(glowing, true); litMerged.applyToMesh(lanternGlow);
-  const lanternPaint = new StandardMaterial('lake-lantern-paint', scene); lanternPaint.disableLighting = true; lanternPaint.emissiveColor = Color3.FromHexString('#ffd48a').scale(theme === 'day' ? .75 : 1.1);
+  const lanternPaint = new StandardMaterial('lake-lantern-paint', scene); lanternPaint.disableLighting = true; lanternPaint.emissiveColor = Color3.FromHexString(palette.lit);
   lanternGlow.material = lanternPaint; lanternGlow.isPickable = false; lanternGlow.freezeWorldMatrix();
   const wire = MeshBuilder.CreateLineSystem('lake-wires', { lines: wires }, scene); wire.color = Color3.FromHexString('#4f3d31'); wire.alpha = .7; wire.isPickable = false; wire.freezeWorldMatrix();
 
@@ -305,7 +283,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   const MOTES = theme === 'rain' ? 90 : 48, moteMatrix = new Float32Array(MOTES * 16), moteSeeds = Array.from({ length: MOTES }, (_, i) => [(hash(i) - .5) * 20, .3 + hash(i * 2) * 2.4, 5 - hash(i * 3) * 16]);
   for (let i = 0; i < MOTES; i++) { const n = i * 16; moteMatrix[n] = moteMatrix[n + 5] = moteMatrix[n + 10] = moteMatrix[n + 15] = 1; if (theme === 'rain') moteMatrix[n + 5] = 9; }
   motes.thinInstanceSetBuffer('matrix', moteMatrix, 16, false);
-  if (theme !== 'day') glow.addIncludedOnlyMesh?.(lanternGlow);
+  glow.addIncludedOnlyMesh(lanternGlow);
 
   const companion = createMobileCompanion(scene, avatar);
   const joints = companion.root.getChildMeshes().find(mesh => mesh.metadata?.rig).metadata.rig.joints;
@@ -314,6 +292,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   let petModel = null;
   try { petModel = createPetModel(scene, pet); petModel.root.position.set(.66, DOCK_Y - .01, 1.45); petModel.root.rotation.y = -.25; petModel.root.scaling.setAll(.85); petModel.contact?.setEnabled(false); } catch { petModel = null; }
   const petPose = { action: 'sit', moving: false, petAge: Infinity, walked: 0, x: .66, z: 1.45, yaw: -.25, hearts: [] };
+  sunShadow.getShadowMap().renderList = [scenery, arch, ...companion.root.getChildMeshes(), ...(petModel ? petModel.root.getChildMeshes() : [])];
 
   const rodPaint = new StandardMaterial('lake-rod-paint', scene); rodPaint.diffuseColor = Color3.FromHexString('#7a5238'); rodPaint.specularColor.setAll(.15);
   const ROD_POINTS = 12, rodPath = Array.from({ length: ROD_POINTS }, () => new Vector3()), rodRadius = (_, d) => .022 * (1 - d / 2.3) + .004;
@@ -531,13 +510,15 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     }
 
     const focusing = fish && (phase === 'leap' || phase === 'shown');
-    const aspect = engine.getAspectRatio(camera), wide = aspect > 1.1; camera.fov = aspect < 1 ? 1.12 : .7;
+    const aspect = engine.getAspectRatio(camera), wide = aspect > 1.1;
     const framed = wide ? cardSide.set(hover.x + .55, hover.y - .05, hover.z - .23) : cardSide.set(hover.x, hover.y - .45, hover.z);
-    const goalLook = focusing ? framed : camHome.look, goalEye = focusing ? FOCUS_EYE : camHome.eye;
-    const rate = reducedMotion ? 1 : 1 - Math.exp(-dt * 2.4);
-    Vector3.LerpToRef(camLook, goalLook, rate, camLook); Vector3.LerpToRef(camEye, goalEye, rate, camEye);
-    if (!reducedMotion) camEye.y += Math.sin(clock * .35) * .0015;
-    camera.position.copyFrom(camEye); camera.setTarget(camLook);
+    const watching = !focusing && phase !== 'idle';
+    if (watching) { Vector3.LerpToRef(STAND, phase === 'reel' ? bobberAt : castTo, .42, watch); watch.y = 1; }
+    if (focusing || watching) { Vector3.TransformCoordinatesToRef(focusing ? framed : watch, camera.getViewMatrix(), focusAt); aim.x = focusAt.x; aim.y = focusAt.y; aim.span = focusing ? (wide ? 8 : 12) : (wide ? 10 : 12.5); }
+    const goal = focusing || watching ? aim : rest, rate = reducedMotion ? 1 : 1 - Math.exp(-dt * 2.4);
+    for (const key of ['x', 'y', 'span']) view[key] += (goal[key] - view[key]) * rate;
+    camera.orthoTop = view.y + view.span / 2; camera.orthoBottom = view.y - view.span / 2;
+    camera.orthoLeft = view.x - view.span * aspect / 2; camera.orthoRight = view.x + view.span * aspect / 2;
 
     let alive = 0;
     for (let i = 0; i < DROPS; i++) {
@@ -577,16 +558,26 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     rise -= dt;
     if (rise < 0 && !reducedMotion) { rise = 2.5 + clockRandom() * 4; ripple((clockRandom() - .5) * 10, -1 - clockRandom() * 7, .7); }
 
-    waterPaint.setFloat('time', clock); waterPaint.setVector3('eye', camera.position); waterPaint.setArray4('ripples', ripples);
-    skyPaint.setFloat('time', clock); for (const m of fallPaints) m.setFloat('time', clock);
+    waterPaint.setFloat('time', clock); waterPaint.setVector3('eye', REFLECTION_EYE); waterPaint.setArray4('ripples', ripples);
+    for (const m of fallPaints) m.setFloat('time', clock);
       }
 
+  const tagAt = new Vector3(), tagPlace = { shown: null, left: '', top: '' };
+  const placeExitTag = () => {
+    Vector3.TransformCoordinatesToRef(EXIT_TAG, scene.getTransformMatrix(), tagAt);
+    const shown = phase === 'idle' && Math.abs(tagAt.x) < .98 && Math.abs(tagAt.y) < .98;
+    if (shown !== tagPlace.shown) exitTag.hidden = !(tagPlace.shown = shown);
+    if (!shown) return;
+    const left = `${Math.round((tagAt.x + 1) * canvas.clientWidth / 2)}px`, top = `${Math.round((1 - tagAt.y) * canvas.clientHeight / 2)}px`;
+    if (left !== tagPlace.left) exitTag.style.left = tagPlace.left = left;
+    if (top !== tagPlace.top) exitTag.style.top = tagPlace.top = top;
+  };
   engine.runRenderLoop(() => {
     if (disposed) return;
     const now = performance.now(), dt = Math.min(.25, (now - last) / 1000); last = now;
-    update(dt); scene.render();
+    update(dt); scene.render(); if (exitTag) placeExitTag();
   });
-  const resize = () => engine.resize();
+  const resize = () => { engine.resize(); fit(); };
   window.addEventListener('resize', resize);
 
   return {

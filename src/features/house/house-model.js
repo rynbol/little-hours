@@ -15,11 +15,25 @@ import { buildGarden } from './house-garden.js';
 import { buildGardenRetreat, buildRetreatFlowers, buildGardenExit } from './garden-retreat.js';
 import { buildPond } from './house-pond.js';
 import { buildIsland } from './house-island.js';
-import { buildExteriorPart, buildBlueprint, exteriorPlan, hingeOf, hingePose, CHIMNEY_TOP } from './house-exterior.js';
+import { buildExteriorPart, buildBlueprint, exteriorPlan, hingeOf, hingePose, CHIMNEY_TOP, HOUSE_POSITIONS } from './house-exterior.js';
+export { HOUSE_POSITIONS };
+
+// A gable end: a triangle `w` wide and `h` tall, standing on (x, y, z).
+// `sideways` turns it to face along x, for the ends of the house.
+export function gableData(x, y, z, w, h, d, sideways = false) {
+  const at = (u, v, t) => sideways ? [x + t, y + v, z + u] : [x + u, y + v, z + t];
+  const l = [-w / 2, 0], r = [w / 2, 0], t = [0, h], f = d / 2, k = -d / 2;
+  const faces = [[at(...l, f), at(...r, f), at(...t, f)], [at(...r, k), at(...l, k), at(...t, k)]];
+  for (const [a, b] of [[l, r], [r, t], [t, l]]) faces.push([at(...a, k), at(...b, k), at(...b, f)], [at(...a, k), at(...b, f), at(...a, f)]);
+  // Both windings, so the gable reads from either side whatever the handedness.
+  for (const face of [...faces]) faces.push([face[0], face[2], face[1]]);
+  const data = new VertexData(); data.positions = faces.flat(2); data.indices = data.positions.map((_, i) => i).slice(0, data.positions.length / 3);
+  data.normals = []; VertexData.ComputeNormals(data.positions, data.indices, data.normals);
+  return data;
+}
 
 // Reuse authored room geometry, batched per room. Only the occupied desk
 // keeps its animated rig; window views retain their illustrated materials.
-export const HOUSE_POSITIONS = { studio: [-2.55, 0, 0], garden: [2.55, 0, 0], loft: [-2.55, 2.95, 0] };
 // Pass the previous model to rebuild only the batches whose inputs changed.
 // Unchanged batches move to the new model, and the previous dispose() skips them.
 export function createHouseModel(scene, house, selectedId, theme = 'day', avatar, previous = null) {
@@ -57,18 +71,8 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     const m = MeshBuilder.CreateSphere('part', { diameter: 1, segments }, scene);
     m.position.set(x, y, z); m.scaling.set(w, h, d); m.rotation.z = tilt; paint(m, hex, strength);
   }
-  // A gable end: a triangle `w` wide and `h` tall, standing on (x, y, z).
-  // `sideways` turns it to face along x, for the ends of the house.
   function prism(x, y, z, w, h, d, hex, sideways = false) {
-    const at = (u, v, t) => sideways ? [x + t, y + v, z + u] : [x + u, y + v, z + t];
-    const l = [-w / 2, 0], r = [w / 2, 0], t = [0, h], f = d / 2, k = -d / 2;
-    const faces = [[at(...l, f), at(...r, f), at(...t, f)], [at(...r, k), at(...l, k), at(...t, k)]];
-    for (const [a, b] of [[l, r], [r, t], [t, l]]) faces.push([at(...a, k), at(...b, k), at(...b, f)], [at(...a, k), at(...b, f), at(...a, f)]);
-    // Both windings, so the gable reads from either side whatever the handedness.
-    for (const face of [...faces]) faces.push([face[0], face[2], face[1]]);
-    const data = new VertexData(); data.positions = faces.flat(2); data.indices = data.positions.map((_, i) => i).slice(0, data.positions.length / 3);
-    data.normals = []; VertexData.ComputeNormals(data.positions, data.indices, data.normals);
-    const m = new Mesh('part', scene); data.applyToMesh(m); paint(m, hex);
+    const m = new Mesh('part', scene); gableData(x, y, z, w, h, d, sideways).applyToMesh(m); paint(m, hex);
   }
   function disc(x, y, z, diameter, depth, hex, strength = 1, sideways = false) {
     const m = MeshBuilder.CreateCylinder('part', { diameter, height: depth, tessellation: 18 }, scene);

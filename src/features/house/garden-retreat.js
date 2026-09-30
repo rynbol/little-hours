@@ -154,6 +154,10 @@ export function buildRetreatFlowers(api, plants) {
 export function buildGardenExit(api, theme) {
   const [x, , z] = GARDEN_EXIT;
   for (let i = 0; i < 7; i++) stone(api, x + Math.sin(i * .5) * .12, -4.65 - i * .52, 1.12, .46, i);
+  buildRoseArch(api, theme, x, z);
+}
+
+export function buildRoseArch(api, theme, x, z) {
   for (const side of [-1, 1]) {
     api.box(x + side * 1.03, 1.13, z, .17, 2.26, .17, '#b29c79');
     api.box(x + side * 1.03, 1.13, z - .74, .17, 2.26, .17, '#b29c79');
