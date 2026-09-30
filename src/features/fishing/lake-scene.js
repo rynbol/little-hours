@@ -115,8 +115,8 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   sun.intensity = palette.sun; sun.diffuse = Color3.FromHexString(palette.sunTint); sun.specular = Color3.Black();
   sun.shadowMinZ = 1; sun.shadowMaxZ = 90; sun.autoUpdateExtends = false;
   sun.orthoLeft = -18; sun.orthoRight = 18; sun.orthoTop = 18; sun.orthoBottom = -18;
-  const shadow = new ShadowGenerator(2048, sun); shadow.usePercentageCloserFiltering = true; shadow.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
-  shadow.bias = .002; shadow.normalBias = .02; shadow.darkness = palette.shade;
+  const sunShadow = new ShadowGenerator(2048, sun); sunShadow.usePercentageCloserFiltering = true; sunShadow.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
+  sunShadow.bias = .002; sunShadow.normalBias = .02; sunShadow.darkness = palette.shade;
   const lamp = new PointLight('lake-lamplight', new Vector3(-.4, 2.3, 4.4), scene);
   lamp.diffuse = Color3.FromHexString('#ffc47e'); lamp.specular = Color3.Black(); lamp.intensity = palette.lamp; lamp.range = 7; lamp.setEnabled(palette.lamp > 0);
   const glow = new GlowLayer('lake-glow', scene, { mainTextureFixedSize: 512, blurKernelSize: 32 }); glow.intensity = palette.glow;
@@ -292,7 +292,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   let petModel = null;
   try { petModel = createPetModel(scene, pet); petModel.root.position.set(.66, DOCK_Y - .01, 1.45); petModel.root.rotation.y = -.25; petModel.root.scaling.setAll(.85); petModel.contact?.setEnabled(false); } catch { petModel = null; }
   const petPose = { action: 'sit', moving: false, petAge: Infinity, walked: 0, x: .66, z: 1.45, yaw: -.25, hearts: [] };
-  shadow.getShadowMap().renderList = [scenery, arch, ...companion.root.getChildMeshes(), ...(petModel ? petModel.root.getChildMeshes() : [])];
+  sunShadow.getShadowMap().renderList = [scenery, arch, ...companion.root.getChildMeshes(), ...(petModel ? petModel.root.getChildMeshes() : [])];
 
   const rodPaint = new StandardMaterial('lake-rod-paint', scene); rodPaint.diffuseColor = Color3.FromHexString('#7a5238'); rodPaint.specularColor.setAll(.15);
   const ROD_POINTS = 12, rodPath = Array.from({ length: ROD_POINTS }, () => new Vector3()), rodRadius = (_, d) => .022 * (1 - d / 2.3) + .004;
