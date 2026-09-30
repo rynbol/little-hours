@@ -105,3 +105,14 @@ test('the floating chrome and the open timer sheet never blur the live room behi
   const blurred = await page.evaluate(selector => [...document.querySelectorAll(`${selector}, #focus-card, #room-more`)].filter(element => getComputedStyle(element).backdropFilter !== 'none').map(element => element.id || element.className), chrome);
   expect(blurred).toEqual([]);
 });
+
+test('a software renderer draws the full-screen room at a reduced density so frames keep up', async ({ page }) => {
+  await open(page, { width: 1440, height: 1000 });
+  const room = await page.evaluate(() => {
+    const { engine, pixelRatio } = window.__littleHours.room.diagnostics();
+    return { renderer: engine.getGlInfo().renderer, pixelRatio, scale: engine.getRenderWidth() / engine.getRenderingCanvas().clientWidth };
+  });
+  expect(room.renderer).toMatch(/swiftshader/i);
+  expect(room.pixelRatio).toBe(0.6);
+  expect(room.scale).toBeCloseTo(0.6, 2);
+});

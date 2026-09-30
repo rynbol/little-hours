@@ -41,6 +41,7 @@ import { createRoomPassages } from './room-passages.js';
 import { createRoomRoof } from '../../models/room-roofs.js';
 import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
+import { renderRatioCeiling } from '../../core/render-scale.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
 import { createStorybook } from '../../models/storybook.js';
@@ -568,7 +569,7 @@ export function createRoom(container, options = {}) {
   let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true, suspended = false;
   // Adaptive and Crisp both start at the display's own density (capped at 2×),
   // so one canvas pixel lands on one screen pixel; only Adaptive steps down.
-  const nativeRatio = () => Math.min(window.devicePixelRatio || 1, 2);
+  const nativeRatio = () => renderRatioCeiling(window.devicePixelRatio, engine.getGlInfo?.()?.renderer);
   let quality = 'auto', pixelRatio = nativeRatio(), ratioCeiling = pixelRatio, raisedAt = -Infinity, statsStart = 0, intervalTotal = 0, sampleFrames = 0, slowSamples = 0, steadySamples = 0;
   let rafCalls = 0, lastRafAt = 0, fastRafFrames = 0, onScreen = true;
   const intervals = [], submissions = [];
