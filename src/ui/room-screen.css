@@ -50,6 +50,30 @@ body:not(.is-decorating):not(.is-avatar-editing):not(.is-pet-care):not(.is-conne
   & #close-timer-sheet { position: absolute; top: 8px; right: 8px; z-index: 2; width: 44px; height: 44px; border: 0; background: transparent; }
   & #focus-card #task { margin-top: 10px; }
 
+  & #focus-card { --hud-subtle: #c7b9c2; --hud-well: #f4e9e314; --hud-rose: #dd98a4; border: 1px solid var(--hud-line); background: #1d1a24e6; color: var(--hud-ink); box-shadow: 0 16px 48px #0c091366; backdrop-filter: blur(16px); }
+  & #close-timer-sheet svg { color: var(--hud-ink); }
+  & #focus-card .timer { color: var(--hud-ink); }
+  & #focus-card .timer-ring .timer-track { stroke: #f4e9e329; }
+  & #focus-card .timer-ring .timer-progress { stroke: var(--hud-rose); }
+  & #focus-card .timer-ring .timer-seed { fill: var(--hud-rose); stroke: #1d1a24; }
+  & #focus-card .durations button { background: var(--hud-well); color: var(--hud-subtle); }
+  & #focus-card .durations button[aria-pressed='true'] { background: #f4e9e333; color: var(--hud-ink); }
+  & #focus-card .focus-mode-button { border-color: var(--hud-line); background: var(--hud-well); color: var(--hud-ink); }
+  & #focus-card .focus-mode-button:hover:not(:disabled) { background: var(--hud-hover); border-color: var(--hud-line); }
+  & #focus-card .focus-mode-button > svg { color: var(--hud-subtle); }
+  & #focus-card :is(.reset-session, .session-kind, .session-result, .chime-toggle, .sound-state) { color: var(--hud-subtle); }
+  & #focus-card .quiet-button { border-color: var(--hud-line); background: var(--hud-well); color: var(--hud-ink); }
+  & #focus-card .quiet-button:hover:not(:disabled) { background: var(--hud-hover); }
+  & #focus-card #task { border-color: var(--hud-line); background: var(--hud-well); color: var(--hud-ink); box-shadow: none; }
+  & #focus-card #task::placeholder { color: var(--hud-subtle); }
+  & #focus-card #task:focus { border-color: var(--hud-rose); outline-color: var(--hud-rose); }
+  & #focus-card .sound-row { border-color: var(--hud-line); }
+  & #focus-card .sound-button { color: var(--hud-ink); }
+  & #focus-card .sound-button > svg { color: var(--hud-subtle); }
+  & #focus-card .sound-switch { background: #f4e9e338; }
+  & #focus-card .sound-button[aria-pressed='true'] .sound-switch { background: #8fa27c; }
+  & #focus-card input[type='checkbox'] { accent-color: var(--hud-rose); }
+
   @media (max-width: 720px) {
     & .heading-actions .room-coins { padding: 0 8px 0 10px; }
     & .heading-actions > :is(#rooms-button, #decorate-button, #room-more-toggle) { padding: 8px 10px; }
