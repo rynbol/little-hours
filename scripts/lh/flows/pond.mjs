@@ -16,7 +16,7 @@ async function castForBite(app) {
 }
 
 export default {
-  about: 'the pond: the island pond tag opens the lake, bait from sessions sits in ranges with their odds, a cast gets a bite, holding to reel against the line tension lands a fish that fills the journal and spends one bait, a missed bite keeps the bait, Escape closes the card, then the journal, then the lake, and the catch survives a reload',
+  about: 'the pond: the island pond tag opens the lake, bait from sessions sits in ranges with their odds, a cast gets a bite, keeping the float on the fish lands one that fills the journal and spends one bait, striking too soon spooks it, a missed bite keeps the bait, Escape closes the card, then the journal, then the lake, and the catch survives a reload',
   async run(t) {
     const { check } = t;
     const app = await t.open({ seed: 'pond' });
@@ -38,18 +38,21 @@ export default {
     const hooked = await app.js(LAKE);
     check('pressing on the bite hooks the fish and shows the line tension', hooked.phase === 'reel' && hooked.fight?.line <= 1 && await app.visible('#lake-tension'), hooked);
     check('the journal waits until the fight is over', await app.js(`document.querySelector('#lake-journal-button').disabled`));
-    await t.shot(app, 'hooked');
-    let held = true, peak = 0, fought = null;
+    let held = true, strain = 0, onFish = 0, polls = 0, fought = null;
+    const began = Date.now();
     for (const end = Date.now() + 90000 * slow; Date.now() < end;) {
       fought = await app.js(LAKE);
       if (!fought.fight) break;
-      peak = Math.max(peak, fought.fight.tension);
-      if (held && fought.fight.tension > .7) { await app.release(reel.x, reel.y); held = false; }
-      else if (!held && fought.fight.tension < .5) { await app.press(reel.x, reel.y); held = true; }
+      polls++;
+      const { tension, zone } = fought.fight;
+      strain = Math.max(strain, fought.fight.strain);
+      if (Math.abs(tension - zone.at) < zone.width / 2) onFish++;
+      if (held && tension > zone.at) { await app.release(reel.x, reel.y); held = false; }
+      else if (!held && tension < zone.at) { await app.press(reel.x, reel.y); held = true; }
       await new Promise(resolve => setTimeout(resolve, 30));
     }
     if (held) await app.release(reel.x, reel.y);
-    check('holding tightens the line and easing off before the red lands it without a snap', peak > .5 && peak < 1 && fought.ui !== 'idle', { peak, fought });
+    check('reeling while the float is under the fish and easing off above it lands it without a snap', onFish > 0 && strain < 1.2 && fought.ui !== 'idle', { strain, onFish, poll: Math.round((Date.now() - began) / polls), fought });
     await app.waitFor(`document.querySelector('#lake-card').open`, { what: 'the catch card', timeout: 30000 }).catch(async error => { throw new Error(error.message + JSON.stringify(fought)); });
     const after = await app.js(POND), name = await app.text('#lake-card-name');
     check('the fish leaps out and its card names it', (await app.js(LAKE)).phase === 'shown' && Boolean(name), name);
@@ -61,6 +64,11 @@ export default {
     await app.key('Escape');
     await app.waitFor(`!document.querySelector('#lake-card').open`, { what: 'the card to close' });
     check('Escape puts the fish in the basket and stays at the lake', (await app.js(LAKE)).open);
+    await app.clickSel('#lake-cast');
+    await app.waitFor(`window.__littleHours.lake.diagnostics()?.ui === 'wait'`, { what: 'the float to settle', timeout: 30000 });
+    const stage = await app.js(`(() => { const r = document.querySelector('.lake-stage').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height * .4 }; })()`);
+    await app.press(stage.x, stage.y); await app.release(stage.x, stage.y);
+    check('striking before the bite spooks the fish and keeps the bait', (await app.js(LAKE)).ui === 'idle' && /Too soon/.test(await app.text('#lake-status')) && (await app.js(POND)).bait.length === after.bait.length);
     await castForBite(app);
     await app.waitFor(`document.querySelector('#lake-bite').hidden`, { what: 'the fish to get away', timeout: 6000 });
     check('a missed bite slips away and keeps the bait', (await app.js(POND)).bait.length === after.bait.length && /slipped/.test(await app.text('#lake-status')));

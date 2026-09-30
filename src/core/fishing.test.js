@@ -76,31 +76,54 @@ test('a broken saved pond is cleaned up', () => {
 });
 
 const lcg = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-function play(tier, seed, holds) {
+function play(tier, seed, holds, { frame = 1 / 60, react = 1 / 60 } = {}) {
   const fight = startFight(tier), random = lcg(seed);
-  let seconds = 0;
-  while (!fight.outcome && seconds < 60) { stepFight(fight, 1 / 30, holds(fight), random); seconds += 1 / 30; }
-  return { outcome: fight.outcome, seconds };
+  let seconds = 0, next = 0, holding = false;
+  while (!fight.outcome && seconds < 90) {
+    if (seconds >= next - 1e-9) { holding = holds(fight); next += react; }
+    stepFight(fight, frame, holding, random); seconds += frame;
+  }
+  return { outcome: fight.outcome, seconds, time: fight.time, runs: fight.runs };
 }
-const outcomes = (tier, holds) => Array.from({ length: 50 }, (_, i) => play(tier, i * 7919 + 1, holds).outcome);
+const outcomes = (tier, holds, options) => Array.from({ length: 40 }, (_, i) => play(tier, i * 7919 + 1, holds, options).outcome);
+const follow = fight => fight.tension < fight.zone.at;
 
-test('easing off when the line is tight lands every tier, bigger fish taking longer', () => {
-  const patient = fight => fight.tension < .7;
-  for (const tier of TIERS) assert.deepEqual([...new Set(outcomes(tier.id, patient))], ['landed'], tier.id);
-  const common = play('common', 11, patient).seconds, legend = play('legendary', 11, patient).seconds;
+test('keeping the float on the fish lands every tier, bigger fish taking longer', () => {
+  for (const tier of TIERS) assert.deepEqual([...new Set(outcomes(tier.id, follow))], ['landed'], tier.id);
+  const common = play('common', 11, follow).seconds, legend = play('legendary', 11, follow).seconds;
   assert.ok(common > 4 && common < legend && legend < 20, `${common} then ${legend}`);
 });
 
-test('holding the reel down through every run snaps the line on a legend, not on a minnow', () => {
-  const always = () => true;
-  assert.ok(outcomes('legendary', always).filter(o => o === 'snapped').length >= 40);
-  assert.deepEqual([...new Set(outcomes('common', always))], ['landed']);
+test('a quarter second of reaction lands every tier, and a sluggish hand loses the legends first', () => {
+  for (const tier of TIERS) assert.deepEqual([...new Set(outcomes(tier.id, follow, { frame: 1 / 4, react: 1 / 4 }))], ['landed'], tier.id);
+  const landed = tier => outcomes(tier, follow, { frame: 1 / 2, react: 1 / 2 }).filter(o => o === 'landed').length;
+  assert.ok(landed('common') >= 36 && landed('legendary') <= 8, `${landed('common')} commons, ${landed('legendary')} legends`);
+});
+
+test('holding the reel down the whole time snaps the line, even on a minnow', () => {
+  for (const tier of TIERS) assert.deepEqual([...new Set(outcomes(tier.id, () => true))], ['snapped'], tier.id);
 });
 
 test('a fish left on a slack line throws the hook', () => {
   const { outcome, seconds } = play('rare', 3, () => false);
   assert.equal(outcome, 'escaped');
-  assert.ok(seconds > 3 && seconds < 8, seconds);
+  assert.ok(seconds > 2 && seconds < 6, seconds);
+});
+
+test('the fight runs on game time, so a slow machine plays the same fish as a fast one', () => {
+  const pulse = fight => Math.floor(fight.time / .5) % 3 !== 0;
+  const fast = play('epic', 5, pulse, { frame: 1 / 60, react: 1 / 4 }), slow = play('epic', 5, pulse, { frame: 1 / 4, react: 1 / 4 });
+  assert.equal(slow.outcome, fast.outcome);
+  assert.equal(slow.runs, fast.runs);
+  assert.ok(Math.abs(slow.time - fast.time) < 1 / 30, `${fast.time} vs ${slow.time}`);
+});
+
+test('undiscovered fish are twice as likely within their tier', () => {
+  const journal = { minnow: { count: 1 }, perch: { count: 1 }, bluegill: { count: 1 } };
+  const picks = [0, .3, .5, .6, .7, .9].map(draw => rollCatch(10, seq(.1, draw, .5), journal).species);
+  assert.deepEqual(picks, ['minnow', 'perch', 'bluegill', 'carp', 'carp', 'carp']);
+  assert.equal(rollCatch(10, seq(.1, .9, .5)).species, 'carp');
+  assert.equal(rollCatch(10, seq(.1, .6, .5)).species, 'bluegill');
 });
 
 test('landing a fish keeps the catch rolled when it was hooked', () => {
