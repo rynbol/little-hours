@@ -60,11 +60,13 @@ const seeded = seed => () => { seed = (seed * 1664525 + 1013904223) >>> 0; retur
 const hex = value => Color3.FromHexString(value);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
+export const aerial = distance => Math.min(1, 1 - Math.exp(-Math.max(0, distance - 12) / 72));
+
 function createShape() {
   const shape = { positions: [], indices: [], roles: [], shades: [], fogs: [], thresholds: [] };
   shape.vertex = (x, y, z, role, shade = 1, threshold = 0) => {
     shape.positions.push(x, y, z); shape.roles.push(role); shape.shades.push(shade); shape.thresholds.push(threshold);
-    shape.fogs.push(smooth(20, 175, Math.hypot(x, z))); return shape.roles.length - 1;
+    shape.fogs.push(aerial(Math.hypot(x, z))); return shape.roles.length - 1;
   };
   shape.quad = (a, b, c, d) => shape.indices.push(a, b, c, a, c, d);
   shape.tri = (a, b, c) => shape.indices.push(a, b, c);

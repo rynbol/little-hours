@@ -315,3 +315,15 @@ test('the moon carries faint maria rather than dark cartoon craters', () => {
   assert.ok(Math.min(...light) > Math.max(...light) * 0.85, `darkest ${Math.min(...light).toFixed(2)} of brightest ${Math.max(...light).toFixed(2)}`);
   engine.dispose();
 });
+
+test('the valley fades into haze with distance, so the tower and the mid-field woods sit well back from the sill', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
+  const fogAt = (low, high) => { const list = []; for (let i = 0; i < shape.roles.length; i++) { const d = Math.hypot(shape.positions[i * 3], shape.positions[i * 3 + 2]); if (d > low && d < high && shape.roles[i] !== 'ember') list.push(shape.fogs[i]); } return list.reduce((a, b) => a + b, 0) / list.length; };
+  const near = fogAt(12, 22), middle = fogAt(50, 62), far = fogAt(140, 175);
+  assert.ok(near < 0.12, `near haze ${near.toFixed(2)}`);
+  assert.ok(middle > 0.35, `haze at the tower's distance ${middle.toFixed(2)}`);
+  assert.ok(far > middle && far < 1, 'haze keeps building toward the ranges');
+  engine.dispose();
+});
