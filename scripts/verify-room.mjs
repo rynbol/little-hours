@@ -1369,6 +1369,28 @@ try {
     assert.equal(diagnostics().passages.links.find(link => link.id === 'studio').name, 'Your studio', 'a literal custom name replaces the design name on the door');
     console.log('PASS connected doors: hover, destination picking, avatar walking, stairs, camera-drag guard, edit-mode isolation and disposal.');
   }
+  {
+    room.setEditMode(false); advance(2);
+    const settle = async () => { for (let i = 0; i < 2000 && diagnostics().seat.preparing; i++) await new Promise(resolve => setTimeout(resolve, 0)); };
+    const deskDetail = () => { const d = diagnostics(); return d.scene.transformNodes.find(node => node.metadata?.itemId === d.layout.activeDeskId)?.metadata.detail; };
+    assert.equal(room.enterSeat(), true, 'Focus mode asks to sit');
+    assert.equal(diagnostics().seat.state, 'room', 'the fly-in waits while the chair view is prepared');
+    assert.equal(diagnostics().seat.preparing, true);
+    assert.equal(room.enterSeat(), true, 'asking again while preparing is harmless');
+    await settle();
+    assert.equal(diagnostics().seat.state, 'entering', 'the fly-in starts once the chair view is ready');
+    for (let i = 0; i < 600 && diagnostics().seat.state !== 'seated'; i++) advance();
+    assert.ok(deskDetail()?.isEnabled() && diagnostics().seat.world.enabled, 'the detailed desk and the valley are shown in the chair');
+    room.leaveSeat(); advance(2);
+    assert.equal(diagnostics().seat.state, 'room');
+    room.setTheme('dusk'); room.enterSeat(); room.leaveSeat(); await settle(); advance(2);
+    assert.equal(diagnostics().seat.preparing, false);
+    assert.equal(diagnostics().seat.state, 'room', 'leaving before the chair view is ready cancels the sit');
+    room.enterSeat(); await settle();
+    assert.equal(diagnostics().seat.state, 'entering', 'a prepared chair view sits again without new work');
+    room.leaveSeat(); advance(2);
+    console.log('PASS seat on intent: the chair view is prepared when Focus asks to sit, the fly-in waits for it, and leaving first cancels the sit.');
+  }
   const beforeHouse = scene.getFrameId();
   room.setSuspended(true); advance(60);
   assert.equal(frames.size, 0, 'the house view cancels the detailed room animation');
