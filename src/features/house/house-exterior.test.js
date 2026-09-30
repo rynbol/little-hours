@@ -40,3 +40,10 @@ test('the cottage front is laid in separate stones and the roof in separate shin
   const roof = boxes.filter(([x, y]) => y > WALL_TOP + .2 && y < WALL_TOP + 1.75);
   assert.ok(roof.length > 150, `only ${roof.length} roof pieces`);
 });
+
+test('the left end wall is framed in timber like the front', () => {
+  const { boxes, options } = boxesOf({ rooms: [{ id: 'studio' }] }, 'studio'), left = -HALF - options.bay;
+  const frame = boxes.filter(([x, y, z, w, h, d, hex]) => x < left - .14 && x > left - .22 && y > .5 && hex === '#6b4a36');
+  assert.ok(frame.length >= 6, `only ${frame.length} timbers on the end wall`);
+  assert.ok(frame.some(box => Array.isArray(box[7]) && box[7][0] !== 0), 'the end wall has no braces');
+});

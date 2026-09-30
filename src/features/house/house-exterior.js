@@ -118,6 +118,13 @@ function gableEnd(api, x, facing, theme) {
 function endWall(api, x, floors) {
   api.box(x - .07, WALL_TOP * floors / 2, 0, .14, WALL_TOP * floors, FRONT - BACK, plaster);
   stoneCourses(BACK, FRONT, PLINTH, 7, (u, v, w, h, hex, out) => api.box(x - .12 - out, v + h / 2, u + w / 2, .1, h, w, hex));
+  const face = x - .17, top = WALL_TOP * floors;
+  for (const z of [BACK + .07, 0, FRONT - .07]) api.box(face, (PLINTH + top) / 2, z, .06, top - PLINTH, .12, timber);
+  for (const y of [PLINTH, ...Array.from({ length: floors }, (_, f) => WALL_TOP * (f + 1) - .07)]) api.box(face, y, 0, .06, .12, FRONT - BACK, timber);
+  for (let f = 0; f < floors; f++) {
+    const bottom = f ? WALL_TOP * f : PLINTH, rise = WALL_TOP * (f + 1) - .13 - bottom, run = FRONT - .13;
+    for (const side of [-1, 1]) api.box(face, bottom + rise / 2, side * run / 2, .05, Math.hypot(rise, run), .1, timber, [side * Math.atan2(run, rise), 0, 0]);
+  }
 }
 
 // Build one part of one room, in room coordinates.

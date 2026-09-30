@@ -5,7 +5,6 @@ import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
-import { FresnelParameters } from '@babylonjs/core/Materials/fresnelParameters.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js';
 import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstrumentation.js';
@@ -27,6 +26,7 @@ import { houseFrame } from './house-framing.js';
 import { createHouseMotion } from './house-motion.js';
 import { createIslandWater } from './house-water.js';
 import { createIslandGrass } from './house-grass.js';
+import { createChimneySmoke } from './house-smoke.js';
 import { createPainterly } from '../../models/painterly.js';
 import { ISLAND_ATMOSPHERES, ISLAND_SUN, islandSkyArt } from './island-atmosphere.js';
 import { nextExpansion, roomDisplayName } from '../../core/house.js';
@@ -74,11 +74,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   let layoutKeys = new Map();
   const motes = MeshBuilder.CreateSphere('cottage-fireflies', { diameter: .045, segments: 3 }, scene);
   const motePaint = new StandardMaterial('cottage-firefly-light', scene); motePaint.disableLighting = true; motePaint.emissiveColor = Color3.FromHexString('#efd6a5'); motes.material = motePaint; motes.isPickable = false;
-  // A few soft puffs of chimney smoke, one draw call, animated with the motes.
-  const smoke = MeshBuilder.CreateSphere('cottage-smoke', { diameter: .5, segments: 8 }, scene);
-  const smokePaint = new StandardMaterial('cottage-smoke-paint', scene); smokePaint.disableLighting = true; smokePaint.emissiveColor = Color3.FromHexString('#f3ebe2'); smokePaint.alpha = .42; smokePaint.opacityFresnelParameters = new FresnelParameters({ leftColor: Color3.Black(), rightColor: Color3.White(), power: 1.4, bias: 0 }); smoke.material = smokePaint; smoke.isPickable = false;
-  const smokeMatrices = new Float32Array(5 * 16), smokeAt = new Vector3(), smokeLocal = new Vector3();
-  smoke.thinInstanceSetBuffer('matrix', smokeMatrices, 16, false); smoke.alwaysSelectAsActiveMesh = true;
+  const smoke = createChimneySmoke(scene, theme), smokeAt = new Vector3(), smokeLocal = new Vector3();
   const water = createIslandWater(scene, theme);
   const grass = createIslandGrass(scene, theme);
   const butterflies = createGardenButterflies(scene);
@@ -158,15 +154,10 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       moteMatrices[n + 14] = selectedId === 'orchard' ? -3.8 + (i * .43 % 7) : -1.4 + (i * .83 % 4);
     }
     motes.thinInstanceBufferUpdated('matrix');
-    smoke.setEnabled(Boolean(model.chimney) && !motion.matches && selectedId !== 'orchard');
-    if (smoke.isEnabled()) {
+    smoke.mesh.setEnabled(Boolean(model.chimney) && !motion.matches && selectedId !== 'orchard');
+    if (smoke.mesh.isEnabled()) {
       smokeLocal.fromArray(model.chimney.point); Vector3.TransformCoordinatesToRef(smokeLocal, model.chimney.node.getWorldMatrix(), smokeAt);
-      for (let i = 0; i < 5; i++) {
-        const n = i * 16, t = (seconds * .16 + i / 5) % 1, size = .6 + t * 1.5;
-        smokeMatrices[n] = smokeMatrices[n + 5] = smokeMatrices[n + 10] = size * Math.min(1, t * 6) * (1 - t * .55); smokeMatrices[n + 15] = 1;
-        smokeMatrices[n + 12] = smokeAt.x + Math.sin(t * 5 + i) * .12 + t * .5; smokeMatrices[n + 13] = smokeAt.y + t * 1.9; smokeMatrices[n + 14] = smokeAt.z - t * .2;
-      }
-      smoke.thinInstanceBufferUpdated('matrix');
+      smoke.animate(seconds, smokeAt, camera);
     }
     const readyBeforeDraw = scene.isReady();
     engine.beginFrame(); scene.render(); engine.endFrame(); renderCount++;
@@ -238,7 +229,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const island = container.id === 'house-canvas' && selectedId !== 'orchard', light = ISLAND_ATMOSPHERES[theme];
     sky.intensity = island ? light.fill : theme === 'dusk' ? .56 : .62; sun.intensity = island ? light.key : theme === 'dusk' ? .8 : .95;
     sky.diffuse = Color3.FromHexString(island ? light.sky : '#ffffff'); sky.groundColor = Color3.FromHexString(island ? light.ground : '#a0a7a4');
-    sun.diffuse = Color3.FromHexString(island ? light.sun : theme === 'dusk' ? '#ead2ab' : '#fff3d9'); water.setTheme(theme);
+    sun.diffuse = Color3.FromHexString(island ? light.sun : theme === 'dusk' ? '#ead2ab' : '#fff3d9'); water.setTheme(theme); smoke.setTheme(theme);
     painterly.setTheme(theme); grass.setTheme(theme);
     const previous = model;
     builds++;
