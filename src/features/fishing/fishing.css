@@ -17,6 +17,10 @@ body.is-lake { overflow: hidden; }
 .lake-title { padding: 8px 0; pointer-events: none; }
 .lake-title h1 { margin: 0; color: var(--chrome-ink, #493f48); font: 24px Georgia, serif; letter-spacing: -.4px; text-shadow: 0 1px 2px #0006, 0 2px 14px #0005; }
 body[data-theme='day'] .lake-title h1 { text-shadow: 0 1px 10px #fffc; }
+.lake .lake-exit { color: #4f473e; }
+.lake .lake-exit:active { transform: translate(calc(var(--pin-half) * -1), -100%); }
+.lake-exit .house-pin-label { max-width: 100px; opacity: 1; padding: 6px 12px 6px 20px; }
+.lake-exit .house-pin { width: 36px; height: 36px; }
 .lake-status { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 86px); transform: translateX(-50%); margin: 0; padding: 7px 16px; border-radius: 999px; border: 1px solid var(--lake-edge); background: var(--lake-paper); box-shadow: var(--lake-shadow); font-size: 14px; font-weight: 600; white-space: nowrap; animation: lake-rise .35s ease both; }
 .lake-status:empty { display: none; }
 

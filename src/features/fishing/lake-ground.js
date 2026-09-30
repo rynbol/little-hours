@@ -3,7 +3,9 @@ import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 
 export const POND = { x: 0, z: -3.2, rx: 8.6, rz: 7.2 };
 export const pondRim = (a, k) => [POND.x + Math.cos(a) * POND.rx * k, POND.z + Math.sin(a) * POND.rz * k];
-export const POND_PATH = Array.from({ length: 8 }, (_, i) => { const t = i / 7; return [-.35 - t * 3.6, 5.9 + Math.sin(t * Math.PI) * 1.1 - t * 1.4]; });
+const EXIT_ANGLE = 1.08;
+export const POND_EXIT = (() => { const [x, z] = pondRim(EXIT_ANGLE, 1.42); return { x, z, yaw: Math.atan2(-Math.cos(EXIT_ANGLE) / POND.rx, -Math.sin(EXIT_ANGLE) / POND.rz) }; })();
+export const POND_PATH = Array.from({ length: 12 }, (_, i) => pondRim(EXIT_ANGLE + .5 * (i / 11) ** 1.25, 1.24 + .23 * (1 - i / 11) ** 3));
 const hash = n => { const s = Math.sin(n * 78.233 + 12.9898) * 43758.5453; return s - Math.floor(s); };
 const radiusAt = (x, z) => Math.hypot((x - POND.x) / POND.rx, (z - POND.z) / POND.rz);
 const smooth = t => { const k = Math.max(0, Math.min(1, t)); return k * k * (3 - 2 * k); };
@@ -12,23 +14,15 @@ export function meadowTone(x, z) {
   return .5 + Math.sin(x * .47 + Math.sin(z * .29)) * .2 + Math.sin(z * .53 - x * .16) * .16 + Math.sin(x * 1.1 + z * .7) * .035;
 }
 
-export const HOUSE_SPOT = { x: 6, z: -13.6, yaw: -.35 };
-const HOUSE_ANGLE = Math.atan2((HOUSE_SPOT.z - POND.z) / POND.rz, (HOUSE_SPOT.x - POND.x) / POND.rx);
 const EDGE = [[1.006, .12, 0], [1.012, .03, 1], [1.006, -.3, 2], [.99, -.95, 3], [.955, -1.5, 4], [.89, -1.9, 5], [.74, -2.18, 6]];
 const EARTH = ['#8f9d6c', '#b9a98a', '#b3a488', '#a6987e', '#978d77', '#8a8570', '#7f7c69'];
 
 export function plotReach(a) {
-  const d = Math.atan2(Math.sin(a - HOUSE_ANGLE), Math.cos(a - HOUSE_ANGLE));
-  return 1.6 + .72 * Math.exp(-d * d / .5) + Math.sin(a * 3 + .7) * .03 + Math.sin(a * 7 + 2) * .012;
+  return 1.6 + Math.sin(a * 3 + .7) * .03 + Math.sin(a * 7 + 2) * .012;
 }
 
 export function onPlot(x, z, margin = 0) {
   return radiusAt(x, z) <= plotReach(Math.atan2((z - POND.z) / POND.rz, (x - POND.x) / POND.rx)) - margin;
-}
-
-export function underHouse(x, z, margin = 0) {
-  const dx = x - HOUSE_SPOT.x, dz = z - HOUSE_SPOT.z, c = Math.cos(HOUSE_SPOT.yaw), s = Math.sin(HOUSE_SPOT.yaw);
-  return Math.abs(dx * c - dz * s) < 6 + margin && Math.abs(dx * s + dz * c) < 2.6 + margin;
 }
 
 export function createLakeBank(palette) {
@@ -85,9 +79,9 @@ export function lakeGrassSpots() {
     const seed = row * 47 + column, x = -18 + column * .8 + (hash(seed + 5) - .5) * .6, z = -19 + row * .8 + (hash(seed + 11) - .5) * .6;
     const radius = radiusAt(x, z);
     if (radius < 1.13 || !onPlot(x, z, .12) || hash(seed + 87) > .45 + smooth((meadowTone(x, z) - .4) * 2.5) * .45) continue;
-    if (Math.abs(x) < 1.25 && z > .5 && z < 6.8 || underHouse(x, z, .3)) continue;
+    if (Math.abs(x) < 1.25 && z > .5 && z < 6.8) continue;
     if (POND_PATH.some(([px, pz]) => Math.hypot(x - px, z - pz) < .72)) continue;
-    if ([[-4.6, 3.9, 1.3], [4.2, 4.6, 1.3], [-6.6, 4.4, 1.2], [7.4, 3.2, 1], [-4.3, -11.5, 3.6]].some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r)) continue;
+    if ([[2.39, 4.61, 1.2], [POND_EXIT.x, POND_EXIT.z, 1.7], [7.4, 3.2, 1], [-4.3, -11.5, 3.6]].some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r)) continue;
     spots.push({ x, z, seed });
   }
   return spots;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HOUSE_SPOT, POND, POND_PATH, createLakeBank, createLakeGrass, lakeGrassSpots, lakeWater, meadowTone, onPlot, underHouse } from './lake-ground.js';
+import { POND, POND_EXIT, POND_PATH, createLakeBank, createLakeGrass, lakeGrassSpots, lakeWater, meadowTone, onPlot } from './lake-ground.js';
 
 const palette = { grass: '#a3c27f', meadow: '#93b572', sand: '#e0cba3' };
 
@@ -25,12 +25,7 @@ test('the pond sits on a closed, bounded plot with a flat meadow and a rounded b
   const heights = points.map(([, y]) => y);
   assert.ok(Math.abs(Math.max(...heights) - .15) < 1e-9);
   assert.ok(Math.min(...heights) < -2 && Math.min(...heights) > -2.5, 'the plot has a visible underside');
-  assert.ok(onPlot(0, 6.2) && onPlot(HOUSE_SPOT.x, HOUSE_SPOT.z - 2.6) && !onPlot(0, 9.5) && !onPlot(16, -4));
-  const c = Math.cos(HOUSE_SPOT.yaw), s = Math.sin(HOUSE_SPOT.yaw);
-  for (const u of [-6, 6]) for (const v of [-2.6, 2.6]) {
-    const x = HOUSE_SPOT.x + u * c + v * s, z = HOUSE_SPOT.z - u * s + v * c;
-    assert.ok(underHouse(x, z, .01) && onPlot(x, z, .05), 'the whole house footprint stands on the plot');
-  }
+  assert.ok(onPlot(0, 6.2) && !onPlot(0, 9.5) && !onPlot(16, -4));
   const edges = new Map();
   for (let i = 0; i < indices.length; i += 3) for (let j = 0; j < 3; j++) {
     const a = indices[i + j], b = indices[i + (j + 1) % 3], key = a < b ? `${a}:${b}` : `${b}:${a}`;
@@ -48,6 +43,19 @@ test('the pond sits on a closed, bounded plot with a flat meadow and a rounded b
   }
 });
 
+test('one unbroken stepping-stone path runs from the exit arch, along the bank, to the foot of the dock', () => {
+  const [first, last] = [POND_PATH[0], POND_PATH.at(-1)];
+  assert.ok(Math.hypot(first[0] - POND_EXIT.x, first[1] - POND_EXIT.z) < .5, 'the path starts under the arch');
+  assert.ok(Math.abs(last[0]) < .5 && last[1] > 5.4 && last[1] < 6, 'the path ends at the foot of the dock');
+  POND_PATH.slice(1).forEach(([x, z], i) => {
+    const gap = Math.hypot(x - POND_PATH[i][0], z - POND_PATH[i][1]);
+    assert.ok(gap > .5 && gap < .85, 'stones sit one stride apart');
+    assert.ok(onPlot(x, z, .1) && Math.hypot(x / POND.rx, (z - POND.z) / POND.rz) > 1.2, 'the path stays on the meadow, clear of the water');
+  });
+  assert.ok(onPlot(POND_EXIT.x, POND_EXIT.z, .1), 'the arch stands on the plot edge');
+  assert.ok(Math.sin(POND_EXIT.yaw) * (POND.x - POND_EXIT.x) + Math.cos(POND_EXIT.yaw) * (POND.z - POND_EXIT.z) > 0, 'the arch opens toward the pond');
+});
+
 test('the water fills the pond and tucks under the bank', () => {
   const { positions, indices } = lakeWater();
   assert.ok(indices.length / 3 > 2000 && indices.length / 3 < 3000);
@@ -58,13 +66,13 @@ test('the water fills the pond and tucks under the bank', () => {
   for (let i = 0; i < ground.length; i += 3) if (Math.abs(Math.hypot(ground[i] / POND.rx, (ground[i + 2] - POND.z) / POND.rz) - 1.1) < .03 && ground[i + 1] > -.5) assert.ok(ground[i + 1] > .05, 'the bank is above the swell where the water ends');
 });
 
-test('grass remains rooted on the plot and leaves the dock, house and stepping stones clear', () => {
+test('grass remains rooted on the plot and leaves the dock, exit arch and stepping stones clear', () => {
   const spots = lakeGrassSpots();
   assert.ok(spots.length > 120 && spots.length < 400);
   assert.deepEqual(spots, lakeGrassSpots());
   for (const { x, z } of spots) {
     assert.ok(Math.hypot(x / POND.rx, (z - POND.z) / POND.rz) >= 1.13);
-    assert.ok(onPlot(x, z, .1) && !underHouse(x, z));
+    assert.ok(onPlot(x, z, .1) && Math.hypot(x - POND_EXIT.x, z - POND_EXIT.z) >= 1.7);
     assert.ok(!(Math.abs(x) < 1.25 && z > .5 && z < 6.8));
     assert.ok(POND_PATH.every(([px, pz]) => Math.hypot(x - px, z - pz) >= .72));
   }

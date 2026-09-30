@@ -1,7 +1,7 @@
 import { steps } from '../steps.mjs';
 
 const measure = `(() => {
-  const scene = window.__littleHours.lake.diagnostics().scene, mesh = scene.getMeshByName('lake-scenery'), house = scene.getMeshByName('lake-house');
+  const scene = window.__littleHours.lake.diagnostics().scene, mesh = scene.getMeshByName('lake-scenery');
   const p = mesh.getVerticesData('position'), c = mesh.getVerticesData('color'), indices = mesh.getIndices();
   let triangles = 0, longest = 0, colorSlope = 0, steepest = null;
   for (let i = 0; i < indices.length; i += 3) {
@@ -28,36 +28,31 @@ const measure = `(() => {
     }
     return box;
   };
-  const screen = bounds([mesh, house]), core = bounds([scene.getMeshByName('lake-water')]), porch = bounds([house]);
-  let home = null;
-  if (house) {
-    const q = house.getVerticesData('position'); let x0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (let i = 0; i < q.length; i += 3) { x0 = Math.min(x0, q[i]); x1 = Math.max(x1, q[i]); y1 = Math.max(y1, q[i + 1]); }
-    home = { width: x1 - x0, top: y1 };
-  }
-  return { triangles, longest, colorSlope, steepest, batches: scene.meshes.filter(m => m.name === 'lake-scenery').length, overflow: document.documentElement.scrollWidth > innerWidth, orthographic: scene.activeCamera.mode === 1, screen, core, porch, rooms: window.__littleHours.state.house.rooms.length, home, meshes: scene.meshes.filter(m => m.isEnabled() && m.getTotalIndices()).map(m => [m.name, m.getTotalIndices() / 3]).sort((a, b) => b[1] - a[1]).slice(0, 8) };
+  const arch = scene.getMeshByName('lake-exit'), screen = bounds([mesh, arch]), core = bounds([scene.getMeshByName('lake-water')]), exit = bounds([arch]);
+  const tag = document.getElementById('lake-exit'), rect = tag.getBoundingClientRect();
+  return { triangles, longest, colorSlope, steepest, batches: scene.meshes.filter(m => m.name === 'lake-scenery').length, overflow: document.documentElement.scrollWidth > innerWidth, orthographic: scene.activeCamera.mode === 1, screen, core, exit: arch ? exit : null, house: Boolean(scene.getMeshByName('lake-house')), tag: { hidden: tag.hidden, left: parseFloat(tag.style.left), top: parseFloat(tag.style.top), rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, label: tag.textContent.trim() }, view: { width: innerWidth, height: innerHeight }, meshes: scene.meshes.filter(m => m.isEnabled() && m.getTotalIndices()).map(m => [m.name, m.getTotalIndices() / 3]).sort((a, b) => b[1] - a[1]).slice(0, 8) };
 })()`;
 
 export default {
-  about: "the pond diorama: smooth meadow shading, a continuous shoreline, the whole plot framed by an orthographic camera on desktop and the pond framed large on a phone with the house beside it, and the player's own house following the save",
+  about: "the pond diorama: smooth meadow shading, a continuous shoreline, the whole plot framed by an orthographic camera on desktop and the pond framed large on a phone, no house, and a rose-arch exit whose label walks back to the island like the back button",
   async run(t) {
-    const homes = {};
     for (const [seed, theme, width, height] of [['pond', 'dusk', 1440, 1000], ['pond', 'day', 390, 844], ['pond', 'rain', 1440, 1000], ['one-room', 'dusk', 390, 844]]) {
       const app = await t.open({ seed, theme, width, height, reducedMotion: true });
       await steps.openLake(app);
-      const ground = await app.js(measure), { screen } = ground, label = `${seed} ${theme} ${width}x${height}`;
+      const ground = await app.js(measure), { screen, core, exit, tag, view } = ground, label = `${seed} ${theme} ${width}x${height}`;
       t.check(`${label}: foreground grass has no stretched triangles or radial color streaks`, ground.triangles > 200 && ground.longest < 1.55 && ground.colorSlope < .05, ground);
       t.check(`${label}: meadow stays in one scenery batch without page overflow`, ground.batches === 1 && !ground.overflow, ground);
-      const inside = box => box.left > -1 && box.right < 1 && box.bottom > -1 && box.top < 1, portrait = height > width, { core, porch } = ground;
-      t.check(`${label}: an orthographic camera keeps the ${portrait ? 'pond, and some of the house,' : 'whole plot and house'} on screen`, ground.orthographic && (portrait ? inside(core) && porch.left < .6 : inside(screen)), ground);
+      const inside = box => box.left > -1 && box.right < 1 && box.bottom > -1 && box.top < 1, portrait = height > width;
+      t.check(`${label}: an orthographic camera keeps the ${portrait ? 'pond and the exit arch' : 'whole plot and the exit arch'} on screen`, ground.orthographic && Boolean(exit) && inside(exit) && inside(portrait ? core : screen), ground);
       t.check(`${label}: the ${portrait ? 'pond fills' : 'plot fills'} the frame`, portrait ? core.right - core.left > 1.7 : Math.max(screen.right - screen.left, screen.top - screen.bottom) > 1.6, ground);
-      homes[seed] = ground;
+      t.check(`${label}: the pond has no house, only the rose arch out`, !ground.house && Boolean(exit), ground);
+      const archX = ((exit?.left + exit?.right) / 2 + 1) * view.width / 2, archTop = (1 - exit?.top) * view.height / 2;
+      t.check(`${label}: an Island label stands on the arch, inside the page`, !tag.hidden && tag.label === 'Island' && Math.abs(tag.left - archX) < 40 && tag.top > archTop - 90 && tag.top < archTop + 20 && tag.rect.left >= 0 && tag.rect.right <= view.width && tag.rect.top >= 0, { tag, archX, archTop });
       await t.shot(app, `meadow-${seed}-${theme}-${width}`);
-      await app.clickSel('#lake-back'); await app.settle();
-      t.check(`${label}: the island path remains usable`, !await app.visible('#lake-page') && await app.visible('#house-page'));
+      await app.clickSel('#lake-exit'); await app.settle();
+      const home = { lake: await app.visible('#lake-page'), island: await app.visible('#house-page'), focus: await app.js(`document.activeElement?.dataset.room ?? document.activeElement?.id ?? null`) };
+      t.check(`${label}: the arch walks back to the island, landing where the back button does`, !home.lake && home.island && home.focus === 'pond', home);
       await t.close(app);
     }
-    const [three, one] = [homes.pond, homes['one-room']];
-    t.check('the pond house follows the rooms in the save', three.rooms === 3 && one.rooms === 1 && Boolean(three.home && one.home) && three.home.width > one.home.width + 4 && three.home.top > one.home.top + 2, { three: three.home, one: one.home });
   },
 };

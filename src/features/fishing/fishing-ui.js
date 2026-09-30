@@ -30,6 +30,7 @@ export function createFishingUI(app, { onClose } = {}) {
   function build() {
     root = document.createElement('section'); root.className = 'lake'; root.id = 'lake-page'; root.hidden = true; root.setAttribute('aria-label', 'Willow Pond');
     root.innerHTML = `<div class="lake-stage"></div><div class="lake-vignette" aria-hidden="true"></div>
+      <button class="house-room-tag lake-exit" id="lake-exit" type="button" aria-label="Back to island" hidden><span class="house-pin" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 5 7 12l9 7M7 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="house-pin-label"><strong>Island</strong></span></button>
       <header class="lake-top"><button class="lake-chip" id="lake-back" type="button" aria-label="Back to the island"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lake-wide">Island</span></button>
         <div class="lake-title"><h1>Willow Pond</h1></div>
         <button class="lake-chip lake-book" id="lake-journal-button" type="button" aria-label="Fishing journal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h10a2 2 0 0 1 2 2v13H8a2 2 0 0 1-2-2Z" fill="#f1e2c9" stroke="currentColor" stroke-width="1.5"/><path d="M6 4.5v13" stroke="#a65766" stroke-width="3"/><path d="M10 9h5M10 12h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="lake-wide">Journal</span><b id="lake-found"></b></button></header>
@@ -44,6 +45,7 @@ export function createFishingUI(app, { onClose } = {}) {
       <dialog class="lake-journal" id="lake-journal" aria-labelledby="lake-journal-title"></dialog>`;
     document.body.appendChild(root);
     $('#lake-back').addEventListener('click', close);
+    $('#lake-exit').addEventListener('click', close);
     $('#lake-cast').addEventListener('click', cast);
     $('#lake-reel').addEventListener('pointerdown', press);
     for (const type of ['pointerup', 'pointercancel', 'pointerleave']) root.addEventListener(type, letGo);
@@ -273,7 +275,7 @@ export function createFishingUI(app, { onClose } = {}) {
     returnFocus = document.activeElement;
     phase = 'idle'; caught = null; chosen = null;
     root.hidden = false; document.body.classList.add('is-lake'); document.getElementById('app').inert = true;
-    building = requestAnimationFrame(() => { building = setTimeout(() => { building = 0; if (!root.hidden) scene = createLakeScene(root.querySelector('.lake-stage'), { theme: app.state.theme, avatar: app.state.avatar, pet: app.state.pet, house: app.state.house, reducedMotion: reduced() }); }); });
+    building = requestAnimationFrame(() => { building = setTimeout(() => { building = 0; if (!root.hidden) scene = createLakeScene(root.querySelector('.lake-stage'), { theme: app.state.theme, avatar: app.state.avatar, pet: app.state.pet, exitTag: $('#lake-exit'), reducedMotion: reduced() }); }); });
     root.dataset.theme = app.state.theme;
     status(''); $('#lake-chances').open = false; renderTray();
     $('#lake-card').close(); $('#lake-journal').close(); $('#lake-bite').hidden = true;
