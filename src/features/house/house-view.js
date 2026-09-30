@@ -5,7 +5,6 @@ import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
-import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { FresnelParameters } from '@babylonjs/core/Materials/fresnelParameters.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js';
@@ -29,7 +28,7 @@ import { createHouseMotion } from './house-motion.js';
 import { createIslandWater } from './house-water.js';
 import { createIslandGrass } from './house-grass.js';
 import { createPainterly } from '../../models/painterly.js';
-import { ISLAND_ATMOSPHERES, islandSkyArt } from './island-atmosphere.js';
+import { ISLAND_ATMOSPHERES, ISLAND_SUN, islandSkyArt } from './island-atmosphere.js';
 import { nextExpansion, roomDisplayName } from '../../core/house.js';
 import './whole-house.css';
 
@@ -62,9 +61,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   scene.doNotHandleCursors = true;
   const sky = new HemisphericLight('soft-sky', new Vector3(0, 1, 0), scene);
   sky.groundColor = Color3.FromHexString('#a0a7a4');
-  const sun = new DirectionalLight('afternoon', new Vector3(-1, -2, -1), scene);
-  sun.position.set(0, 12, 6);
-  const shadows = new ShadowGenerator(2048, sun); shadows.usePercentageCloserFiltering = true; shadows.bias = .002; shadows.normalBias = .02; shadows.darkness = .3;
+  const sun = new DirectionalLight('afternoon', Vector3.FromArray(ISLAND_SUN.direction).normalize(), scene);
+  sun.position.copyFrom(sun.direction.scale(-16));
+  const shadows = new ShadowGenerator(2048, sun); shadows.usePercentageCloserFiltering = true; shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM; shadows.bias = .002; shadows.normalBias = .02; shadows.darkness = ISLAND_SUN.darkness;
   shadows.getShadowMap().refreshRate = 0;
   const gardenRing = MeshBuilder.CreateTorus('garden-selected-bed', { diameter: 2.27, thickness: .04, tessellation: 64 }, scene);
   const ringPaint = new StandardMaterial('garden-selected-bed-paint', scene); ringPaint.diffuseColor = Color3.FromHexString('#e7d6a1'); ringPaint.emissiveColor = Color3.FromHexString('#7e7d43'); ringPaint.specularColor.setAll(0); gardenRing.material = ringPaint; gardenRing.scaling.z = .82; gardenRing.isPickable = false; gardenRing.setEnabled(false);
@@ -77,7 +76,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const motePaint = new StandardMaterial('cottage-firefly-light', scene); motePaint.disableLighting = true; motePaint.emissiveColor = Color3.FromHexString('#efd6a5'); motes.material = motePaint; motes.isPickable = false;
   // A few soft puffs of chimney smoke, one draw call, animated with the motes.
   const smoke = MeshBuilder.CreateSphere('cottage-smoke', { diameter: .5, segments: 8 }, scene);
-  const smokePaint = new StandardMaterial('cottage-smoke-paint', scene); smokePaint.disableLighting = true; smokePaint.emissiveColor = Color3.FromHexString('#f3ebe2'); smokePaint.alpha = .42; smokePaint.opacityFresnelParameters = new FresnelParameters({ leftColor: Color3.Black(), rightColor: Color3.White(), power: 1.4, bias: 0 }); smokePaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; smoke.material = smokePaint; smoke.isPickable = false;
+  const smokePaint = new StandardMaterial('cottage-smoke-paint', scene); smokePaint.disableLighting = true; smokePaint.emissiveColor = Color3.FromHexString('#f3ebe2'); smokePaint.alpha = .42; smokePaint.opacityFresnelParameters = new FresnelParameters({ leftColor: Color3.Black(), rightColor: Color3.White(), power: 1.4, bias: 0 }); smoke.material = smokePaint; smoke.isPickable = false;
   const smokeMatrices = new Float32Array(5 * 16), smokeAt = new Vector3(), smokeLocal = new Vector3();
   smoke.thinInstanceSetBuffer('matrix', smokeMatrices, 16, false); smoke.alwaysSelectAsActiveMesh = true;
   const water = createIslandWater(scene, theme);
@@ -127,7 +126,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const seconds = motion.matches ? 0 : now / 1000;
     const wasReacting = roomMotion.activeCount > 0;
     roomMotion.restore();
-    model.animate(seconds, focused, motion.matches); water.animate(seconds, camera); grass.animate(seconds, camera.position); butterflies.animate(seconds, selectedId === 'orchard' && !motion.matches);
+    model.animate(seconds, focused, motion.matches); water.animate(seconds, camera); grass.animate(seconds); butterflies.animate(seconds, selectedId === 'orchard' && !motion.matches);
     for (const root of model.live) root.metadata.avatar?.setEnabled(focused);
     stroll.setVisible(!focused || selectedId === 'orchard');
     if (!focused || selectedId === 'orchard') stroll.animate(seconds, motion.matches, selectedId === 'orchard' ? focused ? 'garden-rest' : 'garden' : 'island');
@@ -240,7 +239,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     sky.intensity = island ? light.fill : theme === 'dusk' ? .56 : .62; sun.intensity = island ? light.key : theme === 'dusk' ? .8 : .95;
     sky.diffuse = Color3.FromHexString(island ? light.sky : '#ffffff'); sky.groundColor = Color3.FromHexString(island ? light.ground : '#a0a7a4');
     sun.diffuse = Color3.FromHexString(island ? light.sun : theme === 'dusk' ? '#ead2ab' : '#fff3d9'); water.setTheme(theme);
-    painterly.setTheme(theme); grass.setTheme(theme, painterly.state.haze);
+    painterly.setTheme(theme); grass.setTheme(theme);
     const previous = model;
     builds++;
     model = createHouseModel(scene, house, selectedId, theme, avatar, previous);

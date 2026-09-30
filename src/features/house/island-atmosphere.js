@@ -4,6 +4,8 @@ export const ISLAND_ATMOSPHERES = {
   rain: { top: '#344e68', bottom: '#92adb4', sky: '#c2e0ed', ground: '#758d95', sun: '#e0e9e6', fill: .72, key: .65, deep: '#588b9b', shallow: '#a2cbc5' },
 };
 
+export const ISLAND_SUN = Object.freeze({ direction: Object.freeze([.6, -1, -.75]), darkness: 0 });
+
 const STARS = [
   [.05, .04, 1], [.23, .03, 1.2], [.35, .08, .8], [.48, .025, 1.1], [.62, .1, 1.4], [.75, .045, .8],
   [.86, .17, 1], [.95, .25, .9], [.05, .28, 1.3], [.25, .2, .9], [.44, .15, .7], [.7, .22, 1.1],

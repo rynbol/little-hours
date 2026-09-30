@@ -1,8 +1,8 @@
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
-import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
+import { MaterialPluginBase } from '@babylonjs/core/Materials/materialPluginBase.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
-import { Vector2, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { edgePoint, onIsland, ISLAND, STREAMS } from './house-island.js';
 import { inPond, DOCK } from './house-pond.js';
 import { pathDistance, PATH_WIDTH } from './house-paths.js';
@@ -51,71 +51,84 @@ export function rimBlades() {
 }
 
 function bladeGeometry(blades) {
-  const positions = new Float32Array(blades.length * 9), uvs = new Float32Array(blades.length * 6), colors = new Float32Array(blades.length * 12);
-  blades.forEach(({ x, z, height, lean, tone, patch, drop }, i) => {
+  const positions = new Float32Array(blades.length * 9), shape = new Float32Array(blades.length * 9), normals = new Float32Array(blades.length * 9);
+  blades.forEach(({ x, z, height, lean, tone, drop }, i) => {
     const w = GRASS.width * (.7 + tone * .6), cx = Math.cos(lean) * w, cz = Math.sin(lean) * w, tip = .06 * height;
     const top = drop ? [x + drop[0], GROUND + drop[1], z + drop[2]] : [x + Math.cos(lean + 1.4) * tip, GROUND + height, z + Math.sin(lean + 1.4) * tip];
     positions.set([x - cx, GROUND, z - cz, x + cx, GROUND, z + cz, ...top], i * 9);
-    uvs.set([tone * 6.28, 0, tone * 6.28, 0, tone * 6.28, 1], i * 6);
-    const warm = .5 + patch * .35 + (tone - .5) * .3;
-    for (let k = 0; k < 3; k++) colors.set([warm, tone, height, 1], i * 12 + k * 4);
+    const phase = tone * 6.28, sway = drop ? height * .4 : height;
+    shape.set([phase, 0, sway, phase, 0, sway, phase, 1, sway], i * 9);
+    normals.set([0, 1, 0, 0, 1, 0, 0, 1, 0], i * 9);
   });
-  const data = new VertexData(); data.positions = positions; data.uvs = uvs; data.colors = colors;
-  data.indices = new Uint32Array(blades.length * 3).map((_, i) => i);
-  return data;
+  return { positions, shape, normals, indices: new Uint32Array(blades.length * 3).map((_, i) => i) };
 }
 
-const VERTEX = `precision highp float;
-attribute vec3 position; attribute vec2 uv; attribute vec4 color;
-uniform mat4 viewProjection; uniform float time; uniform vec3 eye;
-varying float vTip, vWarm, vGust, vDepth, vTone;
-void main() {
-  vec3 p = position; float tip = uv.y, bend = tip * tip;
-  float wave = sin(dot(p.xz, vec2(.55, .22)) - time * 1.7);
-  float gust = smoothstep(.35, 1., wave) * (.6 + .4 * sin(time * .37 + p.z * .3));
-  float flutter = sin(time * 3.1 + uv.x + p.x * 2.3) * .25;
-  p.xz += vec2(.94, .34) * bend * (.035 + gust * .09 + flutter * .02) * (color.b * 4.);
-  p.y -= bend * gust * .03;
-  vTip = tip; vWarm = color.r; vGust = gust * tip; vTone = color.g;
-  vDepth = length(eye - p);
-  gl_Position = viewProjection * vec4(p, 1.);
-}`;
-const FRAGMENT = `precision highp float;
-varying float vTip, vWarm, vGust, vDepth, vTone;
-uniform vec3 root, blade, sunlit, haze; uniform float light; uniform vec2 depth;
-void main() {
-  vec3 col = mix(root, mix(blade, sunlit, clamp(vWarm, 0., 1.)), smoothstep(0., .85, vTip));
-  col *= .9 + vTone * .18;
-  col = mix(col, sunlit * 1.08, vGust * .45);
-  col *= light;
-  col = mix(col, haze, smoothstep(depth.x, depth.y, vDepth) * .32);
-  gl_FragColor = vec4(col, 1.);
-}`;
+export function bladeColors(blades, tones) {
+  const [root, blade, sunlit] = ['root', 'blade', 'sunlit'].map(key => Color3.FromHexString(tones[key]));
+  const colors = new Float32Array(blades.length * 12), tip = new Color3(), base = new Color3();
+  blades.forEach(({ tone, patch }, i) => {
+    const warm = Math.min(1, Math.max(0, .5 + patch * .35 + (tone - .5) * .3)), shade = .9 + tone * .18;
+    Color3.LerpToRef(blade, sunlit, warm, tip); tip.scaleToRef(shade, tip); root.scaleToRef(shade, base);
+    for (let k = 0; k < 3; k++) { const c = k === 2 ? tip : base; colors.set([c.r, c.g, c.b, 1], i * 12 + k * 4); }
+  });
+  return colors;
+}
+
+class GrassWindPlugin extends MaterialPluginBase {
+  constructor(material) { super(material, 'GrassWind', 160, {}, true, true); this.time = 0; this.gustTint = [1, 1, .8]; }
+  getClassName() { return 'GrassWindPlugin'; }
+  isCompatible(shaderLanguage) { return shaderLanguage === 0; }
+  getAttributes(attributes) { attributes.push('grassBlade'); }
+  getUniforms() {
+    return {
+      ubo: [{ name: 'grassTime', size: 1, type: 'float' }, { name: 'grassGust', size: 3, type: 'vec3' }],
+      vertex: 'uniform float grassTime;', fragment: 'uniform vec3 grassGust;',
+    };
+  }
+  bindForSubMesh(uniformBuffer) { uniformBuffer.updateFloat('grassTime', this.time); uniformBuffer.updateFloat3('grassGust', ...this.gustTint); }
+  getCustomCode(shaderType) {
+    if (shaderType === 'vertex') return {
+      CUSTOM_VERTEX_DEFINITIONS: 'attribute vec3 grassBlade; varying float vGrassGust;',
+      CUSTOM_VERTEX_UPDATE_POSITION: `
+        float grassBend = grassBlade.y * grassBlade.y;
+        float grassWave = sin(dot(positionUpdated.xz, vec2(.55, .22)) - grassTime * 1.7);
+        float grassGustNow = smoothstep(.35, 1., grassWave) * (.6 + .4 * sin(grassTime * .37 + positionUpdated.z * .3));
+        float grassFlutter = sin(grassTime * 3.1 + grassBlade.x + positionUpdated.x * 2.3) * .25;
+        positionUpdated.xz += vec2(.94, .34) * grassBend * (.035 + grassGustNow * .09 + grassFlutter * .02) * (grassBlade.z * 4.);
+        positionUpdated.y -= grassBend * grassGustNow * .03;
+        vGrassGust = grassGustNow * grassBlade.y;`,
+    };
+    return {
+      CUSTOM_FRAGMENT_DEFINITIONS: 'varying float vGrassGust;',
+      CUSTOM_FRAGMENT_UPDATE_DIFFUSE: 'baseColor.rgb = mix(baseColor.rgb, grassGust, vGrassGust * .4);',
+    };
+  }
+}
 
 export const GRASS_TONES = Object.freeze({
-  day: { root: '#6d9440', blade: '#9fc452', sunlit: '#dfe98a', light: 1 },
-  dusk: { root: '#34464c', blade: '#5e7b62', sunlit: '#9fae84', light: .92 },
-  rain: { root: '#3f5c44', blade: '#6f9166', sunlit: '#a9c092', light: .95 },
+  day: { root: '#5b7f36', blade: '#8fb046', sunlit: '#cfd978', gust: '#e6ec9c' },
+  dusk: { root: '#34464c', blade: '#5e7b62', sunlit: '#9fae84', gust: '#b9c49a' },
+  rain: { root: '#3f5c44', blade: '#6f9166', sunlit: '#a9c092', gust: '#c2d4ac' },
 });
 
 export function createIslandGrass(scene, theme = 'day') {
-  const blades = [...grassBlades(), ...rimBlades()];
-  const mesh = new Mesh('island-grass', scene); bladeGeometry(blades).applyToMesh(mesh);
-  const material = new ShaderMaterial('island-grass-paint', scene, { vertexSource: VERTEX, fragmentSource: FRAGMENT }, {
-    attributes: ['position', 'uv', 'color'], uniforms: ['viewProjection', 'time', 'eye', 'root', 'blade', 'sunlit', 'haze', 'light', 'depth'],
-  });
-  material.backFaceCulling = false;
-  mesh.material = material; mesh.isPickable = false; mesh.metadata = { castShadow: false }; mesh.alwaysSelectAsActiveMesh = true; mesh.freezeWorldMatrix();
-  function setTheme(next, haze = [.8, .88, .96]) {
+  const blades = [...grassBlades(), ...rimBlades()], { positions, shape, normals, indices } = bladeGeometry(blades);
+  const mesh = new Mesh('island-grass', scene);
+  const data = new VertexData(); Object.assign(data, { positions, normals, indices, colors: bladeColors(blades, GRASS_TONES[theme] || GRASS_TONES.day) }); data.applyToMesh(mesh, true);
+  mesh.setVerticesData('grassBlade', shape, false, 3);
+  const material = new StandardMaterial('island-grass-paint', scene);
+  material.diffuseColor = Color3.White(); material.specularColor.setAll(0); material.emissiveColor.setAll(.08); material.backFaceCulling = false;
+  const wind = new GrassWindPlugin(material);
+  mesh.material = material; mesh.receiveShadows = true; mesh.isPickable = false; mesh.metadata = { castShadow: false }; mesh.alwaysSelectAsActiveMesh = true; mesh.freezeWorldMatrix();
+  function setTheme(next) {
     const tones = GRASS_TONES[next] || GRASS_TONES.day;
-    for (const key of ['root', 'blade', 'sunlit']) material.setColor3(key, Color3.FromHexString(tones[key]));
-    material.setFloat('light', tones.light); material.setVector3('haze', new Vector3(...haze));
+    mesh.updateVerticesData('color', bladeColors(blades, tones));
+    const gust = Color3.FromHexString(tones.gust); wind.gustTint = [gust.r, gust.g, gust.b];
   }
-  material.setVector2('depth', new Vector2(26, 44)); material.setFloat('time', 0); material.setVector3('eye', Vector3.Zero());
   setTheme(theme);
   return {
     mesh, count: blades.length, setTheme,
-    animate(seconds, eye) { material.setFloat('time', seconds); material.setVector3('eye', eye); },
+    animate(seconds) { wind.time = seconds; },
     dispose() { material.dispose(); mesh.dispose(); },
   };
 }

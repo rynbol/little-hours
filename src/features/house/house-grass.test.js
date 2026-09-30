@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { grassBlades, grassy, rimBlades, RIM_BLADES } from './house-grass.js';
+import { bladeColors, grassBlades, grassy, rimBlades, GRASS_TONES, RIM_BLADES } from './house-grass.js';
 import { HOUSE_POSITIONS } from './house-model.js';
 import { inPond, POND } from './house-pond.js';
 import { pathDistance, PATH_WIDTH, PATHS } from './house-paths.js';
@@ -37,4 +37,11 @@ test('a fringe of grass hangs over the island edge, clear of the waterfalls', ()
     assert.ok(!onIsland(x + drop[0], z + drop[2]), 'fringe tips reach past the edge');
     for (const course of STREAMS) assert.ok(Math.hypot(x - course.at(-1)[0], z - course.at(-1)[1]) >= .5, 'no grass over a waterfall');
   }
+});
+
+test('each blade is darker at the root than at its sunlit tip', () => {
+  const blades = grassBlades().slice(0, 400), colors = bladeColors(blades, GRASS_TONES.day);
+  assert.equal(colors.length, blades.length * 12);
+  const light = at => colors[at] + colors[at + 1] + colors[at + 2];
+  blades.forEach((_, i) => assert.ok(light(i * 12) < light(i * 12 + 8), `blade ${i} root is as bright as its tip`));
 });
