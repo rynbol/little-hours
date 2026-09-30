@@ -71,7 +71,7 @@ export function installTestHook(app) {
       const room = view('room'), pet = room.petModel;
       if (!pet?.root.isEnabled()) return null;
       const { min, max } = pet.root.getHierarchyBoundingVectors(true);
-      return scan(room.scene, min, max, (x, y) => pet.hitTest(room.scene.createPickingRay(x, y, null, room.camera)) !== null);
+      return scan(room.scene, min, max, (x, y) => pet.hitTest(room.scene.createPickingRay(x, y, null, room.scene.activeCamera)) !== null);
     }
     if (Number.isInteger(target?.gardenPlot)) {
       const house = view('house'), spot = house.plots[target.gardenPlot];

@@ -1,19 +1,35 @@
 export default {
-  about: 'whole-room Focus mode, live timer, captured session, Escape and close, and phone framing',
+  about: 'Focus mode seats you at the desk in first person, live timer, captured session, Escape and close, and phone framing',
   async run(t) {
     const { check } = t;
     const app = await t.open({ seed: 'three-rooms' });
-    await app.settle(); await t.steps.openFocus(app);
+    await app.settle();
+    const effects = `Object.keys(window.__littleHours.room.diagnostics().engine._compiledEffects)`;
+    const effectsBefore = await app.js(effects);
+    await app.clickSel('#focus-mode-enter');
+    await app.waitFor(`window.__littleHours.room.diagnostics().seat.state === 'seated'`, { what: 'the view to settle in the chair', timeout: 10000 });
+    const effectsAfter = await app.js(effects);
+    const newEffects = effectsAfter.filter(key => !effectsBefore.includes(key)).map(key => key.slice(0, 160));
+    check('the fly-in into the chair needs no new shaders, so it does not stall', newEffects.length === 0, newEffects);
     await app.waitFor(`window.__littleHours.room.diagnostics().companion.atDesk && window.__littleHours.room.diagnostics().companion.state === 'working'`, { what: 'the companion to settle at the desk', timeout: 30000 });
-    const view = await app.js(`(() => { const d = window.__littleHours.room.diagnostics(), desk = d.scene.transformNodes.find(node => node.metadata?.itemId === d.layout.activeDeskId), avatar = desk?.metadata?.avatar; return { wholeRoom: d.scene.meshes.filter(mesh => mesh.isEnabled() && !mesh.isDescendantOf(desk) && mesh.visibility > 0).length > 40, avatar: Boolean(avatar?.isEnabled() && avatar.getChildMeshes().some(mesh => mesh.isEnabled() && mesh.visibility > 0)), hidden: ['.app-header', '.focus-card', '.room-hint', '.stage-presence'].every(selector => getComputedStyle(document.querySelector(selector)).display === 'none'), hud: !document.getElementById('focus-mode-hud').hidden, timer: document.getElementById('focus-mode-timer').textContent === document.getElementById('timer').textContent }; })()`);
-    check('Focus mode preserves the whole room and working avatar with a matching timer', Object.values(view).every(Boolean), view);
+    const view = await app.js(`(() => { const d = window.__littleHours.room.diagnostics(), desk = d.scene.transformNodes.find(node => node.metadata?.itemId === d.layout.activeDeskId), head = desk.metadata.avatarHead.getAbsolutePosition(), eye = d.seat.camera.position; return { firstPerson: d.scene.activeCamera === d.seat.camera && d.seat.camera.mode === 0, atHead: Math.hypot(eye.x - head.x, eye.y - head.y, eye.z - head.z) < 0.4, bodyHidden: !desk.metadata.avatar.isEnabled(), wholeRoom: d.scene.meshes.filter(mesh => mesh.isEnabled() && !mesh.isDescendantOf(desk) && mesh.visibility > 0).length > 40, hidden: ['.app-header', '.focus-card', '.room-hint', '.stage-presence'].every(selector => getComputedStyle(document.querySelector(selector)).display === 'none'), hud: !document.getElementById('focus-mode-hud').hidden, timer: document.getElementById('focus-mode-timer').textContent === document.getElementById('timer').textContent }; })()`);
+    check('Focus mode seats you at the desk in first person, with the room around you and a matching timer', Object.values(view).every(Boolean), view);
+    const box = await app.box('#room-canvas'), before = await app.js(`window.__littleHours.room.diagnostics().seat.look.yaw`);
+    await app.drag({ x: box.x, y: box.y }, { x: box.x + 160, y: box.y });
+    await app.waitFor(`Math.abs(window.__littleHours.room.diagnostics().seat.look.yaw - ${before}) > 0.4`, { what: 'dragging to look around the room' });
+    check('dragging looks around from the chair and keeps focus running', await app.js(`window.__littleHours.state.session.running && document.body.classList.contains('is-focus-mode')`));
     const deadline = await app.js(`window.__littleHours.state.session.endsAt`);
-    await t.shot(app, 'whole-room'); await app.key('Escape');
+    await t.shot(app, 'desk-view'); await app.key('Escape');
+    check('Escape flies back out while the room still fills the screen', await app.js(`(() => { const d = window.__littleHours.room.diagnostics(); return d.seat.state === 'leaving' && document.body.classList.contains('is-focus-mode') && document.getElementById('focus-mode-hud').hidden; })()`));
     await app.waitFor(`!document.body.classList.contains('is-focus-mode')`, { what: 'Escape to leave Focus mode' });
+    check('the dollhouse camera is back after leaving', await app.js(`(() => { const d = window.__littleHours.room.diagnostics(); return d.seat.state === 'room' && d.scene.activeCamera === d.camera; })()`));
     check('Escape preserves focus time and returns keyboard focus', await app.js(`window.__littleHours.state.session.running && window.__littleHours.state.session.endsAt === ${deadline} && document.activeElement.id === 'focus-mode-enter'`));
     await t.steps.openFocus(app);
     check('re-entering keeps the original deadline', await app.js(`window.__littleHours.state.session.endsAt === ${deadline}`));
-    await t.steps.closeFocus(app); await app.clickSel('#start-button');
+    await app.waitFor(`window.__littleHours.room.diagnostics().seat.state === 'seated'`, { what: 'the view to settle in the chair again', timeout: 10000 });
+    await app.key('Escape'); await app.key('Escape');
+    check('a second Escape during the fly-out cuts straight back to the dollhouse', await app.js(`(() => { const d = window.__littleHours.room.diagnostics(); return d.seat.state === 'room' && d.scene.activeCamera === d.camera && !document.body.classList.contains('is-focus-mode'); })()`));
+    await app.settle(); await app.clickSel('#start-button');
     await app.waitFor(`!window.__littleHours.state.session.running`, { what: 'pause' });
     const pet = await app.js(`window.__littleHours.state.session.petId`);
     await t.steps.openFocus(app);

@@ -38,7 +38,7 @@ test('focus mode keeps the whole room and starts, resumes and exits without rese
   await page.keyboard.press('Escape'); expect((await state(page)).session.running).toBe(true);
 });
 
-test('entry closes pet care and a room pet tap leaves focus mode before reopening care', { tag: '@dev-diagnostics' }, async ({ page }) => {
+test('entry closes pet care, and a glance down at the pet beside the chair lets a tap leave focus mode for care', { tag: '@dev-diagnostics' }, async ({ page }) => {
   await page.locator('#pet-button').click();
   expect(await page.evaluate(() => window.__littleHours.counts().engines)).toBe(2);
   await page.locator('#focus-toggle').click();
@@ -47,7 +47,11 @@ test('entry closes pet care and a room pet tap leaves focus mode before reopenin
   expect(await page.evaluate(() => window.__littleHours.petCloseup)).toBeNull();
   await page.locator('#focus-mode-enter').click(); await expect(focusing(page)).toHaveCount(1);
   await page.evaluate(() => window.__littleHours.settled());
-  await expect.poll(() => page.evaluate(() => Boolean(window.__littleHours.screenPoint('pet')?.visible))).toBe(true);
+  const petInView = () => page.evaluate(() => Boolean(window.__littleHours.screenPoint('pet')?.visible));
+  const view = page.viewportSize();
+  await page.mouse.move(view.width / 2, view.height / 2); await page.mouse.down();
+  await page.mouse.move(view.width / 2 - 260, view.height / 2, { steps: 6 }); await page.mouse.up();
+  await expect.poll(petInView).toBe(true);
   const point = await page.evaluate(() => window.__littleHours.screenPoint('pet'));
   await page.mouse.click(point.x, point.y);
   await expect(focusing(page)).toHaveCount(0); await expect(page.locator('#pet-closeup canvas')).toBeVisible();
