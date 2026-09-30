@@ -16,23 +16,10 @@ body { background: #241f2b; }
 body[data-theme='day'] { background: #2b2832; }
 body[data-theme='rain'] { background: #222631; }
 .app-shell { max-width: 1680px; padding: 0 32px 16px; }
-.app-header { height: 76px; padding: 0; border-color: var(--ui-line); gap: 24px; }
-.brand { color: var(--ui-light); font-size: 23px; letter-spacing: -1px; gap: 11px; }
-.brand-mark { width: 35px; height: 37px; color: #f0d5be; border-color: #c99b8270; border-radius: 15px 15px 10px 10px; background: #c9a18a12; }
-.brand-mark svg { width: 20px; height: 20px; }
-.brand-dot { color: #e6a4af; }
-.brand-tagline { margin-right: auto; font-size: 11px; color: var(--ui-muted); letter-spacing: .2px; }
-.header-right { gap: 8px; }
-.coin-wallet, .time-toggle, .focus-toggle { min-height: 40px; border: 1px solid var(--ui-line); background: #ffffff05; border-radius: 13px; padding: 9px 12px; color: #e6d5ce; font-size: 11px; }
-.coin-wallet { color: #e5c18d; border-color: #bca07435; background: #d8b77c0c; }
-.focus-toggle { border-color: #c899a54a; }
-.focus-toggle:hover, .focus-toggle[aria-expanded='true'], .time-toggle:hover { background: #bd91a019; border-color: #c899a578; }
-#dock-timer { color: #f0d9dd; border-color: #cdaeb23b; }
 .workspace { grid-template-columns: minmax(0, 1fr) 290px; gap: 28px; padding-top: 28px; }
 .room-heading { min-height: 79px; padding: 0; gap: 18px; }
 .eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 1.8px; color: #c8a6ae; }
 h1 { color: #f7e9dc; font-size: clamp(28px, 2.8vw, 40px); letter-spacing: -1.2px; }
-.room-subtitle { color: #c0adb9; font-size: 12px; line-height: 1.6; margin-top: 7px; }
 .heading-actions { gap: 7px; }
 .mode-button { min-height: 42px; background: #f4ded00a; border: 1px solid #c8a6ae48; border-radius: 13px; color: #e9d7d2; font-size: 11px; padding: 10px 13px; }
 .mode-button:hover { background: #c998aa23; border-color: #caa5ab80; }
@@ -40,12 +27,7 @@ h1 { color: #f7e9dc; font-size: clamp(28px, 2.8vw, 40px); letter-spacing: -1.2px
 #decorate-button:hover { background: #f0c6c8; }
 #decorate-button[aria-pressed='true'] { background: #d3dfc5; border-color: #d3dfc5; color: #3d513c; }
 .heading-actions .icon-button { width: 38px; height: 38px; border-color: transparent; color: #bc9da9; }
-.home-connections { padding: 17px 0 8px; gap: 7px; }
 .home-address { color: #b3a1ad; font-size: 10px; }
-.home-connections button { min-height: 32px; color: #c8b6c0; background: transparent; border-color: #c9b1bb28; padding: 6px 10px; }
-.home-connections button[aria-current='location'] { color: #f0d6d5; background: #d6a7b21c; border-color: #c89caa55; }
-.home-connections .home-next { color: #bbc7ab; }
-.home-connections .home-wide { border: 0; padding-right: 0; color: #c5a7b3; text-decoration: underline; text-decoration-color: #c5a7b355; text-underline-offset: 4px; }
 body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(380px, calc(100svh - 365px), 820px); }
 body:not(.is-avatar-editing) .stage-presence { top: 13px; left: 2px; border-color: #b598ab40; background: #292330dc; color: #e2cad5; font-size: 10px; padding: 7px 10px; }
 body:not(.is-avatar-editing) .stage-presence[data-presence='focusing'] { background: #303b30ed; border-color: #a0b08c70; color: #d8e8c7; }
@@ -59,8 +41,6 @@ body:not(.is-avatar-editing) .room-hint { color: #b5a3b1; font-size: 10px; botto
 .tool { min-height: 40px; border-radius: 12px; color: #d2bdc9; font-size: 10px; gap: 6px; }
 .tool svg { color: #c8a3b4; }
 .tool:hover, .tool[aria-expanded='true'], .tool[aria-pressed='true'] { background: #eac9d41a; color: #f6e0e8; }
-.app-footer { color: #b19cac; font-size: 10px; padding: 16px 0 0; align-items: center; margin-top: auto; }
-.app-footer > span:last-child > span { color: #d1a3b1; }
 
 /* A focus card that reads from intention → time → one primary action. */
 .focus-card { display: block; position: sticky; top: 20px; margin: 0; width: 100%; padding: 24px; border: 1px solid #fff8f0; border-radius: 26px; background: var(--ui-paper); color: var(--ui-ink); box-shadow: 0 16px 48px #0c061c25, inset 0 1px #fff; }
@@ -109,22 +89,9 @@ body:not(.is-avatar-editing) .room-hint { color: #b5a3b1; font-size: 10px; botto
 .sound-button[aria-pressed='true'] .sound-switch::after { left: 16px; }
 #volume { height: 16px; accent-color: #8b9b79; margin-top: 5px; }
 #volume:disabled { opacity: .3; }
-.focus-reward { background: #e8eddf; color: #5a6750; border: 1px solid #d9e0cd; border-radius: 12px; padding: 11px; margin-top: 10px; gap: 9px; line-height: 1.5; }
-.focus-reward strong { font-size: 10px; color: #506047; margin-bottom: 2px; }
-.focus-reward span > span { font-size: 10px; }
-.focus-reward small { display: block; font-size: 9px; color: #6b755f; margin-top: 3px; }
 .reward-icon { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; background: #f9fcf0; flex: none; }
 .reward-icon svg { color: #7b8b60; width: 15px; }
 .daily-note { color: #79666b; font-size: 9px; line-height: 1.6; margin-top: 11px; }
-.session-journal { border-top: 1px dashed #dcccc3; margin-top: 15px; padding-top: 12px; font-size: 10px; }
-.session-journal summary { display: flex; justify-content: space-between; gap: 6px; align-items: center; cursor: pointer; color: #705a64; min-height: 25px; list-style: none; }
-.session-journal summary::-webkit-details-marker { display: none; }
-.session-journal summary::after { content: '+'; font-size: 15px; color: #79666b; }
-.session-journal[open] summary::after { content: '−'; }
-#today-total { margin-left: auto; color: #5c6d4f; font-weight: 600; }
-#today-sessions p { color: #79666b; line-height: 1.6; margin-bottom: 0; }
-.journal-sessions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; max-height: 90px; overflow: auto; }
-.journal-sessions span { padding: 5px 7px; background: #e8eddf; border-radius: 6px; color: #586749; }
 
 /* Compact anchored panels never push the room and timer out of place. */
 body:not(.is-avatar-editing) .room-panel { position: fixed; z-index: 10; bottom: 28px; left: max(32px, calc((100vw - 1616px) / 2)); width: 380px; max-width: calc(100vw - 32px); max-height: calc(100svh - 100px); overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: 22px; border-color: #fff7ee; background: var(--ui-paper); color: var(--ui-ink); box-shadow: 0 16px 70px #10091e70; }
@@ -237,7 +204,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
   .tiny-flower:hover { rotate: 35deg; transition: rotate .5s var(--press-spring); }
 }
 @media (min-width: 1000px) and (max-height: 850px) {
-  .app-header { height: 66px; }
   .workspace { padding-top: 20px; }
   .focus-card { padding: 20px; }
   .focus-card h2 { font-size: 32px; margin-top: 8px; }
@@ -247,7 +213,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
   .timer-area { margin: 13px 0; }
   .timer-caption { font-size: 11px; }
   .sound-row { margin-top: 14px; padding-top: 10px; }
-  .session-journal { margin-top: 12px; padding-top: 8px; }
   .focus-card .daily-note { display: none; }
   body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(340px, calc(100svh - 298px), 820px); }
 }
@@ -264,8 +229,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
 }
 @media (max-width: 999px) {
   .app-shell { padding: 0 22px 18px; }
-  .brand-tagline { display: none; }
-  .header-right { margin-left: auto; }
   .workspace { display: flex; flex-direction: column; gap: 22px; padding-top: 24px; }
   body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(360px, 52svh, 600px); }
   .focus-card { position: relative; top: auto; max-width: 580px; margin: 0 auto; padding: 28px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
@@ -276,36 +239,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
   .timer-dial { width: 178px; height: 178px; }
   .focus-card .start-button { grid-column: 2; grid-row: 6 / 8; align-self: start; }
   .reset-session { grid-column: 2; grid-row: 8; }
-  .focus-reward { grid-column: 1; }
-  .session-journal { grid-column: 2; grid-row: 9; align-self: start; }
   .daily-note { grid-column: 1 / -1; }
   .room-company { display: flex; }
   .room-heading { min-height: 75px; }
 }
 @media (max-width: 720px) {
   .app-shell { padding: 0 16px max(20px, env(safe-area-inset-bottom)); }
-  .app-header { height: 68px; gap: 10px; }
-  .brand { font-size: 20px; gap: 8px; }
-  .brand-mark { width: 29px; height: 32px; }
-  .header-right { gap: 6px; }
-  .coin-wallet { padding: 8px 10px; min-height: 38px; }
-  .coin-wallet > span:last-child { display: none; }
-  .time-toggle { width: 36px; min-width: 36px; padding: 8px; }
-  .time-toggle span { display: none; }
-  .focus-toggle { padding: 8px; gap: 5px; min-height: 38px; }
-  .focus-toggle > span:first-of-type { display: none; }
-  #dock-timer { padding-left: 6px; }
   .workspace { padding-top: 23px; gap: 24px; }
   .room-heading { flex-wrap: wrap; gap: 14px; }
   .room-heading .heading-actions { width: 100%; flex-direction: row; align-items: center; justify-content: flex-start; margin: 0; }
   .room-heading .heading-actions .icon-button { margin-left: auto; }
-  .room-heading .eyebrow { font-size: 9px; letter-spacing: 1.5px; }
   h1 { font-size: 32px; }
-  .room-subtitle { max-width: none; font-size: 11px; }
-  .home-connections { gap: 6px; padding-top: 16px; }
   .home-address { display: none; }
-  .home-connections .home-wide { margin-left: auto; font-size: 9px; }
-  .home-connections button { padding-inline: 8px; font-size: 9px; }
   body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(315px, 48svh, 480px); }
   .room-company { display: none; }
   .room-tools { width: 100%; padding: 5px; }
@@ -315,11 +260,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
   body:not(.is-avatar-editing) .room-panel { inset: auto 12px max(12px, env(safe-area-inset-bottom)); width: auto; max-width: none; max-height: 70svh; padding: 22px; border-radius: 24px; }
   body:not(.is-avatar-editing) .panel-heading .icon-button { width: 40px; height: 40px; }
   .is-decorating .builder-panel { border-radius: 20px; }
-  .app-footer { justify-content: center; font-size: 10px; }
 }
 @media (max-width: 520px) {
-  .brand { font-size: 18px; letter-spacing: -.7px; }
-  .brand-mark { display: none; }
   .focus-card { display: block; padding: 27px; max-width: 400px; border-radius: 26px; }
   .focus-card h2 { font-size: 37px; }
   .focus-intro { margin-bottom: 22px; }
@@ -330,7 +272,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
   .durations button { min-height: 40px; }
   .sound-button { min-height: 44px; }
   .reset-session { min-height: 40px; }
-  .session-journal summary { min-height: 36px; }
   .daily-note { margin-top: 14px; }
   .is-decorating .collection-tabs button { font-size: 10px; }
   .is-decorating .builder-meta { gap: 5px; font-size: 9px; }
@@ -342,13 +283,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
 
 /* Authored marks and the Blender-rendered completion keepsake. */
 .ui-art { display: block; width: 24px; height: 24px; flex: none; }
-.coin-wallet .ui-art { width: 21px; height: 21px; }
 .tiny-flower .ui-art { width: 28px; height: 28px; }
 .reward-icon { width: 34px; height: 34px; }
 .reward-icon .ui-art { width: 31px; height: 31px; }
-.journal-sprout { display: flex; justify-content: center; margin-top: 10px; }
-.journal-sprout .ui-art { width: 42px; height: 42px; }
-.journal-sprout + p { text-align: center; }
 .celebration-flower { width: 160px; height: 140px; margin: -10px auto 15px; }
 .celebration-flower img { display: block; width: 160px; height: 160px; object-fit: contain; }
 .celebration-coins .ui-art { width: 26px; height: 26px; }
@@ -361,8 +298,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
   .timer-area { margin: 15px 0; }
   .timer { font-size: 44px; }
   .sound-row { margin-top: 14px; padding-top: 12px; }
-  .focus-reward { padding: 10px; }
-  .session-journal { margin-top: 12px; padding-top: 8px; }
   .focus-card .daily-note { display: none; }
 }
 @media (min-width: 1000px) and (max-height: 800px) {
@@ -375,17 +310,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
   .timer-caption { font-size: 10px; }
   .timer-area { margin: 12px 0; }
   .sound-row { padding-top: 10px; margin-top: 12px; }
-  .focus-reward small { display: none; }
-  .session-journal { margin-top: 10px; }
   body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(320px, calc(100svh - 330px), 820px); }
 }
-/* While decorating, the collection and room share the screen. Utility controls
-   return when Done is pressed; the header focus toggle remains available. */
-body.is-decorating:not(.is-avatar-editing) .home-connections,
-body.is-decorating:not(.is-avatar-editing) .room-bottom,
-body.is-decorating:not(.is-avatar-editing) .room-heading .eyebrow,
-body.is-decorating:not(.is-avatar-editing) .room-subtitle { display: none; }
-body.is-decorating:not(.is-avatar-editing) .app-header { height: 56px; }
+body.is-decorating:not(.is-avatar-editing) .room-bottom { display: none; }
 body.is-decorating:not(.is-avatar-editing) .workspace { padding-top: 10px; }
 body.is-decorating:not(.is-avatar-editing) .room-heading { min-height: 52px; }
 body.is-decorating:not(.is-avatar-editing) .room-heading h1 { font-size: 28px; }
@@ -411,24 +338,17 @@ body.is-decorating:not(.is-avatar-editing) .room-heading h1 { font-size: 28px; }
   .celebration-flower { display: none; }
 }
 @media (max-width: 999px) {
-  .app-header { position: sticky; top: 0; z-index: 7; background: #241f2bf5; }
-  body[data-theme='day'] .app-header { background: #2b2832f5; }
-  body[data-theme='rain'] .app-header { background: #222631f5; }
   .focus-card { scroll-margin-top: 88px; }
 }
 @media (max-width: 720px) {
-  .coin-wallet, .time-toggle, .focus-toggle { min-height: 44px; min-width: 44px; }
   body:not(.is-avatar-editing) .panel-heading .icon-button { width: 44px; height: 44px; }
 }
 
-body .brand-tagline, body .room-heading .eyebrow, body .room-subtitle, body .focus-card .card-top, body .focus-intro, body .timer-caption,
-body .daily-note, body .app-footer > span, body .collection-footnote, body .room-company, body .sound-state, body .focus-reward small,
-body .coin-wallet > span:last-child, body .time-toggle > span, body .avatar-stage-heading .eyebrow { display: none; }
+body .focus-card .card-top, body .focus-intro, body .timer-caption,
+body .daily-note, body .collection-footnote, body .room-company, body .sound-state { display: none; }
 body:not(.is-decorating):not(.is-avatar-editing) .room-hint { display: none; }
 body .stage-presence, body .companion-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; padding: 0; border: 0; }
 body .session-label { opacity: .75; }
-body .focus-reward { padding: 8px 11px; align-items: center; }
-body .time-toggle { min-width: 0; width: 38px; padding: 5px; }
 body .house-page .eyebrow, body .house-page .room-subtitle, body .house-fine-print, body .house-progress-copy, body .preset-note,
 body .room-travel small, body .celebration-note, body .pet-actions .performance-note, body .quality-options ~ .performance-note { display: none; }
 body .house-address, body .house-scene-caption, body .house-map-hint, body .house-room-link .house-slot-label, body .house-room-tag small, body .house-paper-top, body .house-description, body .house-owned-art small,

@@ -49,14 +49,14 @@ export default {
     await app.waitFor(`!document.body.classList.contains('is-focusing')`, { what: 'the pause' });
 
     check('the theme starts at night', await app.js('document.body.dataset.theme') === 'dusk' && await app.text('#time-toggle') === 'Night');
-    await app.clickSel('#time-toggle');
+    await t.steps.openMore(app); await app.clickSel('#time-toggle');
     await app.waitFor(`document.body.dataset.theme === 'day'`, { what: 'daylight' });
     check('the toggle switches to daylight', await app.text('#time-toggle') === 'Daylight' && await app.attr('#time-toggle', 'aria-label') === 'Switch to night' && (await app.saved())?.theme === 'day');
     await t.shot(app, 'day');
     await app.reload();
     await app.settle();
     check('daylight survives a reload', await app.js('document.body.dataset.theme') === 'day' && await app.text('#time-toggle') === 'Daylight');
-    await app.clickSel('#time-toggle');
+    await t.steps.openMore(app); await app.clickSel('#time-toggle');
     await app.waitFor(`document.body.dataset.theme === 'dusk'`, { what: 'night' });
     check('the toggle switches back to night', await app.text('#time-toggle') === 'Night' && (await app.saved())?.theme === 'dusk');
     await t.close(app);

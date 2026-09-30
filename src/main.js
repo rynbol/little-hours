@@ -27,6 +27,7 @@ import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
 import { createBuddyUI } from './features/buddy/index.js';
+import './ui/room-screen.css';
 import { installTestHook } from './dev/test-hook.js';
 import { stockBait } from './core/fishing.js';
 

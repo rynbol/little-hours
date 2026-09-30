@@ -22,7 +22,7 @@ test('focus mode keeps the whole room and starts, resumes and exits without rese
     return room.scene.meshes.filter(mesh => mesh.isEnabled() && !mesh.isDescendantOf(desk) && mesh.visibility > 0).length;
   })).toBeGreaterThan(40);
   await expect.poll(() => page.evaluate(() => { const room = window.__littleHours.room.diagnostics(); return room.companion.atDesk && room.companion.state === 'working'; })).toBe(true);
-  await expect(page.locator('.app-header')).toBeHidden(); await expect(page.locator('#focus-card')).toBeHidden();
+  await expect(page.locator('.room-heading')).toBeHidden(); await expect(page.locator('#focus-card')).toBeHidden();
   const deadline = (await state(page)).session.endsAt;
   await page.keyboard.press('Escape');
   await expect(focusing(page)).toHaveCount(0); await expect(page.locator('#focus-mode-enter')).toBeFocused();
@@ -41,7 +41,7 @@ test('focus mode keeps the whole room and starts, resumes and exits without rese
 test('entry closes pet care, and turning in the chair to find the pet lets a tap leave focus mode for care', { tag: '@dev-diagnostics' }, async ({ page }) => {
   await page.locator('#pet-button').click();
   expect(await page.evaluate(() => window.__littleHours.counts().engines)).toBe(2);
-  await page.locator('#focus-toggle').click();
+  await page.locator('#close-panel').click();
   await expect(page.locator('#room-panel')).toBeHidden();
   expect(await page.evaluate(() => window.__littleHours.counts().engines)).toBe(1);
   expect(await page.evaluate(() => window.__littleHours.petCloseup)).toBeNull();
@@ -104,7 +104,7 @@ test('another tab can pause the timer or replace the room without leaving focus 
   await expect(focusing(page)).toHaveCount(0); expect((await state(page)).session.running).toBe(false);
   await page.locator('#focus-mode-enter').click();
   await expect(focusing(page)).toHaveCount(1);
-  await other.locator('#time-toggle').click();
+  await other.locator('#room-more-toggle').click(); await other.locator('#time-toggle').click();
   await expect(focusing(page)).toHaveCount(0); expect((await state(page)).session.running).toBe(true);
   await other.close();
 });

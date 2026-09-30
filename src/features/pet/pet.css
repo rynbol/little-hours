@@ -1,8 +1,8 @@
 body.is-pet-care #focus-card { display: none; }
-body.is-pet-care .workspace, body.focus-collapsed.is-pet-care .workspace { grid-template-columns: minmax(0, 1fr) 330px; }
+body.is-pet-care .workspace { grid-template-columns: minmax(0, 1fr) 330px; }
 body:not(.is-avatar-editing) .room-panel[data-panel-kind='pet'] { position: sticky; inset: auto; top: 20px; align-self: start; width: 100%; max-width: none; max-height: calc(100svh - 40px); margin: 0; padding: 24px 20px 13px; border: 1px solid #fff8ed; border-radius: 27px; background: #faf5eb; color: #503e38; box-shadow: 0 18px 60px #120e202b, inset 0 1px #fff; overflow: auto; scrollbar-width: thin; }
 @media (min-width: 1000px) {
-  body.is-pet-care .workspace, body.focus-collapsed.is-pet-care .workspace { grid-template-columns: minmax(0, 1fr); }
+  body.is-pet-care .workspace { grid-template-columns: minmax(0, 1fr); }
   body:not(.is-avatar-editing) .room-panel[data-panel-kind='pet'] { position: fixed; inset: 0; z-index: 30; width: min(360px, calc(100% - 32px)); height: fit-content; margin: auto; box-shadow: 0 30px 90px #0a051466, inset 0 1px #fff; }
 }
 .room-panel[data-panel-kind='pet'] > .panel-heading { position: absolute; top: 9px; right: 9px; margin: 0; z-index: 1; }
@@ -106,7 +106,7 @@ body:not(.is-avatar-editing) .room-panel[data-panel-kind='pet'] { position: stic
   body:not(.is-avatar-editing) .room-panel[data-panel-kind='pet'] { position: relative; top: auto; width: min(440px, 100%); max-height: none; margin: 0 auto; overflow: visible; }
   body.is-pet-care .workspace { gap: 8px; padding-top: 8px; }
   body.is-pet-care .room-section { position: sticky; top: 64px; z-index: 2; background: #241f2b; }
-  body.is-pet-care .room-heading, body.is-pet-care #home-connections, body.is-pet-care .room-bottom { display: none; }
+  body.is-pet-care .room-heading, body.is-pet-care .room-bottom { display: none; }
   body.is-pet-care:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(230px, 34svh, 380px); }
   body.is-pet-care .room-panel[data-panel-kind='pet'] { margin-bottom: 24px; z-index: 1; }
   body.is-pet-care[data-theme='day'] .room-section { background: #2b2832; }

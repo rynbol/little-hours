@@ -4,18 +4,11 @@ import { blossomArt, coinArt } from '../ui/ui-art.js';
 export const shellMarkup = (audioPrefs) => `
   <a class="skip-link" href="#start-button">Skip to focus timer</a>
   <div class="app-shell">
-    <header class="app-header">
-      <a class="brand" href="/" aria-label="Little Hours home"><span>little hours<span class="brand-dot">.</span></span></a>
-      <div class="header-right"><button class="coin-wallet" id="coin-wallet" aria-label="Your house and coins">${coinArt()}<span id="coin-balance">0</span><span>coins</span></button><button class="time-toggle" id="time-toggle" aria-label="Switch to daylight" title="Switch to daylight">${icon('moon')}<span>Night</span></button><button class="focus-toggle" id="focus-toggle" aria-expanded="true" aria-controls="focus-card" aria-label="Hide focus panel">${icon('clock')}<span>Focus</span><span id="dock-timer">25:00</span></button></div>
-    </header>
     <main class="workspace">
       <section id="room-section" class="room-section" aria-labelledby="room-title">
-        <div class="room-heading"><div class="room-heading-identity"><div class="room-title-row"><h1 id="room-title" tabindex="-1">The twilight retreat</h1><button class="icon-button" id="rename-room" aria-label="Rename room" aria-controls="room-title-form" aria-expanded="false">${icon('build')}</button></div><form class="room-title-form" id="room-title-form" hidden><label class="sr-only" for="room-title-input">Room name</label><input id="room-title-input" maxlength="40" autocomplete="off" required><button id="save-room-title" type="submit">Save</button><button id="cancel-room-title" type="button">Cancel</button></form><p class="room-subtitle" id="room-subtitle" hidden></p></div><div class="heading-actions"><button class="mode-button" id="rooms-button" aria-label="Visit your house" aria-controls="house-page">${icon('home')}<span>My house</span></button><button class="mode-button" id="decorate-button" aria-label="Decorate" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button></div></div>
-        <nav id="home-connections" class="home-connections" aria-label="Move around your house">
-          <div class="room-route"><button id="previous-room" class="room-step" aria-label="Previous room">${icon('arrow')}</button><button id="room-switcher-toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="room-picker"><span class="room-route-map" aria-hidden="true"></span><span>Rooms</span><span id="room-route-count"></span><svg class="room-route-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3 3 3-3"/></svg></button><button id="next-room" class="room-step" aria-label="Next room">${icon('arrow')}</button></div>
-          <button class="home-wide" aria-pressed="false">${icon('home')}<span>Whole house</span></button>
-        </nav>
-        <div class="avatar-stage-heading"><span class="eyebrow">YOUR EVERYDAY KIND OF MAGIC</span><span class="avatar-pause-note" id="avatar-pause-note"></span></div>
+        <div class="room-heading"><div class="room-heading-identity"><div class="room-title-row"><h1 id="room-title" tabindex="-1">The twilight retreat</h1><button class="icon-button" id="rename-room" aria-label="Rename room" aria-controls="room-title-form" aria-expanded="false">${icon('build')}</button></div><form class="room-title-form" id="room-title-form" hidden><label class="sr-only" for="room-title-input">Room name</label><input id="room-title-input" maxlength="40" autocomplete="off" required><button id="save-room-title" type="submit">Save</button><button id="cancel-room-title" type="button">Cancel</button></form></div><div class="heading-actions"><span class="room-coins">${coinArt()}<span id="coin-balance">0</span><span class="sr-only">coins</span></span><button class="mode-button" id="rooms-button" aria-label="Visit your house" aria-controls="house-page">${icon('home')}<span>My house</span></button><button class="mode-button" id="decorate-button" aria-label="Decorate" aria-pressed="false" aria-controls="builder-panel">${icon('build')}<span>Decorate</span></button></div></div>
+        <div class="retired-navigation" hidden inert><button id="coin-wallet"></button><button id="previous-room"></button><button id="room-switcher-toggle"><span class="room-route-map"></span><span id="room-route-count"></span></button><button id="next-room"></button><button class="home-wide"><span></span></button></div>
+        <div class="avatar-stage-heading"><span class="avatar-pause-note" id="avatar-pause-note"></span></div>
         <div class="stage" id="stage">
           <div class="portrait-backdrop" aria-hidden="true"><span>✧</span><span>✦</span><span>✧</span></div>
           <div class="avatar-preview-controls" aria-label="Turn your avatar"><button id="avatar-turn-left" aria-label="Turn avatar left">${icon('rotate')}</button><span>Drag to turn</span><button id="avatar-turn-right" aria-label="Turn avatar right">${icon('rotate')}</button><button id="avatar-face-front">Face me</button></div>
@@ -35,13 +28,13 @@ export const shellMarkup = (audioPrefs) => `
         <div class="room-bottom">
           <div class="room-company">${icon('cat')}<span id="pet-company">You & Miso</span></div>
           <nav class="room-tools" aria-label="Room controls">
-            <button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Ambience</span></button>
             <button class="tool" id="pet-button" data-panel="pet" aria-expanded="false" aria-controls="room-panel">${icon('cat')}<span id="pet-button-label">Miso</span></button>
             <button class="tool" id="buddy-tool" aria-haspopup="dialog">${icon('leaf')}<span id="buddy-tool-label">Pip</span></button>
             <button class="tool" id="room-more-toggle" popovertarget="room-more" aria-label="More room controls"><span aria-hidden="true">···</span><span>More</span></button>
-            <div id="room-more" popover><button class="tool" id="reset-view" aria-label="Reset room view">${icon('reset')}<span>Reset view</span></button><button class="tool" id="avatar-button" data-panel="avatar" aria-expanded="false" aria-controls="room-panel">${icon('avatar')}<span>Avatar</span></button>
+            <div id="room-more" popover><button class="tool" id="time-toggle" aria-label="Switch to daylight" title="Switch to daylight">${icon('moon')}<span>Night</span></button><button class="tool" data-panel="atmosphere" aria-expanded="false" aria-controls="room-panel">${icon('sun')}<span>Ambience</span></button><button class="tool" id="reset-view" aria-label="Reset room view">${icon('reset')}<span>Reset view</span></button><button class="tool" id="avatar-button" data-panel="avatar" aria-expanded="false" aria-controls="room-panel">${icon('avatar')}<span>Avatar</span></button>
             <button class="tool" id="mini-button" aria-pressed="false">${icon('mini')}<span>Mini view</span></button>
-            <button class="tool" data-panel="performance" aria-label="Performance and quality" title="Performance and quality" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Quality</span></button></div>
+            <button class="tool" data-panel="performance" aria-label="Performance and quality" title="Performance and quality" aria-expanded="false" aria-controls="room-panel">${icon('gauge')}<span>Quality</span></button>
+            <button class="tool" id="save-status" data-panel="saves" aria-expanded="false" aria-controls="room-panel">${icon('check')}<span id="save-status-text">Saved on this device</span></button></div>
           </nav>
         </div>
         <div class="room-panel" id="room-panel" hidden></div>
@@ -70,19 +63,12 @@ export const shellMarkup = (audioPrefs) => `
         <p class="session-kind" id="session-kind" hidden></p>
         <div class="session-result" id="session-result" hidden><p id="session-result-copy"></p><div class="break-actions" role="group" aria-label="Take a break"><button class="quiet-button" data-break-minutes="5">5 min break</button><button class="quiet-button" data-break-minutes="15">15 min break</button></div></div>
         <p class="sr-only" id="timer-status" role="status" aria-live="polite" aria-atomic="true"></p>
-        <details id="focus-options" class="focus-disclosure"><summary>Session settings</summary>
         <label class="field-label sr-only" for="task">What you’re working on</label>
         <input id="task" maxlength="180" placeholder="What are you working on?" autocomplete="off" />
         <div class="sound-row"><button id="sound-button" class="sound-button" aria-pressed="false">${icon('rain')}<span>Soft rain<span class="sound-state" id="sound-state">Sound off</span></span><span class="sound-switch" aria-hidden="true"></span></button><label class="sr-only" for="volume">Rain volume</label><input type="range" id="volume" min="0" max="100" value="${audioPrefs.volume}" aria-label="Rain volume" disabled /><label class="chime-toggle"><span>Chime at the end</span><input type="checkbox" id="chime-toggle" ${audioPrefs.chime ? 'checked' : ''} /></label></div>
-        </details>
-        <details id="focus-progress" class="focus-disclosure"><summary>Your progress</summary>
-        <div id="focus-reward" class="focus-reward"></div>
-        <details class="session-journal"><summary><span>Today</span><span id="today-total">0 min</span></summary><div id="today-sessions"></div><div class="week-history" id="week-history"></div><p class="history-note">Up to 365 completed sessions stay on this device. Download a copy in Saved on this device.</p></details>
-        </details>
         <div class="daily-note" id="daily-note">Good things begin with a little time.</div>
       </aside>
     </main>
-    <footer class="app-footer"><span>A softer place to spend your hours.</span><button class="save-status" id="save-status" data-panel="saves" aria-expanded="false" aria-controls="room-panel"><span id="save-status-text">Saved on this device</span> <span aria-hidden="true">✧</span></button></footer>
   </div>
   <dialog id="room-picker" class="room-picker" aria-labelledby="room-picker-title">
     <div class="room-picker-heading"><h2 id="room-picker-title">Your little house</h2><button id="close-room-picker" aria-label="Close room picker">${icon('close')}</button></div>

@@ -4,12 +4,6 @@ import { petEntry } from '../../core/pets.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 
-const themeCopy = {
-  dusk: 'The candles are lit. Stay a little longer.',
-  rain: 'Raindrops, candlelight, and nowhere else to be.',
-  day: 'Sunlight on the books. A fresh little chapter.',
-};
-
 export function createRoomUI(app) {
   let compact = false, quality = 'auto', performanceStats = null, namingRoom = null, nameDraft = '';
 
@@ -23,13 +17,12 @@ export function createRoomUI(app) {
 
   function renderHeading() {
     const { state } = app, connected = app.nav.connected;
-    const design = roomDesign(state.layout), entry = activeHouseRoom(state.house);
+    const entry = activeHouseRoom(state.house);
     $('#room-title').textContent = connected ? state.house.name : roomDisplayName(entry);
     $('#rename-room').hidden = Boolean(connected);
     $('#rename-room').disabled = app.nav.travelling;
     if (namingRoom && (namingRoom !== entry.id || connected)) closeNameEditor($('#room-title-form').contains(document.activeElement));
     if (namingRoom && $('#room-title-input').value !== nameDraft) $('#room-title-input').value = nameDraft;
-    $('#room-subtitle').textContent = connected ? 'Your rooms, together. Choose a corner to step inside.' : design.style ? ({ sakura: 'Soft light. Cherry blossoms. Room to breathe.', cloud: 'Head in the clouds. Feet on a soft little rug.', metro: 'The city hums. Your little corner is quiet.' })[design.style] : themeCopy[state.theme];
   }
 
   // The room's accessible name says how to use it, with the current pet.

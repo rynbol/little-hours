@@ -17,7 +17,7 @@ test('the focus card has no serious automated accessibility issues', async ({ pa
 
 test('the saves panel has no serious automated accessibility issues', async ({ page }) => {
   await page.goto('/');
-  await page.locator('#save-status').click();
+  await page.locator('#room-more-toggle').click(); await page.locator('#save-status').click();
   await expect(page.locator('#download-backup')).toBeVisible();
   expect(serious(await scan(page))).toEqual([]);
 });
