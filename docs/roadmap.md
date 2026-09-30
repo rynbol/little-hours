@@ -40,6 +40,7 @@ Agreed on September 29, 2026, after a review of every view on main at `fa785c2`.
 | The room page | **The room is the whole screen.** The timer is an object in the room (a candle or a desk clock). Tap Miso or Pip in the room. One button for the house. |
 | Focus | **Time passes in the room.** The window sky moves from dusk to night, the candle burns down, the tea stops steaming, Miso falls asleep. A long session looks different from a short one. |
 | The reward | **Pip brings back real things.** Pip leaves when a session starts and returns with a find that is a piece of furniture for the room. The room becomes a record of study time. Coins stay in the background. |
+| Caught fish | **Fish you catch live in an aquarium in your room.** The aquarium shows each fish you have actually caught, using the same fish models as the pond. A new catch swims into the tank. It is another way the room records your time, and it gives fishing a reason beyond the journal. |
 | Completion | **A short scene in the room.** The candle goes out, Pip flies in through the window with the find, Miso comes to look. It can be skipped and it honours reduced motion. It is the first shot of the trailer. |
 | Companions | **Miso stays, Pip explores.** Miso keeps you company while you study. Pip goes away and comes back. Pet gifts and belongings stop overlapping with Pip. |
 | Breaks | **Breaks go outside.** A break is the time to fish, water the garden or walk the island, with a clear way back to studying. |
@@ -47,14 +48,14 @@ Agreed on September 29, 2026, after a review of every view on main at `fa785c2`.
 
 ### Cut
 
-The Rooms arrows and Whole house, Session settings and Your progress, Pip's colours, the pet's belongings and friendship sections, and the bait economy. The fish journal is under review. Cuts must keep old saves loading.
+The Rooms arrows and Whole house, Session settings and Your progress, Pip's colours, the pet's belongings and friendship sections, and the bait economy. The fish journal is under review, because the aquarium may replace it. Cuts must keep old saves loading.
 
 ### Order
 
 1. **One art style.** Rebuild the pond in the room's style with the player's own house, then bring the garden and island in line. Each step ends with before and after images for approval.
 2. **The room as the whole screen**, with the timer as a room object.
 3. **Time passing during focus.**
-4. **Pip's finds as furniture and the completion scene.**
+4. **Pip's finds as furniture and the completion scene.** The aquarium of caught fish belongs to this step. The fish models come from PR #11 and the aquarium from the `claude/aquarium-fish` work.
 5. **Companion roles, breaks outside and the first session.**
 6. **One continuous house** with the zoomed-out and zoomed-in views.
 
@@ -127,4 +128,4 @@ Changed on September 26, 2026: solo first, friends later (chunks 3 and 4). The i
 - Which server for sync and accounts. Decide before chunk 3.
 - Group size for study sessions with friends.
 - Whether the one continuous house (revamp step 6) should come before the room changes (steps 2 to 5).
-- Whether the fish journal stays.
+- Whether the aquarium replaces the fish journal.
