@@ -133,7 +133,7 @@ export function createBuddyUI(app) {
     const state = buddy(), current = buddyStage(state.minutes), next = nextBuddyStage(state.minutes), found = FINDS.filter(find => state.finds[find.id]).length;
     const progress = next ? Math.round(((state.minutes - current.minutes) / (next.minutes - current.minutes)) * 100) : 100;
     const focused = document.activeElement?.closest?.('#buddy-album') ? document.activeElement.dataset.focusKey : null;
-    album.innerHTML = `<div class="buddy-album-inner">
+    album.innerHTML = `<div class="buddy-album-inner"><div class="buddy-album-scroll">
       <header><div><h2 id="buddy-album-title">${escapeText(state.name)}’s finds</h2><p>${found} of ${FINDS.length} found</p>${app.state.session.running ? `<p class="buddy-album-status">${escapeText(state.name)} is off exploring until your timer ends ✦</p>` : ''}</div><button class="buddy-close" type="button" data-focus-key="close" aria-label="Close collection">${icon('close')}</button></header>
       <section class="buddy-profile" style="--buddy-body:${colorOf(state.color).body};--buddy-shade:${colorOf(state.color).shade};--buddy-cheek:${colorOf(state.color).cheek}">
         <div class="buddy-profile-art" id="buddy-closeup"></div>
@@ -149,7 +149,7 @@ export function createBuddyUI(app) {
         const owned = state.finds[find.id];
         return owned ? `<li class="buddy-find" data-tier="${find.tier}" aria-label="${escapeText(find.label)}, ${TIER_LABELS[find.tier]}, found ${owned.count} times">${findArt(find.id, true)}<strong>${escapeText(find.label)}</strong><small>×${owned.count}</small></li>` : `<li class="buddy-find is-unfound" data-tier="${find.tier}" aria-label="Not found yet, ${TIER_LABELS[find.tier]}">${findArt(find.id, false)}</li>`;
       }).join('')}</ul></section>`).join('')}
-    </div>`;
+    </div></div>`;
     const slot = album.querySelector('#buddy-closeup');
     if (closeupHost) slot.replaceWith(closeupHost); else { closeupHost = slot; closeup = createBuddyCloseup(closeupHost); }
     closeup.update({ colors: colorOf(state.color), stage: current.id, name: state.name });

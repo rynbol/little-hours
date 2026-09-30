@@ -25,7 +25,7 @@ export function petCardMarkup(state, now) {
     <p class="pet-bond-title">${level.title}</p>
     <div class="pet-care-actions">
       <button id="pet-now" data-pet-ritual="cuddle" aria-label="Pet ${petLabel}">${careIcon('heart')}<strong>Pet</strong></button>
-      <button id="pet-play" data-pet-ritual="play" aria-label="Play with ${petLabel}${care.playReady ? ', earn one heart' : `, heart in ${care.playMinutes} minutes`}">${careIcon('ball')}<strong>Play</strong>${care.playReady ? '' : `<small>${care.playMinutes}m ♡</small>`}</button>
+      <button id="pet-play" data-pet-ritual="play" aria-label="Play with ${petLabel}${care.playReady ? ', earn one heart' : `, heart in ${care.playMinutes} minutes`}">${careIcon('ball')}<strong>Play</strong><small>${care.playReady ? '+1 ♡' : `${care.playMinutes}m ♡`}</small></button>
       <button id="pet-feed" aria-expanded="false" aria-controls="pet-meals">${careIcon('food')}<strong>Feed</strong><small>${care.full ? 'Full' : `${MEAL_COST} ◉`}</small></button>
     </div>
     <div id="pet-meals" class="pet-meals" hidden>${PET_FOODS[id].map(food => `<button id="pet-meal-${food.id}" data-pet-meal="${food.id}" ${care.full || state.house.coins < MEAL_COST ? 'disabled' : ''}>${foodArt(food, fabric)}<span>${food.name}</span><small>${care.full ? `${care.mealMinutes}m` : `${MEAL_COST} ◉ · +1 ♡`}</small></button>`).join('')}<span class="pet-meal-note">${care.full ? `Full for ${care.mealMinutes} min` : state.house.coins < MEAL_COST ? `${MEAL_COST - state.house.coins} more coins` : `${state.house.coins} ◉`}</span></div>

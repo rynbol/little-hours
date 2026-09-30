@@ -4,7 +4,7 @@
 .speech-bubble[data-speaker='buddy'] .speech-text::after { border-color: #d9c8f0; }
 .is-decorating .speech-bubble[data-speaker='buddy'] { display: none; }
 
-.buddy-card { position: fixed; inset: 0; margin: auto; padding: 0; border: 0; background: transparent; width: min(360px, calc(100% - 32px)); height: fit-content; max-height: calc(100svh - 32px); overflow: auto; }
+.buddy-card { position: fixed; inset: 0; margin: auto; padding: 0; border: 0; border-radius: 26px; background: transparent; width: min(360px, calc(100% - 32px)); height: fit-content; max-height: calc(100svh - 32px); overflow: auto; }
 .buddy-card::backdrop, .buddy-album::backdrop { background: #21192733; }
 .buddy-card-inner { position: relative; padding: 22px 22px 20px; border-radius: 26px; color: var(--ui-ink, #4b3b40); background: linear-gradient(180deg, #fffaf1, #f4e9d9); border: 1px solid #fff9ed; box-shadow: 0 16px 50px #1c112938; text-align: center; }
 .buddy-close { position: absolute; right: 14px; top: 14px; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: #f0e4d6; color: var(--ui-ink, #4b3b40); cursor: pointer; }
@@ -24,7 +24,8 @@
 
 .buddy-album { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 24px 16px; border: 0; background: transparent; box-sizing: border-box; }
 .buddy-album[open] { display: grid; place-items: center; }
-.buddy-album-inner { position: relative; width: min(820px, 100%); max-height: calc(100svh - 48px); overflow-y: auto; box-sizing: border-box; padding: 26px 28px 30px; border-radius: 28px; color: var(--ui-ink, #4b3b40); background: var(--ui-paper, #faf4e9); box-shadow: 0 30px 90px #0a051480; }
+.buddy-album-inner { position: relative; display: flex; width: min(820px, 100%); max-height: calc(100svh - 48px); overflow: hidden; border-radius: 28px; color: var(--ui-ink, #4b3b40); background: var(--ui-paper, #faf4e9); box-shadow: 0 30px 90px #0a051480; }
+.buddy-album-scroll { flex: 1; overflow-y: auto; box-sizing: border-box; padding: 26px 28px 30px; scrollbar-width: thin; scrollbar-color: #d8c6b4 transparent; }
 .buddy-album header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
 .buddy-album header .buddy-close { position: static; flex: none; }
 .buddy-album h2 { margin: 0 0 4px; font-size: 28px; color: var(--ui-ink, #4b3b40); text-wrap: balance; }
@@ -48,7 +49,7 @@
 .buddy-growth { display: flex; justify-content: space-between; gap: 8px; margin: 0; font-size: 12px; color: var(--ui-subtle, #79666b); }
 .buddy-growth strong { font-size: 13px; color: var(--ui-ink, #4b3b40); }
 .buddy-growth-bar { height: 16px; margin-top: -4px; padding: 3px; border-radius: 999px; background: #eadccb; box-shadow: inset 0 1px 2px #8a6a5230; }
-.buddy-growth-bar i { position: relative; display: block; min-width: 10px; height: 100%; border-radius: inherit; background: linear-gradient(#ffffff80, #fff0 45%), linear-gradient(90deg, var(--buddy-body), var(--buddy-shade)); transition: width .6s ease; }
+.buddy-growth-bar i { position: relative; transform-origin: left center; display: block; min-width: 10px; height: 100%; border-radius: inherit; background: linear-gradient(#ffffff80, #fff0 45%), linear-gradient(90deg, var(--buddy-body), var(--buddy-shade)); transition: width .6s ease; }
 .buddy-growth-bar i::after { content: '✦'; position: absolute; right: -6px; top: 50%; transform: translateY(-52%); font-size: 13px; line-height: 1; color: #f2c56b; text-shadow: 0 0 4px #fff4d0; }
 .buddy-place { margin-top: 22px; }
 .buddy-place h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; font: 17px Georgia, serif; color: var(--ui-ink, #4b3b40); }
@@ -68,7 +69,7 @@
   .buddy-find { min-height: 92px; }
   .buddy-profile { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 18px 18px; background: radial-gradient(circle at 50% 70px, #fffaf0, #f3e8da 120px); }
   .buddy-profile-art { align-self: center; }
-  .buddy-album-inner { padding: 22px 18px 24px; }
+  .buddy-album-scroll { padding: 22px 18px 24px; }
 }
 @keyframes buddy-held-bob { 50% { transform: translateY(-4px) rotate(4deg); } }
 @media (prefers-reduced-motion: reduce) {

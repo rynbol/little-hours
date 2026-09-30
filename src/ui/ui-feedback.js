@@ -2,11 +2,28 @@ import './ui-motion.css';
 
 // One motion vocabulary for the app, including controls rebuilt by render().
 // Short, cancellable effects; no timer loop, layout animation, or avatar changes.
+const BEAT = [{ scale: '1' }, { scale: '1.3', offset: .3 }, { scale: '.94', offset: .55 }, { scale: '1.12', offset: .75 }, { scale: '1' }];
+const SPIN = [{ rotate: '0deg' }, { rotate: '360deg' }];
+const HOP = [{ translate: '0 0' }, { translate: '0 -6px', offset: .35 }, { translate: '0 0', offset: .65 }, { translate: '0 -2px', offset: .82 }, { translate: '0 0' }];
+const WIGGLE = [{ rotate: '0deg' }, { rotate: '-12deg', offset: .25 }, { rotate: '10deg', offset: .55 }, { rotate: '-4deg', offset: .8 }, { rotate: '0deg' }];
+const SQUISH = [{ scale: '1' }, { scale: '.9', offset: .25 }, { scale: '1.06', offset: .6 }, { scale: '1' }];
+const TILES = '[data-pet-fabric], [data-pet-ribbon], [data-pet-gift], [data-pet-meal], [data-pet-choice], [data-color]';
+const REACTIONS = [
+  ['#pet-now', 'svg', BEAT, 560],
+  ['#pet-play', 'svg', SPIN, 640],
+  ['#pet-feed', 'svg', HOP, 480],
+  ['#pet-invite, #pet-nap, #pet-edit-name, #buddy-edit-name, #buddy-card-collection', 'svg', WIGGLE, 460],
+  ['#pet-study, #pet-dance, .buddy-card .start-button', null, SQUISH, 380],
+  ['.pet-details > summary', '.pet-row-icon, .pet-row-swatch, .pet-gift-art, svg', HOP, 460],
+  [TILES, null, SQUISH, 380],
+];
+const PIP_DIALOGS = '#buddy-album, #buddy-card';
+
 export function createUIFeedback(root, { signal } = {}) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const animations = new Set(), particles = new Set(), keyed = new WeakMap();
   const app = root.querySelector('#app');
-  let disposed = false, pressed = null, lastBurst = 0, houseState = '';
+  let disposed = false, pressed = null, lastBurst = 0, houseState = '', petState = null, opening = null;
   const allowed = () => !disposed && !reducedMotion.matches && !document.hidden;
   const excluded = element => element?.closest('.is-avatar-editing, [data-panel="avatar"], .avatar-customizer, .wardrobe-panel');
   document.body.classList.add('ui-motion-enabled');
@@ -62,15 +79,15 @@ export function createUIFeedback(root, { signal } = {}) {
       ], { duration: large ? 1150 : 680, delay: i % 3 * 30 }, 'particle', () => { bit.remove(); particles.delete(bit); });
     }
   }
-  function control(event) {
-    const element = event.target.closest?.('button, summary, input[type="checkbox"], input[type="range"], a[download]');
-    return element && app.contains(element) && !element.disabled && !excluded(element) ? element : null;
-  }
+  const usable = element => element && (app.contains(element) || element.closest(PIP_DIALOGS)) && !element.disabled && !excluded(element) ? element : null;
+  const pressable = event => event.target.closest?.('button, summary, input[type="checkbox"], input[type="range"], a[download]');
+  const control = event => usable(pressable(event));
   function locateAgain(element) {
     if (element.isConnected) return element;
     if (element.id) return document.getElementById(element.id);
-    for (const name of ['data-house-slot', 'data-house-design', 'data-category', 'data-furniture', 'data-preset', 'data-pet-choice', 'data-room', 'data-art', 'data-tint', 'data-walls', 'data-floor', 'data-nudge', 'data-reset-design', 'data-quality', 'data-theme-choice']) {
-      if (element.hasAttribute(name)) return app.querySelector(`[${name}="${CSS.escape(element.getAttribute(name))}"]`);
+    const scope = element.closest('.buddy-album-inner') ? root.querySelector('#buddy-album') : app;
+    for (const name of ['data-house-slot', 'data-house-design', 'data-category', 'data-furniture', 'data-preset', 'data-pet-choice', 'data-room', 'data-art', 'data-tint', 'data-walls', 'data-floor', 'data-nudge', 'data-reset-design', 'data-quality', 'data-theme-choice', 'data-pet-fabric', 'data-pet-ribbon', 'data-pet-gift', 'data-pet-meal', 'data-color']) {
+      if (element.hasAttribute(name)) return scope.querySelector(`[${name}="${CSS.escape(element.getAttribute(name))}"]`);
     }
     return null;
   }
@@ -109,6 +126,52 @@ export function createUIFeedback(root, { signal } = {}) {
       }
     });
   }
+  function react(event) {
+    const element = pressable(event);
+    if (!element || !allowed()) return;
+    const target = usable(locateAgain(element));
+    if (!target) return;
+    const [, part, frames, duration] = REACTIONS.find(([selector]) => element.matches(selector)) || [];
+    if (target !== element && (!frames || part)) pop(target);
+    if (frames) animate(part ? target.querySelector(part) : target, frames, { duration, easing: 'cubic-bezier(.3,.7,.3,1.2)' }, part ? 'reaction' : 'press');
+    if (element.matches('summary') && !element.parentElement.open) opening = element.parentElement;
+    if (element.matches('#pet-feed')) requestAnimationFrame(() => stagger(root.querySelectorAll('#pet-meals:not([hidden]) > button'), 10));
+    if (element.matches('#pet-edit-name, #buddy-edit-name')) requestAnimationFrame(() => enter(root.querySelector('#pet-name-form:not([hidden]), .buddy-name-form:not([hidden])'), 0, 6));
+    if (element.matches('#pet-dance') && performance.now() - lastBurst > 180) { lastBurst = performance.now(); celebrate(target, true, true); }
+  }
+  function reveal(event) {
+    const details = event.target;
+    if (details !== opening || !details.open) return;
+    opening = null;
+    stagger([...details.children].filter(child => child.tagName !== 'SUMMARY').flatMap(child => child.matches('ol, .pet-options, .pet-gift-options, .pet-fabrics, .pet-ribbons') ? [...child.children] : [child]), 8);
+  }
+  function petReaction() {
+    const card = app.querySelector('#room-panel[data-panel-kind="pet"]:not([hidden]) .pet-card');
+    if (!card) { petState = null; return; }
+    const hearts = card.querySelectorAll('.pet-hearts i'), receipt = card.querySelector('#pet-ritual-status');
+    const next = { pet: card.dataset.petId, fills: [...hearts].map(heart => Number(heart.style.getPropertyValue('--fill'))), receipt: receipt?.textContent || '', title: card.querySelector('.pet-bond-title')?.textContent };
+    const previous = petState; petState = next;
+    if (!previous || previous.pet !== next.pet || !allowed()) return;
+    const grown = [...hearts].filter((heart, i) => next.fills[i] > (previous.fills[i] || 0));
+    grown.forEach((heart, i) => animate(heart, [{ scale: '.4' }, { scale: '1.35', offset: .55 }, { scale: '1' }], { duration: 520, delay: i * 60, easing: 'cubic-bezier(.3,.7,.3,1.2)' }, 'entrance'));
+    if (grown.length) celebrate(grown.at(-1), true);
+    if (next.receipt && next.receipt !== previous.receipt) animate(receipt, [{ opacity: 0, translate: '0 8px', scale: '.9' }, { opacity: 1, translate: '0 -2px', scale: '1.04', offset: .6 }, { opacity: 1, translate: '0 0', scale: '1' }], { duration: 420 }, 'entrance');
+    if (next.title !== previous.title) animate(card.querySelector('.pet-bond-title'), SQUISH, { duration: 420 }, 'entrance');
+  }
+  function pipOpened(records) {
+    if (!allowed()) return;
+    for (const { target } of records) {
+      if (!target.matches?.(PIP_DIALOGS) || !target.open) continue;
+      animate(target.firstElementChild, [{ opacity: 0, translate: '0 14px', scale: '.96' }, { opacity: 1, translate: '0 0', scale: '1' }], { duration: 300, easing: 'cubic-bezier(.2,.8,.3,1.1)' }, 'entrance');
+      if (target.id === 'buddy-card') animate(target.querySelector('.buddy-card-art .find-art'), [{ scale: '.3', rotate: '-20deg' }, { scale: '1.15', rotate: '6deg', offset: .6 }, { scale: '1', rotate: '0deg' }], { duration: 560, delay: 120, fill: 'backwards', easing: 'cubic-bezier(.3,.7,.3,1.2)' }, 'entrance');
+      else {
+        requestAnimationFrame(() => stagger(target.querySelectorAll('.buddy-find'), 10));
+        animate(target.querySelector('.buddy-growth-bar i'), [{ scale: '0 1' }, { scale: '1 1' }], { duration: 700, delay: 160, fill: 'backwards', easing: 'cubic-bezier(.2,.8,.3,1)' }, 'entrance');
+      }
+    }
+  }
+  const pipObserver = new MutationObserver(pipOpened);
+  pipObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
   function houseReaction() {
     const page = app.querySelector('#house-page');
     if (!page || page.hidden) { houseState = ''; return; }
@@ -137,12 +200,13 @@ export function createUIFeedback(root, { signal } = {}) {
   }
   const watchedPanels = '#builder-panel, #room-panel, #focus-card, #house-name-form, #session-celebration';
   const observer = new MutationObserver(records => {
-    let houseDirty = false, collectionDirty = false, inspectorDirty = false;
+    let houseDirty = false, collectionDirty = false, inspectorDirty = false, petDirty = false;
     const panels = new Set();
     for (const record of records) {
       const target = record.target;
       if (!(target instanceof Element)) continue;
       if (target.closest('#house-page')) houseDirty = true;
+      if (target.closest('#room-panel')) petDirty = true;
       if (record.type === 'childList') {
         if (target.id === 'collection-content') collectionDirty = true;
         if (target.id === 'selection-inspector') inspectorDirty = true;
@@ -151,6 +215,7 @@ export function createUIFeedback(root, { signal } = {}) {
       } else if (target.matches(watchedPanels) && !target.hidden && (!target.matches('dialog') || target.open)) panels.add(target);
     }
     if (houseDirty) houseReaction();
+    if (petDirty) petReaction();
     if (!allowed() || document.body.classList.contains('is-avatar-editing')) return;
     for (const panel of panels) {
       if (panel.hidden) continue;
@@ -172,8 +237,10 @@ export function createUIFeedback(root, { signal } = {}) {
   root.addEventListener('pointerup', release, { capture: true, signal });
   root.addEventListener('pointercancel', release, { capture: true, signal });
   root.addEventListener('click', onClick, { capture: true, signal });
+  window.addEventListener('click', react, { signal });
+  root.addEventListener('toggle', reveal, { capture: true, signal });
   window.addEventListener('blur', stop, { signal });
   reducedMotion.addEventListener('change', stop, { signal });
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); }, { signal });
-  return { celebrate, dispose() { disposed = true; observer.disconnect(); stop(); document.body.classList.remove('ui-motion-enabled', 'ui-reduced-motion'); } };
+  return { celebrate, dispose() { disposed = true; observer.disconnect(); pipObserver.disconnect(); stop(); document.body.classList.remove('ui-motion-enabled', 'ui-reduced-motion'); } };
 }
