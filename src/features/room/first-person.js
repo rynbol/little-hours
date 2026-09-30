@@ -49,7 +49,7 @@ export function createFirstPersonView(scene, canvas, { roomCamera, seat, roomFra
   camera.maxZ = 200; camera.layerMask = roomCamera.layerMask;
   const look = { yaw: SEAT_LOOK.restYaw, pitch: SEAT_LOOK.restPitch }, aim = { ...look };
   const current = { position: new Vector3(), target: new Vector3(), fov: 1, minZ: 1 };
-  let state = 'room', elapsed = 0, from = null, pose = null, drag = null, seconds = 0, inside = false;
+  let state = 'room', elapsed = 0, from = null, pose = null, drag = null, seconds = 0, inside = false, blend = 0;
 
   function seatFrame() {
     const direction = lookDirection(pose.forward, look.yaw, look.pitch + (state === 'seated' ? Math.sin(seconds * 1.1) * 0.006 : 0));
@@ -89,7 +89,7 @@ export function createFirstPersonView(scene, canvas, { roomCamera, seat, roomFra
     if (instant) finishLeaving();
   }
   function finishLeaving() {
-    pose = null; drag = null; scene.activeCamera = roomCamera;
+    pose = null; drag = null; blend = 0; scene.activeCamera = roomCamera;
     transition('room', false);
   }
 
@@ -99,10 +99,11 @@ export function createFirstPersonView(scene, canvas, { roomCamera, seat, roomFra
     pose.aspect = aspect;
     const follow = reducedMotion ? 1 : 1 - Math.exp(-dt * 9);
     look.yaw += (aim.yaw - look.yaw) * follow; look.pitch += (aim.pitch - look.pitch) * follow;
-    if (state === 'seated') { apply(seatFrame()); return Math.abs(aim.yaw - look.yaw) + Math.abs(aim.pitch - look.pitch) > 0.0005 || !reducedMotion; }
+    if (state === 'seated') { blend = 1; apply(seatFrame()); return Math.abs(aim.yaw - look.yaw) + Math.abs(aim.pitch - look.pitch) > 0.0005 || !reducedMotion; }
     elapsed += dt;
     const entering = state === 'entering', duration = entering ? SEAT_SECONDS.enter : SEAT_SECONDS.leave, t = Math.min(1, elapsed / duration);
     apply(blendFrame(from, entering ? seatFrame() : farRoomFrame(), t, current));
+    blend = entering ? Math.max(blend, ease(t)) : Math.min(blend, 1 - ease(t));
     const nextInside = Vector3.Distance(current.position, pose.eye) < BODY_CLEARANCE;
     if (t < 1) transition(state, nextInside);
     else if (entering) transition('seated', nextInside);
@@ -135,6 +136,7 @@ export function createFirstPersonView(scene, canvas, { roomCamera, seat, roomFra
     camera, enter, leave, update, prepareShaders,
     get state() { return state; },
     get inside() { return inside; },
+    get blend() { return blend; },
     get look() { return { ...look }; },
     dispose() {
       canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointermove', onPointerMove);
