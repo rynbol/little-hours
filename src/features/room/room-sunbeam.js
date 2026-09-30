@@ -15,7 +15,10 @@ float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f)
 void main() {
   float across = pow(sin(3.14159 * vUv.x), 1.6), along = smoothstep(0., .12, vUv.y) * (1. - smoothstep(.55, 1., vUv.y));
   float streak = .55 + .45 * noise(vec2(vSlice * 3.1 + vUv.x * 2., vUv.y * 1.5 - time * .05));
-  float a = across * along * streak * strength;
+  vec2 dust = vec2(vUv.x * 26. + vSlice * 7.3, vUv.y * 40. - time * .35);
+  vec2 cell = floor(dust), spot = fract(dust) - .5 + (vec2(hash(cell + 3.1), hash(cell + 8.7)) - .5) * .5;
+  float speck = step(.9, hash(cell)) * (1. - smoothstep(.06, .2, length(spot))) * (.5 + .5 * sin(time * 1.3 + hash(cell + 1.7) * 6.28));
+  float a = across * along * (streak + speck * 2.2) * strength;
   gl_FragColor = vec4(tint * a, a);
 }`;
 
