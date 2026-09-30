@@ -280,8 +280,15 @@ export function createRoom(container, options = {}) {
     }
     skyTexture.update(true);
   }
-  const windowFrame = material('#be9566'), windowDark = material('#634632'), glazing = material('#d7b572');
-  [-1, 1].forEach(side => box([0.18, archSpring - windowBottom, 0.34], [archCenter + side * archRadius, (archSpring + windowBottom) / 2, -4.43], windowFrame, 0.025));
+  const windowFrame = material('#8f6a4c'), windowDark = material('#634632'), glazing = material('#4d3f35');
+  [-1, 1].forEach(side => {
+    const x = archCenter + side * archRadius, height = archSpring - windowBottom, middle = (archSpring + windowBottom) / 2;
+    box([0.18, height, 0.34], [x, middle, -4.43], windowFrame, 0.025);
+    box([0.035, height, 0.3], [x - side * 0.1, middle, -4.43], windowDark);
+    for (const groove of [-0.045, 0.045]) box([0.018, height - 0.5, 0.012], [x + groove, middle, -4.255], windowDark);
+    box([0.3, 0.14, 0.44], [x, archSpring + 0.02, -4.43], windowFrame, 0.02);
+    box([0.28, 0.24, 0.42], [x, windowBottom + 0.12, -4.43], windowFrame, 0.02);
+  });
   const archPoints = []; for (let i = 0; i <= 32; i++) { const angle = i / 32 * Math.PI; archPoints.push([archCenter + Math.cos(angle) * archRadius, archSpring + Math.sin(angle) * archRadius, -4.43]); }
   tube(archPoints, 0.13, windowDark); tube(archPoints.map(([x, y, z]) => [x, y, z + 0.06]), 0.065, windowFrame);
   box([4.62, 0.18, 0.68], [archCenter, 1.45, -4.25], palette.wood, 0.045);

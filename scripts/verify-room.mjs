@@ -629,6 +629,11 @@ try {
     assert.equal(diagnostics().architectureStyle, style);
     const shell = scene.getTransformNodeByName(`architecture-${style}`); assert.ok(shell?.isEnabled());
     assert.equal(scene.getTransformNodeByName('architecture-retreat').isEnabled(), style === 'retreat');
+    if (style === 'retreat') {
+      const frameAt = (x, y) => scene.pickWithRay(new Ray(new Vector3(x, y, 0), new Vector3(0, 0, -1), 10), mesh => mesh.isEnabled() && mesh.isVisible && mesh.isDescendantOf(shell)).pickedMesh.material.diffuseColor;
+      const lightness = color => (Math.max(color.r, color.g, color.b) + Math.min(color.r, color.g, color.b)) / 2;
+      for (const [x, y] of [[-2.7, 3.3], [-2, 3.15]]) assert.ok(lightness(frameAt(x, y)) < 0.3, 'the glazing bars seen from the desk are dark iron, not bright gold');
+    }
     if (style !== 'retreat') {
       assert.ok(shell.getChildMeshes().length <= 6, 'architecture is batched into at most six meshes');
       for (const mesh of shell.getChildMeshes()) { assert.equal(mesh.isPickable, Boolean(mesh.metadata.lightSwitch), 'only accent lights take taps'); for (const value of mesh.getVerticesData('position')) assert.ok(Number.isFinite(value)); }

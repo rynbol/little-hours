@@ -38,6 +38,7 @@ Options:
   --scale <n>        device pixel ratio (default 2 for perf, 1 for shots)
   --turn <n>         house shots: press the turn buttons n times first (negative turns left)
   --closed           house shots: close the house first
+  --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
   --still            prefers-reduced-motion: reduce
   --headed           show the browser window
   --rounds <n>       perf rounds per side (default 1, or 2 with --against)
@@ -244,6 +245,11 @@ async function shots() {
       await sleep(Number(options.wait || 600));
       const file = await app.shot(join(out, `${name}-${list.length > 1 ? (side === list[0] ? 'this' : String(options.against).replace(/[^\w.-]+/g, '_')) : 'this'}.jpg`));
       console.log(`${side.label} ${name}: ${file}${app.errors.length ? `  page errors: ${app.errors.join(' | ').slice(0, 200)}` : ''}`);
+      if (options.pick) for (const point of String(options.pick).split(';')) {
+        const [x, y] = point.split(',').map(Number);
+        const hit = await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene, hit = scene.pick(${x}, ${y}, mesh => mesh.isEnabled() && mesh.isVisible); const mesh = hit?.pickedMesh; return mesh ? [mesh.name, mesh.material?.name, mesh.parent?.name].join(' | ') : 'nothing'; })()`);
+        console.log(`  pick ${x},${y}: ${hit}`);
+      }
     } finally { await app.close(); }
   }
   return 0;
