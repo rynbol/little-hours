@@ -24,7 +24,8 @@ export const FURNITURE = [
   { id: 'tea-cart', name: 'Brass tea cart', category: 'Storage', description: 'Two oak trays on little wheels: a teapot, cups and biscuits on top, books below. Tap it for a little tea break.', footprint: [1.25, 0.75], height: 1.045, use: { react: 'steam' }, color: '#bf9762', blocking: true },
   // Curios: a tap switches the aquarium's lid lamp and spins the globe; the
   // easel shows a picture of your choice, like the frames.
-  { id: 'fish-tank', name: 'Little aquarium', category: 'Curios', description: 'Three bright fish, sea grass and a stone arch in a tank on an oak stand. Tap it to switch the lid lamp.', footprint: [1.7, 0.8], height: 1.58, use: { toggle: 'lamp' }, color: '#8fc3bf', blocking: true },
+  { id: 'fish-tank', name: 'Little aquarium', category: 'Curios', description: 'Sea grass, a stone arch and three bright fish until you add your own from the pond. Tap it to switch the lid lamp.', footprint: [2.2, 0.9], height: 1.78, use: { toggle: 'lamp' }, color: '#8fc3bf', blocking: true },
+  { id: 'grand-tank', name: 'Grand aquarium', category: 'Curios', description: 'A long, deep tank on a four-door oak stand, with room for eight fish from the pond. Tap it to switch the lid lamp.', footprint: [3.4, 1.2], height: 2, use: { toggle: 'lamp' }, color: '#7fb6c4', blocking: true },
   { id: 'globe', name: 'Brass floor globe', category: 'Curios', description: 'A little painted world in a brass meridian, on a turned oak stand. Tap it to spin it.', footprint: [0.8, 0.8], height: 1.465, use: { react: 'spin' }, color: '#6f96ae', blocking: true },
   { id: 'easel', name: "Painter's easel", category: 'Curios', description: 'An oak easel with a canvas, a ledge and a jar of brushes. Pick the picture.', footprint: [1, 1], height: 2.1, arts: FRAME_ARTS, color: '#f1e6cf', blocking: true },
   // The pet's own bed: one per room, always kept, never counted as a piece.

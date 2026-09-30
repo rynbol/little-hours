@@ -76,6 +76,7 @@ function applyState(next, force = false) {
   app.houseUI?.render();
   app.lake.render();
   app.room?.setHouse(state.house);
+  if (force || previous.pond.tank.join() !== state.pond.tank.join()) app.room?.setTankFish(state.pond.tank);
   app.nav.renderConnections();
   app.roomUI.applyTheme(previous, force);
   if (document.activeElement !== $('#task') && !app.timer.taskPending && $('#task').value !== state.task) $('#task').value = state.task;

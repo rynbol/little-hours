@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rollCatch, baitRange, startFight, stepFight, SPECIES, TIERS, BAIT_RANGES, BAIT_LIMIT, stockBait } from './fishing.js';
+import { rollCatch, baitRange, startFight, stepFight, SPECIES, TIERS, BAIT_RANGES, BAIT_LIMIT, TANK_LIMIT, stockBait, emptyPond, normalizePond, toggleTank } from './fishing.js';
 import { createStateStore, restoreState, freshState } from './state.js';
 
 const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
@@ -70,8 +70,8 @@ test('landing a fish spends the bait and fills the journal, repeats count up', (
 });
 
 test('a broken saved pond is cleaned up', () => {
-  const pond = restoreState(JSON.stringify({ pond: { bait: [{ minutes: 3, at: 1 }, { minutes: 30, at: 2 }, 'x'], journal: { koi: { count: 2, best: 44, first: 9 }, dragon: { count: 1, best: 1, first: 1 }, perch: { count: -1 } }, log: [{ species: 'nope' }] } })).pond;
-  assert.deepEqual(pond, { bait: [{ minutes: 30, at: 2 }], journal: { koi: { count: 2, best: 44, first: 9 } }, log: [] });
+  const pond = restoreState(JSON.stringify({ pond: { bait: [{ minutes: 3, at: 1 }, { minutes: 30, at: 2 }, 'x'], journal: { koi: { count: 2, best: 44, first: 9 }, dragon: { count: 1, best: 1, first: 1 }, perch: { count: -1 } }, log: [{ species: 'nope' }], tank: ['koi', 'dragon', 'koi', 'perch'] } })).pond;
+  assert.deepEqual(pond, { bait: [{ minutes: 30, at: 2 }], journal: { koi: { count: 2, best: 44, first: 9 } }, log: [], tank: ['koi'] });
   assert.deepEqual(restoreState('{}').pond.bait, [{ minutes: 10, at: 0 }]);
 });
 
@@ -121,9 +121,9 @@ test('the fight runs on game time, so a slow machine plays the same fish as a fa
 test('undiscovered fish are twice as likely within their tier', () => {
   const journal = { minnow: { count: 1 }, perch: { count: 1 }, bluegill: { count: 1 } };
   const picks = [0, .3, .5, .6, .7, .9].map(draw => rollCatch(10, seq(.1, draw, .5), journal).species);
-  assert.deepEqual(picks, ['minnow', 'perch', 'bluegill', 'carp', 'carp', 'carp']);
-  assert.equal(rollCatch(10, seq(.1, .9, .5)).species, 'carp');
-  assert.equal(rollCatch(10, seq(.1, .6, .5)).species, 'bluegill');
+  assert.deepEqual(picks, ['minnow', 'bluegill', 'carp', 'carp', 'carp', 'puffer']);
+  assert.equal(rollCatch(10, seq(.1, .5, .5)).species, 'bluegill');
+  assert.equal(rollCatch(10, seq(.1, .7, .5)).species, 'carp');
 });
 
 test('landing a fish keeps the catch rolled when it was hooked', () => {
@@ -152,4 +152,23 @@ test('development stocking never displaces earned bait from a full or nearly ful
     assert.deepEqual(state.pond.bait.slice(0, count), earned);
     assert.deepEqual(restoreState(JSON.stringify(state)).pond.bait, state.pond.bait);
   }
+});
+
+test('caught fish go into the aquarium once each, up to eight, and come back out', () => {
+  const pond = emptyPond();
+  for (const [i, entry] of SPECIES.slice(0, 10).entries()) pond.journal[entry.id] = { count: 1, best: 5, first: i };
+  assert.equal(toggleTank(pond, 'glowfin'), null, 'an uncaught fish cannot go in');
+  assert.deepEqual(SPECIES.slice(0, 9).map(entry => toggleTank(pond, entry.id)), [true, true, true, true, true, true, true, true, null]);
+  assert.equal(pond.tank.length, TANK_LIMIT);
+  assert.equal(toggleTank(pond, 'perch'), false);
+  assert.equal(pond.tank.includes('perch'), false);
+  assert.equal(toggleTank(pond, SPECIES[8].id), true, 'a freed spot takes the next fish');
+  assert.deepEqual(normalizePond(JSON.parse(JSON.stringify(pond))).tank, pond.tank);
+});
+
+test('every species has a shape the models and the journal art can draw', () => {
+  const shapes = new Set(SPECIES.map(entry => entry.look.shape));
+  assert.deepEqual([...shapes].sort(), ['angel', 'betta', 'deep', 'eel', 'jelly', 'koi', 'long', 'puffer', 'round', 'slim', 'star', 'sturgeon']);
+  assert.equal(new Set(SPECIES.map(entry => entry.id)).size, SPECIES.length);
+  assert.deepEqual(SPECIES.filter(entry => entry.look.mark === 'rainbow').map(entry => entry.id), ['prism', 'glowfin']);
 });
