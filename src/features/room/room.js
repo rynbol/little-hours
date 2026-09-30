@@ -41,6 +41,7 @@ import { createRoomRoof } from '../../models/room-roofs.js';
 import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
+import { createPainterly } from '../../models/painterly.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -61,6 +62,7 @@ export function createRoom(container, options = {}) {
   scene.imageProcessingConfiguration.toneMappingEnabled = true;
   scene.imageProcessingConfiguration.toneMappingType = 1;
   scene.imageProcessingConfiguration.exposure = 1.08;
+  createPainterly(scene, 'interior');
   const targetHome = new Vector3(0, 2.15, 0), alphaHome = Math.atan2(12.4, 10.5), betaHome = 1.071;
   const camera = new ArcRotateCamera('whole-room-camera', alphaHome, betaHome, 19, targetHome.clone(), scene);
   camera.mode = Camera.ORTHOGRAPHIC_CAMERA;

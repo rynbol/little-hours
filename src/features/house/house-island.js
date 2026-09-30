@@ -10,8 +10,8 @@ export const STREAMS = Object.freeze([
 ]);
 const TOP = -.175, SEGMENTS = 72, RINGS = 7;
 const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
-const lawn = ['#91ba76', '#a4c780', '#7da66c', '#b5ce8b'];
-const rim = '#82a96b', lip = '#6e945f';
+const lawn = ['#7aa046', '#8cb24e', '#6b9140', '#a3c35c'];
+const rim = '#6f9640', lip = '#5b7f3a';
 
 export function edgePoint(a, scale = 1) {
   const { cx, cz, rx, rz, power } = ISLAND, c = Math.cos(a), s = Math.sin(a);
@@ -97,7 +97,6 @@ export function buildIsland(api) {
 
   buildPaths(api);
 
-  for (const [x, y, z, s, i] of [[-6.2, -2.7, 3.7, 1.1, 0], [4.4, -4.2, 4.4, 1.25, 1], [10.4, -3.3, 3.4, .85, 0], [-8.9, -.7, -1.6, .65, 1]]) asset(i ? 'cloud-b' : 'cloud-a', { x, y, z, yaw: .45 + (hash(x) - .5) * .3, scale: s });
 }
 
 export function waterfalls(drop = 3.3) {
