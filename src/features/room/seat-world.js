@@ -293,9 +293,13 @@ function buildBirds(shape) {
 
 function buildClouds(shape) {
   const random = seeded(19);
-  for (let i = 0; i < 11; i++) {
-    const a = i / 11 * Math.PI * 2 + random() * 0.3, r = 115 + random() * 40, x = Math.cos(a) * r, z = Math.sin(a) * r, y = 22 + random() * 26;
-    for (let puff = 0; puff < 5; puff++) { const s = 7 + random() * 7; shape.blob(x + (puff - 2) * s * 0.9 * -Math.sin(a), y + Math.sin(puff) * 1.6, z + (puff - 2) * s * 0.9 * Math.cos(a), s, s * 0.45, s, 'cloudShade', 'cloud', 0.75, 4, 9); }
+  const bearings = [-1.25, -0.95, -0.62, -0.3, 0.02, 0.3, 0.55, 0.9, 1.6, 2.3, 3, -2.2, -3];
+  for (const b of bearings) {
+    const a = b + (random() - 0.5) * 0.12, r = 120 + random() * 38, x = Math.sin(a) * r, z = -Math.cos(a) * r, y = 19 + random() * 11, size = 6 + random() * 4;
+    const along = [Math.cos(a), Math.sin(a)], puff = (u, lift, s, stretch = 1) => shape.blob(x + along[0] * u, y + lift, z + along[1] * u, s * stretch, s * 0.62, s * 0.8, 'cloudShade', 'cloud', 0.7, 5, 10);
+    for (let k = -2; k <= 2; k++) puff(k * size * 0.9, 0, size * (0.9 + random() * 0.3), 1.35);
+    for (let k = -1; k <= 1; k++) puff(k * size * 0.95 + (random() - 0.5) * 2, size * 0.75, size * (1 + random() * 0.35));
+    puff((random() - 0.5) * size, size * 1.45, size * (0.8 + random() * 0.3));
   }
 }
 
@@ -478,7 +482,7 @@ export function createSeatWorld(scene, parent) {
     mesh.updateVerticesData('color', colors);
   }
   function placeMoon() {
-    const rise = moonRise(progress), heading = -Math.PI / 2 - 0.55, d = 165;
+    const rise = theme === 'day' ? 0.95 : moonRise(progress), heading = -Math.PI / 2 - 0.55, d = 165;
     glow.x = Math.cos(heading); glow.z = Math.sin(heading);
     moon.position.set(Math.cos(heading) * Math.cos(rise) * d, Math.sin(rise) * d, Math.sin(heading) * Math.cos(rise) * d);
     moon.lookAt(Vector3.Zero()); moon.scaling.setAll(theme === 'day' ? 0.8 : 1.2);

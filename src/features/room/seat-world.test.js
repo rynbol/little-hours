@@ -100,3 +100,15 @@ test('wind grass grows outside the room, only its tips bend, and it holds still 
   assert.equal(paint._floats.time, swaying);
   engine.dispose();
 });
+
+test('cumulus bank up in the view from the chair, and the day sun stays out of the window', () => {
+  const { engine, world } = setup();
+  world.setTheme('day'); world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-clouds').metadata;
+  let inView = 0;
+  for (let i = 0; i < shape.roles.length; i++) { const bearing = Math.atan2(shape.positions[i * 3], -shape.positions[i * 3 + 2]); if (bearing > -1.3 && bearing < 0.95) inView++; }
+  assert.ok(inView / shape.roles.length > 0.5, `${Math.round(inView / shape.roles.length * 100)}% of cloud in view`);
+  const sun = world.meshes.find(mesh => mesh.name === 'seat-world-moon');
+  assert.ok(sun.position.y / Math.hypot(sun.position.x, sun.position.z) > 1, 'the day sun rides high above the window');
+  engine.dispose();
+});
