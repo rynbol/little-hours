@@ -63,27 +63,27 @@ def chair(cloth=SAGE, frame_wood=DARK, arm=WOOD):
 
 def laptop():
     f = Frame((0, 1.29, -0.43))
-    shell = '#777f72'
+    shell = '#b3a189'
     parts = [rbox([0.97, 0.04, 0.62], (0, 0, 0), shell, bevel=0.018, surface='metal', layer='metal', frame=f),
-             rbox([0.72, 0.006, 0.26], (0, 0.021, -0.07), '#3f463f', bevel=0.004, frame=f),
-             rbox([0.28, 0.004, 0.14], (0, 0.021, 0.19), '#9ea492', bevel=0.01, surface='metal', layer='metal', frame=f)]
+             rbox([0.72, 0.006, 0.26], (0, 0.021, -0.07), '#4a3f36', bevel=0.004, frame=f),
+             rbox([0.28, 0.004, 0.14], (0, 0.021, 0.19), '#c7b89e', bevel=0.01, surface='metal', layer='metal', frame=f)]
     for row in range(5):
         keys = 13 if row < 4 else 9
         for k in range(keys):
             w = 0.044 if row < 4 else (0.2 if k == 4 else 0.044)
             x = -0.3 + k * 0.05 if row < 4 else [-0.3, -0.25, -0.2, -0.15, 0.0, 0.15, 0.2, 0.25, 0.3][k]
             parts.append(rbox([w, 0.01, 0.038], (x, 0.026, -0.17 + row * 0.048), '#e9e4d2' if (row, k) != (2, 6) else '#d9b07a', bevel=0.004, segments=2, frame=f))
-    lid = Frame((0, 0.022, -0.29), (-0.12, 0, 0), f)
+    lid = Frame((0, 0.022, -0.29), (-0.28, 0, 0), f)
     parts.append(rbox([0.97, 0.62, 0.03], (0, 0.31, 0), shell, bevel=0.016, surface='metal', layer='metal', frame=lid))
-    parts.append(rbox([0.9, 0.56, 0.006], (0, 0.31, 0.016), '#262b28', bevel=0.004, frame=lid))
-    parts.append(rbox([0.86, 0.51, 0.004], (0, 0.31, 0.02), '#cfd9bd', bevel=0.002, layer='glow', frame=lid))
-    parts.append(rbox([0.2, 0.44, 0.004], (-0.3, 0.31, 0.023), '#b4c4a4', bevel=0.002, layer='glow', frame=lid))
-    parts.append(rbox([0.54, 0.42, 0.004], (0.12, 0.31, 0.023), '#f3eedb', bevel=0.002, layer='glow', frame=lid))
-    parts.append(rbox([0.3, 0.02, 0.003], (0.04, 0.47, 0.026), '#7f9474', bevel=0.001, layer='glow', frame=lid))
+    parts.append(rbox([0.9, 0.56, 0.006], (0, 0.31, 0.016), '#2b2420', bevel=0.004, frame=lid))
+    parts.append(rbox([0.86, 0.51, 0.004], (0, 0.31, 0.02), '#efe2c4', bevel=0.002, layer='glow', frame=lid))
+    parts.append(rbox([0.2, 0.44, 0.004], (-0.3, 0.31, 0.023), '#e3cfa8', bevel=0.002, layer='glow', frame=lid))
+    parts.append(rbox([0.54, 0.42, 0.004], (0.12, 0.31, 0.023), '#fbf3df', bevel=0.002, layer='glow', frame=lid))
+    parts.append(rbox([0.3, 0.02, 0.003], (0.04, 0.47, 0.026), '#a97b52', bevel=0.001, layer='glow', frame=lid))
     for i in range(7):
-        parts.append(rbox([0.42 if i < 6 else 0.22, 0.008, 0.003], (0.12 if i < 6 else 0.02, 0.43 - i * 0.04, 0.026), '#aab89c', bevel=0.001, layer='glow', frame=lid))
+        parts.append(rbox([0.42 if i < 6 else 0.22, 0.008, 0.003], (0.12 if i < 6 else 0.02, 0.43 - i * 0.04, 0.026), '#cdb48c', bevel=0.001, layer='glow', frame=lid))
     for i in range(4):
-        parts.append(rbox([0.13 - i * 0.015, 0.012, 0.003], (-0.3, 0.46 - i * 0.05, 0.026), '#7f9474', bevel=0.001, layer='glow', frame=lid))
+        parts.append(rbox([0.13 - i * 0.015, 0.012, 0.003], (-0.3, 0.46 - i * 0.05, 0.026), '#a97b52', bevel=0.001, layer='glow', frame=lid))
     parts.append(sphere((0.05, 0.05, 0.004), (0.2, 0.36, -0.017), '#e8c079', subdivisions=2, frame=lid))
     parts.append(sphere((0.022, 0.034, 0.004), (0.2, 0.43, -0.018), '#8fa878', subdivisions=2, frame=lid))
     return parts

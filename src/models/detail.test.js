@@ -64,3 +64,19 @@ test('every detailed model keeps the size and place of the dollhouse piece it st
   }
   disposeDetails(scene); engine.dispose();
 });
+
+test('the study laptop is warm champagne with a sepia screen, in both the detailed and the dollhouse desk', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const warm = hex => { const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)); return r > g && g > b; };
+  const { palette } = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-metal').metadata;
+  assert.ok(palette.includes('#b3a189') && warm('#b3a189') && !palette.includes('#777f72'), 'detailed laptop shell');
+  const glow = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-glow');
+  const colors = glow.getVerticesData('color'), tints = new Set();
+  for (let i = 0; i < colors.length; i += 4) tints.add(colors[i] >= colors[i + 2] ? 'warm' : 'cool');
+  assert.deepEqual([...tints], ['warm'], 'every lit part of the desk glows warm');
+  const near = (colors, i) => Math.abs(colors[i] - 0xb3 / 255) + Math.abs(colors[i + 1] - 0xa1 / 255) + Math.abs(colors[i + 2] - 0x89 / 255) < 0.02;
+  const shell = createFurniture('study-desk', scene).getChildMeshes().some(mesh => { const colors = mesh.getVerticesData('color'); if (colors) { for (let i = 0; i < colors.length; i += 4) if (near(colors, i)) return true; } const paint = mesh.material?.diffuseColor; return paint && near([paint.r, paint.g, paint.b], 0); });
+  assert.ok(shell, 'the dollhouse laptop shares the champagne shell');
+  disposeDetails(scene); engine.dispose();
+});
