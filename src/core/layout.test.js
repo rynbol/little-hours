@@ -200,16 +200,23 @@ test('fire flickers independently without moving the mantel or changing shared m
     const otherNeutral = Array.from(secondFlames.getVerticesData('position'));
     const stone = first.getChildMeshes().find(mesh => !mesh.metadata?.dynamic);
     const stonePositions = Array.from(stone.getVerticesData('position'));
-    const glow = firstFlames.material.emissiveColor.asArray();
+    const paint = firstFlames.material;
     assert.equal(first.getChildMeshes().length, 4, 'flames and embers each use one batched draw call');
     assert.equal(firstFlames.isEnabled(), true);
     assert.notEqual(firstFlames.geometry, secondFlames.geometry, 'animated buffers belong to each instance');
     assert.equal(firstFlames.material, secondFlames.material, 'unchanging material stays shared');
     first.metadata.animate(1.7, false, false);
+    const reach = firstFlames.getBoundingInfo().boundingBox.maximum.y;
+    for (const seconds of [0.3, 1.1, 2.9, 4.4, 6.2]) {
+      first.metadata.animate(seconds, false, false);
+      const lifted = firstFlames.getVerticesData('position').filter((_, i) => i % 3 === 1);
+      assert.ok(Math.max(...lifted) <= reach, 'leaping flames stay inside their culling bounds');
+    }
+    first.metadata.animate(1.7, false, false);
     assert.notDeepEqual(Array.from(firstFlames.getVerticesData('position')), neutral);
     assert.deepEqual(Array.from(secondFlames.getVerticesData('position')), otherNeutral);
     assert.deepEqual(Array.from(stone.getVerticesData('position')), stonePositions);
-    assert.deepEqual(firstFlames.material.emissiveColor.asArray(), glow);
+    assert.equal(firstFlames.material, paint, 'flickering never swaps the shared flame paint');
     first.metadata.animate(22, false, true);
     assert.deepEqual(Array.from(firstFlames.getVerticesData('position')), neutral);
     first.metadata.animate(123, false, true);

@@ -8,6 +8,8 @@ import { CreateLineSystem } from '@babylonjs/core/Meshes/Builders/linesBuilder.j
 import { CreateTube } from '@babylonjs/core/Meshes/Builders/tubeBuilder.js';
 import { CreatePlane } from '@babylonjs/core/Meshes/Builders/planeBuilder.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
+import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
+import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Vector3, Vector4, Quaternion, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 import { Curve3 } from '@babylonjs/core/Maths/math.path.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
@@ -1091,20 +1093,47 @@ function createSpinningRecord(parent) {
   return (seconds, focused, reducedMotion) => { if (!parent.metadata.off) record.rotation.y = reducedMotion ? 0 : seconds * 1.25 % (Math.PI * 2); };
 }
 
+const FLAME_VERTEX = `precision highp float;
+attribute vec3 position; attribute vec2 uv; uniform mat4 world, viewProjection; varying vec2 vUv;
+void main() { vUv = uv; gl_Position = viewProjection * world * vec4(position, 1.); }`;
+const FLAME_FRAGMENT = `precision highp float;
+varying vec2 vUv; uniform float time;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(hash(i), hash(i + vec2(1., 0.)), f.x), mix(hash(i + vec2(0., 1.)), hash(i + vec2(1., 1.)), f.x), f.y); }
+void main() {
+  float v = vUv.y, lick = noise(vec2(vUv.x * 1.7 + 4., v * 3.2 - time * 2.4)) - .5;
+  float u = abs(vUv.x + lick * .55 * v);
+  float reach = pow(1. - v, .75) * smoothstep(0., .18, v) + (1. - smoothstep(0., .18, v)) * .85;
+  float body = 1. - smoothstep(reach * .72, reach, u + (noise(vec2(vUv.x * 4., v * 6. - time * 3.1)) - .5) * .18 * v);
+  float core = 1. - smoothstep(0., reach * .7 + .02, u * (1. + v * .8));
+  vec3 color = mix(vec3(1., .36, .1), vec3(1., .66, .24), smoothstep(.0, .55, core));
+  color = mix(color, vec3(1., .97, .8), smoothstep(.4, .95, core) * (1. - v * .5));
+  float a = body * (1. - smoothstep(.75, 1., v) * .6);
+  gl_FragColor = vec4(color * a, a);
+}`;
+export const HEARTH_TONGUES = Object.freeze([
+  [-0.40, 0.08, 0.30, 0.52], [-0.20, 0.02, 0.34, 0.72], [0.0, 0.10, 0.38, 0.84], [0.19, 0.03, 0.34, 0.68], [0.39, 0.08, 0.30, 0.50], [-0.08, -0.04, 0.56, 0.58], [0.12, -0.05, 0.52, 0.62],
+]);
+
 function createDancingFire(parent) {
-  const scene = parent.getScene(), templates = cacheFor(scene).templates;
+  const scene = parent.getScene(), templates = cacheFor(scene).templates, batches = cacheFor(scene).batches;
   if (!templates.has('dancing-fire')) {
-    const source = new TransformNode('flame-source', scene), ranges = [];
-    let vertexOffset = 0;
-    for (let i = 0; i < 7; i++) {
-      const height = 0.28 + (i % 3) * 0.11;
-      const flame = cylinder(source, 0.005, 0.092, height, [-0.48 + i * 0.155, 0.39 + height / 2, 0.10 - (i % 2) * 0.075], i % 2 ? '#ffb85e' : '#ffd58a', candleGlow);
-      flame.rotation.z = (i % 2 ? -1 : 1) * 0.13;
-      ranges.push({ start: vertexOffset, end: vertexOffset + flame.getTotalVertices(), height, phase: i * 1.41 });
-      vertexOffset += flame.getTotalVertices();
-    }
-    const template = batch(source); template.metadata = { ranges }; template.setEnabled(false);
-    templates.set('dancing-fire', template);
+    const paint = new ShaderMaterial('hearth-flame-paint', scene, { vertexSource: FLAME_VERTEX, fragmentSource: FLAME_FRAGMENT }, { attributes: ['position', 'uv'], uniforms: ['world', 'viewProjection', 'time'], needAlphaBlending: true });
+    paint.backFaceCulling = false; paint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; paint.disableDepthWrite = true; paint.setFloat('time', 0);
+    batches.set('hearth-flame-paint', paint);
+    const positions = [], uvs = [], indices = [], ranges = [];
+    HEARTH_TONGUES.forEach(([x, z, width, height], i) => {
+      const start = positions.length / 3;
+      positions.push(x - width / 2, 0.39, z, x + width / 2, 0.39, z, x + width / 2, 0.39 + height, z, x - width / 2, 0.39 + height, z);
+      uvs.push(-1, 0, 1, 0, 1, 1, -1, 1);
+      indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+      ranges.push({ start, end: start + 4, height, phase: i * 1.41 });
+    });
+    const source = new Mesh('flame-source', scene), data = new VertexData();
+    Object.assign(data, { positions, uvs, indices }); data.applyToMesh(source, true);
+    source.material = paint;
+    const holder = new TransformNode('flame-template', scene); source.parent = holder; holder.metadata = { ranges }; holder.setEnabled(false);
+    templates.set('dancing-fire', holder);
   }
   const template = templates.get('dancing-fire');
   const fire = template.getChildMeshes()[0].clone('dancing-hearth-flames', parent);
@@ -1112,7 +1141,7 @@ function createDancingFire(parent) {
   fire.makeGeometryUnique(); fire.markVerticesDataAsUpdatable('position', true);
   fire.metadata = { dynamic: true, effect: 'hearth-flames' };
   fire.isPickable = false; fire.receiveShadows = false;
-  fire.setBoundingInfo(new BoundingInfo(new Vector3(-0.7, 0.3, -0.14), new Vector3(0.7, 1.1, 0.25)));
+  fire.setBoundingInfo(new BoundingInfo(new Vector3(-0.7, 0.3, -0.14), new Vector3(0.7, 1.45, 0.25)));
   const neutral = new Float32Array(fire.getVerticesData('position'));
   const positions = new Float32Array(neutral);
   let resting = true;
@@ -1136,6 +1165,7 @@ function createDancingFire(parent) {
       }
     }
     fire.updateVerticesData('position', positions, false, false);
+    fire.material.setFloat('time', seconds);
   };
 }
 
