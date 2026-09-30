@@ -16,7 +16,7 @@ export default {
       await app.clickSel(`[data-theme-choice="${theme}"]`); await app.settle();
       const view = await backdrop(app); skies.push(view.sky);
       t.check(`${theme} has its own scenery without horizontal scrolling`, view.sky.includes('gradient') && !view.overflow, view);
-      if (theme === 'day') t.check('daylight uses dark, readable heading text', view.ink === 'rgb(70, 83, 75)', view.ink);
+      if (theme === 'day') t.check('daylight keeps the light heading ink on its glass pill', view.ink === 'rgb(243, 234, 225)', view.ink);
     }
     t.check('all three themes use different skies', new Set(skies).size === 3);
     await app.clickSel('[data-theme-choice="day"]'); await app.key('Escape');

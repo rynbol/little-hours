@@ -312,7 +312,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
   .sound-row { padding-top: 10px; margin-top: 12px; }
   body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(320px, calc(100svh - 330px), 820px); }
 }
-body.is-decorating:not(.is-avatar-editing) .room-bottom { display: none; }
+body.is-decorating:not(.is-avatar-editing) :is(.room-bottom, #room-more-toggle) { display: none; }
 body.is-decorating:not(.is-avatar-editing) .workspace { padding-top: 10px; }
 body.is-decorating:not(.is-avatar-editing) .room-heading { min-height: 52px; }
 body.is-decorating:not(.is-avatar-editing) .room-heading h1 { font-size: 28px; }

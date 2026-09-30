@@ -65,7 +65,7 @@ test('a long room name keeps the phone heading readable', async ({ page }) => {
     return { width: rect.width, height: rect.height, right: rect.right, left: rect.left };
   }));
   for (const control of controls) {
-    expect(control.width).toBeGreaterThanOrEqual(40);
+    expect(control.width).toBeGreaterThanOrEqual(44);
     expect(control.height).toBeGreaterThanOrEqual(44);
     expect(control.left).toBeGreaterThanOrEqual(0);
     expect(control.right).toBeLessThanOrEqual(390);

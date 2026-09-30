@@ -1,2 +1,50 @@
 .room-coins { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; color: var(--chrome-ink); font-size: 12px; }
 .room-coins .ui-art { width: 20px; height: 20px; }
+
+body:not(.is-decorating):not(.is-avatar-editing):not(.is-pet-care):not(.is-connected):not(.is-focus-mode) {
+  --hud-surface: #201d28a8;
+  --hud-line: #f4e9e33d;
+  --hud-ink: #f3eae1;
+  --hud-hover: #403643e8;
+  --hud-gutter: 12px;
+
+  &:not(.is-house) .app-shell { width: 100%; max-width: none; padding: 0; }
+  &:not(.is-house) .workspace { display: block; min-height: 0; padding: 0; }
+  & .room-section { position: fixed; inset: 0; }
+  & #stage { position: fixed; inset: 0; z-index: 0; width: 100vw; height: 100vh; height: 100svh; border: 0; border-radius: 0; }
+
+  & .room-heading { position: fixed; z-index: 20; top: max(var(--hud-gutter), env(safe-area-inset-top)); left: max(var(--hud-gutter), env(safe-area-inset-left)); right: max(var(--hud-gutter), env(safe-area-inset-right)); min-height: 0; padding: 0; gap: 8px; align-items: flex-start; pointer-events: none; }
+  & .room-heading > * { pointer-events: auto; }
+  & .room-heading-identity { flex: 0 1 auto; }
+  & :is(.room-title-row:not([hidden]), .room-title-form:not([hidden]), .heading-actions, .room-tools) { border: 1px solid var(--hud-line); border-radius: 999px; background: var(--hud-surface); box-shadow: 0 6px 28px #0c091342; backdrop-filter: blur(12px); }
+  & .room-title-row:not([hidden]) { gap: 2px; padding: 0 2px 0 16px; }
+  & .room-title-form:not([hidden]) { padding: 1px 3px 1px 1px; }
+  & .room-heading h1 { overflow: hidden; color: var(--hud-ink); font-size: 18px; line-height: 44px; letter-spacing: -.2px; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+  & #rename-room { color: var(--hud-ink); opacity: .8; }
+
+  & .heading-actions { gap: 2px; width: auto; margin: 0 0 0 auto; padding: 1px; }
+  & .heading-actions .room-coins { color: var(--hud-ink); }
+  & .heading-actions > :is(#rooms-button, #decorate-button, #room-more-toggle) { min-width: 44px; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 999px; background: transparent; box-shadow: none; color: var(--hud-ink); }
+  & .heading-actions > :is(#rooms-button, #decorate-button, #room-more-toggle):is(:hover, :focus-visible) { background: var(--hud-hover); }
+  & #room-more-toggle > span { display: inline; font-size: 20px; line-height: 16px; letter-spacing: 1px; }
+
+  & .room-bottom { position: fixed; z-index: 20; left: max(var(--hud-gutter), env(safe-area-inset-left)); bottom: max(var(--hud-gutter), env(safe-area-inset-bottom)); min-height: 0; margin: 0; }
+  & .room-tools { display: flex; gap: 2px; width: auto; padding: 1px; }
+  & .room-tools > .tool { flex-direction: row; gap: 7px; min-width: 44px; min-height: 44px; padding: 6px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--hud-ink); }
+  & .room-tools > .tool:is(:hover, :focus-visible) { background: var(--hud-hover); }
+  & :is(.room-tools, .heading-actions) svg { color: var(--hud-ink); }
+  & .room-panel { bottom: 76px; }
+
+  @media (min-width: 1000px) {
+    & #focus-card { position: fixed; z-index: 15; top: 76px; right: 16px; max-height: calc(100svh - 92px); overflow-y: auto; }
+  }
+  @media (max-width: 999px) {
+    &:not(.is-house) .workspace { padding-top: 100svh; }
+    & .room-bottom { bottom: calc(max(var(--hud-gutter), env(safe-area-inset-bottom)) + 74px); }
+  }
+  @media (max-width: 720px) {
+    & .heading-actions .room-coins { padding: 0 8px 0 10px; }
+    & .heading-actions > :is(#rooms-button, #decorate-button, #room-more-toggle) { padding: 8px 10px; }
+    & .room-tools > .tool { padding: 6px 12px; }
+  }
+}

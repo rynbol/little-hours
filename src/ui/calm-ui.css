@@ -13,8 +13,7 @@ body #focus-mode-enter span { display: none; }
 body #focus-mode-enter svg { margin: 0; color: #785e69; }
 body .room-tools { grid-template-columns: repeat(4, minmax(0, 1fr)); width: min(410px, 100%); border: 0; background: transparent; box-shadow: none; }
 body .room-tools > .tool { min-height: 44px; }
-#room-more-toggle > span:first-child { font-size: 22px; line-height: 16px; letter-spacing: 1px; }
-#room-more { position: fixed; inset: auto 24px 88px auto; width: 210px; margin: 0; padding: 7px; border: 1px solid #fff8ee; border-radius: 18px; color: #54464b; background: #faf4e9; box-shadow: 0 14px 50px #21152630; }
+#room-more { position: fixed; inset: auto; width: 210px; margin: 0; padding: 7px; border: 1px solid #fff8ee; border-radius: 18px; color: #54464b; background: #faf4e9; box-shadow: 0 14px 50px #21152630; }
 #room-more:popover-open { display: grid; }
 body #room-more .tool { flex-direction: row; justify-content: flex-start; min-height: 48px; padding: 10px 13px; gap: 13px; font-size: 13px; color: #65535b; }
 body #room-more .tool svg { color: #806572; }
@@ -26,24 +25,15 @@ body .session-celebration .pet-gift-reveal { display: grid; grid-template-column
 body .session-celebration .pet-gift-reveal svg { grid-row: 1 / 3; width: 64px; height: 72px; }
 body .session-celebration .pet-gift-reveal strong { align-self: end; font-size: 19px; }
 body .session-celebration .pet-gift-reveal span { align-self: start; margin: 0; }
-@media (min-width: 1000px) {
-  body:not(.is-avatar-editing):not(.is-decorating):not(.is-connected):not(.is-focus-mode):not(.is-pet-care) #stage:not(.is-mini) { height: clamp(320px, calc(100svh - 290px), 820px); }
-}
 @media (max-width: 999px) {
-  body:not(.is-avatar-editing):not(.is-decorating):not(.is-connected):not(.is-focus-mode):not(.is-pet-care) #stage:not(.is-mini) { height: clamp(340px, calc(100svh - 340px), 820px); }
   body #focus-card { max-width: 360px; width: 100%; margin: 12px auto; }
   body:not(.is-avatar-editing):not(.is-decorating) .room-bottom { margin: 0; min-height: 48px; }
-  body #room-more { bottom: 86px; right: 16px; }
 }
 @media (max-width: 720px) {
   body:not(.is-avatar-editing):not(.is-decorating) .room-heading { flex-wrap: nowrap; gap: 6px; }
   body:not(.is-avatar-editing):not(.is-decorating) .heading-actions { width: auto; gap: 0; margin-left: auto; }
-  body:not(.is-avatar-editing):not(.is-decorating) .heading-actions .mode-button { width: 40px; min-height: 44px; padding: 10px; border: 0; background: transparent; }
+  body:not(.is-avatar-editing):not(.is-decorating) .heading-actions .mode-button { width: 44px; min-height: 44px; padding: 10px; border: 0; background: transparent; }
   body:not(.is-avatar-editing):not(.is-decorating) .heading-actions .mode-button span { display: none; }
   body:not(.is-avatar-editing):not(.is-decorating) .room-heading h1 { font-size: 22px; }
   body .room-tools > .tool { flex-direction: row; gap: 7px; }
-}
-
-@media (max-width: 640px) {
-  body:not(.is-avatar-editing):not(.is-decorating):not(.is-connected):not(.is-focus-mode):not(.is-pet-care) #stage:not(.is-mini) { height: clamp(315px, 53svh, 580px); }
 }
