@@ -51,10 +51,12 @@ test('the seated room closes its open sides, with a door for every passage, and 
   engine.dispose();
 });
 
-test('the vista is built and shown only once the chair asks for it, and holds still for reduced motion', () => {
+test('the vista is built ahead of the first sit but shown only when the chair asks for it, and holds still for reduced motion', () => {
   const { engine, world } = setup();
   assert.equal(world.root.isEnabled(false), false);
   assert.equal(world.meshes.length, 0, 'nothing is built before the first sit');
+  world.prepare();
+  assert.ok(world.meshes.length >= 7 && !world.root.isEnabled(false), 'preparing builds the vista without showing it');
   world.setEnabled(true);
   const train = world.meshes.find(mesh => mesh.name === 'seat-world-train').parent;
   world.animate(TRAIN_SECONDS * 0.2, false);

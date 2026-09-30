@@ -122,18 +122,25 @@ export function createFirstPersonView(scene, canvas, { roomCamera, seat, roomFra
   canvas.addEventListener('pointerup', onPointerEnd); canvas.addEventListener('pointercancel', onPointerEnd);
 
   function prepareShaders() {
-    if (state !== 'room') return;
+    if (state !== 'room') return [];
     const engine = scene.getEngine(), previous = scene.activeCamera;
     apply(farRoomFrame());
     engine.beginFrame();
     scene.activeCamera = camera; scene.render();
-    for (const mesh of scene.meshes) if (!mesh.isAnInstance && !mesh.isEnabled()) for (const subMesh of mesh.subMeshes ?? []) subMesh.getMaterial()?.isReadyForSubMesh(mesh, subMesh, mesh.hasInstances || mesh.hasThinInstances);
     scene.activeCamera = previous; scene.render();
     engine.endFrame();
+    return scene.meshes.filter(mesh => !mesh.isAnInstance && !mesh.isEnabled()).flatMap(mesh => (mesh.subMeshes ?? []).map(subMesh => [mesh, subMesh]));
+  }
+  function compileShaders(pending, budget) {
+    const previous = scene.activeCamera, until = performance.now() + budget;
+    scene.activeCamera = camera;
+    while (pending.length) { const [mesh, subMesh] = pending.pop(); if (!mesh.isDisposed()) subMesh.getMaterial()?.isReadyForSubMesh(mesh, subMesh, mesh.hasInstances || mesh.hasThinInstances); if (performance.now() >= until) break; }
+    scene.activeCamera = previous;
+    return pending.length;
   }
 
   return {
-    camera, enter, leave, update, prepareShaders,
+    camera, enter, leave, update, prepareShaders, compileShaders,
     get state() { return state; },
     get inside() { return inside; },
     get blend() { return blend; },

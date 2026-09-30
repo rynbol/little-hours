@@ -411,6 +411,7 @@ export function createSeatWorld(scene, parent) {
     setTheme(next) { theme = VISTA_THEMES[next] ? next : 'dusk'; recolor(); },
     setProgress(next) { progress = Math.min(1, Math.max(0, Number(next) || 0)); recolor(); },
     setShell,
+    prepare() { if (!sky) { build(); recolor(); } },
     setEnabled(enabled) { if (enabled && !sky) build(); root.setEnabled(enabled); if (enabled) { recolor(); placeLanterns(true); } },
     animate,
     dispose() { root.dispose(false, false); unlit.dispose(); lit.dispose(); },

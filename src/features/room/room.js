@@ -1532,9 +1532,10 @@ export function createRoom(container, options = {}) {
   }
   syncCameraControl();
   let seatShaderWarm = 0, seatShadersStale = true;
+  function shapeSeatShell() { seatWorld.setShell(architectureStyle, surfacePaint(architectureStyle, 'walls', layout.walls) || {}, (passages?.links || []).map(link => link.z)); }
   function syncSeatWorld() {
     const inside = seatView.inside;
-    if (inside) seatWorld.setShell(architectureStyle, surfacePaint(architectureStyle, 'walls', layout.walls) || {}, (passages?.links || []).map(link => link.z));
+    if (inside) shapeSeatShell();
     seatWorld.setEnabled(inside);
     passages?.root.setEnabled(!editing && !inside);
     roof?.root?.setEnabled(!inside);
@@ -1549,21 +1550,32 @@ export function createRoom(container, options = {}) {
       detail.setEnabled(seatView.inside); object.metadata.body.setEnabled(!seatView.inside);
     }
   }
-  let detailsWanted = '';
-  function fetchDetails() {
+  let detailsWanted = '', detailsLoading = false, seatShadersQueued = false;
+  const whenIdle = callback => globalThis.requestIdleCallback ? requestIdleCallback(() => callback(), { timeout: 3000 }) : setTimeout(callback, 16);
+  async function fetchDetails() {
     if (!readyReported) return;
     const types = [...new Set(layout.items.map(item => item.type))].filter(hasDetail), key = types.join();
-    if (key === detailsWanted) return; detailsWanted = key;
-    loadDetails(types).then(() => { if (disposed) return; syncDetails(); if (seatView.inside) refreshShadows(); });
+    if (key === detailsWanted) return; detailsWanted = key; detailsLoading = true;
+    for (const type of types) {
+      await new Promise(whenIdle);
+      if (disposed || key !== detailsWanted) return;
+      await loadDetails([type]);
+    }
+    detailsLoading = false; syncDetails(); if (seatView.inside) refreshShadows();
   }
   function warmSeatShaders() {
     fetchDetails();
     if (seatShaderWarm || !seatShadersStale) return;
-    seatShaderWarm = setTimeout(() => {
+    seatShaderWarm = setTimeout(() => whenIdle(() => {
       seatShaderWarm = 0;
       if (disposed || suspended || !visible || !readyReported || seatView.state !== 'room') return;
-      seatView.prepareShaders(); seatShadersStale = false;
-    }, 0);
+      seatWorld.prepare(); shapeSeatShell(); seatShadersStale = false; compileSeatShaders(seatView.prepareShaders());
+    }), 0);
+  }
+  function compileSeatShaders(pending) {
+    if (disposed) return;
+    seatShadersQueued = seatView.compileShaders(pending, 8) > 0;
+    if (seatShadersQueued) whenIdle(() => compileSeatShaders(pending));
   }
   scene.onNewMeshAddedObservable.add(() => { seatShadersStale = true; warmSeatShaders(); });
   // Where a bubble belongs on screen: above the pet's head or the
@@ -1957,7 +1969,7 @@ export function createRoom(container, options = {}) {
     buddyState() { return { mode: buddyFlight.mode, visible: buddyFrame.visible, activity: buddyFrame.activity, plan: buddyPlan?.kind ?? null, arrived: buddyArrived !== Infinity, holding: buddyFrame.holding, x: buddyFrame.x, y: buddyFrame.y, z: buddyFrame.z }; },
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { if (avatarCameraEditing) return; camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, seat: { state: seatView.state, look: seatView.look, camera: seatView.camera, storybook: storybook.amount, world: { enabled: seatWorld.root.isEnabled(false), theme: seatWorld.theme, progress: seatWorld.progress } }, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition || seatView.state === 'entering' || seatView.state === 'leaving'), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, petBelongings, petBond, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    diagnostics() { return { scene, engine, camera, seat: { state: seatView.state, look: seatView.look, camera: seatView.camera, storybook: storybook.amount, warming: detailsLoading || seatShadersQueued || Boolean(seatShaderWarm) || seatShadersStale, world: { enabled: seatWorld.root.isEnabled(false), theme: seatWorld.theme, progress: seatWorld.progress } }, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition || seatView.state === 'entering' || seatView.state === 'leaving'), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, tapTarget: playTarget, petBelongings, petBond, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
     dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); clearTimeout(seatShaderWarm); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); buddyModel?.dispose(); petBelongings.dispose(); seatView.dispose(); seatWorld.dispose(); storybook.dispose(); disposeDetails(scene); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

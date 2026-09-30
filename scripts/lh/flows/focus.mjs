@@ -5,6 +5,7 @@ export default {
     const app = await t.open({ seed: 'three-rooms' });
     await app.settle();
     const effects = `Object.keys(window.__littleHours.room.diagnostics().engine._compiledEffects)`;
+    await app.waitFor(`!window.__littleHours.room.diagnostics().seat.warming`, { what: 'the chair view to warm up after load', timeout: 30000 });
     const effectsBefore = await app.js(effects);
     await app.clickSel('#focus-mode-enter');
     await app.waitFor(`window.__littleHours.room.diagnostics().seat.state === 'seated'`, { what: 'the view to settle in the chair', timeout: 10000 });

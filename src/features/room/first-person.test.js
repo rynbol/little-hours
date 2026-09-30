@@ -143,7 +143,7 @@ test('leaving before the first frame of the fly-in starts from the dollhouse vie
   engine.dispose();
 });
 
-test('preparing the seat shaders also covers hidden effects that appear later, and leaves the dollhouse camera in charge', () => {
+test('preparing the seat shaders also covers hidden effects that appear later, one small step at a time, and leaves the dollhouse camera in charge', () => {
   const { scene, room, view, engine } = stage();
   const rendered = [];
   scene.onBeforeCameraRenderObservable.add(camera => rendered.push(camera.name));
@@ -152,7 +152,10 @@ test('preparing the seat shaders also covers hidden effects that appear later, a
   sparkles.setEnabled(false);
   const perspectiveSparkles = () => Object.keys(engine._compiledEffects).filter(key => key.includes('#define CAMERA_PERSPECTIVE')).length;
   assert.equal(perspectiveSparkles(), 0);
-  view.prepareShaders();
+  const pending = view.prepareShaders();
+  assert.equal(perspectiveSparkles(), 0, 'hidden effects wait to be compiled in small steps');
+  assert.ok(pending.some(([mesh]) => mesh === sparkles));
+  while (view.compileShaders(pending, 0) > 0);
   assert.equal(perspectiveSparkles(), 1);
   assert.deepEqual(rendered, ['seat-camera', 'room']);
   assert.equal(scene.activeCamera, room);
