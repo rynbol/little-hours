@@ -37,7 +37,7 @@ Agreed on September 29, 2026, after a review of every view on main at `fa785c2`.
 | Art style | **One style everywhere: the room's.** Warm local light, soft shapes, consistent ground shadows, detailed furniture. The island, garden and pond follow it. |
 | The pond and garden | The house behind the pond is the player's own house. Long term, the pond and garden are closer views of the same island, not separate worlds. |
 | Rooms or one big house | **Rooms stay, in one continuous house.** Zoomed out, the whole cutaway house is alive on the island. Tap or pinch a room and the camera glides in until it fills the screen, with no fade. The avatar walks through real doorways and stairs. Only the current room draws at full detail. |
-| The room page | **The room is the whole screen.** The timer is an object in the room (a candle or a desk clock). Tap Miso or Pip in the room. One button for the house. |
+| The room page | **The room is the whole screen.** The timer is a small on-screen pill with the time and Start. A desk candle or clock was rejected because at about 10 px on screen it cannot be read. The room shows time passing as mood (see Focus). Tap Miso or Pip in the room. One button for the house. |
 | Focus | **Time passes in the room.** The window sky moves from dusk to night, the candle burns down, the tea stops steaming, Miso falls asleep. A long session looks different from a short one. |
 | The reward | **Pip brings back real things.** Pip leaves when a session starts and returns with a find that is a piece of furniture for the room. The room becomes a record of study time. Coins stay in the background. |
 | Caught fish | **Fish you catch live in an aquarium in your room.** The aquarium shows each fish you have actually caught, using the same fish models as the pond. A new catch swims into the tank. It is another way the room records your time, and it gives fishing a reason beyond the journal. |
@@ -53,7 +53,7 @@ The Rooms arrows and Whole house, Session settings and Your progress, Pip's colo
 ### Order
 
 1. **One art style.** Rebuild the pond in the room's style with the player's own house, then bring the garden and island in line. Each step ends with before and after images for approval.
-2. **The room as the whole screen**, with the timer as a room object.
+2. **The room as the whole screen**, with a small timer pill.
 3. **Time passing during focus.**
 4. **Pip's finds as furniture and the completion scene.** The aquarium of caught fish belongs to this step. The fish models come from PR #11 and the aquarium from the `claude/aquarium-fish` work.
 5. **Companion roles, breaks outside and the first session.**
