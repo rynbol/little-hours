@@ -44,6 +44,7 @@ import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
 import { ROOM_LIGHTS } from './room-lighting.js';
 import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
+import { createLanternGlow } from './room-lantern-glow.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -326,7 +327,9 @@ export function createRoom(container, options = {}) {
     cylinder(0.11, 0.12, 0.31, [0, -0.10, 0], material('#efdab1'), lantern); sphere([0.055, 0.115, 0.055], [0, 0.16, 0], bulb, lantern);
     batchMoving(pivot); swayingLanterns.push(pivot);
   }
-  lantern(-5.33, 4.32, 2.86); lantern(1.64, 4.35, -4.05); lantern(4.40, 4.54, -4.08);
+  const lanternBulbs = [[-5.33, 4.32, 2.86], [1.64, 4.35, -4.05], [4.40, 4.54, -4.08]];
+  for (const [x, y, z] of lanternBulbs) lantern(x, y, z);
+  const lanternGlow = createLanternGlow(scene, lanternBulbs.map(([x, y, z]) => [x, y + 0.16, z]));
   for (let i = 0; i < 5; i++) {
     const x = i < 3 ? -4.21 + i * 0.19 : -1.35 + (i - 3) * 0.24, h = 0.20 + (i % 3) * 0.11;
     cylinder(0.07, 0.075, h, [x, 1.55 + h / 2, -4.05], material('#e6cc96'), decor.lights); sphere([0.03, 0.070, 0.03], [x, 1.60 + h, -4.05], candleFlame, decor.lights);
@@ -1102,6 +1105,7 @@ export function createRoom(container, options = {}) {
     const glow = color('#ffd392').scale(theme === 'day' ? 0.50 : theme === 'dusk' ? 1.25 : 0.80);
     bulb.emissiveColor = decorVisible.lights ? glow : Color3.Black(); candleFlame.emissiveColor = glow; moteGlow.emissiveColor = glow.clone();
     for (const mesh of sillFlames) mesh.setEnabled(decorVisible.lights);
+    lanternGlow.setLight('#ffc278', decorVisible.lights ? ROOM_LIGHTS[theme].glow : 0);
   }
   function aimSunbeam() {
     const light = ROOM_LIGHTS[theme], window = architecture?.window;
