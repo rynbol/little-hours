@@ -1,4 +1,4 @@
-import { createSession, remainingAt, startSession, pauseSession, isDuration } from './session.js';
+import { createSession, remainingAt, startSession, pauseSession, isDuration, normalizeSession, sessionStarted, isFocusing } from './session.js';
 import { createLayout, normalizeLayout, PRESETS } from './layout.js';
 import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCoins, cleanName, recordSession } from './house.js';
 import { fitRoomType } from './room-types.js';
@@ -21,7 +21,12 @@ export function freshState() {
   return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], petBonds: normalizePetBonds(null, FREE_PETS), petWish: null, petFamily: '', avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [], pond: emptyPond(), garden: emptyGarden(), buddy: emptyBuddy() };
 }
 
-export function localDate(timestamp = clockNow()) {
+export function localDate(timestamp = clockNow(), timeZone) {
+  if (timeZone) {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(timestamp));
+    const part = type => parts.find(entry => entry.type === type).value;
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  }
   const date = new Date(timestamp);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -52,25 +57,23 @@ export function restoreState(raw) {
     if (room && room.presetId === preset.id) initial.rooms[preset.id] = normalizeLayout(room);
   }
   if (initial.layout.presetId) initial.rooms[initial.layout.presetId] = structuredClone(initial.layout);
-  const session = saved.session;
-  if (session && Number.isFinite(session.duration) && isDuration(session.duration / 60_000)
-    && Number.isFinite(session.remaining) && session.remaining >= 0
-    && typeof session.running === 'boolean'
-    && (!session.running || (Number.isSafeInteger(session.endsAt) && session.endsAt >= 0 && session.endsAt <= 8.64e15))) {
-    // A clock moved backwards can leave more time than the duration; keep the
-    // session and cap it rather than discarding the user's progress.
-    initial.session = {
-      duration: session.duration, remaining: Math.min(session.remaining, session.duration), running: session.running,
-      endsAt: session.running ? session.endsAt : null,
-    };
-    if (initial.pets.includes(session.petId)) initial.session.petId = session.petId;
-    if (Object.hasOwn(session, 'plantId')) initial.session.plantId = initial.garden.plants.some(plant => plant.id === session.plantId) ? session.plantId : null;
-    if (!session.running && session.remaining === 0 && Number.isSafeInteger(session.completedAt) && session.completedAt >= 0) initial.session.completedAt = session.completedAt;
-  }
+  initial.session = normalizeSession(saved.session);
+  if (sessionStarted(initial.session) && initial.session.taskSnapshot === undefined) initial.session.taskSnapshot = initial.task;
+  if (!initial.pets.includes(initial.session.petId)) delete initial.session.petId;
+  if (saved.session && Object.hasOwn(saved.session, 'plantId')) initial.session.plantId = initial.garden.plants.some(plant => plant.id === saved.session.plantId) ? saved.session.plantId : null;
   if (Array.isArray(saved.history)) {
     initial.history = saved.history.filter(entry => entry && typeof entry === 'object'
       && typeof entry.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry.date) && isDuration(entry.minutes))
-      .slice(-365).map(({ date, minutes }) => ({ date, minutes }));
+      .slice(-365).map(entry => {
+        const record = { date: entry.date, minutes: entry.minutes };
+        if (typeof entry.id === 'string' && entry.id.length <= 160) record.id = entry.id;
+        if (typeof entry.task === 'string') record.task = entry.task.slice(0, 180);
+        if (Number.isSafeInteger(entry.at) && entry.at >= 0 && entry.at <= 8.64e15) record.at = entry.at;
+        if (typeof entry.timeZone === 'string') {
+          try { new Intl.DateTimeFormat('en', { timeZone: entry.timeZone }); record.timeZone = entry.timeZone; } catch {}
+        }
+        return record;
+      });
   }
   initial.buddy = normalizeBuddy(saved.buddy);
   if (!saved.buddy) initial.buddy.minutes = initial.history.reduce((sum, entry) => sum + entry.minutes, 0);
@@ -85,17 +88,19 @@ export function restoreState(raw) {
 function completeDueSession(state, now) {
   if (!state.session.running || remainingAt(state.session, now) > 0) return null;
   // A browser reopened tomorrow still credits the day this session ended.
-  const { endsAt, duration } = state.session;
-  state.session = { ...state.session, remaining: 0, running: false, endsAt: null, completedAt: endsAt };
-  state.history.push({ date: localDate(endsAt), minutes: duration / 60_000 });
+  const { id, kind, endsAt, duration, taskSnapshot, timeZone } = state.session;
+  state.session = { ...state.session, phase: 'completed', remaining: 0, running: false, endsAt: null, completedAt: endsAt };
+  if (kind === 'break') return { id, kind, at: endsAt, minutes: duration / 60_000, coins: 0 };
+  if (state.history.some(entry => entry.id && entry.id === id)) return null;
+  state.history.push({ id, date: localDate(endsAt, timeZone), at: endsAt, minutes: duration / 60_000, task: taskSnapshot ?? '', ...(timeZone ? { timeZone } : {}) });
   state.history = state.history.slice(-365);
   state.house.coins = Math.min(1_000_000_000, state.house.coins + focusCoins(duration / 60_000));
   recordSession(state.house, { at: endsAt, minutes: duration / 60_000 });
   addBait(state.pond, duration / 60_000, endsAt);
   const adventure = recordAdventure(state.buddy, duration / 60_000, endsAt, clockRandom);
-  const reward = recordPetFocus(state, duration / 60_000, endsAt), id = reward.id || state.session.petId || state.pet;
+  const reward = recordPetFocus(state, duration / 60_000, endsAt), petId = reward.id || state.session.petId || state.pet;
   const gifts = Object.freeze(reward.gifts.map(({ id: giftId, label }) => Object.freeze({ id: giftId, label })));
-  return { at: endsAt, minutes: duration / 60_000, coins: focusCoins(duration / 60_000), garden: growGarden(state, duration / 60_000), buddy: adventure, pet: { id, name: petName(state, id), hearts: reward.earned, bondTitle: bondLevel(state.petBonds[id]).title, gifts } };
+  return { id, kind: 'focus', at: endsAt, minutes: duration / 60_000, coins: focusCoins(duration / 60_000), garden: growGarden(state, duration / 60_000), buddy: adventure, pet: { id: petId, name: petName(state, petId), hearts: reward.earned, bondTitle: bondLevel(state.petBonds[petId]).title, gifts } };
 }
 
 export function createStateStore(storage, now = clockNow) {
@@ -154,7 +159,7 @@ export function createStateStore(storage, now = clockNow) {
     },
     enterHouseRoom(id) {
       return update(draft => {
-        if (draft.session.running) return;
+        if (isFocusing(draft.session)) return;
         const destination = draft.house.rooms.find(room => room.id === id);
         if (!destination) return;
         draft.house.activeId = id;
@@ -235,7 +240,7 @@ export function createStateStore(storage, now = clockNow) {
     restore(next) {
       try { storage.setItem(recoveryKey, storage.getItem(storageKey) ?? JSON.stringify(state)); } catch { return { state, persisted: false, restored: false }; }
       const replacement = structuredClone(next);
-      return { ...update(draft => { for (const key of Object.keys(draft)) delete draft[key]; Object.assign(draft, replacement); }), restored: true };
+      return { ...update(draft => { for (const key of Object.keys(draft)) delete draft[key]; Object.assign(draft, replacement); }), completion: null, restored: true };
     },
     hasRecovery() {
       try { return Boolean(storage.getItem(recoveryKey)); } catch { return false; }
@@ -247,11 +252,42 @@ export function createStateStore(storage, now = clockNow) {
       if (!raw) return { state, persisted: false, restored: false };
       return this.restore(restoreState(raw));
     },
-    setRunning(running) {
+    setRunning(running, expectedId) {
       return update((draft, { now: timestamp }) => {
-        const petId = focusPetId(draft);
-        const plantId = focusGardenPlantId(draft);
-        draft.session = running ? { ...startSession(draft.session, timestamp), petId, plantId } : pauseSession(draft.session, timestamp);
+        if (expectedId !== undefined && draft.session.id !== expectedId) return;
+        if (!running) { draft.session = pauseSession(draft.session, timestamp); return; }
+        if (draft.session.running) return;
+        if (draft.session.kind === 'break') draft.session = createSession(draft.session.focusMinutes || 25);
+        const continuing = sessionStarted(draft.session), petId = focusPetId(draft), plantId = focusGardenPlantId(draft);
+        draft.session = { ...startSession(draft.session, timestamp), petId, plantId };
+        if (!continuing) {
+          draft.session.taskSnapshot = draft.task;
+          draft.session.timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        }
+      });
+    },
+    resumeFocus(expectedId) {
+      return update((draft, { now: timestamp }) => {
+        if (draft.session.id === expectedId && sessionStarted(draft.session) && !draft.session.running) draft.session = startSession(draft.session, timestamp);
+      });
+    },
+    resetSession(minutes, expectedId) {
+      return update(draft => {
+        if (expectedId !== undefined && draft.session.id !== expectedId) return;
+        const duration = minutes ?? (draft.session.kind === 'break' ? draft.session.focusMinutes : draft.session.duration / 60_000);
+        if (isDuration(duration)) draft.session = createSession(duration);
+      });
+    },
+    startBreak(minutes, expectedId) {
+      return update((draft, { now: timestamp }) => {
+        if (![5, 15].includes(minutes) || draft.session.running || (expectedId !== undefined && draft.session.id !== expectedId)) return;
+        if (draft.session.kind !== 'focus' || draft.session.remaining !== 0) return;
+        draft.session = { ...startSession(createSession(minutes, 'break'), timestamp), focusMinutes: draft.session.duration / 60_000 };
+      });
+    },
+    endBreak(expectedId) {
+      return update(draft => {
+        if (draft.session.kind === 'break' && (expectedId === undefined || draft.session.id === expectedId)) draft.session = createSession(draft.session.focusMinutes || 25);
       });
     },
   };

@@ -2,6 +2,7 @@ import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 import { BUDDY_COLORS, FINDS, PLACES, adventureStory, buddyStage, colorOf, findOf, nextBuddyStage, placeOf, waitingFind } from '../../core/buddy.js';
 import { clockNow, clockRandom } from '../../core/test-pins.js';
+import { isFocusing } from '../../core/session.js';
 import { findArt } from './buddy-art.js';
 import { createBuddyCloseup } from './buddy-closeup.js';
 import { planActivity, SPOT_TYPES, LEAVE_LINES, RETURN_LINES, WELCOME_LINES, GREET_REPLIES } from './buddy-plan.js';
@@ -27,7 +28,7 @@ export function createBuddyUI(app) {
   const say = (who, lines) => app.speech?.say(who, lines);
 
   function modeNow() {
-    if (app.state.session.running) return 'away';
+    if (isFocusing(app.state.session)) return 'away';
     return waitingFind(buddy()) ? 'back' : 'idle';
   }
 
@@ -101,9 +102,8 @@ export function createBuddyUI(app) {
     else openAlbum();
   }
 
-  function openFind() {
-    const result = app.store.openBuddyFind();
-    app.acceptUpdate(result);
+  async function openFind() {
+    const result = await app.acceptUpdate(app.store.openBuddyFind());
     if (!result.opened) return;
     showCard(result.opened);
   }
@@ -126,7 +126,7 @@ export function createBuddyUI(app) {
   }
 
   let closeup = null, closeupHost = null;
-  const albumState = () => JSON.stringify([buddy(), app.state.session.running]);
+  const albumState = () => JSON.stringify([buddy(), isFocusing(app.state.session)]);
 
   function renderAlbum() {
     albumKey = albumState();
@@ -134,7 +134,7 @@ export function createBuddyUI(app) {
     const progress = next ? Math.round(((state.minutes - current.minutes) / (next.minutes - current.minutes)) * 100) : 100;
     const focused = document.activeElement?.closest?.('#buddy-album') ? document.activeElement.dataset.focusKey : null;
     album.innerHTML = `<div class="buddy-album-inner"><div class="buddy-album-scroll">
-      <header><div><h2 id="buddy-album-title">${escapeText(state.name)}’s finds</h2><p>${found} of ${FINDS.length} found</p>${app.state.session.running ? `<p class="buddy-album-status">${escapeText(state.name)} is off exploring until your timer ends ✦</p>` : ''}</div><button class="buddy-close" type="button" data-focus-key="close" aria-label="Close collection">${icon('close')}</button></header>
+      <header><div><h2 id="buddy-album-title">${escapeText(state.name)}’s finds</h2><p>${found} of ${FINDS.length} found</p>${isFocusing(app.state.session) ? `<p class="buddy-album-status">${escapeText(state.name)} is off exploring until your timer ends ✦</p>` : ''}</div><button class="buddy-close" type="button" data-focus-key="close" aria-label="Close collection">${icon('close')}</button></header>
       <section class="buddy-profile" style="--buddy-body:${colorOf(state.color).body};--buddy-shade:${colorOf(state.color).shade};--buddy-cheek:${colorOf(state.color).cheek}">
         <div class="buddy-profile-art" id="buddy-closeup"></div>
         <div class="buddy-profile-details">

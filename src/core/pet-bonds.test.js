@@ -90,10 +90,11 @@ test('reasserting a running timer and restoring a running backup retain its pet'
 
 test('completion preserves its pet and minutes through a replacement transaction', () => {
   const f = fixture(); f.store.setRunning(true); f.advance(25 * 60000);
+  const id = f.store.state.session.id;
   const result = f.store.update(draft => { draft.pet = 'dog'; draft.session = createSession(50); draft.petBonds.cat.name = 'Maple'; });
   const { buddy, ...completion } = result.completion;
   assert.ok(['garden', 'pond', 'woods'].includes(buddy.place));
-  assert.deepEqual(completion, { at: new Date('2026-09-27T10:25:00').getTime(), minutes: 25, coins: 25, garden: null, pet: { id: 'cat', name: 'Miso', hearts: 5, bondTitle: 'Getting to know you', gifts: [{ id: 'daisy', label: 'A daisy for you' }] } });
+  assert.deepEqual(completion, { id, kind: 'focus', at: new Date('2026-09-27T10:25:00').getTime(), minutes: 25, coins: 25, garden: null, pet: { id: 'cat', name: 'Miso', hearts: 5, bondTitle: 'Getting to know you', gifts: [{ id: 'daisy', label: 'A daisy for you' }] } });
   assert.equal(result.state.petBonds.cat.affection, 5);
   assert.equal(result.state.petBonds.dog.affection, 0);
   assert.equal(result.state.session.duration, 50 * 60000);

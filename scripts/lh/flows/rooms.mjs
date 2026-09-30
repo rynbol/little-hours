@@ -36,6 +36,7 @@ export default {
     await app.waitFor(`document.querySelector('#house-detail h2')?.textContent === 'Garden wing'`, { what: 'the garden wing details' });
     check('picking the garden wing offers entry', (await app.text('#enter-house-room'))?.startsWith('Enter room'), await app.text('#enter-house-room'));
     await app.clickSel('#enter-house-room');
+    await app.waitFor(`document.documentElement.dataset.placeTransition === 'home'`, { what: 'the room entry to begin' }).catch(() => null);
     check('room entry fades through the shared travel layer', await app.js(`document.documentElement.dataset.placeTransition === 'home' && Boolean(document.querySelector('.place-transition'))`));
     await app.settle();
     check('the travel card goes away on arrival', !await travelling(app) && await app.js(`document.getElementById('room-travel').hidden`));
@@ -80,6 +81,7 @@ export default {
     await app.clickSel('#rename-room');
     await app.send('Input.insertText', { text: 'Our Sunday corner ♡' });
     await app.clickSel('#save-room-title');
+    await app.waitFor(`document.querySelector('#room-title').textContent === 'Our Sunday corner ♡'`, { what: 'the room name to save' }).catch(() => null);
     check('the inline name is saved and shown on its room card', await app.text('#room-title') === 'Our Sunday corner ♡' && (await app.text('[data-house-go="studio"]')).includes('Our Sunday corner ♡') && (await app.saved()).house.rooms[0].name === 'Our Sunday corner ♡');
     await steps.openRoomPicker(app);
     await t.shot(app, 'personal-room-cards');

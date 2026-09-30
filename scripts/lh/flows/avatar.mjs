@@ -6,6 +6,7 @@ async function pickPart(app) {
   const choice = await app.js(`(() => { const b = document.querySelector('[data-avatar-part][aria-pressed="false"]'); return b && { part: b.dataset.avatarPart, value: b.dataset.avatarValue }; })()`);
   if (!choice) return null;
   await app.clickSel(`[data-avatar-part="${choice.part}"][data-avatar-value="${choice.value}"]`);
+  await app.waitFor(`document.querySelector('[data-avatar-part="${choice.part}"][data-avatar-value="${choice.value}"]')?.getAttribute('aria-pressed') === 'true'`, { what: 'the avatar choice to save' });
   return { ...choice, now: (await avatar(app))[choice.part], pressed: await app.attr(`[data-avatar-part="${choice.part}"][data-avatar-value="${choice.value}"]`, 'aria-pressed') };
 }
 
@@ -23,6 +24,7 @@ export default {
 
     const lookId = await app.js(`document.querySelector('[data-avatar-look][aria-pressed="false"]')?.dataset.avatarLook ?? null`);
     await app.clickSel(`[data-avatar-look="${lookId}"]`);
+    await app.waitFor(`document.querySelector('[data-avatar-look="${lookId}"]')?.getAttribute('aria-pressed') === 'true'`, { what: 'the avatar look to save' });
     const afterLook = await avatar(app);
     check('picking a look changes the avatar', !same(afterLook, initial), afterLook);
     check('the picked look shows as chosen', await app.attr(`[data-avatar-look="${lookId}"]`, 'aria-pressed') === 'true');
@@ -55,6 +57,7 @@ export default {
 
     await steps.openAvatar(app);
     await app.clickSel('#avatar-reset');
+    await app.waitFor(`JSON.stringify(window.__littleHours.state.avatar) === ${JSON.stringify(JSON.stringify(initial))}`, { what: 'the avatar reset to save' });
     check('Reset look brings back the starting avatar', same(await avatar(app), initial), await avatar(app));
     check('Reset keeps the editor open', await editing(app));
     await steps.closeAvatar(app);

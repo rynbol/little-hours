@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSession, remainingAt, startSession, pauseSession, formatTime, spokenTime, sessionPhase, displayedRemaining, BREAK_AFTER_FINISH } from './session.js';
+import { createSession, remainingAt, startSession, pauseSession, formatTime, spokenTime, sessionPhase, displayedRemaining } from './session.js';
 import { createStateStore, freshState, localDate, restoreState, storageKey } from './state.js';
 import { createLayout } from './layout.js';
 
@@ -86,7 +86,7 @@ test('restoring tomorrow credits the deadline date rather than the reopen date',
   const reopened = createStateStore(storage, () => now);
   const result = reopened.update();
   assert.equal(Boolean(result.completion), true);
-  assert.deepEqual(result.state.history, [{ date: localDate(deadline), minutes: 25 }]);
+  assert.deepEqual(result.state.history, [{ id: first.state.session.id, date: localDate(deadline), at: deadline, minutes: 25, task: '', timeZone: first.state.session.timeZone }]);
   assert.notEqual(result.state.history[0].date, localDate(now));
 });
 
@@ -109,7 +109,7 @@ test('restore skips corrupted history entries without discarding valid preferenc
   const restored = restoreState(JSON.stringify(saved));
   assert.equal(restored.theme, 'rain');
   assert.equal(restored.task, 'Keep this task');
-  assert.deepEqual(restored.session, { ...saved.session });
+  assert.deepEqual(restored.session, { ...saved.session, taskSnapshot: 'Keep this task' });
   assert.deepEqual(restored.history, [{ date: '2026-09-21', minutes: 50 }]);
 });
 
@@ -124,7 +124,7 @@ test('restore rejects malformed session values and invalid JSON safely', () => {
   }
   // A clock moved backwards can leave more time than the duration: cap it and keep the session.
   const ahead = { duration: 1_500_000, remaining: 1_560_000, endsAt: null, running: false };
-  assert.deepEqual(restoreState(JSON.stringify({ session: ahead })).session, { ...ahead, remaining: 1_500_000 });
+  assert.deepEqual(restoreState(JSON.stringify({ session: ahead })).session, createSession());
   assert.deepEqual(restoreState('{broken json'), freshState());
 });
 
@@ -142,7 +142,7 @@ test('existing focus saves gain a furnished room without losing their session', 
   const session = startSession(createSession(50), 1234);
   const restored = restoreState(JSON.stringify({ theme: 'rain', task: 'An old room', session }));
   assert.deepEqual(restored.layout, createLayout());
-  assert.deepEqual(restored.session, { ...session });
+  assert.deepEqual(restored.session, { ...session, taskSnapshot: 'An old room' });
   assert.equal(restored.task, 'An old room');
 });
 
@@ -202,7 +202,7 @@ test('old saves keep their current room and saved rooms are bounded and sanitize
   assert.equal(second.state.rooms['cloud-loft'].presetId, 'cloud-loft', 'a stale tab keeps newly saved rooms');
 });
 
-test('a finished session is a short break, then reads as a fresh timer', () => {
+test('a finished session stays completed until the user chooses what comes next', () => {
   let now = 1_000;
   const storage = memoryStorage(), store = createStateStore(storage, () => now);
   store.setRunning(true); now += 1_500_000;
@@ -211,10 +211,10 @@ test('a finished session is a short break, then reads as a fresh timer', () => {
   assert.equal(result.state.session.completedAt, 1_501_000, 'completion records when the session ended');
   assert.equal(createStateStore(storage, () => now).state.session.completedAt, 1_501_000, 'the finish time survives a reload');
   const finished = result.state.session;
-  assert.equal(sessionPhase(finished, now + 60_000), 'break');
+  assert.equal(sessionPhase(finished, now + 60_000), 'idle');
   assert.equal(displayedRemaining(finished, now + 60_000), 0);
-  assert.equal(sessionPhase(finished, now + BREAK_AFTER_FINISH), 'idle', 'the break ends instead of lasting for days');
-  assert.equal(displayedRemaining(finished, now + BREAK_AFTER_FINISH), finished.duration, 'the timer reads as a fresh session');
+  assert.equal(sessionPhase(finished, now + 86_400_000), 'idle');
+  assert.equal(displayedRemaining(finished, now + 86_400_000), 0);
   assert.equal(sessionPhase(pauseSession(startSession(createSession(), 0), 60_000), 60_000), 'break', 'a paused session is still a break');
 });
 

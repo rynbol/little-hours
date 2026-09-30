@@ -14,11 +14,13 @@ export default {
     check('dragging the timer leaves no selection box or selected text', pointerFocus.outline === 'none' && pointerFocus.selectedText === '', pointerFocus);
     await t.shot(app, 'timer-pointer');
     await app.key('Home'); await app.key('ArrowRight'); await app.key('ArrowRight');
+    await app.waitFor(`document.getElementById('timer').textContent === '03:00'`, { what: 'the keyboard duration to save' });
     check('Home and two right arrows set 3 minutes', await app.text('#timer') === '03:00' && await app.attr('#timer-ring', 'aria-valuetext') === '3 minutes', await app.text('#timer'));
     const keyboardFocus = await app.js(`({ visible: document.getElementById('timer-ring').matches(':focus-visible'), outline: getComputedStyle(document.getElementById('timer-ring')).outlineStyle, radius: getComputedStyle(document.getElementById('timer-ring')).borderRadius })`);
     check('keyboard adjustment keeps its circular focus indicator', keyboardFocus.visible && keyboardFocus.outline === 'solid' && keyboardFocus.radius === '50%', keyboardFocus);
     await t.shot(app, 'timer-keyboard');
     await app.clickSel('[data-minutes="25"]');
+    await app.waitFor(`document.getElementById('timer').textContent === '25:00'`, { what: 'the preset duration to save' });
     check('the 25 minute button still sets 25', await app.text('#timer') === '25:00' && await app.attr('[data-minutes="25"]', 'aria-pressed') === 'true');
     await app.clickSel('#start-button');
     await app.waitFor(`document.getElementById('timer').textContent !== '25:00'`, { what: 'the countdown', timeout: 3000 });

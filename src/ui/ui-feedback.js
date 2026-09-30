@@ -19,7 +19,7 @@ const REACTIONS = [
 ];
 const PIP_DIALOGS = '#buddy-album, #buddy-card';
 
-export function createUIFeedback(root, { signal } = {}) {
+export function createUIFeedback(root, { signal, saving = () => false } = {}) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const animations = new Set(), particles = new Set(), keyed = new WeakMap();
   const app = root.querySelector('#app');
@@ -132,8 +132,18 @@ export function createUIFeedback(root, { signal } = {}) {
     const target = usable(locateAgain(element));
     if (!target) return;
     const [, part, frames, duration] = REACTIONS.find(([selector]) => element.matches(selector)) || [];
-    if (target !== element && (!frames || part)) pop(target);
-    if (frames) animate(part ? target.querySelector(part) : target, frames, { duration, easing: 'cubic-bezier(.3,.7,.3,1.2)' }, part ? 'reaction' : 'press');
+    const play = next => {
+      if (next !== element && (!frames || part)) pop(next);
+      if (frames) animate(part ? next.querySelector(part) : next, frames, { duration, easing: 'cubic-bezier(.3,.7,.3,1.2)' }, part ? 'reaction' : 'press');
+    };
+    play(target);
+    const until = performance.now() + 500;
+    const replaced = () => {
+      if (!allowed()) return;
+      if (!target.isConnected) { const next = usable(locateAgain(element)); if (next) play(next); return; }
+      if (performance.now() < until || saving()) requestAnimationFrame(replaced);
+    };
+    requestAnimationFrame(replaced);
     if (element.matches('summary') && !element.parentElement.open) opening = element.parentElement;
     if (element.matches('#pet-feed')) requestAnimationFrame(() => stagger(root.querySelectorAll('#pet-meals:not([hidden]) > button'), 10));
     if (element.matches('#pet-edit-name, #buddy-edit-name')) requestAnimationFrame(() => enter(root.querySelector('#pet-name-form:not([hidden]), .buddy-name-form:not([hidden])'), 0, 6));

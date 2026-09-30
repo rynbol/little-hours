@@ -60,11 +60,11 @@ export function createDecorateUI(app) {
     (matching || controls[0] || $('#decorate-button')).focus({ preventScroll: true });
   }
 
-  function commitLayout(layout, remember = true) {
+  async function commitLayout(layout, remember = true) {
     const next = normalizeLayout(layout);
     if (JSON.stringify(next) === JSON.stringify(app.state.layout)) return;
     if (remember) undoLayout = structuredClone(app.state.layout);
-    app.acceptUpdate(app.store.saveLayout(next, app.state.house.activeId));
+    await app.acceptUpdate(app.store.saveLayout(next, app.state.house.activeId));
     $('#undo-layout').disabled = !undoLayout;
     renderInspector();
   }
@@ -114,10 +114,10 @@ export function createDecorateUI(app) {
         const active = app.state.layout.presetId === preset.id, saved = Boolean(app.state.rooms[preset.id]);
         return `<article class="preset-card" data-design="${preset.style || 'retreat'}" data-active="${active}"><div class="preset-art" aria-hidden="true">${roomDesignArt(preset)}</div><div><span class="preset-label">${active ? 'CURRENT STYLE' : saved ? 'SAVED DESIGN' : preset.style ? 'A DIFFERENT LITTLE WORLD' : 'TIMBER RETREAT'}</span><h3>${preset.name}</h3><p>${preset.description}</p></div><button class="quiet-button" data-preset="${preset.id}" ${active ? 'disabled' : ''} aria-label="${saved ? 'Use saved' : 'Use'} ${preset.name} design">${active ? "Current design" : saved ? 'Use saved design' : 'Use this design'} ${icon('arrow')}</button>${active ? `<button class="preset-reset" data-reset-design="${preset.id}">Reset layout</button>` : ''}</article>`;
       }).join('')}</div><p class="preset-note">Six furnished designs for this space. Build additional rooms from your House to keep more spaces side by side.</p>`;
-      const useDesign = (presetId, reset = false) => {
+      const useDesign = async (presetId, reset = false) => {
         app.room?.cancelPlacement?.(); app.room?.selectItem?.(null); selectedItem = null;
         undoLayout = structuredClone(app.state.layout);
-        app.acceptUpdate(app.store.useRoom(presetId, reset)); $('#undo-layout').disabled = false;
+        await app.acceptUpdate(app.store.useRoom(presetId, reset)); $('#undo-layout').disabled = false;
         app.toast(reset ? 'The original layout is back. Undo restores your decorations.' : `${roomDesign(app.state.layout).name}. Make yourself at home.`);
         content.querySelector('.preset-card[data-active="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
         revealRoomForPlacement();

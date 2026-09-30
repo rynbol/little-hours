@@ -47,21 +47,21 @@ export function createGardenUI(root, { store, acceptUpdate, onFocus, onBack, onP
     $('.garden-collection-items').innerHTML = garden.plants.length ? `<div class="garden-collection-grid">${garden.plants.map(item => `<button id="garden-collection-${item.id}" data-plant="${item.id}" aria-pressed="${panel === 'plant' && plant?.id === item.id}">${gardenPlantArt(item)}<strong>${escape(gardenPlantName(item))}</strong><small>${item.slot === null ? 'In your collection' : `Spot ${item.slot + 1}`} · ${gardenStage(item)}</small></button>`).join('')}</div>` : '<p>Plant your first seed to begin.</p>';
     root.querySelectorAll('[data-seed]').forEach(button => button.addEventListener('click', () => { selectedSpecies = button.dataset.seed; render(); }));
     root.querySelectorAll('button[data-plant]').forEach(button => button.addEventListener('click', () => { $('#garden-collection-dialog').close('selected'); if ($('#garden-name-form')) $('#garden-name-form').hidden = true; selectedPlant = button.dataset.plant; panel = 'plant'; render(); ($('#garden-place') || $('#garden-study') || $('#garden-new-seeds'))?.focus({ preventScroll: true }); }));
-    $('#garden-plant-seed')?.addEventListener('click', () => {
-      const result = store.plantSeed(selectedSpecies, slot, planted?.id ?? null);
+    $('#garden-plant-seed')?.addEventListener('click', async () => {
+      const result = await acceptUpdate(store.plantSeed(selectedSpecies, slot, planted?.id ?? null));
       if (result.planted.ok) { panel = 'plant'; selectedPlant = result.planted.id; }
-      acceptUpdate(result); render();
+      render();
       if (result.planted.ok) { celebrate(); notice('Planted ♡'); $('#garden-study')?.focus({ preventScroll: true }); }
       else notice(result.planted.reason);
     });
     $('#garden-new-seeds')?.addEventListener('click', () => { panel = 'seeds'; render(); $('#garden-card-title').focus({ preventScroll: true }); });
-    $('#garden-study')?.addEventListener('click', () => { acceptUpdate(store.tendPlant(plant.id)); onFocus(); });
-    $('#garden-place')?.addEventListener('click', () => { acceptUpdate(store.placePlant(plant.id, slot)); render(); celebrate(); });
+    $('#garden-study')?.addEventListener('click', async () => { await acceptUpdate(store.tendPlant(plant.id)); onFocus(); });
+    $('#garden-place')?.addEventListener('click', async () => { await acceptUpdate(store.placePlant(plant.id, slot)); render(); celebrate(); });
     $('#garden-rename')?.addEventListener('click', () => { $('#garden-name-form').hidden = false; $('#garden-name-input').focus(); $('#garden-name-input').select(); });
     const closeName = () => { $('#garden-name-form').hidden = true; $('#garden-rename').focus({ preventScroll: true }); };
     $('#garden-name-cancel')?.addEventListener('click', closeName);
     $('#garden-name-form')?.addEventListener('keydown', event => { if (event.key === 'Escape') { event.stopPropagation(); closeName(); } });
-    $('#garden-name-form')?.addEventListener('submit', event => { event.preventDefault(); acceptUpdate(store.renamePlant(plant.id, $('#garden-name-input').value)); render(); closeName(); });
+    $('#garden-name-form')?.addEventListener('submit', async event => { event.preventDefault(); await acceptUpdate(store.renamePlant(plant.id, $('#garden-name-input').value)); render(); closeName(); });
     if (draftName?.id === plant?.id && $('#garden-name-input')) { $('#garden-name-form').hidden = false; $('#garden-name-input').value = draftName.value; $('#garden-name-input').setSelectionRange(draftName.start, draftName.end); }
     if (focusId) root.querySelector(`#${focusId}`)?.focus({ preventScroll: true });
     onPlot?.(panel === 'closed' ? null : slot);

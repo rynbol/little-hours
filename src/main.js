@@ -7,7 +7,8 @@ import { icon } from './ui/icons.js';
 import { createToast } from './ui/toast.js';
 import { shellMarkup } from './app/shell.js';
 import { createPanels } from './app/panels.js';
-import { createStateStore, storageKey } from './core/state.js';
+import { storageKey } from './core/state.js';
+import { createSharedStateStore } from './core/shared-store.js';
 import { roomDesign } from './core/layout.js';
 import { clockNow, isPinned, pinnedStorage } from './core/test-pins.js';
 import { createRoom, createRoomUI } from './features/room/index.js';
@@ -33,10 +34,10 @@ const deviceStorage = pinnedStorage || {
   getItem: key => localStorage.getItem(key),
   setItem: (key, value) => localStorage.setItem(key, value),
 };
-const store = createStateStore(deviceStorage);
+const store = createSharedStateStore(deviceStorage);
 const audio = createAudio(deviceStorage);
 const listeners = new AbortController();
-let hiddenSince = 0;
+let hiddenSince = 0, updating = 0;
 
 document.querySelector('#app').innerHTML = shellMarkup(audio.prefs);
 $('#task').value = store.state.task;
@@ -45,7 +46,7 @@ const toast = createToast();
 const app = {
   state: store.state, store, audio, room: null, roomReady: false, speech: null, houseUI: null,
   signal: listeners.signal, storageWarningShown: false,
-  feedback: createUIFeedback(document, { signal: listeners.signal }),
+  feedback: createUIFeedback(document, { signal: listeners.signal, saving: () => updating > 0 }),
   toast: toast.show, hideToast: toast.hide, acceptUpdate,
 };
 app.timer = createTimerUI(app);
@@ -77,7 +78,7 @@ function applyState(next, force = false) {
   app.room?.setHouse(state.house);
   app.nav.renderConnections();
   app.roomUI.applyTheme(previous, force);
-  if ($('#task').value !== state.task) $('#task').value = state.task;
+  if (document.activeElement !== $('#task') && !app.timer.taskPending && $('#task').value !== state.task) $('#task').value = state.task;
   if (force || previous.pet !== state.pet) { app.room?.setPet?.(state.pet); app.pet.renderName(); app.decorate.renderInspector(); }
   app.pet.sync();
   app.room?.setAvatarAppearance?.(state.avatar);
@@ -89,11 +90,16 @@ function applyState(next, force = false) {
   app.roomUI.syncControls();
   app.buddy?.sync();
 }
-function acceptUpdate(result) {
-  applyState(result.state);
+async function acceptUpdate(update) {
+  updating++;
+  const result = await Promise.resolve(update).finally(() => updating--);
+  if (listeners.signal.aborted) return result;
+  applyState(store.refresh());
   if (result.completion) {
-    app.room?.celebrate(); app.room?.petRitual('cuddle'); app.delights?.show('finish'); app.delights?.show('bond', 'pet');
-    app.timer.showCelebration(result.completion);
+    if (result.completion.kind === 'focus') {
+      app.room?.celebrate(); app.room?.petRitual('cuddle'); app.delights?.show('finish'); app.delights?.show('bond', 'pet');
+      app.timer.showCelebration(result.completion);
+    } else app.timer.announce('Your break is over. Start focusing when you are ready.');
     // Ring for a session that just ended, not one found finished long ago.
     if (clockNow() - result.completion.at < 90_000) audio.chime();
   }
@@ -103,6 +109,7 @@ function acceptUpdate(result) {
     app.toast('Your browser couldn’t save this visit. The room still works.');
   }
   app.timer.render();
+  return result;
 }
 // The decorator needs a ready room: both entry buttons wait for it.
 const setDecorEntry = enabled => { $('#decorate-button').disabled = !enabled; $('#rooms-button').disabled = !enabled; };
@@ -180,7 +187,7 @@ window.addEventListener('storage', event => {
 }, { signal: listeners.signal });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshState(); }, { signal: listeners.signal });
 // Remember the last visit, for a hello after a long time away.
-function markSeen() { store.update(draft => { draft.seenAt = clockNow(); }); }
+function markSeen() { app.timer.flushTask(); acceptUpdate(store.update(draft => { draft.seenAt = clockNow(); })); }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenSince = clockNow(); markSeen(); }
   else if (hiddenSince && clockNow() - hiddenSince > 10 * 60_000) { hiddenSince = 0; setTimeout(app.companion.welcome, 600); }

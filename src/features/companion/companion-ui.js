@@ -1,3 +1,4 @@
+import { isFocusing } from '../../core/session.js';
 import { clockNow } from '../../core/test-pins.js';
 import { localDate } from '../../core/state.js';
 import { AVATAR_LINES } from './speech.js';
@@ -58,7 +59,7 @@ export function createCompanionUI(app) {
   }
 
   // A hello after a long time away, but never in the middle of focus.
-  function welcome() { if (!app.state.session.running) { say('welcome', { force: true }); app.delights?.show('hello', 'pet'); } }
+  function welcome() { if (!isFocusing(app.state.session)) { say('welcome', { force: true }); app.delights?.show('hello', 'pet'); } }
 
   return { say, syncIntent, renderNote, onItemInteraction, onCompanionTap, onCompanionState, welcome };
 }

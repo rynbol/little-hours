@@ -11,7 +11,7 @@ test('phone focus stays within reach and survives pause, reload and resume', asy
   const bar = page.locator('#focus-quickbar'), start = page.locator('#quick-focus-start');
   await expect(bar).toBeVisible(); await expect(bar.locator('time')).toHaveText('25:00');
   await page.screenshot({ path: '.lh/evidence/calm-phone-arrival.png' });
-  await start.click(); await page.clock.fastForward('05:00'); await start.click();
+  await start.click(); await expect(start).toHaveText(/Pause/); await page.clock.fastForward('05:00'); await start.click();
   await expect(start).toHaveAccessibleName('Keep going');
   const remaining = await bar.locator('time').textContent();
   await page.reload(); await ready(page);
@@ -47,7 +47,7 @@ test('progress opens the newly affordable room without spending the reward', asy
   await page.goto('/'); await ready(page);
   await expect(page.locator('#focus-goal')).toBeHidden(); await page.locator('#focus-progress > summary').click();
   await expect(page.locator('#focus-goal')).toHaveAccessibleName('Greenhouse, 0 of 25 coins saved, available after this session');
-  await page.locator('#start-button').click(); await page.clock.fastForward('25:01');
+  await page.locator('#start-button').click(); await expect(page.locator('#start-button')).toHaveText(/Pause/); await page.clock.fastForward('25:01');
   await page.locator('#session-celebration .start-button').click(); await page.locator('#focus-goal').click();
   await expect(page.locator('#house-detail h2')).toHaveText('Greenhouse');
   expect((await saved(page)).house.coins).toBe(25); expect((await saved(page)).house.rooms).toHaveLength(1);
@@ -58,11 +58,11 @@ test('a wished-for pet leads to the adoption preview, then welcomes it only afte
   await page.addInitScript(() => { if (!sessionStorage.seeded) { localStorage.setItem('little-hours-v1', JSON.stringify({ petWish: 'bunny', house: { coins: 15 } })); sessionStorage.seeded = '1'; } });
   await page.goto('/'); await ready(page); await page.locator('#focus-progress > summary').click(); await page.locator('#focus-goal').click();
   await expect(page.locator('#pet-adopt-name')).toHaveValue('Dango'); await expect(page.locator('#pet-adopt-button')).toBeDisabled();
-  await page.locator('#close-panel').click(); await page.locator('#start-button').click(); await page.clock.fastForward('25:01');
+  await page.locator('#close-panel').click(); await page.locator('#start-button').click(); await expect(page.locator('#start-button')).toHaveText(/Pause/); await page.clock.fastForward('25:01');
   await page.locator('#session-celebration .start-button').click(); await page.locator('#focus-goal').click();
   expect((await saved(page)).house.coins).toBe(40); expect((await saved(page)).pets).not.toContain('bunny');
   await page.locator('#pet-adopt-name').fill('Clover'); await page.locator('#pet-adopt-button').click();
-  expect((await saved(page)).house.coins).toBe(0); expect((await saved(page)).pets).toContain('bunny');
+  await expect.poll(async () => (await saved(page)).house.coins).toBe(0); expect((await saved(page)).pets).toContain('bunny');
   await expect(page.locator('#pet-ritual-status')).toHaveText('Welcome home, Clover ♡');
 });
 

@@ -1,3 +1,4 @@
+import { isFocusing } from '../../core/session.js';
 import { PETS } from './pet.js';
 import { PET_LINES } from '../companion/index.js';
 import { bondLevel, petName, focusPetId } from '../../core/pet-bonds.js';
@@ -13,14 +14,14 @@ export function createPetUI(app) {
   const name = () => petName(app.state), drafts = new Map();
   let offered = null, signature = '', careSignature = '', closeup = null, closeupHost = null;
   const available = () => !app.nav.travelling && !app.nav.houseOpen && !app.nav.connected && !app.roomUI.compact && !app.decorate.active && !app.avatar.active;
-  function feedback({ species = app.state.pet, by = 'you' } = {}) {
+  async function feedback({ species = app.state.pet, by = 'you' } = {}) {
     const bond = app.state.petBonds[species];
     if (by === 'you' && available()) {
       if (bond.ritualDay !== localDate() || !bond.rituals.includes('cuddle')) {
-        const result = app.store.petRitual(species, 'cuddle'); app.acceptUpdate(result);
-        if (result.ritual.unlocked) app.delights?.show('bond', 'pet');
+        const result = await app.acceptUpdate(app.store.petRitual(species, 'cuddle'));
+        if (result.ritual?.unlocked) app.delights?.show('bond', 'pet');
       }
-      if (app.panels.current !== 'pet') app.panels.open('pet');
+      if (available() && app.panels.current !== 'pet') app.panels.open('pet');
     }
     if (by === 'companion' || by === 'buddy') app.speech?.say('pet', (PET_LINES[species] || PET_LINES.cat).friend);
   }
@@ -42,9 +43,9 @@ export function createPetUI(app) {
   function refreshStudy() {
     if (app.panels?.current !== 'pet' || !closeup) return;
     const state = app.state, id = state.pet, bond = state.petBonds[id], together = focusPetId(state);
-    closeup.update({ id, name: name(), ribbon: bond.ribbon, care: bond.care, gift: bond.gift, focusing: state.session.running && together === id });
+    closeup.update({ id, name: name(), ribbon: bond.ribbon, care: bond.care, gift: bond.gift, focusing: isFocusing(state.session) && together === id });
     const button = $('#pet-study'), remaining = remainingAt(state.session);
-    if (button) { button.textContent = state.session.running ? `Pause · ${formatTime(remaining)}` : sessionStarted(state.session) ? `Continue with ${petName(state, together)}` : `Study with ${name()}`; button.disabled = app.nav.travelling || app.avatar.active; }
+    if (button) { button.textContent = state.session.kind === 'break' && state.session.remaining > 0 ? 'End break' : isFocusing(state.session) ? `Pause · ${formatTime(remaining)}` : sessionStarted(state.session) ? `Continue with ${petName(state, together)}` : `Study with ${name()}`; button.disabled = app.nav.travelling || app.avatar.active; }
   }
   function close() { closeup?.dispose(); closeup = null; closeupHost?.remove(); closeupHost = null; }
   app.signal.addEventListener('abort', close, { once: true });
@@ -71,11 +72,11 @@ export function createPetUI(app) {
     if (app.room?.petCareBusy?.()) { receipt('One little moment…'); return false; }
     return true;
   }
-  function ritual(id, kind) {
+  async function ritual(id, kind) {
     if (kind === 'cuddle' ? !available() : !ready()) return;
     if (kind === 'play' && !app.room?.canPetCare()) { receipt('Make a little space to play.'); return; }
-    const result = app.store.petRitual(id, kind); app.acceptUpdate(result);
-    if (!result.ritual.ok) return;
+    const result = await app.acceptUpdate(app.store.petRitual(id, kind));
+    if (!result.ritual?.ok) return;
     if (app.state.pet === id) { app.room?.petRitual(kind); closeup?.react(kind); }
     app.delights?.show(result.ritual.unlocked ? 'bond' : kind, 'pet');
     receipt(result.ritual.earned ? `+${result.ritual.earned} ♡` : '♡');
@@ -110,22 +111,22 @@ export function createPetUI(app) {
     input.addEventListener('keydown', event => { if (event.key === 'Escape') { event.stopPropagation(); drafts.delete(id); $('#pet-name-form').hidden = true; $('#pet-edit-name').focus(); } });
     panel.querySelectorAll('[data-pet-ritual]').forEach(button => button.addEventListener('click', () => ritual(id, button.dataset.petRitual)));
     $('#pet-feed').addEventListener('click', () => { const box = $('#pet-meals'); box.hidden = !box.hidden; $('#pet-feed').setAttribute('aria-expanded', String(!box.hidden)); });
-    panel.querySelectorAll('[data-pet-meal]').forEach(button => button.addEventListener('click', () => {
+    panel.querySelectorAll('[data-pet-meal]').forEach(button => button.addEventListener('click', async () => {
       if (!ready()) return;
       if (!app.room?.canPetCare()) { receipt('Make a little space for the bowl.'); return; }
-      const food = button.dataset.petMeal, result = app.store.feedPet(id, food); app.acceptUpdate(result);
-      if (!result.meal.ok) { receipt(result.meal.reason); return; }
+      const food = button.dataset.petMeal, result = await app.acceptUpdate(app.store.feedPet(id, food));
+      if (!result.meal?.ok) { receipt(result.meal?.reason || 'Please try again.'); return; }
       if (app.state.pet === id) { app.room?.petRitual('treat', food); closeup?.react('treat'); }
-      $('#pet-meals').hidden = true; $('#pet-feed').setAttribute('aria-expanded', 'false'); $('#pet-feed').focus({ preventScroll: true });
+      if (app.panels.current === 'pet') { $('#pet-meals').hidden = true; $('#pet-feed').setAttribute('aria-expanded', 'false'); $('#pet-feed').focus({ preventScroll: true }); }
       receipt('+1 ♡');
     }));
     $('#pet-invite').addEventListener('click', () => { if (ready() && !app.room?.invitePet()) receipt('Make a little space beside your seat.'); });
     $('#pet-study').addEventListener('click', () => app.timer.toggleRunning());
     $('#pet-nap')?.addEventListener('click', () => { if (ready() && !app.room?.invitePet('nap')) receipt('Make a little space beside your seat.'); });
     $('#pet-dance')?.addEventListener('click', () => { if (ready()) { app.room?.petRitual('dance'); closeup?.react('dance'); } });
-    panel.querySelectorAll('[data-pet-fabric]').forEach(button => button.addEventListener('click', () => {
-      const result = app.store.choosePetFabric(id, button.dataset.petFabric); app.acceptUpdate(result);
-      if (!result.fabric.ok) receipt(result.fabric.reason);
+    panel.querySelectorAll('[data-pet-fabric]').forEach(button => button.addEventListener('click', async () => {
+      const result = await app.acceptUpdate(app.store.choosePetFabric(id, button.dataset.petFabric));
+      if (!result.fabric?.ok) receipt(result.fabric?.reason || 'Please try again.');
     }));
     panel.querySelectorAll('[data-pet-ribbon]').forEach(button => button.addEventListener('click', () => app.acceptUpdate(app.store.setPetRibbon(id, Number(button.dataset.petRibbon)))));
     panel.querySelectorAll('[data-pet-gift]').forEach(button => button.addEventListener('click', () => { app.acceptUpdate(app.store.selectPetGift(id, button.dataset.petGift)); if (app.state.pet === id) closeup?.react('cuddle'); }));
@@ -147,10 +148,11 @@ export function createPetUI(app) {
     box.innerHTML = `<h3>${pet.name}</h3><p>${pet.kind}</p><label for="pet-adopt-name">Name</label><input id="pet-adopt-name" maxlength="24" value="${escapePetText(drafts.get(`adopt:${id}`) || pet.name)}"><button id="pet-adopt-button" ${short ? 'disabled' : ''}>Welcome home · ${pet.price} ◉</button>${short ? `<p class="pet-adopt-note">${short} more coins</p><button id="pet-wish" aria-pressed="${wished}">${wished ? 'Saving for you ✓' : 'Save up for me'}</button>` : ''}`;
     $('#pet-adopt-name').addEventListener('input', event => drafts.set(`adopt:${id}`, event.target.value));
     $('#pet-wish')?.addEventListener('click', () => { app.acceptUpdate(app.store.update(draft => { draft.petWish = wished ? null : id; })); });
-    $('#pet-adopt-button').addEventListener('click', () => {
-      const result = app.store.adoptPet(id, $('#pet-adopt-name').value); offered = null; app.acceptUpdate(result);
+    $('#pet-adopt-button').addEventListener('click', async () => {
+      const update = app.store.adoptPet(id, $('#pet-adopt-name').value); offered = null;
+      const result = await app.acceptUpdate(update);
       if (!result.adopted) { receipt(result.reason); return; }
-      drafts.delete(`adopt:${id}`); $('#pet-collection').open = false; app.room?.invitePet(); app.delights?.show('hello', 'pet');
+      drafts.delete(`adopt:${id}`); if ($('#pet-collection')) $('#pet-collection').open = false; app.room?.invitePet(); app.delights?.show('hello', 'pet');
       receipt(`Welcome home, ${name()} ♡`);
     });
     if (focus) { $('#pet-adopt-name').focus({ preventScroll: true }); box.scrollIntoView({ block: 'nearest', behavior: 'instant' }); }

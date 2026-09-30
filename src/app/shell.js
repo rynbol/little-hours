@@ -67,6 +67,9 @@ export const shellMarkup = (audioPrefs) => `
         <div class="focus-actions"><button class="start-button" id="start-button"><span>Start focusing</span>${icon('arrow')}</button>
         <button class="focus-mode-button" id="focus-mode-enter" aria-label="Focus mode" title="Focus mode" aria-expanded="false" aria-controls="focus-mode-hud" disabled>${icon('mini')}<span>Focus mode</span></button></div>
         <button class="reset-session" id="reset-session" hidden>Start over</button>
+        <p class="session-kind" id="session-kind" hidden></p>
+        <div class="session-result" id="session-result" hidden><p id="session-result-copy"></p><div class="break-actions" role="group" aria-label="Take a break"><button class="quiet-button" data-break-minutes="5">5 min break</button><button class="quiet-button" data-break-minutes="15">15 min break</button></div></div>
+        <p class="sr-only" id="timer-status" role="status" aria-live="polite" aria-atomic="true"></p>
         <details id="focus-options" class="focus-disclosure"><summary>Session settings</summary>
         <label class="field-label sr-only" for="task">What you’re working on</label>
         <input id="task" maxlength="180" placeholder="What are you working on?" autocomplete="off" />
@@ -74,7 +77,7 @@ export const shellMarkup = (audioPrefs) => `
         </details>
         <details id="focus-progress" class="focus-disclosure"><summary>Your progress</summary>
         <div id="focus-reward" class="focus-reward"></div>
-        <details class="session-journal"><summary><span>Today</span><span id="today-total">0 min</span></summary><div id="today-sessions"></div></details>
+        <details class="session-journal"><summary><span>Today</span><span id="today-total">0 min</span></summary><div id="today-sessions"></div><div class="week-history" id="week-history"></div><p class="history-note">Up to 365 completed sessions stay on this device. Download a copy in Saved on this device.</p></details>
         </details>
         <div class="daily-note" id="daily-note">Good things begin with a little time.</div>
       </aside>
@@ -90,5 +93,6 @@ export const shellMarkup = (audioPrefs) => `
   <dialog id="session-celebration" class="session-celebration" aria-labelledby="celebration-title" aria-describedby="celebration-copy">
     <form method="dialog"><button class="celebration-close" aria-label="Close session celebration">${icon('close')}</button><div class="celebration-flower" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="m24 0 5.6 17.7L48 24l-18.4 6.3L24 48l-5.6-17.7L0 24l18.4-6.3Z"/></svg></div><h2 id="celebration-title">You did it.</h2><p id="celebration-copy"></p><div class="celebration-coins">${coinArt()}<strong id="celebration-earned"></strong></div><p class="celebration-bond" id="celebration-bond"></p><button class="start-button" autofocus>Lovely ${icon('heart')}</button></form>
   </dialog>
+  <dialog id="replace-session" class="session-celebration" aria-labelledby="replace-session-title"><h2 id="replace-session-title">Start a new session?</h2><p id="replace-session-copy"></p><div class="break-actions"><button class="quiet-button" id="keep-session">Keep my session</button><button class="quiet-button" id="replace-session-confirm">Start fresh</button></div></dialog>
   <div id="drag-return-preview" class="drag-return-preview" aria-hidden="true" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>`;

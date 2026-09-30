@@ -8,9 +8,11 @@ export default {
     check('an empty garden arrives without a seed card or a spots shelf', !await app.visible('#garden-card') && !await app.visible('#garden-spots'));
     await app.clickSel('#garden-spot-0'); await app.clickSel('#seed-moonflower'); await sleep(400); await t.shot(app, 'seeds');
     await app.clickSel('#garden-plant-seed');
+    await app.waitFor(`(JSON.parse(localStorage.getItem('little-hours-v1') || 'null')?.garden?.plants.length === 1)`, { what: 'the first seed to save' }).catch(() => null);
     let saved = await app.saved();
     check('the first seed is free and planted in spot one', saved.garden.plants[0]?.species === 'moonflower' && saved.garden.plants[0]?.slot === 0 && saved.house.coins === 300, saved.garden);
     await app.clickSel('#garden-study'); await app.clickSel('#start-button');
+    await app.waitFor(`(JSON.parse(localStorage.getItem('little-hours-v1') || 'null')?.session?.running)`, { what: 'focus to start' }).catch(() => null);
     check('focus captures this plant', (await app.saved()).session.plantId === 'plant-1');
     await t.steps.openProgress(app); await app.clickSel('#focus-garden'); await app.settle();
     check('a focused garden visit keeps you on the bench with your pet', await app.js(`(() => { const d = window.__littleHours.house.diagnostics(); return d.stroll?.sit === 1 && Boolean(d.strollPet) && d.scene.getTransformNodeByName('house-stroll').isEnabled(); })()`));
@@ -18,9 +20,11 @@ export default {
     await app.clickSel('#house-canvas [data-room="garden-exit"]'); await app.settle();
     await app.clickSel('#back-to-room'); await app.clickSel('#start-button'); await t.steps.openProgress(app); await app.clickSel('#focus-garden'); await app.settle();
     await app.clickSel('#garden-card-close'); await app.clickSel('#garden-spot-1'); await app.clickSel('#seed-cosmos'); await app.clickSel('#garden-plant-seed');
+    await app.waitFor(`(JSON.parse(localStorage.getItem('little-hours-v1') || 'null')?.garden?.plants.length === 2)`, { what: 'the second seed to save' }).catch(() => null);
     saved = await app.saved();
     check('later seeds cost ten coins and keep the paused target', saved.house.coins === 290 && saved.garden.plants.length === 2 && saved.session.plantId === 'plant-1', saved.garden);
     await app.clickSel('#garden-new-seeds'); await app.clickSel('#seed-lavender'); await app.clickSel('#garden-plant-seed');
+    await app.waitFor(`(JSON.parse(localStorage.getItem('little-hours-v1') || 'null')?.garden?.plants.length === 3)`, { what: 'the replanted seed to save' }).catch(() => null);
     saved = await app.saved();
     check('replanting keeps the previous plant in the collection', saved.garden.plants.length === 3 && saved.garden.plants[1].slot === null && saved.garden.plants[2].slot === 1);
     await app.reload(); await t.steps.openProgress(app); await app.clickSel('#focus-garden'); await app.settle();

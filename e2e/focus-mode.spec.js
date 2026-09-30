@@ -30,8 +30,10 @@ test('focus mode keeps the whole room and starts, resumes and exits without rese
   await page.locator('#focus-mode-enter').click(); expect((await state(page)).session.endsAt).toBe(deadline);
   await page.locator('#focus-mode-exit').click();
   await page.clock.fastForward('05:00'); await page.locator('#start-button').click();
+  await expect(page.locator('#start-button')).toHaveText(/Keep going/);
   const remaining = (await state(page)).session.remaining;
   await page.locator('#focus-mode-enter').click();
+  await expect(focusing(page)).toHaveCount(1);
   expect((await state(page)).session.remaining).toBe(remaining);
   await page.keyboard.press('Escape'); expect((await state(page)).session.running).toBe(true);
 });
@@ -53,11 +55,12 @@ test('entry closes pet care and a room pet tap leaves focus mode before reopenin
 });
 
 test('focus completion delivers the captured pet gift once after changing the displayed pet', async ({ page }) => {
-  await page.locator('#focus-mode-enter').click(); await page.clock.fastForward('05:00');
+  await page.locator('#focus-mode-enter').click(); await expect(focusing(page)).toHaveCount(1); await page.clock.fastForward('05:00');
   await page.keyboard.press('Escape'); await page.locator('#start-button').click();
   await page.locator('#pet-button').click(); await page.locator('#pet-collection > summary').click();
   await page.locator('[data-pet-choice="dog"]').click(); await page.locator('#close-panel').click();
   await page.locator('#focus-mode-enter').click();
+  await expect(focusing(page)).toHaveCount(1);
   expect((await state(page)).session.petId).toBe('cat');
   await page.clock.fastForward('20:01');
   await expect(focusing(page)).toHaveCount(0);
@@ -74,6 +77,7 @@ test('focus completion delivers the captured pet gift once after changing the di
 test('entry settles an overdue session without silently starting another timer', async ({ page }) => {
   await page.clock.pauseAt(new Date('2026-09-28T12:01:00'));
   await page.locator('#start-button').click();
+  await expect(page.locator('#start-button')).toHaveText(/Pause/);
   await page.locator('#focus-mode-enter').focus();
   await page.clock.setSystemTime(new Date('2026-09-28T12:27:00'));
   await page.keyboard.press('Enter');
@@ -93,6 +97,7 @@ test('another tab can pause the timer or replace the room without leaving focus 
   await other.locator('#start-button').click();
   await expect(focusing(page)).toHaveCount(0); expect((await state(page)).session.running).toBe(false);
   await page.locator('#focus-mode-enter').click();
+  await expect(focusing(page)).toHaveCount(1);
   await other.locator('#time-toggle').click();
   await expect(focusing(page)).toHaveCount(0); expect((await state(page)).session.running).toBe(true);
   await other.close();
@@ -102,6 +107,7 @@ test('phone focus mode leaves mini view, fills the viewport and keeps an accessi
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#room-more-toggle').click(); await page.locator('#mini-button').click(); await expect(page.locator('#stage')).toHaveClass(/is-mini/);
   await page.locator('#focus-mode-enter').click();
+  await expect(focusing(page)).toHaveCount(1);
   await expect(page.locator('#stage')).not.toHaveClass(/is-mini/);
   const box = await page.locator('#stage').boundingBox();
   expect(box.x).toBe(0); expect(box.y).toBe(0); expect(box.width).toBe(390); expect(box.height).toBe(844);
