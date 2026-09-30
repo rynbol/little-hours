@@ -220,6 +220,9 @@ try {
   assert.equal(shootingStar.isEnabled(), false, 'scheduled shooting stars stay hidden in daylight');
   room.setTheme('rain'); advance(2);
   assert.equal(rainMesh.isEnabled(), true); assert.equal(stars.isEnabled(), false); assert.equal(shootingStar.isEnabled(), false);
+  const streaks = rainMesh.getVerticesData('position'), lengths = [];
+  for (let i = 0; i < streaks.length; i += 6) lengths.push(streaks[i + 4] - streaks[i + 1]);
+  assert.ok(lengths.length >= 60 && Math.max(...lengths) < 0.13 && rainMesh.alpha < 0.4, 'rain falls as many short, faint streaks, not long scratches');
   room.setTheme('dusk'); advance(2);
   assert.equal(stars.isEnabled(), true); assert.equal(shootingStar.isEnabled(), true); assert.equal(rainMesh.isEnabled(), false);
   // Switched-off fairy lights stay on the wall, dark, like the accent lights of the other rooms.

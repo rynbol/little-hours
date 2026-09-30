@@ -375,9 +375,9 @@ export function createRoom(container, options = {}) {
   // A tap on the fairy lights, the lanterns or the sill candles switches them.
   for (const mesh of decor.lights.getChildMeshes()) { mesh.isPickable = true; mesh.metadata = { ...mesh.metadata, lightSwitch: true }; }
   const sillFlames = decor.lights.getChildMeshes().filter(mesh => mesh.material === candleFlame || mesh.material === candleTip);
-  const rainSeeds = Array.from({ length: 40 }, (_, i) => { const x = -4.7 + ((i * 0.618033) % 1) * 3.98; return { x, y: (i * 0.371) % 1, speed: 0.55 + (i % 4) * 0.12, top: archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2)) - 0.12 }; });
-  const rainLines = rainSeeds.map(seed => [new Vector3(seed.x, 2, -4.52), new Vector3(seed.x - 0.025, 2.18, -4.52)]);
-  const rain = MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, updatable: true }, scene); rain.color = color('#fffdf5'); rain.alpha = 0.6; rain.isPickable = false; rain.setEnabled(false);
+  const rainSeeds = Array.from({ length: 72 }, (_, i) => { const x = -4.7 + ((i * 0.618033) % 1) * 3.98; return { x, y: (i * 0.371) % 1, speed: 0.55 + (i % 4) * 0.12, top: archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2)) - 0.12 }; });
+  const rainLines = rainSeeds.map(seed => [new Vector3(seed.x, 2, -4.52), new Vector3(seed.x - 0.014, 2.11, -4.52)]);
+  const rain = MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, updatable: true }, scene); rain.color = color('#dbe4ec'); rain.alpha = 0.32; rain.isPickable = false; rain.setEnabled(false);
   const rainPositions = Float32Array.from(rain.getVerticesData('position'));
   rain.setBoundingInfo(new BoundingInfo(new Vector3(-4.75, 1.55, -4.53), new Vector3(-0.65, 5.28, -4.51)));
   // Forty-eight drifting motes share one draw; size and tint vary per instance.
@@ -1887,7 +1887,7 @@ export function createRoom(container, options = {}) {
     }
     if (settled) requestRender(true);
     if (rain.isEnabled()) {
-      for (let i = 0; i < rainSeeds.length; i++) { const seed = rainSeeds[i], top = seed.top, y = 1.62 + ((seed.y - (reducedMotion ? 0 : seconds * seed.speed) % 1 + 1) % 1) * (top - 1.62); rainPositions[i * 6 + 1] = y; rainPositions[i * 6 + 4] = Math.min(y + 0.20, top); }
+      for (let i = 0; i < rainSeeds.length; i++) { const seed = rainSeeds[i], top = seed.top, y = 1.62 + ((seed.y - (reducedMotion ? 0 : seconds * seed.speed) % 1 + 1) % 1) * (top - 1.62); rainPositions[i * 6 + 1] = y; rainPositions[i * 6 + 4] = Math.min(y + 0.11, top); }
       rain.updateVerticesData('position', rainPositions, false, false);
     }
   }
