@@ -30,6 +30,7 @@ export const views = {
   focus: { about: 'the whole room in Focus mode, or the room on older refs', async go(app) { if (await app.js(`Boolean(document.getElementById('focus-mode-enter'))`)) await steps.openFocus(app); } },
   pet: { about: 'your pet care card', async go(app) { await app.clickSel('#pet-button'); await app.settle(); } },
   room: { about: 'the room at rest', async go() {} },
+  timer: { about: 'the room with the focus timer sheet open, or the room on older refs', async go(app) { await steps.openTimer(app); await app.settle(); } },
   house: { about: 'the house page, open', async go(app) { await steps.openHouse(app); } },
   'house-closed': { about: 'the house page, closed', async go(app) { await steps.openHouse(app); await steps.toggleHouse(app); } },
   decorate: { about: 'Decorate mode', async go(app) { await steps.openDecorate(app); } },
