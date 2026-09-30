@@ -1,5 +1,5 @@
 import { travelTo } from '../../ui/place-transition.js';
-import { BAIT_RANGES, FIGHT, SPECIES, TIERS, baitRange, rollCatch, speciesOf, startFight, stepFight, tierOf } from '../../core/fishing.js';
+import { BAIT_RANGES, FIGHT, SPECIES, TANK_LIMIT, TIERS, baitRange, onFish, rollCatch, speciesOf, startFight, stepFight, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
 import { fishArt } from './fish-art.js';
 import { createLakeScene } from './lake-scene.js';
@@ -16,6 +16,7 @@ const baitIcon = id => `<svg viewBox="0 0 24 24" aria-hidden="true">${BAIT_ART[i
 const rangeText = range => range.to === Infinity ? `${range.from}+ min` : `${range.from}–${range.to} min`;
 const hintFor = tier => { const index = TIERS.findIndex(t => t.id === tier), range = BAIT_RANGES.reduce((best, r) => r.weights[index] > best.weights[index] ? r : best); return `Best on ${range.label.toLowerCase()} · ${rangeText(range)}`; };
 const cm = size => `${size.toFixed(1).replace(/\.0$/, '')} cm`;
+const TANK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12" rx="2" fill="#cfe8e4" stroke="currentColor" stroke-width="1.5"/><path d="M8 12.5c1.6-2 4-2 5.5 0-1.5 2-3.9 2-5.5 0Zm5.5 0 2.2-1.4v2.8Z" fill="#ec8a4e"/><path d="M3.5 15.5h17" stroke="#dccb9f" stroke-width="2"/></svg>';
 const escape = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 export function createFishingUI(app, { onClose } = {}) {
@@ -29,11 +30,12 @@ export function createFishingUI(app, { onClose } = {}) {
   function build() {
     root = document.createElement('section'); root.className = 'lake'; root.id = 'lake-page'; root.hidden = true; root.setAttribute('aria-label', 'Willow Pond');
     root.innerHTML = `<div class="lake-stage"></div><div class="lake-vignette" aria-hidden="true"></div>
+      <button class="house-room-tag lake-exit" id="lake-exit" type="button" aria-label="Back to island" hidden><span class="house-pin" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 5 7 12l9 7M7 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="house-pin-label"><strong>Island</strong></span></button>
       <header class="lake-top"><button class="lake-chip" id="lake-back" type="button" aria-label="Back to the island"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lake-wide">Island</span></button>
         <div class="lake-title"><h1>Willow Pond</h1></div>
         <button class="lake-chip lake-book" id="lake-journal-button" type="button" aria-label="Fishing journal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h10a2 2 0 0 1 2 2v13H8a2 2 0 0 1-2-2Z" fill="#f1e2c9" stroke="currentColor" stroke-width="1.5"/><path d="M6 4.5v13" stroke="#a65766" stroke-width="3"/><path d="M10 9h5M10 12h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="lake-wide">Journal</span><b id="lake-found"></b></button></header>
       <p class="lake-status" id="lake-status" aria-live="polite"></p>
-      <div class="lake-bite" id="lake-bite" hidden><span class="lake-alert" id="lake-alert" aria-hidden="true">!</span><p id="lake-bite-note"></p><div class="lake-tension" id="lake-tension" role="meter" aria-label="Line tension" aria-valuemin="0" aria-valuemax="100"><i></i></div><div class="lake-bite-ring" id="lake-bite-ring"><button type="button" id="lake-reel">Reel!</button></div></div>
+      <div class="lake-bite" id="lake-bite" hidden><span class="lake-alert" id="lake-alert" aria-hidden="true">!</span><p id="lake-bite-note"></p><div class="lake-tension" id="lake-tension" role="meter" aria-label="Line tension" aria-valuemin="0" aria-valuemax="100"><span class="lake-zone"><svg viewBox="0 0 32 16" aria-hidden="true"><path d="M3 8c4-5 11-6 17-3l6-4v14l-6-4c-6 3-13 2-17-3Z" fill="currentColor"/><circle cx="8" cy="7" r="1.3" fill="#fbf5ea"/></svg></span><i class="lake-float"></i></div><div class="lake-bite-ring" id="lake-bite-ring"><button type="button" id="lake-reel">Reel!</button></div></div>
       <div class="lake-tackle" id="lake-tackle" popover role="dialog" aria-label="Bait"><header><h2>Bait</h2><button class="lake-close" type="button" popovertarget="lake-tackle" popovertargetaction="hide" aria-label="Close bait selector">×</button></header>
         <div class="lake-bait" id="lake-bait" role="radiogroup" aria-label="Choose your bait"></div>
         <details id="lake-chances"><summary>Catch chances</summary><div class="lake-odds" id="lake-odds" aria-label="Chances for this bait"></div></details></div>
@@ -43,11 +45,13 @@ export function createFishingUI(app, { onClose } = {}) {
       <dialog class="lake-journal" id="lake-journal" aria-labelledby="lake-journal-title"></dialog>`;
     document.body.appendChild(root);
     $('#lake-back').addEventListener('click', close);
+    $('#lake-exit').addEventListener('click', close);
     $('#lake-cast').addEventListener('click', cast);
     $('#lake-reel').addEventListener('pointerdown', press);
     for (const type of ['pointerup', 'pointercancel', 'pointerleave']) root.addEventListener(type, letGo);
     window.addEventListener('blur', letGo);
     $('#lake-journal-button').addEventListener('click', () => openJournal());
+    for (const id of ['#lake-card', '#lake-journal']) $(id).addEventListener('click', toggleTankFish);
     $('#lake-journal').addEventListener('click', event => { if (event.target === $('#lake-journal')) closeJournal(); });
     for (const [id, dismiss] of [['#lake-card', stow], ['#lake-journal', closeJournal]]) $(id).addEventListener('cancel', event => { event.preventDefault(); event.stopPropagation(); dismiss(); });
     const chooseBait = id => { chosen = id; renderTray(); $(`[data-bait="${id}"]`)?.focus({ preventScroll: true }); };
@@ -98,7 +102,8 @@ export function createFishingUI(app, { onClose } = {}) {
       if (phase !== 'cast') return;
       phase = 'wait'; renderTray(); status('');
       const bite = 1400 + clockRandom() * 3200, nibbles = Math.floor(clockRandom() * 3);
-      for (let i = 0; i < nibbles; i++) later(() => { scene?.nibble(); status('A nibble…'); }, bite * (i + 1) / (nibbles + 1.4));
+      scene.approach(bite);
+      for (let i = 0; i < nibbles; i++) later(() => { scene?.nibble(); status('A nibble… not yet'); }, bite * (i + 1) / (nibbles + 1.4));
       later(() => startBite(index), bite);
     });
   }
@@ -120,32 +125,45 @@ export function createFishingUI(app, { onClose } = {}) {
     later(() => { if (phase === 'idle') status(''); }, 3200);
     ($('#lake-cast').disabled ? $('#lake-back') : $('#lake-cast')).focus({ preventScroll: true });
   }
+  function spooked() {
+    clearTimers(); phase = 'idle'; scene.escape(); status('Too soon! It swam off. Wait for the big splash.'); renderTray();
+    later(() => { if (phase === 'idle') status(''); }, 3200);
+  }
   function press(event) {
+    if (phase === 'wait' && (!event || event.target?.closest?.('.lake-stage'))) { spooked(); return; }
     if (phase !== 'bite' && phase !== 'reel') return;
     event?.preventDefault?.();
     if (phase === 'bite') hook();
+    catchUp();
     holding = true; $('#lake-bite').classList.add('is-holding');
   }
-  function letGo() { holding = false; root?.querySelector('#lake-bite')?.classList.remove('is-holding'); }
+  function catchUp(now = performance.now()) {
+    if (phase !== 'reel' || !fight || fight.outcome || now <= lastFrame) return;
+    stepFight(fight, Math.min(.5, (now - lastFrame) / 1000), holding, clockRandom); lastFrame = now;
+  }
+  function letGo() { catchUp(); holding = false; root?.querySelector('#lake-bite')?.classList.remove('is-holding'); }
   function hook() {
     clearTimeout(biteTimer);
     const index = Number($('#lake-bite').dataset.index), bait = pond().bait[index];
     if (!bait) { phase = 'idle'; $('#lake-bite').hidden = true; renderTray(); return; }
-    hooked = { index, rolled: rollCatch(bait.minutes, clockRandom) };
-    fight = startFight(speciesOf(hooked.rolled.species).tier);
+    hooked = { index, rolled: rollCatch(bait.minutes, clockRandom, pond().journal) };
+    const tier = speciesOf(hooked.rolled.species).tier;
+    fight = startFight(tier); $('#lake-tension').style.setProperty('--tier', tierOf(tier).color);
     phase = 'reel'; scene.hook(hooked.rolled);
     $('#lake-bite').classList.add('is-reeling'); $('#lake-reel').textContent = 'Hold';
     renderTray(); lastFrame = performance.now(); loop = requestAnimationFrame(struggle);
   }
   function struggle(now) {
     if (phase !== 'reel' || !fight) return;
-    stepFight(fight, Math.min(.05, (now - lastFrame) / 1000), holding, clockRandom); lastFrame = now;
+    catchUp(now);
     scene?.fight(fight, holding);
-    const meter = $('#lake-tension'), tension = Math.min(1, fight.tension);
-    meter.style.setProperty('--tension', tension); meter.setAttribute('aria-valuenow', Math.round(tension * 100));
-    meter.classList.toggle('is-red', fight.tension >= FIGHT.red);
+    const meter = $('#lake-tension'), on = onFish(fight), tight = !on && fight.tension > fight.zone.at, loose = !on && !tight;
+    meter.style.setProperty('--tension', fight.tension); meter.style.setProperty('--zone-at', fight.zone.at); meter.style.setProperty('--zone-width', fight.zone.width);
+    meter.style.setProperty('--strain', Math.min(1, fight.strain / FIGHT.strainLimit)); meter.style.setProperty('--slack', Math.min(1, fight.slack / FIGHT.slackLimit));
+    meter.setAttribute('aria-valuenow', Math.round(fight.tension * 100));
+    meter.classList.toggle('is-on', on); meter.classList.toggle('is-red', tight); meter.classList.toggle('is-slack', loose);
     $('#lake-bite-ring').style.setProperty('--progress', 1 - fight.line);
-    const note = fight.tension >= FIGHT.red ? 'Too tight! Let go a moment' : fight.mood === 'run' && fight.pull > .4 ? 'It’s running! Ease off…' : fight.slack > 1.4 ? 'Keep reeling or it’ll slip off' : holding ? 'Reeling…' : 'Hold to reel it in';
+    const note = tight ? (fight.mood === 'run' ? 'It’s running! Let go' : 'Too tight! Let go a moment') : loose ? (fight.slack > 1 ? 'Reel in or it’ll slip off' : 'Hold to reel up to the fish') : fight.line < .25 ? 'Nearly there…' : 'On the fish! Keep it there';
     if ($('#lake-bite-note').textContent !== note) $('#lake-bite-note').textContent = note;
     if (fight.outcome === 'landed') land();
     else if (fight.outcome) lost(fight.outcome);
@@ -178,11 +196,25 @@ export function createFishingUI(app, { onClose } = {}) {
       <div class="lake-card-art">${fishArt(species.id)}</div>
       <span class="lake-tier">${tier.label}</span><h2 id="lake-card-name">${escape(species.name)}</h2>
       <dl><div><dt>Size</dt><dd>${cm(fish.size)}</dd></div><div><dt>Caught</dt><dd>×${fish.count}</dd></div><div><dt>Best</dt><dd>${cm(fish.best)}</dd></div></dl>
+      ${tankButton(species.id)}
       <div class="lake-card-actions"><button type="button" class="lake-secondary" id="lake-card-journal">Open journal</button><button type="button" class="lake-primary" id="lake-card-keep">${pond().bait.length ? 'Keep fishing' : 'Put it in the basket'}</button></div></div>`;
     card.showModal();
     $('#lake-card-keep').addEventListener('click', stow);
     $('#lake-card-journal').addEventListener('click', () => { stow(); openJournal(fish.species); });
     $('#lake-card-keep').focus({ preventScroll: true });
+  }
+  const tankCount = () => `${pond().tank.length} of ${TANK_LIMIT} in your aquarium`;
+  function tankButton(id) {
+    const inTank = pond().tank.includes(id), full = !inTank && pond().tank.length >= TANK_LIMIT;
+    return `<button type="button" class="lake-tank" data-tank="${id}" aria-pressed="${inTank}"${full ? ' disabled' : ''}>${TANK_ICON}<span>${inTank ? 'In your aquarium' : full ? 'Aquarium is full' : 'Put in aquarium'}</span></button>`;
+  }
+  async function toggleTankFish(event) {
+    const button = event.target.closest('[data-tank]');
+    if (!button || button.disabled) return;
+    await app.acceptUpdate(app.store.toggleTankFish(button.dataset.tank));
+    for (const other of root.querySelectorAll('[data-tank]')) other.outerHTML = tankButton(other.dataset.tank);
+    root.querySelector(`[data-tank="${button.dataset.tank}"]`)?.focus({ preventScroll: true });
+    const count = $('#lake-tank-count'); if (count) count.textContent = tankCount();
   }
   function stow() {
     if (phase !== 'card') return;
@@ -197,11 +229,11 @@ export function createFishingUI(app, { onClose } = {}) {
     $('#lake-tackle').hidePopover();
     const journal = pond().journal, found = Object.keys(journal).length, total = Object.values(journal).reduce((sum, e) => sum + e.count, 0);
     const panel = $('#lake-journal');
-    panel.innerHTML = `<div class="lake-journal-inner"><header><div><p class="lake-journal-eyebrow">POND JOURNAL</p><h2 id="lake-journal-title">${found} of ${SPECIES.length} found</h2><p>${total} fish caught</p></div><button type="button" class="lake-close" id="lake-journal-close" aria-label="Close journal">×</button></header>
+    panel.innerHTML = `<div class="lake-journal-inner"><header><div><p class="lake-journal-eyebrow">POND JOURNAL</p><h2 id="lake-journal-title">${found} of ${SPECIES.length} found</h2><p>${total} fish caught · <span id="lake-tank-count">${tankCount()}</span></p></div><button type="button" class="lake-close" id="lake-journal-close" aria-label="Close journal">×</button></header>
       <details class="lake-bait-guide"><summary>Bait guide</summary><ol class="lake-ranges">${BAIT_RANGES.map(range => `<li>${baitIcon(range.id)}<span><strong>${range.label}</strong><small>${rangeText(range)}</small></span><span class="lake-mini-odds">${TIERS.map((tier, i) => range.weights[i] ? `<i style="--w:${range.weights[i]};--c:${tier.color}"></i>` : '').join('')}</span></li>`).join('')}</ol></details>
       ${TIERS.map(tier => { const list = SPECIES.filter(s => s.tier === tier.id); return `<section style="--c:${tier.color}"><h3><i></i>${tier.label}<small>${list.filter(s => journal[s.id]).length} / ${list.length}</small></h3><div class="lake-journal-grid">${list.map(s => {
         const entry = journal[s.id];
-        return entry ? `<article class="lake-entry${s.id === highlight ? ' is-new' : ''}" data-species="${s.id}"><div class="lake-entry-art">${fishArt(s.id)}</div><strong>${escape(s.name)}</strong><small>×${entry.count} · best ${cm(entry.best)}</small></article>`
+        return entry ? `<article class="lake-entry${s.id === highlight ? ' is-new' : ''}" data-species="${s.id}"><div class="lake-entry-art">${fishArt(s.id)}</div><strong>${escape(s.name)}</strong><small>×${entry.count} · best ${cm(entry.best)}</small>${tankButton(s.id)}</article>`
           : `<article class="lake-entry is-missing" data-species="${s.id}"><div class="lake-entry-art">${fishArt(s.id, { silhouette: true })}</div><strong>???</strong><small>${hintFor(tier.id)}</small></article>`;
       }).join('')}</div></section>`; }).join('')}</div>`;
     panel.showModal();
@@ -220,7 +252,7 @@ export function createFishingUI(app, { onClose } = {}) {
       return;
     }
     if ($('#lake-journal').open) return;
-    if ((event.key === ' ' || event.key === 'Enter') && (phase === 'bite' || phase === 'reel') && !event.target.closest('input, textarea')) {
+    if ((event.key === ' ' || event.key === 'Enter') && ['wait', 'bite', 'reel'].includes(phase) && !event.target.closest('input, textarea')) {
       event.preventDefault();
       if (!event.repeat) press();
       return;
@@ -243,7 +275,7 @@ export function createFishingUI(app, { onClose } = {}) {
     returnFocus = document.activeElement;
     phase = 'idle'; caught = null; chosen = null;
     root.hidden = false; document.body.classList.add('is-lake'); document.getElementById('app').inert = true;
-    building = requestAnimationFrame(() => { building = setTimeout(() => { building = 0; if (!root.hidden) scene = createLakeScene(root.querySelector('.lake-stage'), { theme: app.state.theme, avatar: app.state.avatar, pet: app.state.pet, reducedMotion: reduced() }); }); });
+    building = requestAnimationFrame(() => { building = setTimeout(() => { building = 0; if (!root.hidden) scene = createLakeScene(root.querySelector('.lake-stage'), { theme: app.state.theme, avatar: app.state.avatar, pet: app.state.pet, exitTag: $('#lake-exit'), reducedMotion: reduced() }); }); });
     root.dataset.theme = app.state.theme;
     status(''); $('#lake-chances').open = false; renderTray();
     $('#lake-card').close(); $('#lake-journal').close(); $('#lake-bite').hidden = true;
@@ -267,7 +299,7 @@ export function createFishingUI(app, { onClose } = {}) {
     open, close,
     get isOpen() { return Boolean(root && !root.hidden); },
     render() { if (root && !root.hidden && phase === 'idle') renderTray(); },
-    diagnostics: () => scene ? { ...scene.diagnostics(), ui: phase, fight: fight && { tension: fight.tension, line: fight.line, mood: fight.mood, runs: fight.runs } } : null,
+    diagnostics: () => scene ? { ...scene.diagnostics(), ui: phase, fight: (catchUp(), fight) && { tension: fight.tension, line: fight.line, mood: fight.mood, runs: fight.runs, zone: { ...fight.zone }, strain: fight.strain, slack: fight.slack } } : null,
     dispose() { disposed = true; closePond(); root?.remove(); root = null; },
   };
 }

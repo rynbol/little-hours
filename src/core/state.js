@@ -4,7 +4,7 @@ import { createHouse, normalizeHouse, activeHouseRoom, expansionVerdict, focusCo
 import { fitRoomType } from './room-types.js';
 import { AVATAR_DEFAULT, normalizeAvatarAppearance } from './avatar.js';
 import { clockNow, clockRandom } from './test-pins.js';
-import { emptyPond, normalizePond, addBait, landCatch } from './fishing.js';
+import { emptyPond, normalizePond, addBait, landCatch, toggleTank } from './fishing.js';
 import { normalizeOwnedPets, adoptionVerdict, FREE_PETS } from './pets.js';
 import { normalizePetBonds, normalizePetWish, recordPetFocus, shareRitual, feedPet, choosePetFabric, welcomePet, cleanPetName, bondLevel, petName, focusPetId } from './pet-bonds.js';
 import { archivePetFriendships } from './pet-legacy.js';
@@ -217,6 +217,11 @@ export function createStateStore(storage, now = clockNow) {
       let caught = null;
       const result = update((draft, { now: timestamp }) => { caught = landCatch(draft.pond, baitIndex, clockRandom, timestamp, rolled); });
       return { ...result, caught };
+    },
+    toggleTankFish(id) {
+      let inTank = null;
+      const result = update(draft => { inTank = toggleTank(draft.pond, id); });
+      return { ...result, inTank };
     },
     openBuddyFind() {
       let opened = null;

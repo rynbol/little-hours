@@ -5,6 +5,7 @@ const plaster = '#f8ecd6', stone = '#cdbb9f', timber = '#76553f', cream = '#f6ec
 const shutter = '#8fa487', door = '#8b5d44', slate = ['#5a746c', '#526a62'], ceiling = '#c9a47c', brick = '#ae8b70';
 const EAVE = .32, END = .25, slope = RISE / FRONT;
 export const OPEN_FRONT_RAIL = .32;
+export const HOUSE_POSITIONS = { studio: [-2.55, 0, 0], garden: [2.55, 0, 0], loft: [-2.55, 2.95, 0] };
 
 // What each room adds to the house, and how it joins its neighbours.
 export function exteriorPlan(house, id) {
@@ -145,6 +146,14 @@ export function buildExteriorPart(api, part, id, theme, options) {
       const [x, top, z] = CHIMNEY_TOP;
       api.box(x, top - .8, z, .5, 1.3, .5, brick); api.box(x, top - .11, z, .62, .12, .62, cream);
     }
+  }
+}
+
+export function buildClosedHouse(api, house, theme) {
+  for (const { id } of house.rooms) {
+    const [ox, oy, oz] = HOUSE_POSITIONS[id], { parts, options } = exteriorPlan(house, id);
+    const placed = Object.fromEntries(['box', 'ball', 'prism', 'disc'].map(name => [name, (x, y, z, ...rest) => api[name](x + ox, y + oy, z + oz, ...rest)]));
+    for (const part of parts) buildExteriorPart(placed, part, id, theme, options);
   }
 }
 

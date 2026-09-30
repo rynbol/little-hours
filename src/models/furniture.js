@@ -16,6 +16,8 @@ import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import { getFurniture } from '../core/catalog.js';
 import { AVATAR_DEFAULT, avatarAppearanceKey, avatarPaint, normalizeAvatarAppearance } from '../core/avatar.js';
 import { clockNow, clockRandom } from '../core/test-pins.js';
+import { speciesOf } from '../core/fishing.js';
+import { buildFishModel } from './fish-model.js';
 
 // Hand-built forms, real joinery, small deliberate details. No downloaded models,
 // generated pictures or texture files: even the notebook and screen are geometry.
@@ -580,30 +582,34 @@ function moonRug(parent) {
 // A little aquarium on an oak stand. The water is see-through and casts no
 // shadow; the fish and bubbles are instances of one small mesh each, moved in
 // the room's animation loop (see createAquariumLife). The lid lamp switches.
-function fishTank(parent) {
-  const scene = parent.getScene();
-  box(parent, [1.6, 0.66, 0.66], [0, 0.37, 0], C.wood, 0.03);
-  box(parent, [1.66, 0.06, 0.72], [0, 0.73, 0], C.edge, 0.02);
-  for (const x of [-0.39, 0.39]) {
-    box(parent, [0.74, 0.5, 0.03], [x, 0.37, 0.345], '#c29b71', 0.01);
-    sphere(parent, [0.022, 0.022, 0.018], [x + (x < 0 ? 0.3 : -0.3), 0.4, 0.37], C.brass);
+export const TANK_WATER = { 'fish-tank': [1.9, 0.8, 0.62], 'grand-tank': [3.1, 1.02, 0.9] };
+const TANK_FLOOR = 0.88;
+function fishTank(parent, [W, H, D]) {
+  const scene = parent.getScene(), sx = W / 1.42, sz = D / 0.5, top = TANK_FLOOR + H;
+  box(parent, [W + 0.18, 0.66, D + 0.16], [0, 0.37, 0], C.wood, 0.03);
+  box(parent, [W + 0.24, 0.06, D + 0.22], [0, 0.73, 0], C.edge, 0.02);
+  const doors = Math.round((W + 0.18) / 0.8), door = (W + 0.14) / doors;
+  for (let i = 0; i < doors; i++) {
+    const x = (i - (doors - 1) / 2) * door;
+    box(parent, [door - 0.04, 0.5, 0.03], [x, 0.37, D / 2 + 0.095], '#c29b71', 0.01);
+    sphere(parent, [0.022, 0.022, 0.018], [x + (x < 0 ? 1 : -1) * (door / 2 - 0.09), 0.4, D / 2 + 0.12], C.brass);
   }
-  for (const x of [-0.72, 0.72]) for (const z of [-0.26, 0.26]) cylinder(parent, 0.035, 0.03, 0.04, [x, 0.02, z], C.darkWood);
+  for (const x of [-1, 1]) for (const z of [-1, 1]) cylinder(parent, 0.035, 0.03, 0.04, [x * (W / 2 + 0.01), 0.02, z * (D / 2 + 0.01)], C.darkWood);
   // Sand, pebbles, a stone arch and sea grass.
-  box(parent, [1.5, 0.05, 0.58], [0, 0.785, 0], C.darkWood, 0.012);
-  box(parent, [1.42, 0.07, 0.5], [0, 0.845, 0], '#dccb9f', 0.012);
-  for (const [x, z, size, color] of [[-0.5, 0.12, 0.05, '#9c958a'], [-0.38, -0.1, 0.04, '#b9876a'], [0.18, 0.15, 0.045, '#8f8a82'], [0.46, -0.08, 0.055, '#a7a092'], [0.58, 0.14, 0.035, '#c39a76'], [-0.12, 0.02, 0.03, '#9c958a']]) sphere(parent, [size * 1.3, size * 0.7, size], [x, 0.885, z], color);
-  sphere(parent, [0.12, 0.1, 0.09], [0.28, 0.93, -0.12], '#8e8a80'); sphere(parent, [0.09, 0.14, 0.08], [0.4, 0.95, -0.14], '#9a958a');
+  box(parent, [W + 0.08, 0.05, D + 0.08], [0, 0.785, 0], C.darkWood, 0.012);
+  box(parent, [W, 0.07, D], [0, 0.845, 0], '#dccb9f', 0.012);
+  for (const [x, z, size, color] of [[-0.5, 0.12, 0.05, '#9c958a'], [-0.38, -0.1, 0.04, '#b9876a'], [0.18, 0.15, 0.045, '#8f8a82'], [0.46, -0.08, 0.055, '#a7a092'], [0.58, 0.14, 0.035, '#c39a76'], [-0.12, 0.02, 0.03, '#9c958a']]) sphere(parent, [size * 1.3, size * 0.7, size], [x * sx, 0.885, z * sz], color);
+  sphere(parent, [0.12, 0.1, 0.09], [0.28 * sx, 0.93, -0.12 * sz], '#8e8a80'); sphere(parent, [0.09, 0.14, 0.08], [0.4 * sx, 0.95, -0.14 * sz], '#9a958a');
   for (const [x, z, h, lean, color] of [[-0.58, -0.14, 0.42, 0.12, '#6f8d58'], [-0.5, -0.17, 0.3, -0.18, '#809a62'], [-0.26, -0.18, 0.36, 0.08, '#5f7d4f'], [0.06, -0.16, 0.26, -0.1, '#809a62'], [0.62, -0.1, 0.38, -0.14, '#6f8d58']]) {
-    const blade = sphere(parent, [0.028, h / 2, 0.01], [x, 0.88 + h / 2, z], color); blade.rotation.z = lean;
+    const tall = h * H / 0.6, blade = sphere(parent, [0.028, tall / 2, 0.01], [x * sx, TANK_FLOOR + tall / 2, z * sz], color); blade.rotation.z = lean;
   }
   // The water, and the glass edges and lid around it.
-  box(parent, [1.42, 0.6, 0.5], [0, 1.18, 0], '#a7d3cc', 0.006).material = material(scene, '#a7d3cc', { alpha: 0.36 });
-  for (const x of [-0.725, 0.725]) for (const z of [-0.265, 0.265]) box(parent, [0.03, 0.66, 0.03], [x, 1.14, z], C.darkWood, 0.008);
-  for (const z of [-0.265, 0.265]) box(parent, [1.48, 0.035, 0.035], [0, 1.49, z], C.darkWood, 0.008);
-  for (const x of [-0.725, 0.725]) box(parent, [0.035, 0.035, 0.56], [x, 1.49, 0], C.darkWood, 0.008);
-  box(parent, [1.54, 0.07, 0.62], [0, 1.545, 0], '#73533d', 0.02);
-  box(parent, [1.3, 0.02, 0.06], [0, 1.502, 0.18], '#fff1c9', 0.006).material = material(scene, '#fff1c9', { emissive: '#ffe7ad', emissiveIntensity: 0.8 });
+  box(parent, [W, H, D], [0, TANK_FLOOR + H / 2, 0], '#a7d3cc', 0.006).material = material(scene, '#bfe3dc', { alpha: 0.2 });
+  for (const x of [-1, 1]) for (const z of [-1, 1]) box(parent, [0.03, H + 0.06, 0.03], [x * (W / 2 + 0.015), 0.81 + (H + 0.06) / 2, z * (D / 2 + 0.015)], C.darkWood, 0.008);
+  for (const z of [-1, 1]) box(parent, [W + 0.06, 0.035, 0.035], [0, top + 0.01, z * (D / 2 + 0.015)], C.darkWood, 0.008);
+  for (const x of [-1, 1]) box(parent, [0.035, 0.035, D + 0.06], [x * (W / 2 + 0.015), top + 0.01, 0], C.darkWood, 0.008);
+  box(parent, [W + 0.12, 0.07, D + 0.12], [0, top + 0.065, 0], '#73533d', 0.02);
+  box(parent, [W - 0.12, 0.02, 0.06], [0, top + 0.022, D / 2 - 0.07], '#fff1c9', 0.006).material = material(scene, '#fff1c9', { emissive: '#ffe7ad', emissiveIntensity: 0.8 });
 }
 
 // A turned floor globe. The stand and meridian are still; the globe is its
@@ -949,8 +955,29 @@ function globeTemplate(scene) {
 // Three fish and a string of bubbles, as instances of one small mesh each:
 // the fish swim to and fro and turn around, the bubbles rise and start again.
 // Both keep still with reduced motion, and the bubbles hide.
-function createAquariumLife(parent) {
-  const scene = parent.getScene(), templates = cacheFor(scene).templates;
+const TANK_FISH_SIZE = { swim: 0.36, creep: 0.23, drift: 0.3 };
+function tankFishTemplate(scene, id, [W, H, D]) {
+  const templates = cacheFor(scene).templates, key = `tank-fish:${id}:${D}`;
+  if (!templates.has(key)) {
+    const { root, kind, length } = buildFishModel(scene, speciesOf(id), null, null), measure = () => {
+      root.getChildMeshes().forEach(mesh => mesh.computeWorldMatrix(true));
+      return root.getHierarchyBoundingVectors(true);
+    };
+    const paint = root.getChildMeshes()[0].material, look = speciesOf(id).look;
+    paint.emissiveColor = Color3.FromHexString(look.glow || look.body).scale(look.glow ? 0.55 : 0.45);
+    root.scaling.setAll(1); root.computeWorldMatrix(true);
+    const { min, max } = measure(), size = max.subtract(min);
+    const flat = kind === 'swim' ? Math.min(W * 0.3 / size.x, D * 0.4 / size.z) : (D - 0.1) / Math.max(size.x, size.z);
+    root.scaling.setAll(Math.min(TANK_FISH_SIZE[kind] * H / 0.4 / Math.sqrt(Math.max(1, length)), H * 0.58 / size.y, flat));
+    root.computeWorldMatrix(true);
+    const bounds = measure();
+    root.metadata = { kind, low: bounds.min, high: bounds.max, rainbow: speciesOf(id).look.mark === 'rainbow' };
+    root.setEnabled(false); templates.set(key, root);
+  }
+  return templates.get(key);
+}
+function createAquariumLife(parent, [W, H, D]) {
+  const scene = parent.getScene(), templates = cacheFor(scene).templates, sx = W / 1.42, sz = D / 0.5, lift = y => TANK_FLOOR + (y - TANK_FLOOR) * H / 0.6;
   if (!templates.has('aquarium-fish')) {
     const body = CreateSphere('fish-body', { diameter: 2, segments: 6 }, scene); body.scaling.set(0.07, 0.04, 0.019);
     const tail = CreateSphere('fish-tail', { diameter: 2, segments: 4 }, scene); tail.scaling.set(0.03, 0.036, 0.007); tail.position.x = -0.082;
@@ -959,9 +986,9 @@ function createAquariumLife(parent) {
     for (const mesh of [fish, bubble]) { mesh.material = material(scene, '#ffffff'); mesh.setEnabled(false); }
     templates.set('aquarium-fish', fish); templates.set('aquarium-bubble', bubble);
   }
-  const water = new BoundingInfo(new Vector3(-0.7, 0.88, -0.24), new Vector3(0.7, 1.48, 0.24));
-  const school = [{ y: 1.12, z: 0.08, speed: 0.55, phase: 0, reach: 0.48, size: 1, color: '#ec8a4e' }, { y: 1.3, z: -0.07, speed: 0.42, phase: 2.1, reach: 0.4, size: 0.8, color: '#e9bd57' }, { y: 0.99, z: 0.01, speed: 0.68, phase: 4.2, reach: 0.36, size: 0.9, color: '#6c9bd4' }];
-  const bubbles = Array.from({ length: 6 }, (_, i) => ({ phase: i / 6, x: 0.5 + (i % 2) * 0.02, z: -0.08, size: 0.012 + (i % 3) * 0.004 }));
+  const water = new BoundingInfo(new Vector3(-W / 2 + 0.01, TANK_FLOOR, -D / 2 + 0.01), new Vector3(W / 2 - 0.01, TANK_FLOOR + H, D / 2 - 0.01));
+  const school = [{ y: lift(1.12), z: 0.08 * sz, speed: 0.55, phase: 0, reach: 0.48 * sx, size: 1, color: '#ec8a4e' }, { y: lift(1.3), z: -0.07 * sz, speed: 0.42, phase: 2.1, reach: 0.4 * sx, size: 0.8, color: '#e9bd57' }, { y: lift(0.99), z: 0.01 * sz, speed: 0.68, phase: 4.2, reach: 0.36 * sx, size: 0.9, color: '#6c9bd4' }];
+  const bubbles = Array.from({ length: 6 }, (_, i) => ({ phase: i / 6, x: 0.5 * sx + (i % 2) * 0.02, z: -0.08 * sz, size: 0.012 + (i % 3) * 0.004 }));
   const parts = [['aquarium-fish', school], ['aquarium-bubble', bubbles]].map(([name, seeds]) => {
     const mesh = templates.get(name).clone(name, parent); mesh.setEnabled(true); mesh.isPickable = false; mesh.receiveShadows = false;
     mesh.metadata = { dynamic: true, effect: 'aquarium-life', castShadow: false }; mesh.setBoundingInfo(water);
@@ -971,6 +998,32 @@ function createAquariumLife(parent) {
     return { mesh, matrices };
   });
   const [fish, bubble] = parts, scratch = new Matrix(), turn = new Quaternion(), scale = new Vector3(), at = new Vector3(), still = Quaternion.Identity();
+  let swimmers = [], shown = '';
+  function swim(swimmer, i, seconds, moving) {
+    const { root, tail, kind, low, high, scale: size, lane } = swimmer, s = seconds * swimmer.speed + swimmer.phase, edge = 0.015;
+    const across = Math.hypot(Math.max(-low.x, high.x), Math.max(-low.z, high.z)), span = (from, to) => from + Math.max(0, to - from) * lane;
+    const roam = (wave, room) => wave * Math.max(0, room);
+    if (kind === 'creep') {
+      const reach = Math.hypot(Math.max(-low.x, high.x), Math.max(-low.y, high.y));
+      root.position.set(roam(Math.sin(s * 0.12), W / 2 - reach - edge), span(TANK_FLOOR + reach + edge, TANK_FLOOR + H * 0.78 - reach - edge), D / 2 - high.z - 0.005);
+      root.rotation.z = s * 0.15;
+    } else if (kind === 'drift') {
+      const pulse = moving ? Math.sin(seconds * 2.2 + i) * 0.08 : 0, grow = 1.08, bob = 0.06;
+      const bottom = TANK_FLOOR - low.y * grow + edge + bob, top = TANK_FLOOR + H * 0.78 - high.y * grow - edge - bob;
+      root.position.set(roam(Math.sin(s * 0.25), W / 2 - across * grow - edge), span(bottom, top) + Math.sin(s * 0.6) * Math.min(bob, Math.max(0, (top - bottom) / 2 + bob)), (lane - 0.5) * 2 * Math.max(0, D / 2 - across * grow - edge));
+      root.scaling.set(size * (1 + pulse), size * (1 - pulse), size * (1 + pulse));
+    } else {
+      const heading = Math.max(-1, Math.min(1, Math.cos(s) * 3)), bob = 0.02, turn = (1 - heading) / 2 * Math.PI;
+      const long = Math.max(-low.x, high.x) / size * 1.15 + 0.01, thick = Math.max(-low.z, high.z) / size + long * 0.12, deep = Math.max(0, D / 2 - thick * size - edge), sway = Math.min(0.03, deep);
+      const z = (lane - 0.5) * 2 * (deep - sway) + Math.sin(s * 0.8) * sway, room = D / 2 - edge - Math.abs(z) - thick * size * Math.abs(Math.cos(turn));
+      const swing = long * size * Math.abs(Math.sin(turn)), squash = swing > room ? Math.max(0.05, room) / swing : 1;
+      root.scaling.set(size * squash, size, size);
+      root.position.set(roam(Math.sin(s), W / 2 - Math.max(long, thick) * size - edge), span(TANK_FLOOR - low.y + edge + bob, TANK_FLOOR + H * 0.78 - high.y - edge - bob) + Math.sin(s * 1.7) * bob, z);
+      root.rotation.y = turn;
+      if (tail) tail.rotation.y = moving ? Math.sin(seconds * 8 + i) * 0.35 : 0;
+    }
+    if (swimmer.shine) swimmer.shine.level = moving ? 0.5 + Math.sin(seconds * 1.6 + i) * 0.2 : 0.6;
+  }
   function pose(seconds, moving) {
     school.forEach((seed, i) => {
       const s = seconds * seed.speed + seed.phase, heading = Math.max(-1, Math.min(1, Math.cos(s) * 3));
@@ -980,12 +1033,28 @@ function createAquariumLife(parent) {
     });
     bubbles.forEach((seed, i) => {
       const t = (seconds * 0.35 + seed.phase) % 1;
-      Matrix.ComposeToRef(scale.setAll(seed.size), still, at.set(seed.x + Math.sin(t * 12 + i) * 0.012, 0.92 + t * 0.52, seed.z), scratch); scratch.copyToArray(bubble.matrices, i * 16);
+      Matrix.ComposeToRef(scale.setAll(seed.size), still, at.set(seed.x + Math.sin(t * 12 + i) * 0.012, TANK_FLOOR + 0.04 + t * (H - 0.08), seed.z), scratch); scratch.copyToArray(bubble.matrices, i * 16);
     });
     fish.mesh.thinInstanceBufferUpdated('matrix'); bubble.mesh.thinInstanceBufferUpdated('matrix');
+    swimmers.forEach((swimmer, i) => swim(swimmer, i, seconds, moving));
   }
-  pose(0, false); bubble.mesh.setEnabled(false);
   let resting = true;
+  parent.metadata.setFish = ids => {
+    const kept = ids.filter(id => speciesOf(id)), key = kept.join();
+    if (key === shown) return;
+    shown = key;
+    swimmers.forEach(swimmer => swimmer.root.dispose(false, false));
+    swimmers = kept.map((id, i) => {
+      const template = tankFishTemplate(scene, id, [W, H, D]), root = template.clone(`tank-fish-${id}`, parent);
+      root.setEnabled(true);
+      for (const mesh of root.getChildMeshes()) { mesh.isPickable = false; mesh.receiveShadows = false; mesh.metadata = { dynamic: true, effect: 'aquarium-life', castShadow: false }; }
+      const tail = root.getChildTransformNodes(true, node => node.name.endsWith('lake-fish-tail'))[0], shine = template.metadata.rainbow ? root.getChildMeshes()[0].material.emissiveTexture : null;
+      return { root, tail, shine, id, ...template.metadata, scale: template.scaling.x, lane: (i * 0.618 + 0.2) % 1, speed: 0.4 + (i * 0.37 % 1) * 0.04, phase: i / kept.length * Math.PI * 2 };
+    });
+    fish.mesh.setEnabled(!swimmers.length);
+    pose(0, false);
+  };
+  pose(0, false); bubble.mesh.setEnabled(false);
   return (seconds, focused, reducedMotion) => {
     if (reducedMotion) { if (!resting) { pose(0, false); bubble.mesh.setEnabled(false); } resting = true; return; }
     if (resting) bubble.mesh.setEnabled(true);
@@ -1837,7 +1906,7 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
       'cloud-shelf': parent => cloudShelf(parent, 2.5), 'small-cloud-shelf': parent => cloudShelf(parent, 2.1),
       'wall-scroll': wallScroll, 'neon-orbit': neonOrbit, 'record-sleeve': recordSleeve, 'felt-rainbow': feltRainbow,
       'cottage-window': cottageWindow, 'arched-window': archedWindow, 'round-window': roundWindow,
-      'fish-tank': fishTank, globe: globeStand, easel, 'bean-bag': beanBag, monstera: parent => monstera(parent), 'tea-cart': teaCart,
+      'fish-tank': parent => fishTank(parent, TANK_WATER['fish-tank']), 'grand-tank': parent => fishTank(parent, TANK_WATER['grand-tank']), globe: globeStand, easel, 'bean-bag': beanBag, monstera: parent => monstera(parent), 'tea-cart': teaCart,
     };
     builders[type](source);
     const template = batch(source); template.setEnabled(false); templates.set(type, template);
@@ -1998,7 +2067,7 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
   }
   if (type === 'fireplace') { animations.push(createDancingFire(result)); animations.push(createHearthEmbers(result)); }
   if (type === 'plant' || type === 'moon-tree' || type === 'monstera') animations.push(createSwayingCanopy(result, type));
-  if (type === 'fish-tank') animations.push(createAquariumLife(result));
+  if (TANK_WATER[type]) animations.push(createAquariumLife(result, TANK_WATER[type]));
   if (type === 'tea-cart') animations.push(createTeaSteam(result, TEA_CART_SPOUT, 0.8));
   if (type === 'globe') {
     // The globe turns about its tilted axis; a tap spins it once.

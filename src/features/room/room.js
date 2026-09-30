@@ -28,7 +28,8 @@ import { createPetModel, createPetBelongings } from '../pet/index.js';
 import { createPetRoutine, insideBed, PETS, PET_REACTION } from '../pet/index.js';
 import { createCompanionRoutine } from '../companion/index.js';
 import { interactionFor, INTERACTION_NOTICES } from '../../core/item-interactions.js';
-import { createArchitecture, styleFurniture, buildWallMesh } from '../../models/architecture.js';
+import { createArchitecture, styleFurniture, buildWallMesh, furnitureRepaint } from '../../models/architecture.js';
+import { hasDetail, isDetailLoaded, loadDetails, createDetail, disposeDetails } from '../../models/detail.js';
 import { getFurniture } from '../../core/catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, footprintBounds, MAX_ITEMS, pieceCount, petBed, roomDesign, rugStack, rugTouches, groundAt, standHeight, FLOOR_Y, RUG_STEP, FLAT_RUG } from '../../core/layout.js';
 import { roomDisplayName } from '../../core/house.js';
@@ -41,6 +42,9 @@ import { createRoomRoof } from '../../models/room-roofs.js';
 import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
+import { createFirstPersonView, seatEye } from './first-person.js';
+import { createStorybook } from '../../models/storybook.js';
+import { createSeatWorld } from './seat-world.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -61,6 +65,7 @@ export function createRoom(container, options = {}) {
   scene.imageProcessingConfiguration.toneMappingEnabled = true;
   scene.imageProcessingConfiguration.toneMappingType = 1;
   scene.imageProcessingConfiguration.exposure = 1.08;
+  const storybook = createStorybook(scene);
   const targetHome = new Vector3(0, 2.15, 0), alphaHome = Math.atan2(12.4, 10.5), betaHome = 1.071;
   const camera = new ArcRotateCamera('whole-room-camera', alphaHome, betaHome, 19, targetHome.clone(), scene);
   camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
@@ -74,11 +79,11 @@ export function createRoom(container, options = {}) {
   camera.angularSensibilityX = camera.angularSensibilityY = 700;
   camera.inputs.removeByType('ArcRotateCameraMouseWheelInput');
   camera.inputs.removeByType('ArcRotateCameraKeyboardMoveInput');
-  if (!options.engineFactory) camera.attachControl(canvas, false);
   canvas.style.touchAction = 'pan-y';
   const instrumentation = new SceneInstrumentation(scene);
   const color = value => Color3.FromHexString(value);
   const world = new TransformNode('room', scene);
+  const seatWorld = createSeatWorld(scene, world);
   const classicArchitecture = new TransformNode('architecture-retreat', scene); classicArchitecture.parent = world;
   const decor = { plants: new TransformNode('window-greenery', scene), lights: new TransformNode('fairy-lights', scene), rug: new TransformNode('legacy-rug', scene) };
   Object.values(decor).forEach(group => { group.parent = world; });
@@ -540,6 +545,13 @@ export function createRoom(container, options = {}) {
     object.metadata.setPhase(plantPhase);
     object.metadata.plant.getChildMeshes(false).concat(object.metadata.plant).forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = true; });
   }
+  let tankFish = [];
+  const showTank = object => object.metadata.setFish?.(tankFish);
+  function setTankFish(ids) {
+    tankFish = [...ids];
+    for (const object of placedObjects.values()) showTank(object);
+    requestRender();
+  }
   function setPlantPhase(phase) {
     if (phase === plantPhase) return;
     plantPhase = phase;
@@ -585,7 +597,7 @@ export function createRoom(container, options = {}) {
   function refreshShadows() {
     shadow.getShadowMap().renderList = scene.meshes.filter(mesh => !(drag?.active && mesh === petModel?.body && drag.id === petBed(layout)?.id) && mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && (!drag?.active || itemAncestor(mesh)?.metadata.itemId !== drag.id) && mesh !== rain && mesh !== marker && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
     for (const mesh of glowingMeshes) bloom.removeIncludedOnlyMesh(mesh); glowingMeshes.clear();
-    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && !mesh.metadata?.companion && !['tea-steam', 'wall-highlight'].includes(mesh.metadata?.effect) && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
+    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && !mesh.metadata?.companion && (!mesh.metadata?.seatWorld || mesh.metadata.glow) && !['tea-steam', 'wall-highlight'].includes(mesh.metadata?.effect) && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
     bloom.mainTexture.renderList = [...glowingMeshes];
     requestRender(true);
   }
@@ -646,7 +658,7 @@ export function createRoom(container, options = {}) {
   function keepReason(item) { return getFurniture(item?.type)?.unique ? `${PETS[petSpecies].name}'s bed stays in your room. Move it anywhere you like.` : 'Keep one study desk so your companion has a place to focus.'; }
   function syncCompanionVisibility() {
     const atDesk = companionRoutine?.pose.atDesk ?? true;
-    for (const [id, object] of placedObjects) object.metadata.avatar?.setEnabled(atDesk && id === layout.activeDeskId);
+    for (const [id, object] of placedObjects) object.metadata.avatar?.setEnabled(atDesk && !seatView.inside && id === layout.activeDeskId);
     mobileCompanion?.root.setEnabled(!atDesk); mobileCompanion?.contact.setEnabled(!atDesk);
   }
   // A wall piece's back sits on its wall face; the side wall turns it to face the room.
@@ -778,7 +790,7 @@ export function createRoom(container, options = {}) {
         object.metadata ||= {}; object.metadata.itemId = item.id; object.metadata.furnitureType = item.type; object.metadata.tint = item.tint;
         if (customizedDesk) object.metadata.avatarAppearanceKey = avatarKey;
         object.getChildMeshes().forEach(mesh => { mesh.isPickable = isFurnitureSurface(mesh); mesh.receiveShadows = !mesh.metadata?.effect; });
-        showPlant(object);
+        showPlant(object); showTank(object);
         placedObjects.set(item.id, object);
         if (settleNew && !reducedMotion) { object.scaling.setAll(0.92); settlingPieces.set(item.id, { object, start: performance.now() }); }
       }
@@ -794,6 +806,7 @@ export function createRoom(container, options = {}) {
       object.setEnabled(item.type === 'plant' ? decorVisible.plants : getFurniture(item.type).category === 'Rugs' ? decorVisible.rug : true);
     }
     settleOnRugs(layout.items);
+    syncDetails();
     applySurfaces(); syncOpenings();
     if (selectedId && !ids.has(selectedId)) { selectedId = null; options.onSelectionChange?.(null); }
     animatedObjects.length = 0;
@@ -992,11 +1005,11 @@ export function createRoom(container, options = {}) {
   function setEditMode(value) {
     celebrationAge = Infinity;
     cancelDrag(); hoverItem(null); playHover = null;
-    const wasEditing = editing; editing = Boolean(value);
+    editing = Boolean(value);
     passages?.root.setEnabled(!editing); fitRoom();
     if (petRoutine?.pose.held) releasePet();
     companionRoutine?.setEditing(editing); petRoutine?.setEditing(editing); syncCompanionVisibility(); refreshShadows();
-    if (!options.engineFactory && wasEditing !== editing) { if (editing) camera.detachControl(); else camera.attachControl(canvas, false); }
+    syncCameraControl();
     camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0;
     canvas.style.touchAction = editing ? 'none' : 'pan-y'; canvas.style.cursor = 'grab';
     canvas.setAttribute('aria-label', editing ? 'Room design canvas. Hover to outline furniture. Drag a piece to move it, or drop it over the bottom collection to return it. Drag empty space to look around. Escape cancels a drag.' : 'Your cozy miniature study room. Drag to look around. Tap a lamp, the fire or the record player to switch it; tap your pet to pet it, or drag your pet somewhere new.');
@@ -1040,7 +1053,7 @@ export function createRoom(container, options = {}) {
       avatarPreviewRotation = avatarPreviewTarget = 0;
       camera.getViewMatrix(true);
       savedAvatarCamera = cameraFrame();
-      camera.detachControl(); avatarCameraControl = true; avatarCameraEditing = true;
+      avatarCameraControl = true; avatarCameraEditing = true; syncCameraControl();
       // Keep the portrait fill among the four lights StandardMaterial draws.
       // The room's two local glows are decorative and can pause for the close-up.
       savedAvatarEffects = [fireflies, skyStars, moths, shootingStar, rain, windowGlow, hearthGlow].map(effect => [effect, effect.isEnabled()]);
@@ -1096,7 +1109,7 @@ export function createRoom(container, options = {}) {
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
     const daylight = theme === 'day', night = theme === 'dusk';
     companionRoutine?.setContext({ night });
-    paintSky(theme); architecture?.setTheme(theme); roof?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
+    paintSky(theme); seatWorld.setTheme(theme); architecture?.setTheme(theme); roof?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
     if (!night) { shootingStar.setEnabled(false); streakMaterial.alpha = 0; }
     sun.diffuse = color(daylight ? '#fff1d2' : night ? '#c5ccec' : '#d5dfeb');
     sun.intensity = daylight ? 1.6 : night ? 0.62 : 0.82;
@@ -1151,7 +1164,7 @@ export function createRoom(container, options = {}) {
     const hardwareScale = engine.getHardwareScalingLevel();
     const x = (event.clientX - rect.left) * engine.getRenderWidth() * hardwareScale / Math.max(1, rect.width);
     const y = (event.clientY - rect.top) * engine.getRenderHeight() * hardwareScale / Math.max(1, rect.height);
-    return scene.createPickingRay(x, y, Matrix.IdentityReadOnly, camera);
+    return scene.createPickingRay(x, y, Matrix.IdentityReadOnly, scene.activeCamera);
   }
   // What a tap outside Decorate reaches: the cat, a piece with a use, or the
   // room's own lights. The closest of them wins.
@@ -1300,9 +1313,9 @@ export function createRoom(container, options = {}) {
     if (event.isPrimary === false || (event.button != null && event.button !== 0) || downPosition) return;
     const ray = editing && !placement ? castPointer(event) : null, floor = ray && floorPosition(ray), wall = ray && wallPosition(ray, 1.5);
     downPosition = { x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, pointerId: event.pointerId,
-      itemId: ray ? decorHit(ray) : null, floor: floor ? { x: floor.x, z: floor.z } : null, wall, pet: !editing && !avatarCameraEditing && hitPet(castPointer(event)), avatarRotation: avatarCameraEditing };
+      itemId: ray ? decorHit(ray) : null, floor: floor ? { x: floor.x, z: floor.z } : null, wall, pet: seatView.state === 'room' && !editing && !avatarCameraEditing && hitPet(castPointer(event)), avatarRotation: avatarCameraEditing };
     // A press on the pet can become a carry, so the room does not turn.
-    if (downPosition.pet && !options.engineFactory) camera.detachControl();
+    syncCameraControl();
     if ((editing || downPosition.pet || downPosition.avatarRotation) && event.pointerId != null) canvas.setPointerCapture(event.pointerId);
     if (downPosition.avatarRotation) canvas.style.cursor = 'grab';
     requestRender();
@@ -1397,7 +1410,7 @@ export function createRoom(container, options = {}) {
   function releasePet(event) {
     const pointerId = downPosition?.pointerId, carried = petRoutine.pose.held;
     downPosition = null; releasePointer(pointerId);
-    if (!options.engineFactory && !editing) camera.attachControl(canvas, false);
+    syncCameraControl();
     if (carried) {
       petRoutine.drop(); options.onPetCarry?.({ species: petSpecies, name: PETS[petSpecies].name, held: false }); updatePetShadow();
       // With reduced motion, one more frame sends the sitting pet home.
@@ -1445,7 +1458,7 @@ export function createRoom(container, options = {}) {
     restoreAvatarScenery(); restoreAvatarEffects();
     camera.layerMask = roomMask; portraitPlinth.setEnabled(false); portraitFill.intensity = 0;
     avatarCameraControl = false; companionRoutine.endAvatarEditing();
-    camera.attachControl(canvas, false); canvas.setAttribute('data-portrait', 'room');
+    syncCameraControl(); canvas.setAttribute('data-portrait', 'room');
   }
   function setCameraHeight(height, centerX = 0, centerY = 0) {
     const halfHeight = height / 2, halfWidth = halfHeight * canvasAspect;
@@ -1502,6 +1515,59 @@ export function createRoom(container, options = {}) {
     return { centerX, centerY, height: viewHeight };
   }
   scene.onBeforeRenderObservable.add(() => { if (fitAlpha !== camera.alpha || fitBeta !== camera.beta) fitRoom(); });
+  function seatPose() {
+    const desk = placedObjects.get(layout.activeDeskId), head = desk?.metadata.avatarHead;
+    if (!head) return null;
+    desk.computeWorldMatrix(true); head.computeWorldMatrix(true);
+    const forward = desk.getDirection(new Vector3(0, 0, -1));
+    return { eye: seatEye(head.getAbsolutePosition(), forward), forward, aspect: canvasAspect };
+  }
+  const seatView = createFirstPersonView(scene, canvas, { roomCamera: camera, seat: seatPose, roomFrame: roomFraming, onLook: () => requestRender(), onChange(change) { syncCameraControl(); syncCompanionVisibility(); syncDetails(); syncSeatWorld(); refreshShadows(); options.onSeatChange?.(change); } });
+  let cameraControl = false;
+  function syncCameraControl() {
+    const wanted = !options.engineFactory && seatView.state === 'room' && !editing && !avatarCameraControl && !downPosition?.pet;
+    if (wanted === cameraControl) return;
+    cameraControl = wanted;
+    if (wanted) camera.attachControl(canvas, false); else camera.detachControl();
+  }
+  syncCameraControl();
+  let seatShadersStale = true, seatSitting = null;
+  function shapeSeatShell() { seatWorld.setShell(architectureStyle, surfacePaint(architectureStyle, 'walls', layout.walls) || {}, (passages?.links || []).map(link => link.z)); }
+  function syncSeatWorld() {
+    const inside = seatView.inside;
+    if (inside) shapeSeatShell();
+    seatWorld.setEnabled(inside);
+    passages?.root.setEnabled(!editing && !inside);
+    roof?.root?.setEnabled(!inside);
+    skyStars.setEnabled(theme === 'dusk' && !inside);
+    for (const mesh of scene.meshes) if (mesh.material && (mesh.material === retreatView || mesh.material === architecture?.viewMaterial)) mesh.isVisible = !inside;
+  }
+  function syncDetails() {
+    for (const object of placedObjects.values()) {
+      const type = object.metadata.furnitureType; if (!hasDetail(type)) continue;
+      let detail = object.metadata.detail;
+      if (!detail) { detail = createDetail(type, scene, furnitureRepaint(architectureStyle, tintPaint(type, object.metadata.tint))); if (!detail) continue; detail.parent = object; object.metadata.detail = detail; }
+      detail.setEnabled(seatView.inside); object.metadata.body.setEnabled(!seatView.inside);
+    }
+  }
+  const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
+  async function prepareSeat(sitting) {
+    for (const type of new Set(layout.items.map(item => item.type).filter(type => hasDetail(type) && !isDetailLoaded(type)))) {
+      await loadDetails([type]); await yieldToBrowser();
+      if (disposed || seatSitting !== sitting) return;
+    }
+    syncDetails();
+    if (!seatShadersStale) return;
+    seatWorld.prepare(); shapeSeatShell(); seatShadersStale = false; scene.materials.forEach(moreLights);
+    const pending = seatView.prepareShaders();
+    while (seatView.compileShaders(pending, 12) > 0) { await yieldToBrowser(); if (disposed || seatSitting !== sitting) return; }
+  }
+  function sit() {
+    const sitting = {};
+    seatSitting = sitting;
+    prepareSeat(sitting).then(() => { if (disposed || seatSitting !== sitting) return; seatSitting = null; seatView.enter(reducedMotion); requestRender(); });
+  }
+  scene.onNewMeshAddedObservable.add(() => { seatShadersStale = true; });
   // Where a bubble belongs on screen: above the pet's head or the
   // companion's, in CSS pixels from the canvas corner. The result object is
   // reused from call to call.
@@ -1679,6 +1745,9 @@ export function createRoom(container, options = {}) {
     const companionDelta = companionTime ? Math.max(0, Math.min(.1, (now - companionTime) / 1000)) : 0;
     companionTime = now;
     animateAvatarCamera(companionDelta);
+    if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
+    storybook.amount = seatView.blend;
+    seatWorld.animate(companionDelta, reducedMotion);
     passages?.animate(companionDelta, houseHover, reducedMotion, lockedDoor, openingDoor);
     const celebrating = celebrationAge < 3.2;
     celebrationAge = celebrating ? celebrationAge + companionDelta : Infinity;
@@ -1839,12 +1908,12 @@ export function createRoom(container, options = {}) {
   const onMotionChange = event => { reducedMotion = event.matches; if (reducedMotion) { celebrationAge = Infinity; if (avatarCameraTransition) avatarCameraTransition.duration = 0; if (avatarPoseTransition) avatarPoseTransition.duration = 0; if (petRoutine.pose.care) { clearTimeout(petWake); petWake = setTimeout(requestRender, 9000); } } requestRender(); wakeForClock(); }; motionQuery.addEventListener('change', onMotionChange);
   // Restart timing from scratch after a pause, so the gap never reads as a slow frame.
   function resumeFrames() { companionTime = 0; lastFrame = 0; lastRenderedAt = 0; statsStart = 0; sampleFrames = 0; rafCalls = 0; lastRafAt = 0; intervalTotal = 0; intervals.length = 0; submissions.length = 0; requestRender(); }
-  const onVisibility = () => { visible = !document.hidden; companionTime = 0; if (visible) resumeFrames(); else { cancelDrag(); hoverItem(null); cancelAnimationFrame(frame); frame = 0; } wakeForClock(); };
+  const onVisibility = () => { visible = !document.hidden; companionTime = 0; if (visible) resumeFrames(); else { if (seatView.state === 'leaving') seatView.leave({ instant: true }); cancelDrag(); hoverItem(null); cancelAnimationFrame(frame); frame = 0; } wakeForClock(); };
   document.addEventListener('visibilitychange', onVisibility);
   requestRender();
 
   return {
-    setHouse, setPlantPhase,
+    setHouse, setPlantPhase, setTankFish,
     celebrate() { if (!editing && !avatarCameraEditing && !suspended && !reducedMotion) { celebrationAge = 0; requestRender(); } },
     petCareBusy() { return Boolean(editing || avatarCameraEditing || suspended || petRoutine.pose.held || petRoutine.pose.care); },
     canPetCare() { return Boolean(!editing && !avatarCameraEditing && !suspended && !petRoutine.pose.held && !petRoutine.pose.care && petRoutine.diningSpot()); },
@@ -1868,9 +1937,12 @@ export function createRoom(container, options = {}) {
       return started;
     },
     cancelDoorWalk(options) { const cancelled = companionRoutine.cancelDoorWalk(options); if (cancelled) requestRender(); return cancelled; },
-    setSuspended(value) { suspended = Boolean(value); if (suspended) { cancelDrag(); cancelAnimationFrame(frame); frame = 0; clearTimeout(petWake); } else { resize(); resumeFrames(); } wakeForClock(); },
+    setSuspended(value) { suspended = Boolean(value); if (suspended) { if (seatView.state === 'leaving') seatView.leave({ instant: true }); cancelDrag(); cancelAnimationFrame(frame); frame = 0; clearTimeout(petWake); } else { resize(); resumeFrames(); } wakeForClock(); },
     resize, setTheme, setLayout, setEditMode, setAvatarEditing, setAvatarAppearance, selectItem, beginPlacement, confirmPlacement, cancelPlacement, cancelDrag, rotateSelection, removeSelection, moveSelection, setActiveDesk, setArt, setTint, setSurface, setQuality,
     turnAvatar(angle, reset = false) { if (!avatarCameraEditing || avatarPoseTransition) return; avatarPreviewTarget = reset ? 0 : avatarPreviewTarget + angle; requestRender(); },
+    enterSeat() { if (editing || avatarCameraEditing || !seatPose()) return false; if (seatView.state !== 'room') { seatView.enter(reducedMotion); requestRender(); } else if (!seatSitting) sit(); return true; },
+    leaveSeat({ animate = false } = {}) { seatSitting = null; seatView.leave({ instant: !animate || reducedMotion || suspended || !visible || seatView.state === 'leaving' }); requestRender(); return seatView.state; },
+    setFocusProgress(value) { seatWorld.setProgress(value); requestRender(); },
     setFocused(value) { focused = Boolean(value); companionRoutine.setIntent(focused ? 'working' : 'break'); requestRender(); },
     setActivity(value) { if (value === 'working') celebrationAge = Infinity; focused = value === 'working'; companionRoutine.setIntent(value); requestRender(); }, pet, interactWithItem,
     setPet(species) { const next = PETS[species] ? species : 'cat'; if (next === petSpecies) return; if (petRoutine.pose.held) releasePet(); petSpecies = next; buildPet(); requestRender(); },
@@ -1887,7 +1959,7 @@ export function createRoom(container, options = {}) {
     buddyState() { return { mode: buddyFlight.mode, visible: buddyFrame.visible, activity: buddyFrame.activity, plan: buddyPlan?.kind ?? null, arrived: buddyArrived !== Infinity, holding: buddyFrame.holding, x: buddyFrame.x, y: buddyFrame.y, z: buddyFrame.z }; },
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { if (avatarCameraEditing) return; camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, petBelongings, petBond, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
-    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); buddyModel?.dispose(); petBelongings.dispose(); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    diagnostics() { return { scene, engine, camera, seat: { state: seatView.state, look: seatView.look, camera: seatView.camera, storybook: storybook.amount, preparing: Boolean(seatSitting), world: { enabled: seatWorld.root.isEnabled(false), theme: seatWorld.theme, progress: seatWorld.progress } }, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition || seatView.state === 'entering' || seatView.state === 'leaving'), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, tapTarget: playTarget, petBelongings, petBond, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); buddyModel?.dispose(); petBelongings.dispose(); seatView.dispose(); seatWorld.dispose(); storybook.dispose(); disposeDetails(scene); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

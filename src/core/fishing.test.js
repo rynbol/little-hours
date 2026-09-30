@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rollCatch, baitRange, startFight, stepFight, SPECIES, TIERS, BAIT_RANGES, BAIT_LIMIT, stockBait } from './fishing.js';
+import { rollCatch, baitRange, startFight, stepFight, SPECIES, TIERS, BAIT_RANGES, BAIT_LIMIT, TANK_LIMIT, stockBait, emptyPond, normalizePond, toggleTank } from './fishing.js';
 import { createStateStore, restoreState, freshState } from './state.js';
 
 const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
@@ -70,37 +70,60 @@ test('landing a fish spends the bait and fills the journal, repeats count up', (
 });
 
 test('a broken saved pond is cleaned up', () => {
-  const pond = restoreState(JSON.stringify({ pond: { bait: [{ minutes: 3, at: 1 }, { minutes: 30, at: 2 }, 'x'], journal: { koi: { count: 2, best: 44, first: 9 }, dragon: { count: 1, best: 1, first: 1 }, perch: { count: -1 } }, log: [{ species: 'nope' }] } })).pond;
-  assert.deepEqual(pond, { bait: [{ minutes: 30, at: 2 }], journal: { koi: { count: 2, best: 44, first: 9 } }, log: [] });
+  const pond = restoreState(JSON.stringify({ pond: { bait: [{ minutes: 3, at: 1 }, { minutes: 30, at: 2 }, 'x'], journal: { koi: { count: 2, best: 44, first: 9 }, dragon: { count: 1, best: 1, first: 1 }, perch: { count: -1 } }, log: [{ species: 'nope' }], tank: ['koi', 'dragon', 'koi', 'perch'] } })).pond;
+  assert.deepEqual(pond, { bait: [{ minutes: 30, at: 2 }], journal: { koi: { count: 2, best: 44, first: 9 } }, log: [], tank: ['koi'] });
   assert.deepEqual(restoreState('{}').pond.bait, [{ minutes: 10, at: 0 }]);
 });
 
 const lcg = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-function play(tier, seed, holds) {
+function play(tier, seed, holds, { frame = 1 / 60, react = 1 / 60 } = {}) {
   const fight = startFight(tier), random = lcg(seed);
-  let seconds = 0;
-  while (!fight.outcome && seconds < 60) { stepFight(fight, 1 / 30, holds(fight), random); seconds += 1 / 30; }
-  return { outcome: fight.outcome, seconds };
+  let seconds = 0, next = 0, holding = false;
+  while (!fight.outcome && seconds < 90) {
+    if (seconds >= next - 1e-9) { holding = holds(fight); next += react; }
+    stepFight(fight, frame, holding, random); seconds += frame;
+  }
+  return { outcome: fight.outcome, seconds, time: fight.time, runs: fight.runs };
 }
-const outcomes = (tier, holds) => Array.from({ length: 50 }, (_, i) => play(tier, i * 7919 + 1, holds).outcome);
+const outcomes = (tier, holds, options) => Array.from({ length: 40 }, (_, i) => play(tier, i * 7919 + 1, holds, options).outcome);
+const follow = fight => fight.tension < fight.zone.at;
 
-test('easing off when the line is tight lands every tier, bigger fish taking longer', () => {
-  const patient = fight => fight.tension < .7;
-  for (const tier of TIERS) assert.deepEqual([...new Set(outcomes(tier.id, patient))], ['landed'], tier.id);
-  const common = play('common', 11, patient).seconds, legend = play('legendary', 11, patient).seconds;
+test('keeping the float on the fish lands every tier, bigger fish taking longer', () => {
+  for (const tier of TIERS) assert.deepEqual([...new Set(outcomes(tier.id, follow))], ['landed'], tier.id);
+  const common = play('common', 11, follow).seconds, legend = play('legendary', 11, follow).seconds;
   assert.ok(common > 4 && common < legend && legend < 20, `${common} then ${legend}`);
 });
 
-test('holding the reel down through every run snaps the line on a legend, not on a minnow', () => {
-  const always = () => true;
-  assert.ok(outcomes('legendary', always).filter(o => o === 'snapped').length >= 40);
-  assert.deepEqual([...new Set(outcomes('common', always))], ['landed']);
+test('a quarter second of reaction lands every tier, and a sluggish hand loses the legends first', () => {
+  for (const tier of TIERS) assert.deepEqual([...new Set(outcomes(tier.id, follow, { frame: 1 / 4, react: 1 / 4 }))], ['landed'], tier.id);
+  const landed = tier => outcomes(tier, follow, { frame: 1 / 2, react: 1 / 2 }).filter(o => o === 'landed').length;
+  assert.ok(landed('common') >= 36 && landed('legendary') <= 8, `${landed('common')} commons, ${landed('legendary')} legends`);
+});
+
+test('holding the reel down the whole time snaps the line, even on a minnow', () => {
+  for (const tier of TIERS) assert.deepEqual([...new Set(outcomes(tier.id, () => true))], ['snapped'], tier.id);
 });
 
 test('a fish left on a slack line throws the hook', () => {
   const { outcome, seconds } = play('rare', 3, () => false);
   assert.equal(outcome, 'escaped');
-  assert.ok(seconds > 3 && seconds < 8, seconds);
+  assert.ok(seconds > 2 && seconds < 6, seconds);
+});
+
+test('the fight runs on game time, so a slow machine plays the same fish as a fast one', () => {
+  const pulse = fight => Math.floor(fight.time / .5) % 3 !== 0;
+  const fast = play('epic', 5, pulse, { frame: 1 / 60, react: 1 / 4 }), slow = play('epic', 5, pulse, { frame: 1 / 4, react: 1 / 4 });
+  assert.equal(slow.outcome, fast.outcome);
+  assert.equal(slow.runs, fast.runs);
+  assert.ok(Math.abs(slow.time - fast.time) < 1 / 30, `${fast.time} vs ${slow.time}`);
+});
+
+test('undiscovered fish are twice as likely within their tier', () => {
+  const journal = { minnow: { count: 1 }, perch: { count: 1 }, bluegill: { count: 1 } };
+  const picks = [0, .3, .5, .6, .7, .9].map(draw => rollCatch(10, seq(.1, draw, .5), journal).species);
+  assert.deepEqual(picks, ['minnow', 'bluegill', 'carp', 'carp', 'carp', 'puffer']);
+  assert.equal(rollCatch(10, seq(.1, .5, .5)).species, 'bluegill');
+  assert.equal(rollCatch(10, seq(.1, .7, .5)).species, 'carp');
 });
 
 test('landing a fish keeps the catch rolled when it was hooked', () => {
@@ -129,4 +152,23 @@ test('development stocking never displaces earned bait from a full or nearly ful
     assert.deepEqual(state.pond.bait.slice(0, count), earned);
     assert.deepEqual(restoreState(JSON.stringify(state)).pond.bait, state.pond.bait);
   }
+});
+
+test('caught fish go into the aquarium once each, up to eight, and come back out', () => {
+  const pond = emptyPond();
+  for (const [i, entry] of SPECIES.slice(0, 10).entries()) pond.journal[entry.id] = { count: 1, best: 5, first: i };
+  assert.equal(toggleTank(pond, 'glowfin'), null, 'an uncaught fish cannot go in');
+  assert.deepEqual(SPECIES.slice(0, 9).map(entry => toggleTank(pond, entry.id)), [true, true, true, true, true, true, true, true, null]);
+  assert.equal(pond.tank.length, TANK_LIMIT);
+  assert.equal(toggleTank(pond, 'perch'), false);
+  assert.equal(pond.tank.includes('perch'), false);
+  assert.equal(toggleTank(pond, SPECIES[8].id), true, 'a freed spot takes the next fish');
+  assert.deepEqual(normalizePond(JSON.parse(JSON.stringify(pond))).tank, pond.tank);
+});
+
+test('every species has a shape the models and the journal art can draw', () => {
+  const shapes = new Set(SPECIES.map(entry => entry.look.shape));
+  assert.deepEqual([...shapes].sort(), ['angel', 'betta', 'deep', 'eel', 'jelly', 'koi', 'long', 'puffer', 'round', 'slim', 'star', 'sturgeon']);
+  assert.equal(new Set(SPECIES.map(entry => entry.id)).size, SPECIES.length);
+  assert.deepEqual(SPECIES.filter(entry => entry.look.mark === 'rainbow').map(entry => entry.id), ['prism', 'glowfin']);
 });

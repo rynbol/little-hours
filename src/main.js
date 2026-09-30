@@ -76,6 +76,7 @@ function applyState(next, force = false) {
   app.houseUI?.render();
   app.lake.render();
   app.room?.setHouse(state.house);
+  if (force || previous.pond.tank.join() !== state.pond.tank.join()) app.room?.setTankFish(state.pond.tank);
   app.nav.renderConnections();
   app.roomUI.applyTheme(previous, force);
   if (document.activeElement !== $('#task') && !app.timer.taskPending && $('#task').value !== state.task) $('#task').value = state.task;
@@ -129,6 +130,7 @@ try {
     pet: app.state.pet,
     onPet: app.pet.feedback,
     onPetCarry: app.pet.onPetCarry,
+    onSeatChange: change => app.timer.onSeatChange(change),
     onFrame() { app.speech?.update(); app.delights?.update(); },
     onBuddy: event => app.buddy?.onRoom(event),
     onDoorProgress: app.nav.onDoorProgress,
@@ -160,7 +162,7 @@ app.houseUI = createHouseUI($('#house-page'), {
   onPond: () => app.lake.open(),
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !event.isComposing && app.timer.leaveFocusMode()) { event.preventDefault(); return; }
+  if (event.key === 'Escape' && !event.isComposing && app.timer.leaveFocusMode({ animate: true })) { event.preventDefault(); return; }
   if (event.key === 'Escape' && app.nav.houseOpen && !event.target.closest('input')) { app.nav.setHouseOpen(false); return; }
   if (event.key === 'Escape' && app.room?.cancelDrag?.()) { event.preventDefault(); return; }
   // Escape while typing (or composing) belongs to the text field, not the panel.
