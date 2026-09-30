@@ -49,6 +49,7 @@ export default {
     await app.js(FAST_SAVES);
     check('Play spins the ball, even when the save lands late and rebuilds the card', await app.js(`document.querySelector('#pet-play svg') !== window.__playIcon`) && await app.js(MOVED('#pet-play svg')) === 1, await app.js(`[${MOVED('#pet-play svg')}, window.__moves.filter(el => el.matches('#pet-play svg')).length]`));
     await press(app, sleep, '#pet-feed');
+    await app.waitFor(`${MOVED('#pet-feed svg')} > 0 && ${MOVED('#pet-meals > button')} > 0`, { timeout: 10000, what: 'the bowl to hop and the meals to slide in' }).catch(() => {});
     check('Feed hops the bowl and the meals slide in', await app.js(MOVED('#pet-feed svg')) === 1 && await app.js(MOVED('#pet-meals > button')) > 0);
     await press(app, sleep, '#pet-edit-name');
     check('the rename pencil wiggles and the name form slides in', await app.js(MOVED('#pet-edit-name svg')) === 1 && await app.js(MOVED('#pet-name-form')) === 1);
