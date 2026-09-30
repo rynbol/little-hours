@@ -46,6 +46,7 @@ export const SHELL_PAINT = Object.freeze({
 
 export const SEAT_WINDOW = Object.freeze({ x: 0, y: 3.05, width: 4.2, height: 3.1 });
 export const FLOCK_SECONDS = 38;
+export const CLOUD_SHADOW = Object.freeze({ day: 1, dusk: 0, rain: 0.5 });
 const SPIRITS = 34, SPIRIT_SECONDS = 40, SHOOTING_SECONDS = 23;
 const ahead = (across, distance) => [across, -distance];
 const bearing = (x, z) => Math.atan2(x, -z);
@@ -359,11 +360,24 @@ function buildShell(shape, doors) {
   }
 }
 
+const CLOUD_SHADE = `float hash(vec2 q) { return fract(sin(dot(q, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 q) { vec2 i = floor(q), f = fract(q); f = f * f * (3. - 2. * f); return mix(mix(hash(i), hash(i + vec2(1., 0.)), f.x), mix(hash(i + vec2(0., 1.)), hash(i + vec2(1., 1.)), f.x), f.y); }
+float cloudShade(vec2 at, float time) { vec2 drift = at * .05 + time * vec2(.018, .007); return smoothstep(.42, .6, noise(drift) * .65 + noise(drift * 2.3 + 4.1) * .35); }`;
+const LAND_VERTEX = `precision highp float;
+attribute vec3 position; attribute vec4 color; uniform mat4 world, viewProjection; uniform float time, shadow;
+varying vec3 vColor; varying float vCloud;
+${CLOUD_SHADE}
+void main() { vec4 p = world * vec4(position, 1.); vColor = color.rgb; vCloud = cloudShade(p.xz, time) * shadow * (1. - smoothstep(60., 110., length(p.xz))); gl_Position = viewProjection * p; }`;
+const LAND_FRAGMENT = `precision highp float;
+varying vec3 vColor; varying float vCloud;
+void main() { gl_FragColor = vec4(vColor * (1. - vCloud * .4), 1.); }`;
 const GRASS_VERTEX = `precision highp float;
 attribute vec3 position; attribute vec2 uv; uniform mat4 world, viewProjection; uniform float time;
-varying float vTip, vFog, vGust, vShade;
+uniform float shadow; varying float vTip, vFog, vGust, vShade, vCloud;
+${CLOUD_SHADE}
 void main() {
   vec4 p = world * vec4(position, 1.);
+  vCloud = cloudShade(p.xz, time) * shadow;
   float wave = sin(p.x * .045 + p.z * .03 - time * .9) * .5 + .5 + sin(p.x * .11 - p.z * .07 - time * 1.7) * .15;
   float gust = smoothstep(.55, 1., wave), sway = sin(time * 2.1 + p.x * .35 + p.z * .25 + uv.y * 6.28) * .22 + gust * .9;
   p.xz += vec2(.92, .38) * sway * uv.x * .55; p.y -= uv.x * gust * .18;
@@ -372,10 +386,11 @@ void main() {
   gl_Position = viewProjection * p;
 }`;
 const GRASS_FRAGMENT = `precision highp float;
-varying float vTip, vFog, vGust, vShade; uniform vec3 root, tip, shine, haze;
+varying float vTip, vFog, vGust, vShade, vCloud; uniform vec3 root, tip, shine, haze;
 void main() {
   vec3 c = mix(root, tip, vTip * vTip) * vShade;
-  c = mix(c, shine, vGust * .42);
+  c = mix(c, shine, vGust * .42 * (1. - vCloud));
+  c *= 1. - vCloud * .45;
   gl_FragColor = vec4(mix(c, haze, vFog), 1.);
 }`;
 
@@ -454,11 +469,13 @@ export function createSeatWorld(scene, parent) {
   const shapes = {};
   const make = (name, build, material = unlit, parentNode = root) => { const shape = createShape(); build(shape); shapes[name] = shape; return toMesh(shape, `seat-world-${name}`, scene, parentNode, material); };
   const spiritMatrices = new Float32Array(SPIRITS * 16);
-  const grassPaint = new ShaderMaterial('seat-world-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'uv'], uniforms: ['world', 'viewProjection', 'time', 'root', 'tip', 'shine', 'haze'] });
-  grassPaint.backFaceCulling = false; grassPaint.setFloat('time', 0);
+  const grassPaint = new ShaderMaterial('seat-world-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'uv'], uniforms: ['world', 'viewProjection', 'time', 'shadow', 'root', 'tip', 'shine', 'haze'] });
+  const landPaint = new ShaderMaterial('seat-world-land-paint', scene, { vertexSource: LAND_VERTEX, fragmentSource: LAND_FRAGMENT }, { attributes: ['position', 'color'], uniforms: ['world', 'viewProjection', 'time', 'shadow'] });
+  landPaint.backFaceCulling = false; landPaint.setFloat('time', 0); landPaint.setFloat('shadow', 0);
+  grassPaint.backFaceCulling = false; grassPaint.setFloat('time', 0); grassPaint.setFloat('shadow', 0);
   let sky = null, land, grass, cloudRoot, clouds, flockRoot, flock, moon, shooting, spirits;
   function build() {
-    sky = make('sky', buildSky); land = make('land', shape => { buildLand(shape); buildHamlet(shape); buildForest(shape); buildRuins(shape); buildCastle(shape); buildWatchtower(shape); buildVolcano(shape); });
+    sky = make('sky', buildSky); land = make('land', shape => { buildLand(shape); buildHamlet(shape); buildForest(shape); buildRuins(shape); buildCastle(shape); buildWatchtower(shape); buildVolcano(shape); }, landPaint);
     grass = new Mesh('seat-world-grass', scene); Object.assign(new VertexData(), grassBlades()).applyToMesh(grass); grass.material = grassPaint; grass.parent = root; grass.isPickable = false; grass.metadata = { castShadow: false, seatWorld: true };
     cloudRoot = new TransformNode('seat-world-cloud-drift', scene); cloudRoot.parent = root;
     clouds = make('clouds', buildClouds, unlit, cloudRoot);
@@ -496,7 +513,7 @@ export function createSeatWorld(scene, parent) {
     placeMoon();
     for (const mesh of [sky, land, clouds, flock, moon, shooting, spirits]) paint(mesh, palette);
     const blade = (key, scale) => hex(palette[key]).scale(scale);
-    grassPaint.setColor3('root', blade('grass', 0.62)); grassPaint.setColor3('tip', Color3.Lerp(blade('meadow', 1.08), hex(palette.glow), 0.12)); grassPaint.setColor3('shine', Color3.Lerp(blade('meadow', 1.28), hex(palette.glow), 0.3)); grassPaint.setColor3('haze', hex(palette.haze));
+    grassPaint.setColor3('root', blade('grass', 0.62)); grassPaint.setColor3('tip', Color3.Lerp(blade('meadow', 1.08), hex(palette.glow), 0.12)); grassPaint.setColor3('shine', Color3.Lerp(blade('meadow', 1.28), hex(palette.glow), 0.3)); grassPaint.setColor3('haze', hex(palette.haze)); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
   }
   function setShell(style, wallPaint = {}, doors = []) {
     const base = SHELL_PAINT[style] || SHELL_PAINT.retreat, key = JSON.stringify([style, wallPaint, doors]);
@@ -524,7 +541,7 @@ export function createSeatWorld(scene, parent) {
     if (!root.isEnabled(false)) return;
     seconds += reduced ? 0 : delta;
     cloudRoot.rotation.y = seconds * 0.004;
-    grassPaint.setFloat('time', seconds);
+    grassPaint.setFloat('time', seconds); landPaint.setFloat('time', seconds);
     const run = (seconds % FLOCK_SECONDS) / FLOCK_SECONDS * 2;
     flockRoot.rotation.y = -(FLOCK.center - FLOCK.span / 2 + FLOCK.span * Math.min(1, run));
     flockRoot.position.y = FLOCK.y + Math.sin(seconds * 0.7) * 0.9;
@@ -545,6 +562,6 @@ export function createSeatWorld(scene, parent) {
     prepare() { if (!sky) { build(); recolor(); } },
     setEnabled(enabled) { if (enabled && !sky) build(); root.setEnabled(enabled); if (enabled) { recolor(); placeSpirits(true); } },
     animate,
-    dispose() { root.dispose(false, false); unlit.dispose(); lit.dispose(); grassPaint.dispose(); },
+    dispose() { root.dispose(false, false); unlit.dispose(); lit.dispose(); grassPaint.dispose(); landPaint.dispose(); },
   };
 }

@@ -112,3 +112,16 @@ test('cumulus bank up in the view from the chair, and the day sun stays out of t
   assert.ok(sun.position.y / Math.hypot(sun.position.x, sun.position.z) > 1, 'the day sun rides high above the window');
   engine.dispose();
 });
+
+test('cloud shadows drift over the ground and the grass by day, soften in rain and stay off at dusk', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const paints = ['seat-world-land', 'seat-world-grass'].map(name => world.meshes.find(mesh => mesh.name === name).material);
+  for (const [theme, shadow] of [['day', 1], ['rain', 0.5], ['dusk', 0]]) {
+    world.setTheme(theme);
+    for (const paint of paints) assert.equal(paint._floats.shadow, shadow, `${paint.name} in ${theme}`);
+  }
+  world.animate(4, false);
+  assert.ok(paints.every(paint => paint._floats.time > 0));
+  engine.dispose();
+});
