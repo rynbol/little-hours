@@ -508,6 +508,19 @@ test('rain falls in sheets at three depths outside the room, denser and fainter 
   engine.dispose();
 });
 
+test('rain streaks lean 10 to 15 degrees with the wind, falling toward the side the grass bends to', () => {
+  const { positions, uvs } = rainShape(), leans = [];
+  for (let v = 0; v < positions.length / 3; v += 2) {
+    assert.deepEqual([uvs[v * 2 + 1], uvs[v * 2 + 3]], [0, 1], 'each streak column runs from a foot vertex to a head vertex');
+    const across = positions[v * 3] - positions[v * 3 + 3], drop = positions[v * 3 + 4] - positions[v * 3 + 1];
+    assert.equal(positions[v * 3 + 2], positions[v * 3 + 5], 'the wind leans streaks sideways, the same way wherever the sheet curves');
+    assert.ok(across > 0, 'the foot of each streak lies downwind of its head');
+    leans.push(Math.atan2(across, drop) * 180 / Math.PI);
+  }
+  assert.equal(leans.length, 33);
+  assert.ok(leans.every(lean => lean >= 10 && lean <= 15), `streaks lean ${Math.min(...leans).toFixed(1)} to ${Math.max(...leans).toFixed(1)} degrees`);
+});
+
 test('the moon maria fade into the face with no hard rim', () => {
   const { engine, world } = setup();
   world.setTheme('dusk'); world.setEnabled(true);
