@@ -527,8 +527,8 @@ void main() {
     float column = vUv.x * vKind.x + vUv.y * vKind.x * .012, h = hash(vec2(floor(column), vKind.x));
     float fall = fract(vUv.y * (5. + h * 4.) + time * (1.4 + h * .8) + h * 9.), dash = smoothstep(0., .06, fall) * (1. - smoothstep(.06, .3, fall));
     float thin = 1. - smoothstep(.04, .12, abs(fract(column) - .5)), mist = (1. - smoothstep(0., .45, vUv.y)) * .35 * (1. - smoothstep(.8, 1., abs(vUv.x * 2. - 1.)));
-    float a = (dash * thin * step(.35, h) * .9 + mist) * (vKind.y - 2.) * rain;
-    gl_FragColor = vec4(mix(haze, vec3(1.), .5) * a, a);
+    float a = (dash * thin * step(.35, h) * .45 + mist) * (vKind.y - 2.) * rain;
+    gl_FragColor = vec4(mix(haze, vec3(1.), .3) * a, a);
     return;
   }
   if (vKind.y < .5) {
