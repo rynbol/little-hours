@@ -44,7 +44,8 @@ import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
-import { ROOM_LIGHTS, seatedDim, deskLamp } from './room-lighting.js';
+import { ROOM_LIGHTS, seatedDim, deskLamp, gradeFocus } from './room-lighting.js';
+import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
 import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
 import { createLanternGlow } from './room-lantern-glow.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
@@ -70,6 +71,8 @@ export function createRoom(container, options = {}) {
   scene.imageProcessingConfiguration.toneMappingEnabled = true;
   scene.imageProcessingConfiguration.toneMappingType = 1;
   scene.imageProcessingConfiguration.exposure = 1.08;
+  scene.imageProcessingConfiguration.colorCurves = gradeFocus(new ColorCurves(), 0);
+  scene.imageProcessingConfiguration.colorCurvesEnabled = true;
   const painterly = createPainterly(scene, 'room-dusk');
   const storybook = createStorybook(scene);
   const targetHome = new Vector3(0, 2.15, 0), alphaHome = Math.atan2(12.4, 10.5), betaHome = 1.071;
@@ -1863,6 +1866,7 @@ export function createRoom(container, options = {}) {
     companionTime = now;
     animateAvatarCamera(companionDelta);
     if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
+    if (storybook.amount !== seatView.blend) gradeFocus(scene.imageProcessingConfiguration.colorCurves, seatView.blend);
     storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = ROOM_LIGHTS[theme].sun * seatedDim(theme, seatView.blend); aimDeskLamp(seatView.blend); rain.alpha = windowRainAlpha * (1 - seatView.blend);
     sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend);
     seatWorld.animate(companionDelta, reducedMotion);

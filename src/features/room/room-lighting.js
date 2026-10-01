@@ -12,3 +12,10 @@ export function deskLamp(theme, blend) {
   const { lamp, seatedLamp } = ROOM_LIGHTS[theme], mix = (from, to) => from + (to - from) * blend;
   return { intensity: mix(lamp[0], seatedLamp[0]), range: mix(lamp[1], seatedLamp[1]), offset: LAMP_AT.room.map((at, i) => mix(at, LAMP_AT.seated[i])) };
 }
+
+export const FOCUS_GRADE = Object.freeze({ globalHue: 70, globalDensity: 40, midtonesSaturation: 15, highlightsSaturation: -10, shadowsExposure: 80, highlightsExposure: -50 });
+
+export function gradeFocus(curves, blend) {
+  for (const [key, value] of Object.entries(FOCUS_GRADE)) curves[key] = key === 'globalHue' ? value : value * blend;
+  return curves;
+}
