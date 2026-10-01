@@ -344,3 +344,23 @@ test('the watchtower glows with glyph lines up every tier and splays its crown c
   assert.ok(crown.length >= 4 && crown.every(each => each.reach > 2.4), 'claw tips lean out past the crown platform');
   engine.dispose();
 });
+
+test('the meadow ruins are weathered: moss drapes down the columns and a column lies toppled at each site', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata, boxes = [];
+  for (let start = 0, i = 1; i <= shape.roles.length; i++) {
+    if (i < shape.roles.length && shape.roles[i] === shape.roles[start]) continue;
+    if ((i - start) % 20 === 0) for (let b = start; b < i; b += 20) {
+      const xs = [], ys = [], zs = [];
+      for (let v = b; v < b + 20; v++) { xs.push(shape.positions[v * 3]); ys.push(shape.positions[v * 3 + 1]); zs.push(shape.positions[v * 3 + 2]); }
+      const span = list => Math.max(...list) - Math.min(...list);
+      boxes.push({ role: shape.roles[b], tall: span(ys), long: Math.max(span(xs), span(zs)) });
+    }
+    start = i;
+  }
+  const drapes = boxes.filter(box => box.role === 'moss' && box.tall > 0.6 && box.long < 0.7), toppled = boxes.filter(box => box.role === 'ruin' && box.long > 2.4 && box.tall < 0.9 && box.tall > 0.6);
+  assert.ok(drapes.length >= 10, `${drapes.length} moss drapes`);
+  assert.ok(toppled.length >= 6, `${toppled.length} toppled columns`);
+  engine.dispose();
+});
