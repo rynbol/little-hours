@@ -393,10 +393,22 @@ function buildClouds(shape) {
   });
 }
 
+export const SPIRIT_MOTE = Object.freeze({ rim: 12, core: 0.3, halo: 0.4, wing: 12 });
 function buildSpirit(shape) {
-  const top = shape.vertex(0, 0.45, 0, 'spirit', 1.2), bottom = shape.vertex(0, -0.45, 0, 'spirit', 1);
-  const ring = [[0.28, 0], [0, 0.28], [-0.28, 0], [0, -0.28]].map(([x, z]) => shape.vertex(x, 0, z, 'spirit', 1.1));
-  for (let k = 0; k < 4; k++) { shape.tri(top, ring[k], ring[(k + 1) % 4]); shape.tri(bottom, ring[(k + 1) % 4], ring[k]); }
+  shape.fades = []; shape.wings = [];
+  const point = (x, y, z, fade, wing, shade) => { shape.fades.push(fade); shape.wings.push(wing); return shape.vertex(x, y, z, 'spirit', shade); };
+  const ring = (radius, fade, shade) => Array.from({ length: SPIRIT_MOTE.rim }, (_, s) => { const a = s / SPIRIT_MOTE.rim * Math.PI * 2; return point(Math.cos(a) * radius, Math.sin(a) * radius, 0, fade, false, shade); });
+  const center = point(0, 0, 0, 1, false, 1.25), core = ring(SPIRIT_MOTE.core, SPIRIT_MOTE.halo, 1.1), edge = ring(1, 0, 1);
+  for (let s = 0; s < SPIRIT_MOTE.rim; s++) { const next = (s + 1) % SPIRIT_MOTE.rim; shape.tri(center, core[s], core[next]); shape.quad(core[s], edge[s], edge[next], core[next]); }
+  for (const side of [-1, 1]) {
+    const hinge = point(0, 0, 0, 1, true, 0.8);
+    const outline = Array.from({ length: SPIRIT_MOTE.wing + 1 }, (_, s) => {
+      const a = s / SPIRIT_MOTE.wing * Math.PI, reach = (0.55 + 0.45 * Math.abs(Math.sin(a * 2)) ** 0.7) * (a < Math.PI / 2 ? 1 : 0.8);
+      const out = Math.sin(a) * reach;
+      return point(side * out, out, Math.cos(a) * reach * 0.7, 1, true, 1.05);
+    });
+    for (let s = 0; s < SPIRIT_MOTE.wing; s++) shape.tri(hinge, outline[s], outline[s + 1]);
+  }
 }
 
 export const MOON_FACE = Object.freeze({ radius: 6.5, center: 1.05, limb: 0.92 });
@@ -701,7 +713,7 @@ export function vistaPalette(theme, progress) {
 
 export const windowsLit = (theme, progress) => theme === 'day' ? 0 : Math.min(1, (VISTA_THEMES[theme] || VISTA_THEMES.dusk).light + progress * 0.7);
 export const spiritsAloft = (theme, progress) => theme === 'day' ? 0 : Math.round(4 + progress * (SPIRITS - 4));
-export const BUTTERFLIES = 6;
+export const BUTTERFLIES = 6, BUTTERFLY_WING = 0.16;
 export const butterfliesOut = theme => theme === 'day' ? BUTTERFLIES : 0;
 export const MOON_BEARING = 0.08;
 export const moonRise = progress => 0.3 + progress * 0.3;
@@ -713,6 +725,7 @@ export function createSeatWorld(scene, parent) {
   const shapes = {};
   const make = (name, build, material = unlit, parentNode = root) => { const shape = createShape(); build(shape); shapes[name] = shape; return toMesh(shape, `seat-world-${name}`, scene, parentNode, material); };
   const spiritMatrices = new Float32Array(SPIRITS * 16);
+  const spiritPaint = new StandardMaterial('seat-world-spirit', scene); spiritPaint.disableLighting = true; spiritPaint.diffuseColor = Color3.Black(); spiritPaint.emissiveColor = Color3.White(); spiritPaint.specularColor = Color3.Black(); spiritPaint.backFaceCulling = false; spiritPaint.disableDepthWrite = true; spiritPaint.imageProcessingConfiguration = unlit.imageProcessingConfiguration;
   const grassPaint = new ShaderMaterial('seat-world-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'uv'], uniforms: ['world', 'viewProjection', 'time', 'shadow', 'root', 'tip', 'shine', 'haze', 'warm', 'petal'] });
   const landPaint = new ShaderMaterial('seat-world-land-paint', scene, { vertexSource: LAND_VERTEX, fragmentSource: LAND_FRAGMENT }, { attributes: ['position', 'color'], uniforms: ['world', 'viewProjection', 'time', 'shadow'] });
   landPaint.backFaceCulling = false; landPaint.setFloat('time', 0); landPaint.setFloat('shadow', 0);
@@ -730,8 +743,8 @@ export function createSeatWorld(scene, parent) {
     clouds = make('clouds', buildClouds, cloudPaint, cloudRoot); clouds.setVerticesData('uv', clouds.metadata.shape.uvs); clouds.setVerticesData('uv2', clouds.metadata.shape.seeds);
     flockRoot = new TransformNode('seat-world-flock-flight', scene); flockRoot.parent = root; flockRoot.position.y = FLOCK.y;
     flock = make('flock', buildBirds, unlit, flockRoot);
-    moon = make('moon', buildMoon); shooting = make('shooting', buildShootingStar); spirits = make('spirits', buildSpirit);
-    spirits.metadata.glow = true;
+    moon = make('moon', buildMoon); shooting = make('shooting', buildShootingStar); spirits = make('spirits', buildSpirit, spiritPaint);
+    spirits.hasVertexAlpha = true;
     spirits.thinInstanceSetBuffer('matrix', spiritMatrices, 16, false); spirits.alwaysSelectAsActiveMesh = true;
   }
   let shell = null, shellKey = '', theme = 'dusk', progress = 0, colorKey = '', seconds = 0, backdrop = true;
@@ -763,6 +776,7 @@ export function createSeatWorld(scene, parent) {
     glow.lit = windowsLit(theme, progress); glow.stars = theme === 'dusk' ? 0.55 + progress * 0.45 : 0;
     placeMoon();
     for (const mesh of [sky, land, clouds, flock, moon, shooting, spirits]) paint(mesh, palette);
+    fadeSpirits();
     const tones = grassTones(palette);
     for (const [name, value] of Object.entries(tones)) grassPaint.setColor3(name, value); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
     skyEffectPaint.setFloat('rays', SUN_RAY_STRENGTH[theme] ?? 0); skyEffectPaint.setColor3('tint', Color3.Lerp(Color3.White(), hex(palette.glow), 0.6));
@@ -778,13 +792,19 @@ export function createSeatWorld(scene, parent) {
     for (let i = 0; i < shape.roles.length; i++) { const c = hex(palette[shape.roles[i]] || SHELL_ROLES[shape.roles[i]] || base.wall).scale(shape.shades[i]); colors.set([c.r, c.g, c.b, 1], i * 4); }
     shell.updateVerticesData('color', colors);
   }
+  function fadeSpirits() {
+    const { shape } = spirits.metadata, colors = spirits.getVerticesData('color'), day = theme === 'day';
+    shape.fades.forEach((fade, i) => { colors[i * 4 + 3] = shape.wings[i] === day ? fade : 0; });
+    spirits.updateVerticesData('color', colors);
+  }
   function placeSpirits(reduced) {
     const aloft = spiritsAloft(theme, progress), fluttering = butterfliesOut(theme);
     for (let i = 0; i < SPIRITS; i++) {
       if (i < fluttering) {
         const { x, z, sway } = butterflyStarts[i], t = reduced ? 0 : seconds, wander = t * 0.35 + sway, beat = reduced ? 1 : Math.abs(Math.sin(t * 13 + sway * 5));
         spot.set(x + Math.sin(wander) * 2.2 + Math.sin(wander * 2.3) * 0.8, 0.6 + (sway % 1.5) + Math.sin(t * 2.4 + sway) * 0.3, z + Math.cos(wander * 0.8) * 1.6);
-        scale.set(0.12 + beat * 0.5, 0.14, 0.3);
+        const lift = 0.15 + (1 - beat) * 1.1;
+        scale.set(BUTTERFLY_WING * Math.cos(lift), BUTTERFLY_WING * Math.sin(lift), BUTTERFLY_WING);
         Quaternion.RotationYawPitchRollToRef(Math.atan2(Math.cos(wander) * 2.2, -Math.sin(wander * 0.8) * 1.3), 0, 0, turn);
         Matrix.ComposeToRef(scale, turn, spot, matrix); matrix.copyToArray(spiritMatrices, i * 16);
         continue;
@@ -793,7 +813,7 @@ export function createSeatWorld(scene, parent) {
       const rise = i < aloft ? life : -1;
       spot.set(start.x + Math.sin(life * 9 + start.sway) * 1.6, rise < 0 ? -400 : start.ground + 0.8 + rise * 12, start.z + Math.cos(life * 7 + start.sway) * 1.6);
       scale.setAll(rise < 0 ? 0 : Math.sin(Math.PI * life) * 0.9);
-      Quaternion.RotationYawPitchRollToRef(life * 4 + start.sway, 0, 0, turn);
+      Quaternion.RotationYawPitchRollToRef(Math.atan2(spot.x, spot.z), -Math.atan2(spot.y, Math.hypot(spot.x, spot.z)), 0, turn);
       Matrix.ComposeToRef(scale, turn, spot, matrix); matrix.copyToArray(spiritMatrices, i * 16);
     }
     spirits.thinInstanceBufferUpdated('matrix');
@@ -825,6 +845,6 @@ export function createSeatWorld(scene, parent) {
     setBackdrop(next) { backdrop = Boolean(next); showBackdrop(); },
     setEnabled(enabled) { if (enabled && !sky) { build(); showBackdrop(); } root.setEnabled(enabled); if (enabled) { recolor(); placeSpirits(true); } },
     animate,
-    dispose() { root.dispose(false, false); unlit.dispose(); lit.dispose(); grassPaint.dispose(); landPaint.dispose(); skyEffectPaint.dispose(); },
+    dispose() { root.dispose(false, false); unlit.dispose(); lit.dispose(); grassPaint.dispose(); landPaint.dispose(); skyEffectPaint.dispose(); spiritPaint.dispose(); },
   };
 }
