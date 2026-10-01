@@ -501,49 +501,53 @@ function petBed(parent) {
   box(tag, [0.12, 0.035, 0.018], [0, 0, 0], C.cream, 0.008);
   for (const x of [-0.06, 0.06]) for (const y of [-0.016, 0.016]) sphere(tag, [0.02, 0.02, 0.012], [x, y, 0], C.cream);
 }
-const MOON_CANOPY = Object.freeze({ under: '#44605f', side: '#6a9652', top: '#9cc163', rim: '#c9dc8c', sun: [-0.3, 0.82, 0.48] });
-function leafClump(parent, center, radii, seed) {
-  const positions = [], indices = [], colors = [];
-  const [under, side, top, rim] = [MOON_CANOPY.under, MOON_CANOPY.side, MOON_CANOPY.top, MOON_CANOPY.rim].map(hex => Color3.FromHexString(hex));
-  const sun = new Vector3(...MOON_CANOPY.sun).normalize(), toward = new Vector3();
+const MOON_CANOPY = Object.freeze({ core: '#41665f', under: '#46696a', side: '#5f9a4c', top: '#a3c95a', rim: '#dcea93', sun: [-0.3, 0.82, 0.48] });
+function leafClump(parent, center, radii, seed, leaves) {
+  const positions = [], indices = [], colors = [], normals = [];
+  const [core, under, side, top, rim] = ['core', 'under', 'side', 'top', 'rim'].map(key => Color3.FromHexString(MOON_CANOPY[key]));
+  const sun = new Vector3(...MOON_CANOPY.sun).normalize(), normal = new Vector3(), along = new Vector3(), across = new Vector3();
   const band = (value, from, to) => Math.max(0, Math.min(1, (value - from) / (to - from)));
-  const puffs = [{ offset: [0, 0, 0], scale: 0.9, rings: 8, segments: 15, flatten: 0.82 }, { offset: [0.15 * Math.cos(seed), 0.4, 0.15 * Math.sin(seed)], scale: 0.58, rings: 6, segments: 11, flatten: 1 }];
-  for (let k = 0; k < 3; k++) {
-    const angle = seed * 2.1 + k * Math.PI * 2 / 3;
-    puffs.push({ offset: [0.62 * Math.cos(angle), 0.22, 0.62 * Math.sin(angle)], scale: 0.52, rings: 6, segments: 11, flatten: 1 });
-  }
-  for (const [index, puff] of puffs.entries()) {
-    const first = positions.length / 3, { rings, segments } = puff;
-    const middle = puff.offset.map((value, axis) => center[axis] + value * radii[axis]);
-    for (let ring = 0; ring <= rings; ring++) {
-      const phi = ring / rings * Math.PI, y = Math.cos(phi), r = Math.sin(phi);
-      for (let s = 0; s < (ring === 0 || ring === rings ? 1 : segments); s++) {
-        const angle = s / segments * Math.PI * 2, lump = 1 + (0.05 * Math.sin(angle * 3 + seed * 1.7 + index * 2.3 + ring * 1.1) + 0.03 * Math.sin(angle * 5 - seed + ring * 2.3)) * r;
-        const nx = Math.cos(angle) * r, nz = Math.sin(angle) * r;
-        const x = middle[0] + nx * radii[0] * puff.scale * lump, height = middle[1] + y * radii[1] * puff.scale * (y < 0 ? puff.flatten : 1), z = middle[2] + nz * radii[2] * puff.scale * lump;
-        positions.push(x, height, z);
-        toward.set((x - center[0]) / radii[0], (height - center[1]) / radii[1], (z - center[2]) / radii[2]).normalize();
-        const light = Math.max(0, Math.min(1, ((nx * 0.25 + toward.x * 0.75) * sun.x + (y * 0.25 + toward.y * 0.75) * sun.y + (nz * 0.25 + toward.z * 0.75) * sun.z) * 0.5 + 0.5));
-        const tone = Color3.Lerp(Color3.Lerp(Color3.Lerp(under, side, band(light, 0.08, 0.45)), top, band(light, 0.5, 1)), rim, band(light, 0.9, 1.08));
-        const tucked = index === 0 ? 1 : 0.9 + 0.1 * band(y, -0.6, 0.2);
-        colors.push(tone.r * tucked, tone.g * tucked, tone.b * tucked, 1);
-      }
+  const random = k => { const v = Math.sin((seed * 97.13 + k) * 12.9898) * 43758.5453; return v - Math.floor(v); };
+  const tone = (n, lift) => {
+    const light = Math.max(0, Math.min(1, Vector3.Dot(n, sun) * 0.5 + 0.5 + lift));
+    return Color3.Lerp(Color3.Lerp(Color3.Lerp(under, side, band(light, 0.15, 0.5)), top, band(light, 0.55, 0.95)), rim, band(light, 0.95, 1.12));
+  };
+  const vertex = (point, n, color) => { positions.push(point.x, point.y, point.z); normals.push(n.x, n.y, n.z); colors.push(color.r, color.g, color.b, 1); return positions.length / 3 - 1; };
+  const surfaceNormal = (x, y, z) => new Vector3(x / radii[0], y / radii[1], z / radii[2]).normalize();
+  const rings = 5, segments = 9, first = positions.length / 3;
+  for (let ring = 0; ring <= rings; ring++) {
+    const phi = ring / rings * Math.PI, y = Math.cos(phi), r = Math.sin(phi);
+    for (let s = 0; s < (ring === 0 || ring === rings ? 1 : segments); s++) {
+      const angle = s / segments * Math.PI * 2 + seed, n = surfaceNormal(Math.cos(angle) * r, y, Math.sin(angle) * r);
+      const point = new Vector3(center[0] + Math.cos(angle) * r * radii[0] * 0.8, center[1] + y * radii[1] * 0.8, center[2] + Math.sin(angle) * r * radii[2] * 0.8);
+      vertex(point, n, Color3.Lerp(core, tone(n, -0.03), 0.85));
     }
-    const ringStart = ring => first + 1 + (ring - 1) * segments, last = first + 1 + (rings - 1) * segments;
-    for (let s = 0; s < segments; s++) indices.push(first, ringStart(1) + s, ringStart(1) + (s + 1) % segments);
-    for (let ring = 1; ring < rings - 1; ring++) for (let s = 0; s < segments; s++) {
-      const a = ringStart(ring) + s, b = ringStart(ring) + (s + 1) % segments, c = ringStart(ring + 1) + s, d = ringStart(ring + 1) + (s + 1) % segments;
-      indices.push(a, c, b, b, c, d);
-    }
-    for (let s = 0; s < segments; s++) indices.push(last, ringStart(rings - 1) + (s + 1) % segments, ringStart(rings - 1) + s);
   }
-  const data = new VertexData(); Object.assign(data, { positions, indices, colors, normals: [] });
-  VertexData.ComputeNormals(positions, indices, data.normals);
-  for (let i = 0; i < positions.length; i += 3) {
-    toward.set((positions[i] - center[0]) / radii[0], (positions[i + 1] - center[1]) / radii[1], (positions[i + 2] - center[2]) / radii[2]).normalize();
-    const blended = new Vector3(data.normals[i] * 0.35 + toward.x * 0.65, data.normals[i + 1] * 0.35 + toward.y * 0.65, data.normals[i + 2] * 0.35 + toward.z * 0.65).normalize();
-    data.normals[i] = blended.x; data.normals[i + 1] = blended.y; data.normals[i + 2] = blended.z;
+  const ringStart = ring => first + 1 + (ring - 1) * segments, last = first + 1 + (rings - 1) * segments;
+  for (let s = 0; s < segments; s++) indices.push(first, ringStart(1) + s, ringStart(1) + (s + 1) % segments);
+  for (let ring = 1; ring < rings - 1; ring++) for (let s = 0; s < segments; s++) {
+    const a = ringStart(ring) + s, b = ringStart(ring) + (s + 1) % segments, c = ringStart(ring + 1) + s, d = ringStart(ring + 1) + (s + 1) % segments;
+    indices.push(a, c, b, b, c, d);
   }
+  for (let s = 0; s < segments; s++) indices.push(last, ringStart(rings - 1) + (s + 1) % segments, ringStart(rings - 1) + s);
+  const scale = (radii[0] + radii[1]) / 0.45;
+  for (let k = 0; k < leaves; k++) {
+    const y = Math.max(-0.95, Math.min(0.98, 1 - 2 * (k + 0.5) / leaves + (random(k) - 0.5) * 0.12)), r = Math.sqrt(1 - y * y), angle = k * 2.39996 + seed * 1.3 + random(k + 50) * 0.4;
+    const ux = Math.cos(angle) * r, uz = Math.sin(angle) * r;
+    const n = surfaceNormal(ux, y, uz), point = new Vector3(center[0] + ux * radii[0] * 0.9, center[1] + y * radii[1] * 0.9, center[2] + uz * radii[2] * 0.9);
+    Vector3.CrossToRef(n, Math.abs(n.y) > 0.9 ? Vector3.Right() : Vector3.Up(), across); across.normalize();
+    Vector3.CrossToRef(across, n, along); along.normalize();
+    const spin = random(k + 100) * Math.PI * 2;
+    normal.copyFrom(along.scale(Math.cos(spin))).addInPlace(across.scale(Math.sin(spin))).scaleInPlace(0.9).addInPlace(n.scale(0.22)).addInPlace(new Vector3(0, -0.35, 0)).normalize();
+    Vector3.CrossToRef(normal, n, across); across.normalize();
+    const length = (0.062 + random(k + 200) * 0.024) * scale, width = length * 0.34, cup = n.scale(-width * 0.35);
+    const base = point.subtract(normal.scale(length * 0.2)), tip = point.add(normal.scale(length)), middle = point.add(normal.scale(length * 0.28));
+    const left = middle.add(across.scale(width)).addInPlace(cup), right = middle.subtract(across.scale(width)).addInPlace(cup);
+    const shade = tone(n, (random(k + 300) - 0.5) * 0.06);
+    const ids = [vertex(base, n, shade), vertex(left, n, shade), vertex(tip, n, shade), vertex(right, n, shade)];
+    indices.push(ids[0], ids[1], ids[2], ids[0], ids[2], ids[3], ids[0], ids[2], ids[1], ids[0], ids[3], ids[2]);
+  }
+  const data = new VertexData(); Object.assign(data, { positions, indices, colors, normals });
   const clump = new Mesh('moonleaf-clump', parent.getScene()); data.applyToMesh(clump);
   mesh(parent, clump, MOON_CANOPY.side, [0, 0, 0]);
   clump.metadata = { sway: { anchorY: center[1] - radii[1] * 1.6, height: radii[1] * 2.6, phase: seed * 0.61 } };
@@ -562,23 +566,27 @@ function moonTree(parent, canopyOnly = false) {
     const trunk = [[0, 0.65, 0], [-0.08, 1.2, 0.02], [0.11, 1.85, -0.04], [-0.02, 2.46, 0.02], [0.11, 2.93, -0.06]];
     for (let i = 0; i < trunk.length - 1; i++) rod(parent, trunk[i], trunk[i + 1], 0.06 - i * 0.011, '#775d43');
   }
+  const trunkPath = [[0, 0.63, 0], [-0.08, 1.2, 0.02], [0.11, 1.85, -0.04], [-0.02, 2.46, 0.02], [0.11, 2.93, -0.06]];
+  const trunkAt = y => { for (let i = 0; i < trunkPath.length - 1; i++) { const [p0, p1] = [trunkPath[i], trunkPath[i + 1]]; if (y >= p0[1] && y <= p1[1]) { const f = (y - p0[1]) / (p1[1] - p0[1]); return p0.map((v, j) => v + (p1[j] - v) * f); } } return trunkPath[trunkPath.length - 1]; };
+  const vary = k => { const v = Math.sin(k * 12.9898) * 43758.5453; return v - Math.floor(v); };
   for (let tier = 0; tier < 4; tier++) {
     for (let branch = 0; branch < 3; branch++) {
-      const angle = tier * 1.2 + branch * Math.PI * 2 / 3;
+      const angle = tier * 1.2 + branch * Math.PI * 2 / 3, c = Math.cos(angle), s = Math.sin(angle);
       const height = 1.34 + tier * 0.43, reach = tier === 3 ? 0.39 : 0.55;
-      const end = [Math.cos(angle) * reach, height + 0.24, Math.sin(angle) * reach];
-      if (!canopyOnly) rod(parent, [0, height - 0.05, 0], end, 0.020, '#816746');
+      const end = [c * reach, height + 0.24, s * reach], [tx, , tz] = trunkAt(height - 0.06);
+      const fork = [tx + (c * reach - tx) * 0.5, height + 0.08, tz + (s * reach - tz) * 0.5], turn = angle + (branch % 2 ? 0.5 : -0.5);
+      const twig = [fork[0] + Math.cos(turn) * 0.14, fork[1] + 0.14, fork[2] + Math.sin(turn) * 0.14];
+      if (!canopyOnly) { rod(parent, [0, height - 0.05, 0], end, 0.020, '#816746'); rod(parent, fork, twig, 0.010, '#816746'); }
       else {
-        const seed = tier * 3 + branch, offset = angle + 0.55, vary = k => { const v = Math.sin(k * 12.9898) * 43758.5453; return v - Math.floor(v); };
-        const size = (tier === 3 ? 0.85 : 1) * (0.86 + vary(seed) * 0.22), small = 0.75 + vary(seed + 12) * 0.5;
-        leafClump(parent, [end[0] * 0.9, end[1] + 0.06, end[2] * 0.9], [0.3 * size, 0.23 * size, 0.3 * size], seed);
-        if (tier < 3) leafClump(parent, [Math.cos(offset) * reach * 0.72, end[1] + 0.14, Math.sin(offset) * reach * 0.72], [0.22 * small, 0.18 * small, 0.22 * small], seed + 12);
+        const seed = tier * 3 + branch, size = (tier === 3 ? 0.85 : 1) * (0.9 + vary(seed) * 0.2), small = 0.85 + vary(seed + 12) * 0.3;
+        leafClump(parent, [end[0] * 1.04, end[1] + 0.04, end[2] * 1.04], [0.25 * size, 0.18 * size, 0.25 * size], seed, 160);
+        leafClump(parent, [twig[0], twig[1] + 0.07, twig[2]], [0.15 * small, 0.115 * small, 0.15 * small], seed + 12, 76);
       }
     }
   }
   if (canopyOnly) {
-    leafClump(parent, [0.08, 2.975, -0.05], [0.27, 0.22, 0.27], 24);
-    leafClump(parent, [-0.12, 2.84, 0.12], [0.2, 0.17, 0.2], 25);
+    leafClump(parent, [0.1, 3.04, -0.06], [0.24, 0.19, 0.24], 24, 160);
+    leafClump(parent, [-0.1, 2.9, 0.13], [0.17, 0.13, 0.17], 25, 90);
   }
   if (!canopyOnly) for (const [x, y, z] of [[-0.48, 1.82, 0.2], [0.42, 2.23, 0.27], [-0.15, 2.87, -0.23]]) {
     rod(parent, [x, y, z], [x, y - 0.19, z], 0.005, '#bca36f');
