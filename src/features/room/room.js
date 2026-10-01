@@ -375,27 +375,46 @@ export function createRoom(container, options = {}) {
   const turned = (profile, position, mat, segments = 20) => finish(MeshBuilder.CreateLathe(`turned-${meshId++}`, { shape: profile.map(([r, y]) => new Vector3(r, y, 0)), tessellation: segments }, scene), mat, position, decor.lights);
   const SILL_DISH = [[0, 0], [0.112, 0], [0.124, 0.006], [0.13, 0.02], [0.124, 0.03], [0.112, 0.022], [0.08, 0.015], [0, 0.015]];
   const FLAME = [[0, 0], [0.013, 0.006], [0.022, 0.022], [0.021, 0.04], [0.013, 0.062], [0.005, 0.08], [0, 0.09]];
+  const drip = (path, radius) => finish(MeshBuilder.CreateTube(`drip-${meshId++}`, { path: path.map(point => Vector3.FromArray(point)), radiusFunction: index => radius * (0.55 + 0.6 * index / (path.length - 1)), tessellation: 6, cap: Mesh.CAP_ALL }, scene), material('#e6cc96'), [0, 0, 0], decor.lights);
+  const sillDishes = [];
   for (let i = 0; i < 5; i++) {
     const x = i < 3 ? -4.21 + i * 0.19 : -1.35 + (i - 3) * 0.24, h = 0.20 + (i % 3) * 0.11, z = -4.05, floor = 1.555;
-    const wax = material('#e6cc96'), top = floor + h, radius = 0.07;
+    const wax = material('#e6cc96'), top = floor + h, radius = 0.07, spill = 0.5 + i * 1.7;
+    sillDishes.push([x, z]);
     turned(SILL_DISH, [x, 1.54, z], palette.brass, 24);
     if (i === 0 || i === 4) {
       const ring = finish(MeshBuilder.CreateTorus(`handle-${meshId++}`, { diameter: 0.05, thickness: 0.011, tessellation: 14 }, scene), palette.brass, [x + (i ? 0.142 : -0.142), 1.556, z], decor.lights);
       ring.rotation.x = Math.PI / 2;
     }
-    turned([[0, 0], [radius + 0.004, 0], [radius + 0.005, 0.012], [radius, h * 0.55], [radius - 0.003, h - 0.01], [radius - 0.001, h - 0.002], [radius - 0.008, h + 0.004], [radius - 0.022, h - 0.006], [0.03, h - 0.013], [0, h - 0.015]], [x, floor, z], wax, 18);
+    const body = turned([[0, 0], [radius + 0.004, 0], [radius + 0.005, 0.012], [radius, h * 0.55], [radius - 0.003, h - 0.012], [radius - 0.001, h - 0.003], [radius - 0.007, h + 0.004], [radius - 0.017, h - 0.005], [radius - 0.028, h - 0.018], [0.02, h - 0.025], [0, h - 0.027]], [x, floor, z], wax, 28);
+    meltRim(body, h, spill, i);
     for (let k = 0; k < 3 + (i % 2); k++) {
-      const angle = 0.5 + i * 1.7 + k * 1.9, reaches = k === 0 && i !== 1, length = reaches ? h - 0.014 : 0.04 + ((i + k) % 3) * 0.035, side = r => [x + Math.cos(angle) * r, z + Math.sin(angle) * r];
-      const path = [0, 0.4, 0.75, 1].map((t, step) => { const [px, pz] = side(radius - 0.004 + t * 0.002 + (step % 2) * 0.002); return [px, top - 0.003 - t * length, pz]; });
-      tube(path, 0.011 + (k % 2) * 0.003, wax, decor.lights);
-      const [bx, bz] = side(radius + 0.001), bead = sphere([0.009, 0.017, 0.016], [bx, top - 0.003 - length, bz], wax, decor.lights);
+      const angle = spill + k * 1.9, reaches = k === 0 && i !== 1, length = reaches ? h - 0.014 : 0.045 + ((i + k) % 3) * 0.035, start = top - (k === 0 ? 0.013 : 0.004);
+      const path = [0, 0.2, 0.45, 0.7, 1].map(t => { const turn = angle + 0.05 * Math.sin(t * 6 + k + i), r = radius - 0.003 + t * 0.003 + 0.0015 * Math.sin(t * 9 + k); return [x + Math.cos(turn) * r, start - t * (start - top + 0.003 + length), z + Math.sin(turn) * r]; });
+      drip(path, 0.012 + (k % 2) * 0.003);
+      const [bx, , bz] = path[4], bead = sphere([0.01, 0.019, 0.017], [bx + Math.cos(angle) * 0.002, path[4][1], bz + Math.sin(angle) * 0.002], wax, decor.lights);
       bead.rotation.y = -angle;
-      if (reaches) { const [px, pz] = side(radius + 0.024); sphere([0.03, 0.006, 0.022], [px, floor + 0.001, pz], wax, decor.lights); }
+      if (reaches) { const side = r => [x + Math.cos(angle) * r, z + Math.sin(angle) * r], [px, pz] = side(radius + 0.024); sphere([0.03, 0.006, 0.022], [px, floor + 0.001, pz], wax, decor.lights); }
     }
-    tube([[x, top - 0.016, z], [x, top + 0.01, z], [x + 0.005, top + 0.024, z + 0.002]], 0.0042, palette.dark, decor.lights);
+    tube([[x, top - 0.027, z], [x, top - 0.012, z]], 0.0042, wax, decor.lights);
+    tube([[x, top - 0.014, z], [x, top + 0.004, z], [x + 0.003, top + 0.012, z + 0.001]], 0.0042, palette.dark, decor.lights);
+    sphere([0.0075, 0.0075, 0.0075], [x + 0.003, top + 0.012, z + 0.001], candleTip, decor.lights);
     turned(FLAME, [x + 0.003, top + 0.014, z], candleFlame, 14);
     cylinder(0, 0.009, 0.026, [x + 0.003, top + 0.094, z], candleTip, decor.lights, 10);
   }
+  function meltRim(body, h, spill, seed) {
+    const positions = body.getVerticesData('position');
+    for (let v = 0; v < positions.length; v += 3) {
+      const px = positions[v], pz = positions[v + 2], rise = (positions[v + 1] - (h - 0.03)) / 0.034;
+      if (rise <= 0 || Math.hypot(px, pz) < 0.015) continue;
+      const angle = Math.atan2(pz, px), off = Math.atan2(Math.sin(angle - spill), Math.cos(angle - spill)), notch = Math.exp(-((off / 0.42) ** 2));
+      positions[v + 1] -= Math.min(1, rise) * (0.011 * notch + 0.0025 * (1 + Math.sin(angle * 3 + seed * 2.1)));
+      const flare = 1 + 0.05 * notch * Math.min(1, rise); positions[v] *= flare; positions[v + 2] *= flare;
+    }
+    const normals = []; VertexData.ComputeNormals(positions, body.getIndices(), normals);
+    body.setVerticesData('position', positions); body.setVerticesData('normal', normals);
+  }
+
 
   // Merge architecture per material once. Furniture factories similarly batch
   // their painted parts, keeping only the companion's head and hands dynamic.
@@ -504,6 +523,23 @@ export function createRoom(container, options = {}) {
     return mesh;
   }
   const wallShades = [wallShade('back-wall-shade', true), wallShade('side-wall-shade', false)];
+  function dishShade(dishes) {
+    const rings = [[0.1, 0.5], [0.145, 0.2], [0.21, 0]], steps = 24, positions = [], colors = [], indices = [];
+    for (const [x, z] of dishes) {
+      const first = positions.length / 3;
+      for (let k = 0; k < steps; k++) {
+        const angle = k / steps * Math.PI * 2;
+        for (const [radius, alpha] of rings) { positions.push(x + Math.cos(angle) * radius, 0, z + Math.sin(angle) * radius); colors.push(0.10, 0.065, 0.04, alpha); }
+        const a = first + k * rings.length, b = first + ((k + 1) % steps) * rings.length;
+        for (let ring = 0; ring < rings.length - 1; ring++) indices.push(a + ring, b + ring, a + ring + 1, a + ring + 1, b + ring, b + ring + 1);
+      }
+    }
+    const data = new VertexData(); Object.assign(data, { positions, colors, indices, normals: positions.map((_, i) => i % 3 === 1 ? 1 : 0) });
+    const mesh = new Mesh('sill-dish-shade', scene); data.applyToMesh(mesh); mesh.material = floorShadeMaterial; mesh.hasVertexAlpha = true;
+    mesh.parent = decor.lights; mesh.position.y = 1.5425; mesh.isPickable = false; mesh.receiveShadows = false; mesh.metadata = { castShadow: false, effect: 'contact-shadow' };
+    return mesh;
+  }
+  dishShade(sillDishes);
   // Shade sits 2 mm above whatever is under it: the highest rug it overlaps,
   // or the floor. Rugs stack 6 mm apart, so one fixed height either z-fights a
   // rug top or floats over bare floor and darkens the base of each piece.
