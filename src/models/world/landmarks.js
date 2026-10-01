@@ -18,7 +18,7 @@ export const LANDMARKS = Object.freeze({
 });
 
 export const PLUME = Object.freeze({ puffs: 40, period: 260, rise: 160, reach: 1500 });
-export const MIST = Object.freeze({ puffs: 8, period: 16 });
+export const MIST = Object.freeze({ puffs: 12, period: 14, rise: 42, spread: 40, small: 16, large: 46 });
 export const SAIL_TURN = 0.32;
 export const MIST_RIBBONS = Object.freeze([
   Object.freeze({ reach: 2300, low: 140, high: 230, from: -62, to: 48 }),
@@ -36,23 +36,24 @@ const THEME_LIGHT = Object.freeze({
 });
 
 const PAINT = Object.freeze({
-  stone: [0.76, 0.74, 0.69], terrace: [0.6, 0.61, 0.6], paving: [0.66, 0.66, 0.63], verdigris: [0.43, 0.65, 0.6], slit: [0.22, 0.27, 0.31], pane: [0.3, 0.28, 0.25],
+  stone: [0.9, 0.85, 0.74], terrace: [0.6, 0.61, 0.6], paving: [0.66, 0.66, 0.63], verdigris: [0.3, 0.52, 0.49], slit: [0.22, 0.27, 0.31], pane: [0.3, 0.28, 0.25],
   rock: [0.5, 0.55, 0.6], rockDeep: [0.37, 0.42, 0.49],
-  bluff: [0.8, 0.76, 0.68], bluffBand: [0.66, 0.67, 0.65], turf: [0.42, 0.56, 0.33],
-  plaster: [0.7, 0.67, 0.6], plinth: [0.5, 0.48, 0.45], thatch: [0.36, 0.32, 0.29], cloth: [0.76, 0.7, 0.6], spar: [0.33, 0.28, 0.24],
+  bluffBand: [0.66, 0.67, 0.65], turf: [0.42, 0.56, 0.33], moss: [0.33, 0.5, 0.25],
+  plaster: [0.7, 0.67, 0.6], plinth: [0.5, 0.48, 0.45], thatch: [0.36, 0.32, 0.29], cloth: [0.66, 0.62, 0.54], spar: [0.33, 0.28, 0.24], hubCap: [0.24, 0.21, 0.19],
 });
 
 const SAIL_AXIS = Object.freeze([0, 0, -1]);
 const WINDOW_EYE = Object.freeze([-2, -2.4]);
 const NO_SPIN = Object.freeze([0, 0, 0, 0]);
 const SLIT_HALF = 9;
+export const OBSERVATORY_ACCENT = 1;
 const glsl = value => value.toFixed(4);
 const toward = (x, z) => { const length = Math.hypot(x, z); return [x / length, z / length]; };
 
 function geometry() {
   const positions = [], normals = [], colors = [], marks = [], spins = [], indices = [];
-  const vertex = (at, normal, { albedo, lamp = 0, snow = 0, spin = NO_SPIN }) => {
-    positions.push(at[0], at[1], at[2]); normals.push(normal[0], normal[1], normal[2]); colors.push(albedo[0], albedo[1], albedo[2], 1); marks.push(lamp, snow); spins.push(spin[0], spin[1], spin[2], spin[3]);
+  const vertex = (at, normal, { albedo, lamp = 0, snow = 0, spin = NO_SPIN, accent = 0 }) => {
+    positions.push(at[0], at[1], at[2]); normals.push(normal[0], normal[1], normal[2]); colors.push(albedo[0], albedo[1], albedo[2], accent); marks.push(lamp, snow); spins.push(spin[0], spin[1], spin[2], spin[3]);
     return positions.length / 3 - 1;
   };
   function panel(corners, normal, paint) {
@@ -90,24 +91,24 @@ function footing(x, z, radius) {
 
 function buildObservatory({ lathe, panel }, { x, z, drum, tower }) {
   const deck = heightAt(x, z) + 3, root = footing(x, z, drum * 2) - 40, [ex, ez] = toward(-x, -z), right = [ez, -ex];
-  lathe([x, z], [[drum * 1.5, root], [drum * 1.38, deck - 3], [drum * 1.38, deck]], { albedo: PAINT.terrace }, 44);
-  lathe([x, z], [[drum * 1.38, deck], [0, deck]], { albedo: PAINT.paving }, 44);
+  lathe([x, z], [[drum * 1.5, root], [drum * 1.38, deck - 3], [drum * 1.38, deck]], { albedo: PAINT.terrace, accent: OBSERVATORY_ACCENT }, 44);
+  lathe([x, z], [[drum * 1.38, deck], [0, deck]], { albedo: PAINT.paving, accent: OBSERVATORY_ACCENT }, 44);
   const wall = deck + drum * 0.8, rim = wall + 6, dome = drum * 0.98;
-  lathe([x, z], [[drum, deck], [drum, wall]], { albedo: PAINT.stone }, 44);
-  lathe([x, z], [[drum, wall], [drum * 1.07, wall + 2], [drum * 1.07, rim], [dome, rim]], { albedo: PAINT.terrace }, 44);
+  lathe([x, z], [[drum, deck], [drum, wall]], { albedo: PAINT.stone, accent: OBSERVATORY_ACCENT }, 44);
+  lathe([x, z], [[drum, wall], [drum * 1.07, wall + 2], [drum * 1.07, rim], [dome, rim]], { albedo: PAINT.terrace, accent: OBSERVATORY_ACCENT }, 44);
   const arc = Array.from({ length: 13 }, (_, i) => { const a = i / 12 * Math.PI / 2; return [Math.cos(a) * dome, rim + Math.sin(a) * dome * 0.94]; });
-  lathe([x, z], arc, { albedo: PAINT.verdigris }, 44);
+  lathe([x, z], arc, { albedo: PAINT.verdigris, accent: OBSERVATORY_ACCENT }, 44);
   const crown = rim + dome * 0.94;
-  lathe([x, z], [[7, crown - 3], [7, crown + 9], [9, crown + 9], [0, crown + 15]], { albedo: PAINT.verdigris }, 16);
+  lathe([x, z], [[7, crown - 3], [7, crown + 9], [9, crown + 9], [0, crown + 15]], { albedo: PAINT.verdigris, accent: OBSERVATORY_ACCENT }, 16);
   const slitTurn = 0.45, slitAt = [ex * Math.cos(slitTurn) - ez * Math.sin(slitTurn), ex * Math.sin(slitTurn) + ez * Math.cos(slitTurn)], slitSide = [slitAt[1], -slitAt[0]];
   for (let i = 0; i < 12; i++) {
     const point = (k, side) => { const a = k / 12 * Math.PI / 2, out = Math.cos(a) * (dome + 0.8); return [x + slitAt[0] * out + slitSide[0] * side, rim + Math.sin(a) * (dome + 0.8) * 0.94, z + slitAt[1] * out + slitSide[1] * side]; };
     const a = (i + 0.5) / 12 * Math.PI / 2;
-    panel([point(i, -SLIT_HALF), point(i, SLIT_HALF), point(i + 1, SLIT_HALF), point(i + 1, -SLIT_HALF)], [slitAt[0] * Math.cos(a), Math.sin(a), slitAt[1] * Math.cos(a)], { albedo: PAINT.slit });
+    panel([point(i, -SLIT_HALF), point(i, SLIT_HALF), point(i + 1, SLIT_HALF), point(i + 1, -SLIT_HALF)], [slitAt[0] * Math.cos(a), Math.sin(a), slitAt[1] * Math.cos(a)], { albedo: PAINT.slit, accent: OBSERVATORY_ACCENT });
   }
   const window = (cx, cz, facing, low, high, half, lamp) => {
     const [nx, nz] = facing, side = [nz, -nx];
-    panel([[cx - side[0] * half, low, cz - side[1] * half], [cx + side[0] * half, low, cz + side[1] * half], [cx + side[0] * half, high, cz + side[1] * half], [cx - side[0] * half, high, cz - side[1] * half]], [nx, 0, nz], { albedo: PAINT.pane, lamp });
+    panel([[cx - side[0] * half, low, cz - side[1] * half], [cx + side[0] * half, low, cz + side[1] * half], [cx + side[0] * half, high, cz + side[1] * half], [cx - side[0] * half, high, cz - side[1] * half]], [nx, 0, nz], { albedo: PAINT.pane, lamp, accent: OBSERVATORY_ACCENT });
   };
   for (const turn of [-1.1, -0.55, 0, 0.55, 1.1]) {
     const facing = [ex * Math.cos(turn) - ez * Math.sin(turn), ex * Math.sin(turn) + ez * Math.cos(turn)];
@@ -116,8 +117,8 @@ function buildObservatory({ lathe, panel }, { x, z, drum, tower }) {
   const tx = x + right[0] * drum * 1.1 - ex * drum * 0.2, tz = z + right[1] * drum * 1.1 - ez * drum * 0.2, gallery = deck + tower, facing = Math.atan2(ez, ex), side = [ez, -ex];
   const corner = (half, k, y) => { const a = facing + Math.PI / 4 + k * Math.PI / 2; return [tx + Math.cos(a) * half * Math.SQRT2, y, tz + Math.sin(a) * half * Math.SQRT2]; };
   const block = (half, low, high, albedo) => {
-    for (let k = 0; k < 4; k++) { const a = facing + k * Math.PI / 2; panel([corner(half, k - 1, low), corner(half, k, low), corner(half, k, high), corner(half, k - 1, high)], [Math.cos(a), 0, Math.sin(a)], { albedo }); }
-    panel([0, 1, 2, 3].map(k => corner(half, k, high)), [0, 1, 0], { albedo });
+    for (let k = 0; k < 4; k++) { const a = facing + k * Math.PI / 2; panel([corner(half, k - 1, low), corner(half, k, low), corner(half, k, high), corner(half, k - 1, high)], [Math.cos(a), 0, Math.sin(a)], { albedo, accent: OBSERVATORY_ACCENT }); }
+    panel([0, 1, 2, 3].map(k => corner(half, k, high)), [0, 1, 0], { albedo, accent: OBSERVATORY_ACCENT });
   };
   block(16, root, gallery, PAINT.stone);
   block(19, gallery, gallery + 3, PAINT.terrace);
@@ -125,7 +126,7 @@ function buildObservatory({ lathe, panel }, { x, z, drum, tower }) {
   block(18, gallery + 24, gallery + 26, PAINT.terrace);
   for (let k = 0; k < 4; k++) {
     const a = facing + k * Math.PI / 2, slope = Math.hypot(14, 19);
-    panel([corner(19, k - 1, gallery + 26), corner(19, k, gallery + 26), [tx, gallery + 40, tz]], [Math.cos(a) * 14 / slope, 19 / slope, Math.sin(a) * 14 / slope], { albedo: PAINT.verdigris });
+    panel([corner(19, k - 1, gallery + 26), corner(19, k, gallery + 26), [tx, gallery + 40, tz]], [Math.cos(a) * 14 / slope, 19 / slope, Math.sin(a) * 14 / slope], { albedo: PAINT.verdigris, accent: OBSERVATORY_ACCENT });
   }
   for (const offset of [-5, 5]) window(tx + ex * 15.4 + side[0] * offset, tz + ez * 15.4 + side[1] * offset, [ex, ez], gallery + 8, gallery + 20, 3, 1);
   for (const lift of [0.42, 0.66]) window(tx + ex * 16.4, tz + ez * 16.4, [ex, ez], deck + tower * lift, deck + tower * lift + 11, 2.4, 0.8);
@@ -149,48 +150,72 @@ function buildPeak({ sheet }, { x, z, summit, radius }) {
   }, [x, base - 1000, z]);
 }
 
-const BUTTE_STEPS = Object.freeze([-1, -0.6, -0.3, -0.1, 0, 1.5, 3, 4.5, 6, 9, 12, 15, 18, 20, 22.5, 25, 27, 33, 42, 55, 75]);
-const tieredBluff = (m, tilt) => (0.3 + 0.1 * tilt) * (1 - smooth(0, 6, m)) + 0.05 * (1 - smooth(6, 18, m)) + (0.3 - 0.1 * tilt) * (1 - smooth(18, 27, m)) + 0.35 * (1 - smooth(27, 75, m));
+export const BUTTE_STRATA = Object.freeze([
+  Object.freeze({ from: 0, to: 0.8, drop: 0.11, tier: 1, albedo: [0.8, 0.74, 0.63] }),
+  Object.freeze({ from: 2.2, to: 2.9, drop: 0.1, tier: 1, albedo: [0.67, 0.67, 0.65] }),
+  Object.freeze({ from: 4.3, to: 5, drop: 0.1, tier: 1, albedo: [0.79, 0.68, 0.55] }),
+  Object.freeze({ from: 18, to: 18.7, drop: 0.1, tier: -1, albedo: [0.7, 0.69, 0.65] }),
+  Object.freeze({ from: 20.4, to: 21.1, drop: 0.1, tier: -1, albedo: [0.81, 0.75, 0.62] }),
+  Object.freeze({ from: 22.8, to: 23.5, drop: 0.1, tier: -1, albedo: [0.64, 0.62, 0.58] }),
+]);
+const BUTTE_STEPS = Object.freeze([-1, -0.6, -0.3, -0.1, ...BUTTE_STRATA.flatMap(({ from, to }) => [from, (from + to) / 2, from + (to - from) * 0.8, to, to + 0.6]), 9, 12, 15, 27, 33, 42, 55, 75].sort((a, b) => a - b));
+const tieredBluff = (m, tilt) => BUTTE_STRATA.reduce((sum, { from, to, drop, tier }) => sum + drop * (1 + tier * tilt / 3) * (1 - smooth(from, to, m)), 0) + 0.05 * (1 - smooth(6, 18, m)) + 0.04 * (1 - smooth(23.5, 27, m)) + 0.3 * (1 - smooth(27, 75, m));
 const sheerBluff = m => 0.65 * (1 - smooth(0, 8, m)) + 0.35 * (1 - smooth(8, 60, m));
 
 function buildFalls({ sheet }, { x, z, height, width, depth }) {
-  const ground = heightAt(x, z), root = footing(x, z, width + 60) - 6, top = ground + height, columns = 72, [ex, ez] = toward(-x, -z), face = Math.atan2(ez, ex);
+  const ground = heightAt(x, z), root = footing(x, z, width + 60) - 6, top = ground + height, columns = 64, [ex, ez] = toward(-x, -z), face = Math.atan2(ez, ex);
   const plateau = a => (1 + noise2(Math.cos(a) * 1.8, Math.sin(a) * 1.8, 91) * 0.22 + noise2(Math.cos(a) * 5, Math.sin(a) * 5, 93) * 0.09) / Math.hypot(Math.cos(a - face - Math.PI / 2) / width, Math.sin(a - face - Math.PI / 2) / depth);
   const channel = a => Math.exp(-((Math.atan2(Math.sin(a - face), Math.cos(a - face)) / 0.16) ** 2));
+  const tiltAt = a => noise2(Math.cos(a) * 1.4, Math.sin(a) * 1.4, 96) * 1.6;
   const level = (m, a) => {
-    const open = channel(a), tilt = noise2(Math.cos(a) * 1.4, Math.sin(a) * 1.4, 96) * 1.6, ledge = m + noise2(Math.cos(a) * 2.6, Math.sin(a) * 2.6, 97) * 7, crown = 0.03 * (1 - smooth(-30, 0, m)) + noise2(Math.cos(a) * 4, Math.sin(a) * 4, 94) * 0.04 * (1 - smooth(-4, 2, m));
-    return root + (top - root) * (tieredBluff(ledge, tilt) + (sheerBluff(m) - tieredBluff(ledge, tilt)) * open + crown) - 6 * open * (1 - smooth(-24, -2, m)) * smooth(-40, -14, m);
+    const open = channel(a), tilt = tiltAt(a), crown = 0.03 * (1 - smooth(-30, 0, m)) + noise2(Math.cos(a) * 4, Math.sin(a) * 4, 94) * 0.04 * (1 - smooth(-4, 2, m));
+    return root + (top - root) * (tieredBluff(m, tilt) + (sheerBluff(m) - tieredBluff(m, tilt)) * open + crown) - 6 * open * (1 - smooth(-24, -2, m)) * smooth(-40, -14, m);
+  };
+  const stratumAt = (y, a) => {
+    const tilt = tiltAt(a);
+    for (let i = 0; i < BUTTE_STRATA.length; i++) {
+      const { from, to } = BUTTE_STRATA[i], high = root + (top - root) * tieredBluff(from, tilt), low = root + (top - root) * tieredBluff(to, tilt);
+      if (y <= high + 1 && y >= low - 1) return { stratum: BUTTE_STRATA[i], below: Math.max(0, high - y), fall: Math.min(1, Math.max(0, (high - y) / (high - low))), cap: i === 0 };
+    }
+    return null;
   };
   sheet(BUTTE_STEPS.length - 1, columns, (r, c) => {
     const a = c / columns * Math.PI * 2, edge = plateau(a), step = BUTTE_STEPS[r], m = step < 0 ? step * edge : step, y = level(m, a);
-    const steep = Math.abs(level(m + 0.5, a) - level(m - 0.5, a)), rocky = smooth(0.9, 1.8, steep);
-    const fluted = edge + m + 4 * noise2(a * 13, y / 9, 95) * smooth(-3, 0, m) * (1 - smooth(27, 34, m));
-    const band = 0.5 + 0.5 * Math.sin(y / 8 + noise2(a * 3, y / 30, 92) * 1.5);
-    const albedo = PAINT.bluffBand.map((low, k) => { const stone = low + (PAINT.bluff[k] - low) * band; return PAINT.turf[k] + (stone - PAINT.turf[k]) * rocky; });
+    const steep = Math.abs(level(m + 0.25, a) - level(m - 0.25, a)) * 2, rocky = smooth(1.4, 3.2, steep);
+    const fluted = edge + m + 2.5 * noise2(a * 13, y / 9, 95) * smooth(-3, 0, m) * (1 - smooth(27, 34, m));
+    const layer = rocky > 0 ? stratumAt(y, a) : null;
+    let stone = PAINT.bluffBand, moss = 0;
+    if (layer) {
+      const { stratum, below, fall, cap } = layer, drip = cap ? 4 + 7 * Math.max(0, noise2(a * 9, 3, 98)) : 2.5;
+      stone = stratum.albedo.map(tone => tone * (1 - 0.5 * smooth(0.7, 1, fall)));
+      moss = (cap ? 1 : 0.7) * (1 - smooth(drip * 0.5, drip, below));
+    }
+    const albedo = stone.map((rock, k) => { const face = PAINT.turf[k] + (rock - PAINT.turf[k]) * rocky; return face + (PAINT.moss[k] - face) * moss; });
     return { at: [x + Math.cos(a) * fluted, y, z + Math.sin(a) * fluted], albedo };
   }, [x, root - 1000, z]);
   const lipOut = plateau(face) - 1;
   return { lip: [x + ex * lipOut, level(-1, face), z + ez * lipOut], foot: level(15, face), out: [ex, ez] };
 }
 
-const MILL = Object.freeze({ foot: 0.19, waist: 0.15, neck: 0.11, cap: 0.125, stock: 0.5, sailFrom: 0.2, sailWide: 0.21, bars: 5, reefed: 0.5 });
+const MILL = Object.freeze({ foot: 0.19, waist: 0.15, neck: 0.11, cap: 0.17, hub: 0.055, stock: 0.5, sailFrom: 0.2, sailWide: 0.21, bars: 4, member: 0.5, reefed: 0.45 });
 
 function buildWindmill({ lathe, panel }, { x, z, height }) {
-  const ground = heightAt(x, z), root = footing(x, z, height * MILL.foot) - 4, top = ground + height, plinth = ground + height * 0.08, neck = top - 3;
+  const ground = heightAt(x, z), root = footing(x, z, height * MILL.foot) - 4, top = ground + height, plinth = ground + height * 0.08, neck = top - 3, cap = height * MILL.cap;
   lathe([x, z], [[height * MILL.foot, root], [height * MILL.foot * 0.96, plinth]], { albedo: PAINT.plinth }, 14);
   lathe([x, z], [[height * MILL.foot * 0.96, plinth], [height * MILL.waist, ground + height * 0.45], [height * MILL.neck, neck]], { albedo: PAINT.plaster }, 14);
-  lathe([x, z], [[height * MILL.cap, neck], [height * MILL.cap, neck + 1.5], [height * MILL.cap * 0.8, top + 2.5], [height * MILL.cap * 0.4, top + 4.5], [0, top + 5.2]], { albedo: PAINT.thatch }, 14);
-  const hub = [x - SAIL_AXIS[0] * (height * MILL.cap + 1.2), top, z - SAIL_AXIS[2] * (height * MILL.cap + 1.2)], across = [-SAIL_AXIS[2], 0, SAIL_AXIS[0]], length = height * MILL.stock, spin = [...hub, SAIL_TURN];
+  lathe([x, z], [[height * MILL.neck, neck - 0.5], [cap, neck - 0.5], [cap, neck + 1.2], [cap * 0.86, top + 3], [cap * 0.5, top + 6], [0, top + 7]], { albedo: PAINT.thatch }, 14);
+  const hub = [x - SAIL_AXIS[0] * (cap + 1.2), top + 1, z - SAIL_AXIS[2] * (cap + 1.2)], across = [-SAIL_AXIS[2], 0, SAIL_AXIS[0]], length = height * MILL.stock, spin = [...hub, SAIL_TURN], member = MILL.member;
   const at = (dir, side, along, wide, lift) => [0, 1, 2].map(k => hub[k] + dir[k] * along + side[k] * wide + SAIL_AXIS[k] * lift);
   const bar = (dir, side, from, to, low, high, lift, albedo) => panel([at(dir, side, from, low, lift), at(dir, side, to, low, lift), at(dir, side, to, high, lift), at(dir, side, from, high, lift)], SAIL_AXIS, { albedo, spin });
-  bar(across, [0, 1, 0], -1.3, 1.3, -1.3, 1.3, -0.6, PAINT.thatch);
+  const boss = height * MILL.hub, rim = Array.from({ length: 10 }, (_, k) => [Math.cos(k / 10 * Math.PI * 2), Math.sin(k / 10 * Math.PI * 2)]);
+  panel(rim.map(([c, v]) => at(across, [0, 1, 0], c * boss, v * boss, -1.6)), SAIL_AXIS, { albedo: PAINT.hubCap, spin });
   for (let k = 0; k < 4; k++) {
     const turn = k * Math.PI / 2 + 0.4, dir = [0, 1, 2].map(i => across[i] * Math.cos(turn) + (i === 1 ? Math.sin(turn) : 0)), side = [0, 1, 2].map(i => -across[i] * Math.sin(turn) + (i === 1 ? Math.cos(turn) : 0));
-    const inner = length * MILL.sailFrom, outer = 0.4 + length * MILL.sailWide;
-    bar(dir, side, -0.8, length, -0.35, 0.35, 0, PAINT.spar);
-    bar(dir, side, inner, k % 2 ? inner + (length - inner) * MILL.reefed : length, 0.4, outer, 0.2, PAINT.cloth);
-    bar(dir, side, inner, length, outer - 0.6, outer, 0.3, PAINT.spar);
-    for (let j = 0; j <= MILL.bars; j++) { const along = inner + (length - inner) * j / MILL.bars; bar(dir, side, along - 0.3, along + 0.3, 0.35, outer, 0.3, PAINT.spar); }
+    const inner = length * MILL.sailFrom, outer = length * MILL.sailWide, reef = k % 2 ? inner + (length - inner) * MILL.reefed : length;
+    bar(dir, side, -1, length, -member, member, -0.4, PAINT.spar);
+    bar(dir, side, inner, reef, member, outer - member, 0.1, PAINT.cloth);
+    for (const rail of [member, outer - member]) bar(dir, side, inner, length, rail - member, rail + member, -0.2, PAINT.spar);
+    for (let j = 0; j <= MILL.bars; j++) { const along = inner + (length - inner) * j / MILL.bars; bar(dir, side, along - member, along + member, member, outer, -0.2, PAINT.spar); }
   }
 }
 
@@ -235,7 +260,7 @@ export function veilGeometry(falls) {
 
 const SOLID_VERTEX = `precision highp float;
 attribute vec3 position, normal; attribute vec4 color, spin; attribute vec2 uv; uniform mat4 world, viewProjection; uniform vec3 eye; uniform float time;
-varying vec3 vWorld, vNormal, vAlbedo; varying vec2 vMarks; varying float vSail;
+varying vec3 vWorld, vNormal, vAlbedo; varying vec2 vMarks; varying float vSail, vAccent;
 const vec3 sailAxis = vec3(${glsl(SAIL_AXIS[0])}, 0., ${glsl(SAIL_AXIS[2])});
 vec3 turned(vec3 v, float a) { float c = cos(a), s = sin(a); return v * c + cross(sailAxis, v) * s + sailAxis * dot(sailAxis, v) * (1. - c); }
 void main() {
@@ -243,11 +268,11 @@ void main() {
   vec4 p = world * vec4(spin.xyz + turned(position - spin.xyz, a), 1.);
   vec3 n = turned(normal, a);
   if (spin.w > 0. && dot(n, eye - p.xyz) < 0.) n = -n;
-  vWorld = p.xyz; vNormal = n; vAlbedo = color.rgb; vMarks = uv; vSail = step(.001, spin.w); gl_Position = viewProjection * p;
+  vWorld = p.xyz; vNormal = n; vAlbedo = color.rgb; vAccent = color.a; vMarks = uv; vSail = step(.001, spin.w); gl_Position = viewProjection * p;
 }`;
 
 const SOLID_FRAGMENT = `precision highp float;
-varying vec3 vWorld, vNormal, vAlbedo; varying vec2 vMarks; varying float vSail;
+varying vec3 vWorld, vNormal, vAlbedo; varying vec2 vMarks; varying float vSail, vAccent;
 uniform vec3 eye, sun, sunColor, skyAmbient, groundAmbient, shadowTint, fogNear, fogFar, fogSun, lamp, snow;
 uniform float sunStrength, shadowLift, fogDensity, fogHeight, lampGain, sunRim, wet;
 ${WORLD_GLSL}
@@ -260,9 +285,9 @@ void main() {
   float lit = clamp((dot(n, sun) + .3) / 1.3, 0., 1.);
   vec3 ambient = mix(groundAmbient, skyAmbient, n.y * .5 + .5);
   vec3 color = albedo * mix(shadowTint * shadowLift + ambient * (.55 + .9 * snowy), sunColor * sunStrength, lit);
-  float rim = pow(1. - clamp(dot(n, toEye), 0., 1.), 3.) * clamp(dot(-toEye, sun) * 1.5, 0., 1.) * (.2 + .8 * snowy);
-  color += sunColor * sunStrength * (rim * .55 + albedo * vSail * pow(max(dot(-toEye, sun), 0.), 2.) * .5);
-  color = liftRidges(worldAir(color, mix(vWorld, eye, .5 * snowy - .7 * wet), eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), vWorld.y, distance(eye, vWorld));
+  float rim = pow(1. - clamp(dot(n, toEye), 0., 1.), 3.) * clamp(dot(-toEye, sun) * 1.5, 0., 1.) * (.2 + .8 * snowy + 1.6 * vAccent);
+  color += sunColor * sunStrength * (rim * .55 + albedo * vSail * pow(max(dot(-toEye, sun), 0.), 2.) * .25);
+  color = liftRidges(worldAir(color, mix(vWorld, eye, .5 * snowy + .3 * vAccent - .7 * wet), eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), vWorld.y, distance(eye, vWorld));
   vec3 view = normalize(vec3(toEye.x, 0., toEye.z)), sunFlat = vec3(sun.x, 0., sun.z), sunAcross = normalize(sunFlat - view * dot(sunFlat, view) + vec3(0., 1e-4, 0.));
   float sunSide = (.5 + .5 * smoothstep(.05, .55, dot(n, sunAcross))) * (.6 + .4 * pow(1. - clamp(dot(n, toEye), 0., 1.), 1.2));
   color = mix(color, mix(sunColor, vec3(1.), .4), snowy * sunRim * sunSide * .7);
@@ -291,10 +316,10 @@ void main() {
     vAlpha = smoothstep(0., .12, age) * (1. - smoothstep(.55, 1., age));
   } else {
     float age = fract(color.x + time / ${glsl(MIST.period)});
-    c.xz += windDir * age * 26. + (color.yz - .5) * 30.;
-    c.y += age * 30.;
-    size = mix(12., 34., sqrt(age)) * (.7 + .6 * color.w);
-    vAlpha = sin(3.1416 * age) * .8;
+    c.xz += windDir * age * 26. + (color.yz - .5) * ${glsl(MIST.spread)};
+    c.y += age * ${glsl(MIST.rise)};
+    size = mix(${glsl(MIST.small)}, ${glsl(MIST.large)}, sqrt(age)) * (.7 + .6 * color.w);
+    vAlpha = sin(3.1416 * age) * .85;
   }
   vec3 p = c + (vRight * uv.x + vUp * uv.y * .7) * size;
   vWorld = p; gl_Position = viewProjection * vec4(p, 1.);
@@ -309,9 +334,10 @@ ${SKY_GLSL}
 void main() {
   if (vKind > .5 && vKind < 1.5) {
     float streak = worldNoise(vec2(vCorner.x * 1.6 + 3., vCorner.y * 22. - time * 1.4)), fine = worldNoise(vec2(vCorner.x * 5. + 9., vCorner.y * 60. - time * 3.2));
-    float edge = 1. - smoothstep(.35, 1., abs(vCorner.x) + (streak - .5) * .5);
-    float alpha = edge * (.5 + .35 * streak + .15 * fine) * smoothstep(0., .04, vCorner.y) * (1. - .55 * smoothstep(.75, 1., vCorner.y));
-    vec3 water = vec3(.86, .92, .94) * mix(shadowTint * shadowLift + skyAmbient * (.55 + .6 * wet), sunColor * sunStrength, .45 + .4 * streak);
+    float strand = worldNoise(vec2(vCorner.x * 7.5 + 21., vCorner.y * 7. - time * .9)), foam = smoothstep(.72, 1., vCorner.y) + .6 * (1. - smoothstep(0., .12, vCorner.y));
+    float edge = 1. - smoothstep(.35, 1., abs(vCorner.x) * (1. - .25 * foam) + (streak - .5) * .5);
+    float alpha = edge * (.35 + .3 * streak + .15 * fine + .35 * smoothstep(.35, .7, strand) + .3 * foam) * smoothstep(0., .04, vCorner.y) * (1. - .4 * smoothstep(.85, 1., vCorner.y));
+    vec3 water = mix(vec3(.74, .84, .88), vec3(1.), .55 * foam + .3 * smoothstep(.5, .8, strand)) * mix(shadowTint * shadowLift + skyAmbient * (.55 + .6 * wet), sunColor * sunStrength, .45 + .4 * streak);
     gl_FragColor = vec4(worldAir(water, mix(vWorld, eye, .45 * wet), eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), min(alpha * (1. + .5 * wet), 1.));
     return;
   }

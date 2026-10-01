@@ -161,3 +161,17 @@ test('four mist ribbons rise from the valleys into view from the window in the s
   assert.deepEqual(['day', 'dusk', 'rain'].map(misted), [['#bcd0cc', 0.42], ['#91928c', 0.45], ['#5c6252', 0.6]]);
   scene.dispose();
 });
+
+test('each windmill wears a cap that overhangs its tower and a dark hub boss in front of its sails', () => {
+  const across = ([px, , pz], { x, z }) => Math.hypot(px - x, pz - z), point = i => [0, 1, 2].map(k => geometry.positions[i * 3 + k]);
+  for (const windmill of LANDMARKS.windmills) {
+    const top = heightAt(windmill.x, windmill.z) + windmill.height, parts = near(windmill, windmill.height * 0.7);
+    const fixed = parts.filter(i => geometry.spins[i * 4 + 3] === 0), reach = (low, high) => Math.max(...fixed.filter(i => geometry.positions[i * 3 + 1] > low && geometry.positions[i * 3 + 1] < high).map(i => across(point(i), windmill)));
+    const ground = top - windmill.height, cap = reach(top - 4, top + 8), waist = reach(ground + windmill.height * 0.4, ground + windmill.height * 0.5);
+    assert.ok(waist > 0 && cap > waist * 1.1, `cap ${cap.toFixed(1)} m over a ${waist.toFixed(1)} m tower`);
+    const sails = parts.filter(i => geometry.spins[i * 4 + 3] > 0), hub = [...geometry.spins.slice(sails[0] * 4, sails[0] * 4 + 3)];
+    const boss = sails.filter(i => { const p = point(i); return Math.hypot(p[0] - hub[0], p[1] - hub[1], p[2] - hub[2]) < windmill.height * 0.08 && p[2] - hub[2] > 1; });
+    const luma = i => 0.2126 * geometry.colors[i * 4] + 0.7152 * geometry.colors[i * 4 + 1] + 0.0722 * geometry.colors[i * 4 + 2];
+    assert.ok(boss.length >= 8 && boss.every(i => luma(i) < 0.25), `${boss.length} hub boss vertices`);
+  }
+});
