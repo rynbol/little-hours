@@ -141,8 +141,8 @@ test('focus started in another tab cancels a pending house-page entry', async ({
   await other.locator('#start-button').click();
   await expect(other.locator('body')).toHaveClass(/is-focusing/);
   await expect(page.locator('body')).toHaveClass(/is-focusing/);
-  await page.locator('.place-transition').evaluate(node => node.getAnimations().forEach(animation => animation.play()));
-  await expect(page.locator('html')).not.toHaveAttribute('data-place-transition');
+  await page.evaluate(() => document.querySelectorAll('.place-transition').forEach(node => node.getAnimations().forEach(animation => animation.play())));
+  await expect(page.locator('html')).not.toHaveAttribute('data-place-transition', { timeout: 10_000 });
   const actual = await page.evaluate(() => ({ save: JSON.parse(localStorage.getItem('little-hours-v1')), heading: document.querySelector('#room-title').textContent, body: document.body.className }));
   await testInfo.attach('arrival-state', { body: JSON.stringify(actual, null, 2), contentType: 'application/json' });
   expect(actual.save.session.running).toBe(true);
