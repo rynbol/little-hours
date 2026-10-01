@@ -49,15 +49,21 @@ test('only dusk has a golden hour, so the day and rain skies keep their colours'
   assert.ok(hsv(WORLD_ATMOSPHERES.dusk.horizon).s > 0.4, 'the band near the sun is gold, not grey');
 });
 
-test('only dusk hazes the air gold toward the sun, so day and rain air is untouched', () => {
-  assert.deepEqual(Object.fromEntries(Object.entries(WORLD_ATMOSPHERES).map(([theme, air]) => [theme, air.sunHaze])), { day: 0, dusk: 1, rain: 0 });
-  assert.ok(AIR_UNIFORMS.includes('sunHaze'));
+test('the dusk air keeps its amber in a tight glare around the sun, while day and rain keep their broad glare', () => {
+  assert.deepEqual(Object.fromEntries(Object.entries(WORLD_ATMOSPHERES).map(([theme, air]) => [theme, air.sunFocus])), { day: 10, dusk: 60, rain: 10 });
+  assert.ok(AIR_UNIFORMS.includes('sunFocus') && !AIR_UNIFORMS.includes('sunHaze'));
   const scene = new Scene(new NullEngine()), paint = new ShaderMaterial('air', scene, { vertexSource: 'void main() {}', fragmentSource: 'void main() {}' }, { uniforms: [...AIR_UNIFORMS] });
   applyAir(paint, WORLD_ATMOSPHERES.dusk);
-  assert.equal(paint._floats.sunHaze, 1);
+  assert.equal(paint._floats.sunFocus, 60);
   applyAir(paint, WORLD_ATMOSPHERES.day);
-  assert.equal(paint._floats.sunHaze, 0);
+  assert.equal(paint._floats.sunFocus, 10);
   scene.dispose();
+});
+
+test('day and dusk suns carry a warm glow and rain has none', () => {
+  assert.deepEqual(Object.fromEntries(Object.entries(WORLD_ATMOSPHERES).map(([theme, air]) => [theme, [air.sunGlow, air.sunGlowStrength]])), { day: ['#fcf2cc', 0.6], dusk: ['#fff1c3', 0.8], rain: ['#6a6e5e', 0] });
+  const { r, b } = Color3.FromHexString(WORLD_ATMOSPHERES.dusk.sunColor);
+  assert.ok(r - b < 0.4, 'the dusk sun lights the meadow gold, not orange');
 });
 
 test('the dusk sky above the window is a calm grey-green, not olive beige', () => {
@@ -87,6 +93,7 @@ test('the sky dome takes each theme\'s colours and sun', () => {
   assert.equal(paint._floats.goldenHour, 1);
   assert.equal(paint._colors3.zenith.toHexString().toLowerCase(), '#7e8a8c');
   assert.equal(paint._floats.glowStrength, 0.9);
+  assert.equal(paint._floats.sunGlowStrength, 0.8);
   assert.equal(paint._colors3.horizonAway.toHexString().toLowerCase(), '#a9a496');
   assert.equal(paint._vectors3.sun.y, WORLD_ATMOSPHERES.dusk.sun[1]);
   sky.setTheme(WORLD_ATMOSPHERES.rain);

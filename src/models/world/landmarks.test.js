@@ -107,8 +107,8 @@ test('the landmarks are two draws that take the theme, wet in rain and rimmed at
   moving.setTheme(WORLD_ATMOSPHERES.day);
   const dayGlow = solid._floats.lampGain;
   moving.setTheme(WORLD_ATMOSPHERES.dusk);
-  assert.equal(solid._colors3.sunColor.toHexString().toLowerCase(), '#ffb46a');
-  assert.equal(veil._colors3.sunColor.toHexString().toLowerCase(), '#ffb46a');
+  assert.equal(solid._colors3.sunColor.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.sunColor);
+  assert.equal(veil._colors3.sunColor.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.sunColor);
   assert.equal(solid._colors3.snow.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.snow);
   assert.ok(solid._floats.lampGain > dayGlow * 3);
   assert.equal(solid._floats.sunRim, 1);

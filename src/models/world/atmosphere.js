@@ -3,9 +3,9 @@ const sunFrom = (heading, elevation) => Object.freeze([Math.cos(elevation) * Mat
 export const WORLD_ATMOSPHERES = Object.freeze({
   day: Object.freeze({
     sun: sunFrom(-0.02, 0.23), sunColor: '#fff4dc', sunStrength: 1,
-    zenith: '#8fb3c4', high: '#a5c2c8', horizon: '#cfdcd2', horizonAway: '#cfdcd2', glow: '#f4f2dc', glowStrength: 0.7, sunGlow: '#fff8e8', goldenHour: 0,
+    zenith: '#8fb3c4', high: '#a5c2c8', horizon: '#cfdcd2', horizonAway: '#cfdcd2', glow: '#f4f2dc', glowStrength: 0.7, sunGlow: '#fcf2cc', sunGlowStrength: 0.6, goldenHour: 0,
     skyAmbient: '#a9c4d6', groundAmbient: '#8a9a5c', shadowTint: '#6f86a8', shadowLift: 0.42,
-    fogNear: '#bcd0cc', fogFar: '#7a9eae', fogSun: '#dfe8d0', fogDensity: 0.0005, fogHeight: 300, sunHaze: 0,
+    fogNear: '#bcd0cc', fogFar: '#7a9eae', fogSun: '#dfe8d0', fogDensity: 0.0005, fogHeight: 300, sunFocus: 10,
     mist: '#bcd0cc', mistStrength: 0.35,
     cloudLit: '#fdfaf0', cloudShade: '#8ea6b4', cloudRim: '#fffbea', cloudCover: 0.55,
     water: '#4f8f96', waterShallow: '#3e5a44',
@@ -13,10 +13,10 @@ export const WORLD_ATMOSPHERES = Object.freeze({
     grass: '#679a46', grassLight: '#8bb556', grassWarm: '#a0ae52', grassTip: '#c6dba0', grassFar: '#e6f848', flowerWhite: '#f6f4ea', flowerYellow: '#f4dc7a', flowerLilac: '#b8a4dc', forestFloor: '#4f8a3a', rock: '#8d9ea3', rockDark: '#61747e', dirt: '#a89e74', sand: '#d4cc9c', snow: '#f4f6f4', crestGlow: 0.15,
   }),
   dusk: Object.freeze({
-    sun: sunFrom(-0.2, 0.19), sunColor: '#ffb46a', sunStrength: 0.8,
-    zenith: '#7e8a8c', high: '#84918a', horizon: '#f0c07e', horizonAway: '#a9a496', glow: '#ffe6a8', glowStrength: 0.9, sunGlow: '#fff1c3', goldenHour: 1,
+    sun: sunFrom(-0.2, 0.19), sunColor: '#ffd8ae', sunStrength: 0.8,
+    zenith: '#7e8a8c', high: '#84918a', horizon: '#f0c07e', horizonAway: '#a9a496', glow: '#ffe6a8', glowStrength: 0.9, sunGlow: '#fff1c3', sunGlowStrength: 0.8, goldenHour: 1,
     skyAmbient: '#8c8a9c', groundAmbient: '#7a5c3c', shadowTint: '#5f6e80', shadowLift: 0.38,
-    fogNear: '#91928c', fogFar: '#5f7284', fogSun: '#fcbe74', fogDensity: 0.00042, fogHeight: 220, sunHaze: 1,
+    fogNear: '#91928c', fogFar: '#5f7284', fogSun: '#fcbe74', fogDensity: 0.00042, fogHeight: 220, sunFocus: 60,
     mist: '#91928c', mistStrength: 0.45,
     cloudLit: '#ffe2b0', cloudShade: '#d8a080', cloudRim: '#fff1c3', cloudCover: 0.5,
     water: '#56707a', waterShallow: '#3a3e38',
@@ -25,9 +25,9 @@ export const WORLD_ATMOSPHERES = Object.freeze({
   }),
   rain: Object.freeze({
     sun: sunFrom(0.5, 0.6), sunColor: '#c8ccc0', sunStrength: 0.4,
-    zenith: '#3e443c', high: '#474d42', horizon: '#555c4c', horizonAway: '#555c4c', glow: '#6a6e5e', glowStrength: 0.15, sunGlow: '#6a6e5e', goldenHour: 0,
+    zenith: '#3e443c', high: '#474d42', horizon: '#555c4c', horizonAway: '#555c4c', glow: '#6a6e5e', glowStrength: 0.15, sunGlow: '#6a6e5e', sunGlowStrength: 0, goldenHour: 0,
     skyAmbient: '#7a8272', groundAmbient: '#4e5642', shadowTint: '#5e665c', shadowLift: 0.7,
-    fogNear: '#5c6252', fogFar: '#4a5045', fogSun: '#6a6e5e', fogDensity: 0.00105, fogHeight: 200, sunHaze: 0,
+    fogNear: '#5c6252', fogFar: '#4a5045', fogSun: '#6a6e5e', fogDensity: 0.00105, fogHeight: 200, sunFocus: 10,
     mist: '#5c6252', mistStrength: 0.6,
     cloudLit: '#4c5246', cloudShade: '#3e443a', cloudRim: '#6a6e5e', cloudCover: 0.95,
     water: '#4a5448', waterShallow: '#32382e',
