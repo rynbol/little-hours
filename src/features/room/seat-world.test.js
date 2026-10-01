@@ -480,3 +480,14 @@ test('the daytime field reads as bright gold-green, with sunlit blade roots and 
   assert.ok(luma(day.tip) > luma(day.root) + 0.15);
   for (const theme of Object.keys(VISTA_THEMES)) assert.ok(luma(grassTones(vistaPalette(theme)).root) < luma(grassTones(vistaPalette(theme)).tip), theme);
 });
+
+test('by day the clouds stay cream on their sunlit side and lavender in shade through the distance haze', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true); world.setTheme('day');
+  const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-clouds'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color');
+  const mean = role => { const sum = [0, 0, 0]; let n = 0; shape.roles.forEach((r, i) => { if (r === role) { n++; for (let c = 0; c < 3; c++) sum[c] += colors[i * 4 + c]; } }); return sum.map(v => v / n); };
+  const [lr, lg, lb] = mean('cloud'), [sr, sg, sb] = mean('cloudShade');
+  assert.ok(lr > lb + 0.02, `sunlit ${[lr, lg, lb].map(v => v.toFixed(2))}`);
+  assert.ok(sb > sg + 0.03 && sr > sg - 0.03, `shade ${[sr, sg, sb].map(v => v.toFixed(2))}`);
+  engine.dispose();
+});

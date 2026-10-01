@@ -19,11 +19,11 @@ export const VISTA_THEMES = Object.freeze({
     light: 0.35, night: { zenith: '#070b24', high: '#171b44', horizon: '#6a4f86', glow: '#b67a8e', haze: '#3a3766', cloud: '#5a4f80', cloudShade: '#35325c' },
   },
   day: {
-    zenith: '#2f74c8', high: '#6fa9e0', horizon: '#d9ecef', glow: '#fff4d6', haze: '#a4c4df', below: '#8fb08a',
+    zenith: '#2f74c8', high: '#6fa9e0', horizon: '#d9ecef', glow: '#ffecc4', haze: '#a4c4df', below: '#8fb08a',
     far: '#7090c0', mid: '#6c9a86', valley: '#7aa84c', field: '#a0c45a', cliff: '#8c8a7c', grass: '#76a843', meadow: '#8cbf4e', meadowWarm: '#c8cf5a', petal: '#fffaf0',
     trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
-    star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffffff', cloudShade: '#c4d3e6',
+    star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffeccc', cloudShade: '#bdb8dc',
     castle: '#687088', castleRoof: '#3a5a74', rock: '#5c3e38', ember: '#e2683c', smoke: '#8c827e', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
     light: 0, night: null,
   },
@@ -360,7 +360,7 @@ function buildClouds(shape) {
       for (let i = start; i < shape.roles.length; i++) {
         const nx = (shape.positions[i * 3] - cx) / rx, ny = (shape.positions[i * 3 + 1] - cy) / ry, nz = (shape.positions[i * 3 + 2] - cz) / rz;
         const band = smooth(-0.1, 0.3, (nx * SUN_TOWARD[0] + ny * SUN_TOWARD[1] + nz * SUN_TOWARD[2]) / Math.max(0.001, Math.hypot(nx, ny, nz)));
-        shape.roles[i] = band > 0.5 ? 'cloud' : 'cloudShade'; shape.shades[i] = 0.84 + 0.2 * band;
+        shape.roles[i] = band > 0.5 ? 'cloud' : 'cloudShade'; shape.shades[i] = 0.84 + 0.2 * band; shape.fogs[i] *= 0.42;
       }
     };
     for (let k = -2; k <= 2; k++) puff(k * size * 0.9, 0, size * (0.9 + random() * 0.3), 1.35);
