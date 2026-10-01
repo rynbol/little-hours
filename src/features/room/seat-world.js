@@ -266,6 +266,12 @@ function buildWatchtower(shape) {
   for (let k = 0; k < 4; k++) { shape.tri(c[0], ring[k], ring[(k + 1) % 4]); shape.tri(c[1], ring[(k + 1) % 4], ring[k]); }
 }
 
+function shardTop(shape, x, y, z, radius, rise) {
+  const tip = shape.vertex(x + radius * 0.4, y + rise, z, 'ruin', 1.05);
+  const foot = [0, 1, 2].map(k => { const a = k / 3 * Math.PI * 2 + 0.3; return shape.vertex(x + Math.cos(a) * radius, y, z + Math.sin(a) * radius, 'ruin', 0.82 + k * 0.08); });
+  for (let k = 0; k < 3; k++) shape.tri(tip, foot[k], foot[(k + 1) % 3]);
+}
+
 function buildRuins(shape) {
   const random = seeded(71);
   for (let site = 0; site < 12; site++) {
@@ -273,18 +279,19 @@ function buildRuins(shape) {
     if (nearRiver(x, z) < 4) continue;
     const g = terrainHeight(x, z) - 0.2, yaw = random() * Math.PI, cos = Math.cos(yaw), sin = Math.sin(yaw);
     if (site % 4 === 0) {
-      for (const side of [-1, 1]) { shape.box(x + side * 2 * cos, g + 2.4, z - side * 2 * sin, 0.9, 4.8, 0.9, yaw, 'ruin'); shape.box(x + side * 2 * cos, g + 4.9, z - side * 2 * sin, 1.1, 0.25, 1.1, yaw, 'moss'); }
-      shape.box(x, g + 5.3, z, 5.2, 0.8, 1, yaw, 'ruin', 1.05); shape.box(x, g + 5.75, z, 5.2, 0.15, 1, yaw, 'moss');
-      continue;
+      shape.box(x + 2 * cos, g + 1.5, z - 2 * sin, 1.2, 3.4, 1.2, yaw, 'ruin'); shape.box(x + 2 * cos, g + 3.25, z - 2 * sin, 1.35, 0.2, 1.35, yaw, 'moss');
+      shape.box(x - 2 * cos, g + 0.9, z + 2 * sin, 1.2, 2.2, 1.2, yaw, 'ruin', 0.92); shardTop(shape, x - 2 * cos, g + 2, z + 2 * sin, 0.5, 0.9);
+      shape.box(x + 0.6 * cos, g + 3.6, z - 0.6 * sin, 3.6, 0.8, 1.1, yaw, 'ruin', 1.05); shape.box(x + 0.6 * cos, g + 4.05, z - 0.6 * sin, 3.6, 0.15, 1.1, yaw, 'moss');
     }
     for (let k = 0; k < 2 + Math.floor(random() * 3); k++) {
-      const px = x + (random() - 0.5) * 5, pz = z + (random() - 0.5) * 5, h = 1 + random() * 3.2, py = terrainHeight(px, pz) - 0.2;
+      const px = x + (random() - 0.5) * 6, pz = z + (random() - 0.5) * 6, w = 1 + random() * 0.25, h = 0.7 + random() * 1.4, py = terrainHeight(px, pz) - 0.45;
       const turn = yaw + random(), tone = 0.9 + random() * 0.15;
-      for (const offset of [0, Math.PI / 4]) shape.box(px, py + h / 2, pz, 0.8, h, 0.8, turn + offset, 'ruin', tone - offset * 0.08);
-      shape.box(px, py + 0.12, pz, 1.1, 0.24, 1.1, turn, 'ruin', tone * 0.85);
-      shape.box(px + 0.12, py + h + 0.18, pz - 0.08, 0.5, 0.36, 0.42, turn + 0.4, 'ruin', tone * 1.05); shape.box(px - 0.1, py + h + 0.02, pz + 0.1, 0.62, 0.1, 0.6, turn, 'moss');
-      const drape = h * (0.4 + random() * 0.35);
-      shape.box(px + Math.sin(turn) * 0.42, py + h - drape / 2, pz + Math.cos(turn) * 0.42, 0.52, drape, 0.08, turn, 'moss', 0.85);
+      for (const offset of [0, Math.PI / 4]) shape.box(px, py + h / 2, pz, w, h, w, turn + offset, 'ruin', tone - offset * 0.08);
+      shape.box(px, py + 0.4, pz, w + 0.3, 0.24, w + 0.3, turn, 'ruin', tone * 0.85);
+      shape.box(px + 0.12, py + h + 0.18, pz - 0.08, w * 0.55, 0.36, w * 0.5, turn + 0.4, 'ruin', tone * 1.05); shape.box(px - 0.1, py + h + 0.02, pz + 0.1, w * 0.85, 0.1, w * 0.8, turn, 'moss');
+      shardTop(shape, px + 0.15, py + h, pz - 0.1, w * 0.4, 0.35 + random() * 0.4);
+      const drape = Math.max(0.7, h * (0.45 + random() * 0.35));
+      shape.box(px + Math.sin(turn) * w * 0.52, py + h - drape / 2, pz + Math.cos(turn) * w * 0.52, 0.52, drape, 0.08, turn, 'moss', 0.85);
     }
     const fallen = yaw + 0.7, fx = x + Math.cos(yaw) * 1.6, fz = z - Math.sin(yaw) * 1.6, fg = terrainHeight(fx, fz);
     shape.box(fx, fg + 0.25, fz, 0.75, 0.75, 3.2, fallen, 'ruin', 0.85); shape.box(fx, fg + 0.66, fz, 0.5, 0.08, 2.4, fallen, 'moss');
