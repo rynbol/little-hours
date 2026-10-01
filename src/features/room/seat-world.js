@@ -498,8 +498,8 @@ void main() {
 const GRASS_FRAGMENT = `precision highp float;
 varying float vTip, vFog, vGust, vShade, vCloud, vWarm, vDeep, vFlower; varying vec3 vPetal; uniform vec3 root, tip, shine, haze, warm;
 void main() {
-  vec3 top = mix(mix(tip, warm, vWarm), root * 1.15, vDeep * .6);
-  vec3 c = mix(root, top, vTip * vTip) * vShade;
+  vec3 top = mix(mix(tip, warm, vWarm), root * 1.15, vDeep * .35);
+  vec3 c = mix(mix(root, top, vTip * vTip), top * .94, smoothstep(.04, .3, vFog)) * vShade;
   c = mix(c, vPetal, vFlower);
   c = mix(c, shine, vGust * .42 * (1. - vCloud));
   c *= 1. - vCloud * .45;
@@ -507,6 +507,11 @@ void main() {
 }`;
 
 const flowerField = (x, z) => Math.sin(x * 0.31 + 1.3) * Math.sin(z * 0.27 - 0.7) + Math.sin(x * 0.12 - z * 0.15) * 0.6;
+
+export function grassTones(palette) {
+  const blade = (key, scale) => hex(palette[key]).scale(scale);
+  return { root: blade('grass', 0.74), tip: Color3.Lerp(blade('meadow', 1.14), hex(palette.glow), 0.12), shine: Color3.Lerp(blade('meadow', 1.28), hex(palette.glow), 0.3), haze: hex(palette.haze), warm: blade('meadowWarm', 1), petal: blade('petal', 1) };
+}
 
 export function grassBlades() {
   const positions = [], uvs = [], indices = [], random = seeded(83);
@@ -639,8 +644,8 @@ export function createSeatWorld(scene, parent) {
     glow.lit = windowsLit(theme, progress); glow.stars = theme === 'dusk' ? 0.55 + progress * 0.45 : 0;
     placeMoon();
     for (const mesh of [sky, land, clouds, flock, moon, shooting, spirits]) paint(mesh, palette);
-    const blade = (key, scale) => hex(palette[key]).scale(scale);
-    grassPaint.setColor3('root', blade('grass', 0.62)); grassPaint.setColor3('tip', Color3.Lerp(blade('meadow', 1.08), hex(palette.glow), 0.12)); grassPaint.setColor3('shine', Color3.Lerp(blade('meadow', 1.28), hex(palette.glow), 0.3)); grassPaint.setColor3('haze', hex(palette.haze)); grassPaint.setColor3('warm', blade('meadowWarm', 1)); grassPaint.setColor3('petal', blade('petal', 1)); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
+    const tones = grassTones(palette);
+    for (const [name, value] of Object.entries(tones)) grassPaint.setColor3(name, value); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
     skyEffectPaint.setFloat('rays', SUN_RAY_STRENGTH[theme] ?? 0); skyEffectPaint.setColor3('tint', Color3.Lerp(Color3.White(), hex(palette.glow), 0.6));
     skyEffectPaint.setColor3('smoke', hex(palette.smoke)); skyEffectPaint.setColor3('ember', hex(palette.ember)); skyEffectPaint.setColor3('haze', hex(palette.haze)); skyEffectPaint.setFloat('glow', theme === 'day' ? 0.55 : 1);
   }

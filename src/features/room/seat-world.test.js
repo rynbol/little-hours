@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, butterfliesOut, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, VOLCANO } from './seat-world.js';
+import { createSeatWorld, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, VOLCANO } from './seat-world.js';
 
 const PEAK = VOLCANO.base + VOLCANO.height;
 
@@ -472,4 +472,11 @@ test('no cloud hangs in front of the volcano plume, and the smoke stands tall an
   const [r, g, b] = [1, 3, 5].map(k => parseInt(VISTA_THEMES.day.smoke.slice(k, k + 2), 16));
   assert.ok((r + g + b) / 3 < 150, `day smoke ${VISTA_THEMES.day.smoke} reads against the pale sky`);
   engine.dispose();
+});
+
+test('the daytime field reads as bright gold-green, with sunlit blade roots and tips brighter still', () => {
+  const luma = color => 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b, day = grassTones(vistaPalette('day'));
+  assert.ok(luma(day.root) > 0.4);
+  assert.ok(luma(day.tip) > luma(day.root) + 0.15);
+  for (const theme of Object.keys(VISTA_THEMES)) assert.ok(luma(grassTones(vistaPalette(theme)).root) < luma(grassTones(vistaPalette(theme)).tip), theme);
 });
