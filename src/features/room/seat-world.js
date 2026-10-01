@@ -14,7 +14,7 @@ export const VISTA_THEMES = Object.freeze({
     far: '#5c5082', mid: '#40496c', valley: '#34485a', field: '#3d5462', cliff: '#463f56', grass: '#3a5646', meadow: '#476a4e', meadowWarm: '#6a7048', petal: '#a89cc0',
     trunk: '#3b2e33', leaf: '#2c4a40', leafLight: '#4a6a50', walls: ['#c9a58a', '#b98f86', '#a9a3a0', '#d4b894'], roofs: ['#6a3f3a', '#4a3a3a', '#7a4a3a', '#3f4a5a'],
     stone: '#6b6480', water: '#50608e', glint: '#f2d7b0', window: '#ffc978', windowWarm: '#ffa860', windowDark: '#2b2d44', lamp: '#ffdca0',
-    star: '#fff4d8', moon: '#fff1d0', cloud: '#f2aa92', cloudShade: '#6a5a8c',
+    star: '#fff4d8', moon: '#ffe6bc', cloud: '#f2aa92', cloudShade: '#6a5a8c',
     castle: '#4c4668', castleRoof: '#2e2c4a', rock: '#3a3042', ember: '#ff6a3a', smoke: '#6a5a78', ruin: '#6c6478', moss: '#3f5a48', rune: '#ffb060', bird: '#221c30', spirit: '#d8ffb8', snow: '#cdb8d8',
     light: 0.35, night: { zenith: '#070b24', high: '#171b44', horizon: '#6a4f86', glow: '#b67a8e', haze: '#3a3766', cloud: '#5a4f80', cloudShade: '#35325c' },
   },

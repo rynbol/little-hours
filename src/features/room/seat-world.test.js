@@ -409,3 +409,14 @@ test('the far ranges split into a sunlit band and a shaded band, and cloud puffs
   assert.ok(clouds.roles.length >= 13 * 9 * 8 * 14, `${clouds.roles.length} cloud vertices`);
   engine.dispose();
 });
+
+test('the dusk moon glows warm cream through the haze, not grey', () => {
+  const { engine, world } = setup();
+  world.setTheme('dusk'); world.setEnabled(true);
+  const colors = world.meshes.find(mesh => mesh.name === 'seat-world-moon').getVerticesData('color');
+  for (let i = 0; i < colors.length / 4; i++) {
+    const [r, g, b] = colors.slice(i * 4, i * 4 + 3);
+    assert.ok(r > 0.8 && r - b > 0.22 && g - b > 0.12, `moon vertex ${[r, g, b].map(v => v.toFixed(2))}`);
+  }
+  engine.dispose();
+});
