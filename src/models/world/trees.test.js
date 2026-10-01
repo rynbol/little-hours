@@ -5,7 +5,7 @@ import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
-import { createWorldTrees, plantTrees, NEAR_TREES, HERO_TREES, WINDOW_EYE, VISTA } from './trees.js';
+import { createWorldTrees, plantTrees, NEAR_TREES, HERO_TREES, WINDOW_EYE, VISTA, TREE_FORMS, CROWN_TOPS } from './trees.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 import { WORLD, riverDistance, pathDistance } from '../../core/world-terrain.js';
 import { TERRAIN_RINGS, terrainRing, ringAt } from './terrain-mesh.js';
@@ -21,18 +21,18 @@ function flatRing(radius, step, at) {
 
 const halfForest = () => [flatRing(600, 20, x => ({ y: 10, up: 1, cover: x > 0 ? 1 : 0, wet: 0 }))];
 
-const conifers = trees => trees.kind.reduce((sum, kind) => sum + kind, 0);
+const conifers = trees => trees.kind.filter(kind => kind === TREE_FORMS.conifer).length;
 
 test('forests fill canopy ground while meadows get only a few lone broadleaf trees', () => {
   const trees = plantTrees(halfForest());
-  assert.equal(trees.count, 1159);
+  assert.equal(trees.count, 893);
   let meadow = 0, meadowConifers = 0;
   for (let i = 0; i < trees.count; i++) {
     const d = Math.hypot(trees.x[i], trees.z[i]);
     assert.ok(d >= 25, `tree ${i} sits ${d} m from the house`);
     assert.ok(riverDistance(trees.x[i], trees.z[i]) >= WORLD.river.width * 1.4, `tree ${i} stands in the river`);
     assert.ok(Math.abs(trees.x[i]) < 600 && Math.abs(trees.z[i]) < 600, `tree ${i} is off the terrain`);
-    if (trees.x[i] < -20) { meadow++; meadowConifers += trees.kind[i]; }
+    if (trees.x[i] < -20) { meadow++; meadowConifers += trees.kind[i] === TREE_FORMS.conifer ? 1 : 0; }
   }
   assert.equal(meadow, 53);
   assert.equal(meadowConifers, 0);
@@ -42,7 +42,7 @@ test('forests fill canopy ground while meadows get only a few lone broadleaf tre
 test('lowland forest is broadleaf and conifers only take the high ground', () => {
   const forestAt = y => plantTrees([flatRing(600, 20, () => ({ y, up: 1, cover: 1, wet: 0 }))]);
   assert.equal(conifers(forestAt(-40)), 0);
-  assert.equal(conifers(forestAt(200)), 609);
+  assert.equal(conifers(forestAt(200)), 464);
 });
 
 test('far hills hold a few wide grove clumps instead of a carpet of single trees', () => {
@@ -92,6 +92,60 @@ test('valley canopy sizes range from about 0.6 to 1.6 so groves are not one stam
   assert.ok(smallest < 0.65 && largest > 1.55, `valley tree widths run ${smallest} to ${largest}`);
 });
 
+test('valley groves mix round and spreading crowns, meadows favour lone spreading trees, and far hills keep their grove clumps', () => {
+  const tally = (trees, keep) => {
+    const forms = [0, 0, 0];
+    for (let i = HERO_TREES.length; i < trees.count; i++) if (keep(Math.hypot(trees.x[i], trees.z[i]))) forms[trees.kind[i]]++;
+    return forms;
+  };
+  const forest = plantTrees([flatRing(600, 20, () => ({ y: -40, up: 1, cover: 1, wet: 0 }))]), meadow = plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0 }))]);
+  assert.deepEqual({
+    valley: tally(forest, d => d < 450),
+    pastValley: tally(forest, d => d >= 450)[TREE_FORMS.spreading],
+    meadow: tally(meadow, () => true),
+  }, { valley: [1018, 0, 551], pastValley: 0, meadow: [35, 0, 71] });
+});
+
+test('a spreading tree holds a wide flat canopy lower than a round crown, and its far card is wider still', () => {
+  const { scene, trees } = forestScene(true);
+  const extent = (mesh, leavesOnly) => {
+    const p = mesh.getVerticesData('position'), color = mesh.getVerticesData('color'), box = { width: 0, height: 0, top: -Infinity };
+    let left = Infinity, right = -Infinity, low = Infinity;
+    for (let v = 0; v < p.length / 3; v++) {
+      if (leavesOnly && color[v * 4 + 2] < 0.1) continue;
+      left = Math.min(left, p[v * 3]); right = Math.max(right, p[v * 3]); low = Math.min(low, p[v * 3 + 1]); box.top = Math.max(box.top, p[v * 3 + 1]);
+    }
+    return { width: Number((right - left).toFixed(1)), height: Number((box.top - low).toFixed(1)), top: Number(box.top.toFixed(1)) };
+  };
+  const [round, roundFar, , , spreading, spreadingFar] = trees.meshes;
+  assert.deepEqual(
+    { round: extent(round, true), spreading: extent(spreading, true), roundFar: extent(roundFar, false), spreadingFar: extent(spreadingFar, false) },
+    { round: { width: 11.3, height: 7.5, top: 10.4 }, spreading: { width: 14.4, height: 5.9, top: 9.3 }, roundFar: { width: 11.6, height: 11.6, top: 10.8 }, spreadingFar: { width: 16.4, height: 9.8, top: 9 } },
+  );
+  assert.ok(extent(spreading, true).top <= CROWN_TOPS[TREE_FORMS.spreading]);
+  scene.dispose();
+});
+
+test('day canopy shade leans teal under warm lit tops and settles back to the old haze green past the valley', () => {
+  const hue = hex => {
+    const [r, g, b] = [1, 3, 5].map(k => parseInt(hex.slice(k, k + 2), 16) / 255), max = Math.max(r, g, b), d = max - Math.min(r, g, b);
+    return Math.round(60 * (max === g ? (b - r) / d + 2 : max === r ? ((g - b) / d + 6) % 6 : (r - g) / d + 4));
+  };
+  const { day } = WORLD_ATMOSPHERES;
+  assert.deepEqual({ under: hue(day.leafUnder), top: hue(day.leafTop), haze: day.leafHaze }, { under: 158, top: 80, haze: '#2f5a2e' });
+  const { scene, trees } = forestScene(true);
+  scene.render();
+  const fragment = trees.paint.getEffect()._fragmentSourceCode;
+  assert.match(fragment, /leafShade = mix\(leafUnder, leafHaze, smoothstep\(300\., 500\., dist\)\);/);
+  assert.match(fragment, /vec3 field = mix\(mix\(leafHaze, needleUnder, needle\)/);
+  scene.dispose();
+});
+
+test('dusk trunks take a pale bark so the backlit shade does not crush them to black', () => {
+  const luma = hex => [1, 3, 5].map(k => parseInt(hex.slice(k, k + 2), 16) / 255).reduce((sum, c, k) => sum + c * [0.2126, 0.7152, 0.0722][k], 0);
+  assert.equal(Number(luma(WORLD_ATMOSPHERES.dusk.bark).toFixed(2)), 0.72);
+});
+
 test('no trees grow on steep rock or wet river banks except the window hero trees', () => {
   assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0 }))]).count, 109);
   assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 0.5, cover: 0, wet: 0 }))]).count, HERO_TREES.length);
@@ -102,8 +156,8 @@ test('hero trees frame the window vista below the far ridge and leave its cleari
   const trees = plantTrees([flatRing(600, 20, () => ({ y: -10, up: 1, cover: 1, wet: 0 }))]);
   HERO_TREES.forEach((hero, i) => {
     assert.ok(Math.abs(trees.x[i] - hero.x) < 1e-3 && Math.abs(trees.z[i] - hero.z) < 1e-3);
-    assert.equal(trees.kind[i], 0);
-    const crown = trees.y[i] + trees.height[i] * 10.6, sight = WINDOW_EYE.y - hero.distance * VISTA.dip;
+    assert.equal(trees.kind[i], TREE_FORMS.spreading);
+    const crown = trees.y[i] + trees.height[i] * CROWN_TOPS[TREE_FORMS.spreading], sight = WINDOW_EYE.y - hero.distance * VISTA.dip;
     assert.ok(crown <= sight + 1e-3, `hero ${i} crown ${crown} rises over the ridge line ${sight}`);
   });
   for (let i = HERO_TREES.length; i < trees.count; i++) {
@@ -167,17 +221,17 @@ function forestScene(still) {
   return { scene, camera, trees };
 }
 
-test('four thin-instanced meshes split every tree between near models and far impostors', () => {
+test('six thin-instanced meshes split every tree between near models and far impostors', () => {
   const { scene, camera, trees } = forestScene(true);
-  assert.deepEqual(trees.meshes.map(mesh => mesh.name), ['world-trees-broadleaf-near', 'world-trees-broadleaf-far', 'world-trees-conifer-near', 'world-trees-conifer-far']);
+  assert.deepEqual(trees.meshes.map(mesh => mesh.name), ['world-trees-broadleaf-near', 'world-trees-broadleaf-far', 'world-trees-conifer-near', 'world-trees-conifer-far', 'world-trees-spreading-near', 'world-trees-spreading-far']);
   const counts = () => trees.meshes.map(mesh => mesh.thinInstanceCount);
   const nearCount = (x, z) => Array.from(trees.planted.x).filter((tx, i) => (tx - x) ** 2 + (trees.planted.z[i] - z) ** 2 < NEAR_TREES * NEAR_TREES).length;
   assert.equal(counts().reduce((a, b) => a + b), trees.planted.count);
-  assert.equal(counts()[0] + counts()[2], nearCount(0, 0));
+  assert.equal(counts()[0] + counts()[2] + counts()[4], nearCount(0, 0));
   assert.ok(trees.meshes.every(mesh => mesh.alwaysSelectAsActiveMesh && !mesh.isPickable));
   camera.position.set(300, 2, 0);
   scene.render();
-  assert.equal(counts()[0] + counts()[2], nearCount(300, 0));
+  assert.equal(counts()[0] + counts()[2] + counts()[4], nearCount(300, 0));
   assert.equal(counts().reduce((a, b) => a + b), trees.planted.count);
   scene.dispose();
 });
@@ -213,8 +267,8 @@ test('far broadleaf cards mirror and resize their lobes per tree so neighbouring
   const { scene, trees } = forestScene(true);
   scene.render();
   const fragment = trees.paint.getEffect()._fragmentSourceCode, lobes = fragment.match(/clump\((?!vec2 c)[^;]*\);/g);
-  assert.equal(lobes.length, 13);
-  assert.ok(lobes.every(lobe => /^clump\(m, vec2\([^)]*\), [\d.]+ \* \([^)]*fract\(seed \* [\d.]+\)\), seed, best\);$/.test(lobe)), lobes.join('\n'));
+  assert.equal(lobes.length, 18);
+  assert.ok(lobes.every(lobe => /^clump\([mf], vec2\([^)]*\), [\d.]+ \* \([^)]*fract\(seed \* [\d.]+\)\), seed, best\);$/.test(lobe)), lobes.join('\n'));
   assert.match(fragment, /vec2 m = vec2\(c\.x \* flip, c\.y\)/);
   scene.dispose();
 });

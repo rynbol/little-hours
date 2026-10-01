@@ -11,29 +11,31 @@ import { WORLD_GLSL, AIR_UNIFORMS, applyAir, followEye } from './world-glsl.js';
 import { RIDGE_LIFT_GLSL, RIDGE_UNIFORMS, applyRidges } from './terrain-paint.js';
 
 export const TREE_BANDS = Object.freeze([
-  Object.freeze({ from: 25, to: 450, spacing: 8, size: 1, clump: 1, spread: 1, lone: 1, behind: 450, gather: 1, fray: 0 }),
-  Object.freeze({ from: 450, to: 1300, spacing: 34, size: 1.7, clump: 2.9, spread: 1.7, lone: 0, behind: 200, gather: 0.7, fray: 1 }),
-  Object.freeze({ from: 1300, to: 3400, spacing: 46, size: 2.6, clump: 3.6, spread: 1.8, lone: 0, behind: 200, gather: 0.7, fray: 0 }),
+  Object.freeze({ from: 25, to: 450, spacing: 8, size: 1, clump: 1, spread: 1, lone: 1, behind: 450, gather: 1, fray: 0, clearing: -0.05 }),
+  Object.freeze({ from: 450, to: 1300, spacing: 34, size: 1.7, clump: 2.9, spread: 1.7, lone: 0, behind: 200, gather: 0.7, fray: 1, clearing: -0.25 }),
+  Object.freeze({ from: 1300, to: 3400, spacing: 46, size: 2.6, clump: 3.6, spread: 1.8, lone: 0, behind: 200, gather: 0.7, fray: 0, clearing: -0.25 }),
 ]);
 export const WINDOW_EYE = Object.freeze({ x: -2, y: 2.24, z: -2.4 });
 export const VISTA = Object.freeze({ reach: 320, clearing: 170, bearing: -0.3, halfAngle: 1.25, dip: 0.022 });
 export const HERO_TREES = Object.freeze([
-  Object.freeze({ bearing: -0.44, distance: 50, size: 1.3, turn: 0.4 }),
+  Object.freeze({ bearing: -0.52, distance: 50, size: 1.3, turn: 0.4 }),
   Object.freeze({ bearing: -0.86, distance: 105, size: 1.7, turn: 2.2 }),
   Object.freeze({ bearing: 0.42, distance: 62, size: 1.3, turn: 4.1 }),
 ].map(hero => Object.freeze({ ...hero, x: WINDOW_EYE.x + Math.sin(hero.bearing) * hero.distance, z: WINDOW_EYE.z - Math.cos(hero.bearing) * hero.distance })));
 const HERO_CLEARANCE = 11;
-const CROWN_TOP = 10.6;
+export const TREE_FORMS = Object.freeze({ broadleaf: 0, conifer: 1, spreading: 2 });
+export const CROWN_TOPS = Object.freeze([10.6, 14.6, 9.4]);
+const SPREADING_SHARE = Object.freeze({ lone: 0.7, grove: 0.35 });
 export const NEAR_TREES = 115;
 const LONE_TREE_AREA = 70 * 70;
 const RIVER_CLEARANCE = WORLD.river.width * 1.4;
 export const PATH_CLEARANCE = 2;
 const FRAY_REACH = 50;
 
-const FOLIAGE_COLORS = Object.freeze(['leafTop', 'leafUnder', 'leafBack', 'leafCrown', 'needleTop', 'needleUnder', 'bark']);
+const FOLIAGE_COLORS = Object.freeze(['leafTop', 'leafUnder', 'leafHaze', 'leafBack', 'leafCrown', 'needleTop', 'needleUnder', 'bark']);
 const LIGHT_COLORS = ['sunColor', 'skyAmbient', 'groundAmbient', 'shadowTint'];
 
-const PART = Object.freeze({ bark: 0, mass: 0.16, leaf: 0.25, needle: 0.5, farLeaf: 0.75, farNeedle: 1 });
+const PART = Object.freeze({ bark: 0, mass: 0.16, leaf: 0.25, needle: 0.5, farLeaf: 0.75, farSpreading: 0.81, farNeedle: 1 });
 
 function hash(a, b, salt) {
   let h = Math.imul(a, 374761393) ^ Math.imul(b, 668265263) ^ Math.imul(salt, 1274126177);
@@ -73,16 +75,16 @@ const sightLine = (px, pz) => {
 
 export function plantTrees(rings) {
   const ground = groundOf(rings), x = [], y = [], z = [], width = [], height = [], turn = [], kind = [];
-  const plant = (px, pz, at, grow, spin, conifer, tall, spread = 1) => {
+  const plant = (px, pz, at, grow, spin, form, tall, spread = 1) => {
     x.push(px); z.push(pz); y.push(at.y - 0.5 * grow); turn.push(spin);
-    width.push(grow * spread); height.push(grow * tall); kind.push(conifer ? 1 : 0);
+    width.push(grow * spread); height.push(grow * tall); kind.push(form);
   };
   for (const hero of HERO_TREES) {
     const at = ground(hero.x, hero.z), top = WINDOW_EYE.y - hero.distance * VISTA.dip;
-    if (at) plant(hero.x, hero.z, at, Math.max(0.6, Math.min(hero.size, (top - at.y) / (CROWN_TOP - 0.5))), hero.turn, false, 1);
+    if (at) plant(hero.x, hero.z, at, Math.max(0.6, Math.min(hero.size, (top - at.y) / (CROWN_TOPS[TREE_FORMS.spreading] - 0.5))), hero.turn, TREE_FORMS.spreading, 1);
   }
   const neighbour = groundOf(rings), coverAt = (x, z) => neighbour(x, z)?.cover ?? 0, heightToward = (x, z, fallback) => neighbour(x, z)?.y ?? fallback;
-  TREE_BANDS.forEach(({ from, to, spacing, size, clump, spread, lone: loneShare, behind, gather, fray }, band) => {
+  TREE_BANDS.forEach(({ from, to, spacing, size, clump, spread, lone: loneShare, behind, gather, fray, clearing }, band) => {
     const cells = Math.ceil(to / spacing), lone = loneShare * spacing * spacing / LONE_TREE_AREA, salt = band * 8, scatter = 1 + 0.7 * gather, thicketSize = spacing / TREE_BANDS[0].spacing;
     for (let gx = -cells; gx < cells; gx++) for (let gz = -cells; gz < Math.ceil(behind / spacing); gz++) {
       const px = (gx + 0.5 + (hash(gx, gz, salt + 1) - 0.5) * scatter) * spacing, pz = (gz + 0.5 + (hash(gx, gz, salt + 2) - 0.5) * scatter) * spacing, d = Math.hypot(px, pz);
@@ -96,15 +98,17 @@ export function plantTrees(rings) {
       const crest = fray && open && up > 0.85 ? smooth(8, 22, at.y - heightToward(px * (1 - FRAY_REACH / d), pz * (1 - FRAY_REACH / d), at.y)) : 0;
       const frayed = fray * Math.max(smooth(0.3, 0.8, edge) * smooth(0.55, 0.75, up) * 0.8, crest) * smooth(-0.3, 0.3, noise2(px / 70, pz / 70, 96));
       const meadow = Math.max(lone * smooth(0.9, 0.96, up), frayed) * open;
-      const thicket = smooth(-0.25, 0.4, noise2(px / (30 * thicketSize), pz / (30 * thicketSize), 94) + 0.45 * noise2(px / (12 * thicketSize), pz / (12 * thicketSize), 95)), gathered = 1 - gather + gather * thicket;
+      const thicket = smooth(clearing, 0.4, noise2(px / (30 * thicketSize), pz / (30 * thicketSize), 94) + 0.45 * noise2(px / (12 * thicketSize), pz / (12 * thicketSize), 95)), gathered = 1 - gather + gather * thicket;
       const forest = smooth(0.04, 0.3, at.cover) * grove * 1.3 * gathered * (1 + gather), roll = hash(gx, gz, salt + 3);
       if (roll >= forest && roll >= meadow) continue;
       const alone = roll >= forest, stand = smooth(-0.05, 0.35, noise2(px / 90, pz / 90, 93)), conifer = !alone && hash(gx, gz, salt + 4) < (0.85 * smooth(25, 120, at.y) + 0.5 * smooth(0.95, 0.85, at.up)) * stand;
+      const spreading = !conifer && band === 0 && hash(gx, gz, salt + 10) < (alone ? SPREADING_SHARE.lone : SPREADING_SHARE.grove);
+      const form = conifer ? TREE_FORMS.conifer : spreading ? TREE_FORMS.spreading : TREE_FORMS.broadleaf;
       const massed = !alone && !conifer, scale = (0.6 + 0.65 * hash(gx, gz, salt + 5) + 0.35 * smooth(0.4, 0.9, grove)) * (1 - gather * 0.55 + gather * gathered);
       const grow = (massed ? clump : size) * scale * (alone ? 1.3 : 1), tall = 0.88 + 0.28 * hash(gx, gz, salt + 7) + gather * 0.2 * (hash(gx, gz, salt + 8) - 0.5);
-      if (at.y - 0.5 * grow + grow * tall * (conifer ? 14.6 : CROWN_TOP) > sightLine(px, pz)) continue;
+      if (at.y - 0.5 * grow + grow * tall * CROWN_TOPS[form] > sightLine(px, pz)) continue;
       if (pathDistance(px, pz) < PATH_CLEARANCE + 5 * grow) continue;
-      plant(px, pz, at, grow, hash(gx, gz, salt + 6) * Math.PI * 2, conifer, tall, massed ? spread : 1 + gather * 0.3 * (hash(gx, gz, salt + 9) - 0.5));
+      plant(px, pz, at, grow, hash(gx, gz, salt + 6) * Math.PI * 2, form, tall, massed ? spread : 1 + gather * 0.3 * (hash(gx, gz, salt + 9) - 0.5));
     }
   });
   return { count: x.length, x: Float32Array.from(x), y: Float32Array.from(y), z: Float32Array.from(z), width: Float32Array.from(width), height: Float32Array.from(height), turn: Float32Array.from(turn), kind: Uint8Array.from(kind) };
@@ -178,6 +182,29 @@ function broadleaf() {
   return s.data();
 }
 
+function spreading() {
+  const s = shape(), rand = seeded(17), canopy = [0, 6.4, 0], fork = [0.15, 2.9, 0.05], limbs = [], clumps = [{ c: [0, 7, 0], r: 2.6 }];
+  for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2 + 0.4 + rand() * 0.6; limbs.push([Math.cos(a) * 2.6, 4.9 + rand() * 0.5, Math.sin(a) * 2.6]); }
+  for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2 + rand() * 0.4, d = 4.4 + rand() * 1.2; clumps.push({ c: [Math.cos(a) * d, 6.2 + rand() * 0.6, Math.sin(a) * d], r: 2.1 + rand() * 0.5 }); }
+  const barkColor = p => [0.45 + 0.5 * smooth(-0.5, 5, p[1]), 0.08 * smooth(1, 5, p[1]), PART.bark, 0];
+  s.tube([0, -0.8, 0], fork, 0.55, 0.4, 7, barkColor);
+  for (const limb of limbs) s.tube(fork, limb, 0.3, 0.17, 5, barkColor);
+  for (const { c } of clumps) {
+    const limb = limbs.reduce((best, l) => Math.hypot(...sub(c, l)) < Math.hypot(...sub(c, best)) ? l : best);
+    s.tube(limb, add(limb, sub(c, limb), 0.75), 0.15, 0.06, 4, barkColor);
+  }
+  for (const { c, r } of clumps) {
+    const normalOf = v => blendNormal(v, canopy, c, 1.3), light = v => {
+      const out = sub(v, canopy), depth = Math.min(1, Math.hypot(...out) / 7);
+      return 0.36 + 0.22 * out[1] / (Math.hypot(...out) || 1) + 0.2 * depth + 0.38 * (v[1] - c[1]) / (r * 0.55);
+    };
+    const sway = v => Math.min(1, (v[1] / 9) ** 1.5), seed = rand();
+    s.ball(c, r * 0.8, 0.55, normalOf, v => [Math.min(0.75, Math.max(0.12, light(v) - 0.12)), sway(v), PART.mass, seed]);
+    scatterCards(s, rand, c, r, 0.55, 14, 0.62, 0.6, normalOf, leafSeed => v => [Math.min(1, Math.max(0.16, light(v))), sway(v), PART.leaf, leafSeed]);
+  }
+  return s.data();
+}
+
 function conifer() {
   const s = shape(), rand = seeded(31), tiers = 9, segments = 12;
   s.tube([0, -0.8, 0], [0, 13.6, 0], 0.34, 0.06, 6, p => [0.4 + 0.5 * smooth(0, 12, p[1]), 0.1 * smooth(2, 13, p[1]), PART.bark, 0]);
@@ -206,6 +233,7 @@ function impostor(halfWidth, top, part) {
 const TREE_KINDS = Object.freeze([
   Object.freeze({ name: 'broadleaf', near: broadleaf, far: () => impostor(5.8, 10.8, PART.farLeaf) }),
   Object.freeze({ name: 'conifer', near: conifer, far: () => impostor(3.8, 14.6, PART.farNeedle) }),
+  Object.freeze({ name: 'spreading', near: spreading, far: () => impostor(8.2, 9, PART.farSpreading) }),
 ]);
 
 const TREE_VERTEX = `precision highp float;
@@ -238,7 +266,8 @@ void main() {
 const TREE_FRAGMENT = `precision highp float;
 varying vec3 vWorld, vNormal, vRight; varying vec4 vPart; varying vec2 vUv; varying float vSeed, vSpread;
 uniform vec3 eye, sun, sunColor, skyAmbient, groundAmbient, shadowTint, fogNear, fogFar, fogSun;
-uniform vec3 leafTop, leafUnder, leafBack, leafCrown, needleTop, needleUnder, bark;
+uniform vec3 leafTop, leafUnder, leafHaze, leafBack, leafCrown, needleTop, needleUnder, bark;
+vec3 leafShade;
 uniform float sunStrength, shadowLift, fogDensity, fogHeight, time, goldenHour;
 ${WORLD_GLSL}
 ${RIDGE_LIFT_GLSL}
@@ -265,7 +294,7 @@ void clump(vec2 c, vec2 centre, float radius, float seed, inout vec4 best) {
 vec3 foliage(vec3 n, vec3 v, float ao, float needle, float tint, float leaf) {
   vec3 ambient = mix(groundAmbient, skyAmbient, n.y * .5 + .5), shade = shadowTint * shadowLift + ambient * .35, lit = sunColor * sunStrength;
   float soft = .45 - .3 * goldenHour, wrap = clamp((dot(n, sun) + soft) / (1. + soft), 0., 1.), light = wrap * mix(.4, 1., ao);
-  vec3 top = mix(leafTop, needleTop, needle), under = mix(leafUnder, needleUnder, needle);
+  vec3 top = mix(leafTop, needleTop, needle), under = mix(leafShade, needleUnder, needle);
   top = mix(top, top * vec3(1.12, 1.06, .78), tint * (1. - needle) * .6);
   top = mix(top, top * vec3(.8, .92, 1.04), smoothstep(.5, 1., fract(tint * 7.31)) * (1. - needle) * .8);
   top = mix(top, leafBack, goldenHour * light * sqrt(light) * (1. - needle * .5) * .75);
@@ -281,6 +310,7 @@ vec3 foliage(vec3 n, vec3 v, float ao, float needle, float tint, float leaf) {
 void main() {
   float part = vPart.b, needle = step(.37, part) * (1. - step(.62, part)) + step(.87, part);
   vec3 toEye = eye - vWorld; float dist = length(toEye); vec3 v = toEye / dist;
+  leafShade = mix(leafUnder, leafHaze, smoothstep(300., 500., dist));
   vec3 ambient = mix(groundAmbient, skyAmbient, .6), shade = shadowTint * shadowLift + ambient * .35, lit = sunColor * sunStrength;
   vec3 color;
   if (part < .12) {
@@ -297,8 +327,14 @@ void main() {
       ao = clamp(.3 + .45 * sqrt(1. - h) + .25 * t + .2 * (1. - tier), 0., 1.);
     } else {
       vec4 best = vec4(-1.);
+      bool spreading = abs(part - .81) < .03;
       float flip = fract(seed * .53) < .5 ? -1. : 1.; vec2 m = vec2(c.x * flip, c.y);
-      if (vSpread > 1.2) {
+      if (spreading) {
+        vec2 f = vec2(m.x, 6.6 + (m.y - 6.6) * 1.4);
+        clump(f, vec2(-5.6, 6.3), 2.2 * (.75 + .5 * fract(seed * 1.7)), seed, best); clump(f, vec2(-2.9, 6.9), 2.6 * (.8 + .4 * fract(seed * 2.3)), seed, best); clump(f, vec2(0., 7.5), 2.8 * (.8 + .4 * fract(seed * 3.1)), seed, best);
+        clump(f, vec2(2.9, 6.8), 2.6 * (.8 + .4 * fract(seed * 4.3)), seed, best); clump(f, vec2(5.7, 6.2), 2.1 * (.6 + .8 * fract(seed * 5.9)), seed, best);
+        if (best.x < 0. && (c.y < 3. || c.y > 6.2 || min(abs(m.x - (c.y - 3.) * .9), abs(m.x + (c.y - 3.) * .8)) > .32 - c.y * .02) && (abs(c.x) > .5 - c.y * .03 || c.y > 3.4)) discard;
+      } else if (vSpread > 1.2) {
         clump(m, vec2(-3.4, 6.), 2.1 * (.75 + .5 * fract(seed * 1.7)), seed, best); clump(m, vec2(-.9, 7.4), 2.6 * (.75 + .5 * fract(seed * 2.3)), seed, best); clump(m, vec2(2.1, 6.6), 2.4 * (.75 + .5 * fract(seed * 3.1)), seed, best); clump(m, vec2(3.9, 4.9), 1.5 * (.6 + .8 * fract(seed * 4.3)), seed, best);
         clump(m, vec2(-2.5, 3.), 2.6 * (.8 + .4 * fract(seed * 5.9)), seed, best); clump(m, vec2(1., 3.2), 2.9 * (.8 + .4 * fract(seed * 6.7)), seed, best); clump(m, vec2(3.6, 2.6), 1.8 * (.7 + .6 * fract(seed * 7.9)), seed, best);
         if (best.x < 0.) discard;
@@ -306,12 +342,12 @@ void main() {
         clump(m, vec2(0., 7.9), 2.7 * (.8 + .4 * fract(seed * 1.7)), seed, best); clump(m, vec2(-2.9, 6.3), 2.2 * (.7 + .6 * fract(seed * 2.3)), seed, best); clump(m, vec2(2.8, 6.5), 2.2 * (.7 + .6 * fract(seed * 3.1)), seed, best);
         clump(m, vec2(-1.4, 5.5), 2.3 * (.75 + .5 * fract(seed * 4.3)), seed, best); clump(m, vec2(1.5, 5.7), 2.3 * (.75 + .5 * fract(seed * 5.9)), seed, best); clump(m, vec2(.4, 9.3), 1.7 * (.5 + fract(seed * 6.7)), seed, best);
       }
-      h = best.x; best.y *= flip; underside = smoothstep(0., 2.6, c.y - (vSpread > 1.2 ? .6 : 3.2) + best.z * 1.2);
-      if (h < 0.) { if (abs(c.x) < .42 - c.y * .03 && c.y < 4.6) { color = bark * mix(shade * 1.25, lit, .25); gl_FragColor = vec4(treeAir(color), 1.); return; } discard; }
-      vec2 dc = (c - vec2(0., 6.6)) / 5.2;
+      h = best.x; best.y *= flip; underside = smoothstep(0., 2.6, c.y - (spreading ? 4.2 : vSpread > 1.2 ? .6 : 3.2) + best.z * 1.2);
+      if (h < 0.) { if (spreading || (abs(c.x) < .42 - c.y * .03 && c.y < 4.6)) { color = bark * mix(shade * 1.25, lit, .25); gl_FragColor = vec4(treeAir(color), 1.); return; } discard; }
+      vec2 dc = spreading ? (c - vec2(0., 6.9)) / vec2(8.2, 2.6) : (c - vec2(0., 6.6)) / 5.2;
       vec3 local = normalize(normalize(vec3(dc, sqrt(max(1. - dot(dc, dc), .05)))) * .55 + normalize(vec3(best.yz, sqrt(h))) * .45);
       n = normalize(vRight * local.x + vec3(0., local.y, 0.) + facing * local.z);
-      ao = clamp(.16 + .64 * smoothstep(3.5, 9.8, c.y) + .28 * sqrt(h), 0., 1.);
+      ao = clamp(.16 + .64 * (spreading ? smoothstep(4.6, 8.8, c.y) : smoothstep(3.5, 9.8, c.y)) + .28 * sqrt(h), 0., 1.);
     }
     vec2 turned = mat2(.8, -.6, .6, .8) * c;
     float mottle = dist < 1100. ? mix(.86 + .2 * worldNoise(turned * 1.7 + seed * 7.) + .1 * worldNoise(turned * 4.1 - seed * 3.), 1., smoothstep(350., 1100., dist)) : 1.;
@@ -319,7 +355,7 @@ void main() {
     float back = pow(clamp(dot(-v, sun), 0., 1.), 2.), band = smoothstep(40., 180., dist) * (1. - smoothstep(900., 1600., dist));
     color = mix(color, leafBack * lit, back * band * .7 * (1. - sqrt(max(h, 0.))) * clamp(n.y + .4, 0., 1.));
     color *= mix(.6, 1., underside);
-    vec3 field = mix(mix(leafUnder, needleUnder, needle) * (shade * 1.35 + .25), mix(leafCrown, needleTop * lit, needle), .32);
+    vec3 field = mix(mix(leafHaze, needleUnder, needle) * (shade * 1.35 + .25), mix(leafCrown, needleTop * lit, needle), .32);
     color = mix(color, field, smoothstep(300., 1500., dist) * .8);
     color = mix(color, leafBack * lit, goldenHour * back * smoothstep(.2, .9, n.y) * (1. - sqrt(max(h, 0.))) * .9);
   } else {
