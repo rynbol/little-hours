@@ -4,7 +4,7 @@ import kit
 from kit import cylinder, displace, lathe, rod, sphere, torus, tube
 from plant import leaf, pebble, soil
 
-PLANTER, RIM, SOIL, RIB, TRUNK, BRANCH, STRING, CHARM = '#967a50', '#c2a16a', '#4d4938', '#b89a63', '#775d43', '#816746', '#bca36f', '#d5bb78'
+PLANTER, RIM, SOIL, RIB, TRUNK, BRANCH, STRING, CHARM = '#967a50', '#c2a16a', '#4d4938', '#b89a63', '#775d43', '#816746', '#8e6f45', '#d5bb78'
 MOSS, CAP, SPOT, STALK, BARK = '#7d8f5a', '#c9776a', '#f1e3c8', '#e6d8bc', '#664e38'
 TRUNK_PATH = [(0, 0.63, 0), (-0.08, 1.2, 0.02), (0.11, 1.85, -0.04), (-0.02, 2.46, 0.02), (0.11, 2.93, -0.06)]
 EYE = (0.35, 0.2, 1.0)
@@ -85,8 +85,8 @@ def trunk():
     return parts
 
 
-def branches():
-    parts = []
+def branch_paths():
+    paths = []
     for tier in range(4):
         for branch in range(3):
             angle = tier * 1.2 + branch * math.pi * 2 / 3
@@ -95,19 +95,47 @@ def branches():
             end = (c * reach, height + 0.24, s * reach)
             tx, ty, tz = trunk_at(height - 0.06)
             path = [(tx - c * 0.01, ty, tz - s * 0.01), (tx + (c * reach - tx) * 0.4, height + 0.04, tz + (s * reach - tz) * 0.4), (tx + (c * reach - tx) * 0.75, height + 0.15, tz + (s * reach - tz) * 0.75), end]
-            parts.append(tube(path, 0.026, BRANCH, surface='wood', tip=0.35, resolution=5))
             fork = (tx + (c * reach - tx) * 0.5, height + 0.08, tz + (s * reach - tz) * 0.5)
             side = angle + (0.5 if branch % 2 else -0.5)
             twig = (fork[0] + math.cos(side) * 0.14, fork[1] + 0.14, fork[2] + math.sin(side) * 0.14)
-            parts.append(tube([fork, ((fork[0] + twig[0]) / 2, fork[1] + 0.09, (fork[2] + twig[2]) / 2), twig], 0.011, BRANCH, surface='wood', tip=0.3, resolution=3))
-            parts.append(sphere((0.012, 0.018, 0.012), end, '#9aae78', subdivisions=1, surface='leaf'))
+            paths.append((path, [fork, ((fork[0] + twig[0]) / 2, fork[1] + 0.09, (fork[2] + twig[2]) / 2), twig], end))
+    return paths
+
+
+def branches():
+    parts = []
+    for path, twig, end in branch_paths():
+        parts.append(tube(path, 0.026, BRANCH, surface='wood', tip=0.35, resolution=5))
+        parts.append(tube(twig, 0.011, BRANCH, surface='wood', tip=0.3, resolution=3))
+        parts.append(sphere((0.012, 0.018, 0.012), end, '#9aae78', subdivisions=1, surface='leaf'))
     return parts
+
+
+def hanging_point(x, y, z):
+    best = None
+    for path, _, _ in branch_paths():
+        for p0, p1 in zip(path, path[1:]):
+            for k in range(21):
+                f = k / 20
+                p = tuple(p0[j] + (p1[j] - p0[j]) * f for j in range(3))
+                if p[1] < y + 0.15 or p[1] > y + 0.32:
+                    continue
+                d = (p[0] - x) ** 2 + (p[2] - z) ** 2
+                if best is None or d < best[0]:
+                    best = (d, p)
+    return best[1]
 
 
 def charms():
     parts = []
-    for k, (x, y, z) in enumerate([(-0.48, 1.82, 0.2), (0.42, 2.23, 0.27), (-0.15, 2.87, -0.23)]):
-        parts.append(rod((x, y, z), (x, y - 0.19, z), 0.004, STRING, sides=6, surface='cloth'))
+    for k, (x, y, z, canopy) in enumerate([(-0.48, 1.82, 0.2, 2.42), (0.42, 2.23, 0.27, 2.42), (-0.15, 2.62, -0.23, None)]):
+        if canopy:
+            parts.append(rod((x, canopy, z), (x, y - 0.19, z), 0.0055, STRING, sides=6, surface='cloth'))
+        else:
+            x, by, z = hanging_point(x, y, z)
+            parts.append(torus(0.016, 0.0045, (x, by - 0.012, z), STRING, major_segments=12, minor_segments=5, surface='cloth'))
+            parts.append(rod((x, by - 0.026, z), (x, y - 0.19, z), 0.0055, STRING, sides=6, surface='cloth'))
+            parts.append(sphere((0.008, 0.008, 0.008), (x, by - 0.03, z), STRING, subdivisions=1, surface='cloth'))
         parts.append(torus(0.012, 0.003, (x, y - 0.198, z), CHARM, major_segments=10, minor_segments=4, surface='metal', layer='metal'))
         if k == 1:
             parts += crescent((x, y - 0.25, z), 0.0, 0.05, CHARM)
