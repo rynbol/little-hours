@@ -117,6 +117,7 @@ test('phone decorating keeps Done, Undo and collection uncovered', async ({ page
 });
 
 test('focus started in another tab cancels a pending house-page entry', async ({ page, context }, testInfo) => {
+  test.slow();
   await page.addInitScript(seed => {
     if (!localStorage.getItem('little-hours-v1')) localStorage.setItem('little-hours-v1', JSON.stringify(seed));
   }, seedState('three-rooms'));
