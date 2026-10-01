@@ -44,10 +44,10 @@ import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
-import { ROOM_LIGHTS, seatedDim, deskLamp, gradeFocus, roomBloom, bloomEmission } from './room-lighting.js';
+import { ROOM_LIGHTS, seatedDim, deskLamp, gradeFocus, roomBloom, bloomEmission, lampPool } from './room-lighting.js';
 import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
 import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
-import { createLanternGlow } from './room-lantern-glow.js';
+import { createLanternGlow, createGlowDecal, deskPoolShape, DESK_POOL } from './room-lantern-glow.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
 import { createStorybook } from '../../models/storybook.js';
 import { createSeatWorld } from './seat-world.js';
@@ -377,6 +377,8 @@ export function createRoom(container, options = {}) {
   const lanternBulbs = [[-5.33, 4.32, 2.86], [1.64, 4.35, -4.05], [4.40, 4.54, -4.08]];
   for (const [x, y, z] of lanternBulbs) lantern(x, y, z);
   const lanternGlow = createLanternGlow(scene, lanternBulbs.map(([x, y, z]) => [x, y + 0.16, z]));
+  const deskPool = createGlowDecal(scene, 'desk-lamp-pool', deskPoolShape(1.5), true); deskPool.setLight(DESK_POOL.tint, 0);
+  let deskPoolOwner = null, deskPoolFlag = -1;
   const turned = (profile, position, mat, segments = 20) => finish(MeshBuilder.CreateLathe(`turned-${meshId++}`, { shape: profile.map(([r, y]) => new Vector3(r, y, 0)), tessellation: segments }, scene), mat, position, decor.lights);
   const SILL_DISH = [[0, 0], [0.112, 0], [0.124, 0.006], [0.13, 0.02], [0.124, 0.03], [0.112, 0.022], [0.08, 0.015], [0, 0.015]];
   const FLAME = [[0, 0], [0.013, 0.006], [0.022, 0.022], [0.021, 0.04], [0.013, 0.062], [0.005, 0.08], [0, 0.09]];
@@ -946,9 +948,12 @@ export function createRoom(container, options = {}) {
     if (fireplace) { const offset = Vector3.TransformCoordinates(new Vector3(0, 1.0, 0.70), Matrix.RotationY(fireplace.rotation * Math.PI / 2)); hearthGlow.position.set(fireplace.x + offset.x, offset.y, fireplace.z + offset.z); }
   }
   function aimDeskLamp(blend = 0) {
-    const desk = layout.items.find(item => item.id === layout.activeDeskId); if (!desk) return;
+    const desk = layout.items.find(item => item.id === layout.activeDeskId); if (!desk) { deskPool.setStrength(0); return; }
     const lamp = deskLamp(theme, blend), offset = Vector3.TransformCoordinates(Vector3.FromArray(lamp.offset), Matrix.RotationY(desk.rotation * Math.PI / 2));
     windowGlow.position.set(desk.x + offset.x, offset.y, desk.z + offset.z); windowGlow.intensity = lamp.intensity; windowGlow.range = lamp.range;
+    const object = placedObjects.get(desk.id), world = object?.computeWorldMatrix();
+    if (world && (object !== deskPoolOwner || world.updateFlag !== deskPoolFlag)) { deskPoolOwner = object; deskPoolFlag = world.updateFlag; deskPool.place(deskPoolShape(getFurniture(desk.type).footprint[0] / 2 - 0.02), world); }
+    deskPool.setStrength(world && !desk.off && !avatarCameraEditing ? lampPool(theme, blend) : 0);
   }
   // A switched-off lamp keeps its shade with an unlit twin of its glowing
   // paint. Candles and fires lose their flames.
