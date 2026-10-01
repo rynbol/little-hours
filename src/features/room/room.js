@@ -44,7 +44,7 @@ import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
-import { ROOM_LIGHTS, seatedDim } from './room-lighting.js';
+import { ROOM_LIGHTS, seatedDim, deskLamp } from './room-lighting.js';
 import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
 import { createLanternGlow } from './room-lantern-glow.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
@@ -894,7 +894,7 @@ export function createRoom(container, options = {}) {
   // first fire that is lit. A switched-off lamp or fire takes its light along.
   function placeRoomLights() {
     const desk = layout.items.find(item => item.id === layout.activeDeskId); windowGlow.setEnabled(!avatarCameraEditing && !desk?.off);
-    if (desk) { const offset = Vector3.TransformCoordinates(new Vector3(0.85, 2.08, -0.35), Matrix.RotationY(desk.rotation * Math.PI / 2)); windowGlow.position.set(desk.x + offset.x, offset.y, desk.z + offset.z); }
+    aimDeskLamp();
     const fireplace = layout.items.find(item => item.type === 'fireplace' && !item.off); hearthGlow.setEnabled(!avatarCameraEditing && Boolean(fireplace));
     // Rebuilding an outfit also refreshes furniture. Keep the portrait fill
     // inside the material's four-light budget throughout every selection.
@@ -903,6 +903,11 @@ export function createRoom(container, options = {}) {
       if (entry[0] === hearthGlow) entry[1] = Boolean(fireplace);
     }
     if (fireplace) { const offset = Vector3.TransformCoordinates(new Vector3(0, 1.0, 0.70), Matrix.RotationY(fireplace.rotation * Math.PI / 2)); hearthGlow.position.set(fireplace.x + offset.x, offset.y, fireplace.z + offset.z); }
+  }
+  function aimDeskLamp(blend = 0) {
+    const desk = layout.items.find(item => item.id === layout.activeDeskId); if (!desk) return;
+    const lamp = deskLamp(theme, blend), offset = Vector3.TransformCoordinates(Vector3.FromArray(lamp.offset), Matrix.RotationY(desk.rotation * Math.PI / 2));
+    windowGlow.position.set(desk.x + offset.x, offset.y, desk.z + offset.z); windowGlow.intensity = lamp.intensity; windowGlow.range = lamp.range;
   }
   // A switched-off lamp keeps its shade with an unlit twin of its glowing
   // paint. Candles and fires lose their flames.
@@ -1188,7 +1193,7 @@ export function createRoom(container, options = {}) {
     sun.position.set(...light.position); sun.direction.set(...light.direction).normalize();
     hemisphere.diffuse = color(light.sky); hemisphere.groundColor = color(light.ground); hemisphere.intensity = light.ambient;
     painterly.setTheme(`room-${theme}`); aimSunbeam();
-    windowGlow.intensity = daylight ? 0.22 : night ? 2.1 : 0.65; windowGlow.range = night ? 3.4 : 6;
+    aimDeskLamp();
     applyBulbs(); applyAccents();
     bloom.intensity = daylight ? 0.18 : night ? 0.40 : 0.26;
     shadow.darkness = light.darkness;
@@ -1822,7 +1827,7 @@ export function createRoom(container, options = {}) {
     companionTime = now;
     animateAvatarCamera(companionDelta);
     if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
-    storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = ROOM_LIGHTS[theme].sun * seatedDim(theme, seatView.blend);
+    storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = ROOM_LIGHTS[theme].sun * seatedDim(theme, seatView.blend); aimDeskLamp(seatView.blend);
     sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend);
     seatWorld.animate(companionDelta, reducedMotion);
     passages?.animate(companionDelta, houseHover, reducedMotion, lockedDoor, openingDoor);
