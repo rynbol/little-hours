@@ -8,6 +8,7 @@ WOOD, EDGE, DARK, BRASS, SAGE, PAPER = '#aa7954', '#bc9169', '#73533d', '#bf9762
 BOOKS = ['#788e84', '#bb8066', '#5f7a8c']
 WALNUT, LEATHER, LAPTOP_BRASS, GILT, RIBBON, INK = '#7f4c33', '#7a5640', '#c9a063', '#d9b36e', '#a8463e', '#3f4a5e'
 EYE = (0.25, 0.9, 1.0)
+SHADE_FOLD, SHADE_TRIM = '#eeb26a', '#9a5a3c'
 KEY_TOP, KEY_SKIRT, KEY_SHADOW = '#f4ecd8', '#d8caa9', '#22170f'
 KEY_ROWS = ([1] * 11 + [2], [1.5] + [1] * 10 + [1.5], [1.75] + [1] * 9 + [2.25], [2.25] + [1] * 8 + [2.75], [1, 1, 1.25, 6.5, 1.25, 1, 1])
 
@@ -115,7 +116,7 @@ def laptop():
 
 def lamp(x, y, z):
     f = Frame((x, y, z))
-    base = [(0.0, 0.0), (0.19, 0.0), (0.195, 0.012), (0.185, 0.03), (0.15, 0.045), (0.11, 0.05), (0.06, 0.07), (0.04, 0.09), (0.03, 0.1), (0.0, 0.1)]
+    base = [(0.0, 0.0), (0.19, 0.0), (0.199, 0.006), (0.2, 0.013), (0.193, 0.019), (0.186, 0.024), (0.188, 0.031), (0.15, 0.045), (0.11, 0.05), (0.06, 0.07), (0.045, 0.082), (0.052, 0.088), (0.04, 0.094), (0.03, 0.1), (0.0, 0.1)]
     parts = [lathe(base, (0, 0, 0), BRASS, segments=32, surface='metal', layer='metal', frame=f),
              rod((0, 0.09, 0), (0, 0.52, 0), 0.018, BRASS, surface='metal', layer='metal', frame=f),
              sphere((0.03, 0.03, 0.03), (0, 0.53, 0), BRASS, surface='metal', layer='metal', frame=f),
@@ -124,6 +125,19 @@ def lamp(x, y, z):
     pleats = lambda a, h: 0.035 * abs(math.sin(a * 12))
     parts.append(lathe([(0.1, 0.73), (0.105, 0.735), (0.245, 0.525), (0.24, 0.52)], (-0.14, 0, 0), '#ffd08a', segments=72, layer='glow', frame=f, wobble=pleats))
     parts.append(lathe([(0.0, 0.54), (0.21, 0.54), (0.1, 0.72), (0.0, 0.72)], (-0.14, 0, 0), '#ffe0a6', segments=32, layer='glow', frame=f))
+    for k in range(24):
+        a = k * math.pi / 12
+        fold = lambda r, y: (-0.14 + math.cos(a) * r, y, -math.sin(a) * r)
+        parts.append(tube([fold(0.107, 0.731), fold(0.177, 0.629), fold(0.247, 0.526)], 0.0026, SHADE_FOLD, layer='glow', frame=f, resolution=2))
+        b = a + math.pi / 24
+        drop = (-0.14 + math.cos(b) * 0.256, 0.5, -math.sin(b) * 0.256)
+        parts.append(tube([(drop[0], 0.517, drop[2]), (drop[0], 0.505, drop[2])], 0.0016, SHADE_TRIM, frame=f, resolution=2))
+        parts.append(sphere((0.0075, 0.0075, 0.009), drop, GILT, subdivisions=1, surface='metal', layer='metal', frame=f))
+    parts.append(lathe([(0.246, 0.513), (0.251, 0.515), (0.251, 0.536), (0.246, 0.538), (0.243, 0.526), (0.246, 0.513)], (-0.14, 0, 0), SHADE_TRIM, segments=72, surface='cloth', frame=f, wobble=pleats, caps=False))
+    parts.append(lathe([(0.104, 0.722), (0.109, 0.724), (0.109, 0.739), (0.104, 0.741), (0.101, 0.731), (0.104, 0.722)], (-0.14, 0, 0), SHADE_TRIM, segments=72, surface='cloth', frame=f, wobble=pleats, caps=False))
+    parts.append(cylinder(0.008, 0.012, 0.03, (-0.14, 0.745, 0), BRASS, segments=12, surface='metal', layer='metal', frame=f))
+    parts.append(sphere((0.02, 0.024, 0.02), (-0.14, 0.775, 0), BRASS, subdivisions=2, surface='metal', layer='metal', frame=f))
+    parts.append(cylinder(0.0, 0.009, 0.022, (-0.14, 0.806, 0), BRASS, segments=12, surface='metal', layer='metal', frame=f))
     parts.append(tube([(-0.05, 0.6, 0.12), (-0.05, 0.48, 0.13), (-0.05, 0.38, 0.13)], 0.003, BRASS, frame=f, resolution=3))
     parts.append(sphere((0.012, 0.018, 0.012), (-0.05, 0.37, 0.13), BRASS, subdivisions=2, surface='metal', layer='metal', frame=f))
     return parts

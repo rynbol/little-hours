@@ -157,3 +157,18 @@ test('the laptop keyboard staggers its rows around modifier keys and a wide cent
   assert.ok(shadows.length > 100 && Math.min(...shadows) > -0.335 && Math.max(...shadows) < 0.335 && Math.max(...tops.map(([x]) => Math.abs(x))) < 0.33, 'the keys sit in shaded seats inside the original keyboard width');
   disposeDetails(scene); engine.dispose();
 });
+
+test('the desk lamp shade shows its pleat folds, a rust trim at both rims, a gilt bead fringe and a brass finial', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const layers = Object.fromEntries(createDetail('study-desk', scene).getChildMeshes().map(mesh => [mesh.material.name, mesh]));
+  const at = (layer, hex) => { const { slots, palette } = layers[layer].metadata, slot = palette.indexOf(hex), p = layers[layer].getVerticesData('position'), out = []; slots.forEach((s, v) => { if (s === slot) out.push([p[v * 3], p[v * 3 + 1], p[v * 3 + 2]]); }); return out; };
+  const nearShade = ([x, , z]) => Math.hypot(x - 0.96, z + 0.69) < 0.27;
+  assert.ok(at('detail-glow', '#eeb26a').filter(nearShade).length > 200, 'darker fold lines run down the glowing shade');
+  const trim = at('detail-paint', '#9a5a3c').filter(nearShade).map(([, y]) => y);
+  assert.ok(trim.some(y => y < 1.8) && trim.some(y => y > 1.98), 'a rust trim binds the bottom and top rims');
+  const beads = at('detail-metal', '#d9b36e').filter(([x, y, z]) => Math.abs(Math.hypot(x - 0.96, z + 0.69) - 0.256) < 0.012 && Math.abs(y - 1.76) < 0.015);
+  assert.ok(beads.length > 24 * 6, `${beads.length} fringe bead vertices`);
+  assert.ok(at('detail-metal', '#bf9762').some(([x, y, z]) => Math.hypot(x - 0.96, z + 0.69) < 0.03 && y > 2.05), 'a brass finial crowns the shade');
+  disposeDetails(scene); engine.dispose();
+});

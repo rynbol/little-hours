@@ -79,7 +79,7 @@ def rbox(size, position, colour, bevel=0.02, surface='plain', layer='paint', fra
     return _finish(obj, colour, surface, layer, frame, position, rotation)
 
 
-def lathe(profile, position, colour, segments=28, surface='plain', layer='paint', frame=None, rotation=(0, 0, 0), wobble=None):
+def lathe(profile, position, colour, segments=28, surface='plain', layer='paint', frame=None, rotation=(0, 0, 0), wobble=None, caps=True):
     bm = bmesh.new()
     rings = []
     for radius, y in profile:
@@ -92,9 +92,9 @@ def lathe(profile, position, colour, segments=28, surface='plain', layer='paint'
     for lower, upper in zip(rings, rings[1:]):
         for k in range(segments):
             bm.faces.new((lower[k], lower[(k + 1) % segments], upper[(k + 1) % segments], upper[k]))
-    if profile[0][0] > 0.0005:
+    if caps and profile[0][0] > 0.0005:
         bm.faces.new(list(reversed(rings[0])))
-    if profile[-1][0] > 0.0005:
+    if caps and profile[-1][0] > 0.0005:
         bm.faces.new(rings[-1])
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.00005)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
