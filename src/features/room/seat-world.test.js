@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, butterfliesOut, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape } from './seat-world.js';
+import { createSeatWorld, butterfliesOut, grassBlades, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, VOLCANO } from './seat-world.js';
+
+const PEAK = VOLCANO.base + VOLCANO.height;
 
 const setup = () => { const engine = new NullEngine(), scene = new Scene(engine); return { engine, scene, world: createSeatWorld(scene, new TransformNode('room', scene)) }; };
 const litWindows = world => {
@@ -196,7 +198,7 @@ test('lava runs unbroken from the volcano crater down its ribbed slopes', () => 
   const columns = new Map();
   for (let i = 0; i < shape.roles.length; i++) {
     const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2];
-    if (shape.roles[i] !== 'ember' || Math.hypot(x + 82, z + 96) > 40 || y > 40) continue;
+    if (shape.roles[i] !== 'ember' || Math.hypot(x + 82, z + 96) > 40 || y > PEAK - 4) continue;
     const column = Math.round(Math.atan2(z + 96, x + 82) * 100);
     columns.set(column, [...(columns.get(column) ?? []), y].sort((a, b) => a - b));
   }
@@ -256,7 +258,7 @@ test('the castle keep rises into a tall sanctum spire above its curtain wall', (
 test('smoke leaves the volcano crater, widens downwind and glows with ember light after dark', () => {
   const { positions } = plumeShape(), at = k => positions.slice(k * 6, k * 6 + 6), last = positions.length / 6 - 1;
   const width = k => Math.hypot(at(k)[0] - at(k)[3], at(k)[2] - at(k)[5]), middle = k => (at(k)[0] + at(k)[3]) / 2;
-  assert.ok(Math.abs(middle(0) + 82) < 1 && Math.abs(at(0)[1] - 43) < 0.5, 'starts at the crater');
+  assert.ok(Math.abs(middle(0) + 82) < 1 && Math.abs(at(0)[1] - (PEAK - 1)) < 0.5, 'starts at the crater');
   assert.ok(middle(last) > middle(0) + 20 && width(last) > width(0) * 2);
   const { engine, world } = setup();
   world.setEnabled(true);
@@ -298,9 +300,9 @@ test('the volcano rises in uneven shoulders to a broken crater rim and darkens t
     if (shape.roles[i] === 'rock' && Math.hypot(x + 82, z + 96) < 40) rock.push({ y, shade: shape.shades[i], reach: Math.hypot(x + 82, z + 96) });
   }
   const mean = list => list.reduce((sum, each) => sum + each.shade, 0) / list.length;
-  const foot = rock.filter(each => each.y < 12), summit = rock.filter(each => each.y > 30);
+  const foot = rock.filter(each => each.y < VOLCANO.base + 2), summit = rock.filter(each => each.y > PEAK - 14);
   assert.ok(mean(summit) < mean(foot) * 0.8, `summit shade ${mean(summit).toFixed(2)} against foot ${mean(foot).toFixed(2)}`);
-  const rim = shape.roles.map((role, i) => role === 'ember' && Math.hypot(shape.positions[i * 3] + 82, shape.positions[i * 3 + 2] + 96) < 8 ? shape.positions[i * 3 + 1] : null).filter(y => y !== null && y > 40);
+  const rim = shape.roles.map((role, i) => role === 'ember' && Math.hypot(shape.positions[i * 3] + 82, shape.positions[i * 3 + 2] + 96) < 8 ? shape.positions[i * 3 + 1] : null).filter(y => y !== null && y > PEAK - 4);
   assert.ok(Math.max(...rim) - Math.min(...rim) > 2, 'the crater rim is broken, not level');
   const reaches = foot.map(each => each.reach);
   assert.ok(Math.max(...reaches) / Math.min(...reaches) > 1.25, 'the foot spreads in uneven shoulders');
@@ -388,7 +390,7 @@ test('the volcano foot melts into the valley haze while its upper slopes stay cr
   const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata, foot = [], slope = [], plain = [];
   for (let i = 0; i < shape.roles.length; i++) {
     const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2], reach = Math.hypot(x + 82, z + 96);
-    if (shape.roles[i] === 'rock' && reach < 40) (y < 11 ? foot : y > 22 ? slope : []).push(shape.fogs[i]);
+    if (shape.roles[i] === 'rock' && reach < 40) (y < VOLCANO.base + 1 ? foot : y > VOLCANO.base + 12 ? slope : []).push(shape.fogs[i]);
     else if (shape.roles[i] !== 'rock' && reach > 36 && reach < 48 && y < 20) plain.push(shape.fogs[i]);
   }
   const mean = list => list.reduce((sum, each) => sum + each, 0) / list.length;
@@ -418,5 +420,29 @@ test('the dusk moon glows warm cream through the haze, not grey', () => {
     const [r, g, b] = colors.slice(i * 4, i * 4 + 3);
     assert.ok(r > 0.8 && r - b > 0.22 && g - b > 0.12, `moon vertex ${[r, g, b].map(v => v.toFixed(2))}`);
   }
+  engine.dispose();
+});
+
+test('the volcano crater and the top of its plume sit low enough to stay inside the window from the raised seat', () => {
+  const { positions } = plumeShape(), tops = [];
+  for (let i = 1; i < positions.length; i += 3) tops.push(positions[i]);
+  assert.ok(PEAK <= 38, `crater at ${PEAK}`);
+  assert.ok(Math.max(...tops) < 48, `plume tops out at ${Math.max(...tops).toFixed(1)}`);
+});
+
+test('cloud puffs split into a sunlit side and a shaded side by the direction of the sun', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-clouds').metadata, puff = 8 * 14;
+  let toward = 0, away = 0, towardLit = 0, awayLit = 0;
+  for (let start = 0; start + puff <= shape.roles.length; start += puff) {
+    let cx = 0, cz = 0;
+    for (let i = start; i < start + puff; i++) { cx += shape.positions[i * 3] / puff; cz += shape.positions[i * 3 + 2] / puff; }
+    for (let i = start; i < start + puff; i++) {
+      const side = (shape.positions[i * 3] - cx) * -0.3 + (shape.positions[i * 3 + 2] - cz) * -0.49, lit = shape.roles[i] === 'cloud';
+      if (side > 0.5) { toward++; towardLit += lit; } else if (side < -0.5) { away++; awayLit += lit; }
+    }
+  }
+  assert.ok(towardLit / toward > awayLit / away + 0.2, `lit ${(towardLit / toward).toFixed(2)} toward the sun, ${(awayLit / away).toFixed(2)} away`);
   engine.dispose();
 });

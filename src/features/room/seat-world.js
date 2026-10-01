@@ -24,7 +24,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffffff', cloudShade: '#c4d3e6',
-    castle: '#687088', castleRoof: '#3a5a74', rock: '#6a524a', ember: '#e2683c', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
+    castle: '#687088', castleRoof: '#3a5a74', rock: '#5c3e38', ember: '#e2683c', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
     light: 0, night: null,
   },
   rain: {
@@ -55,6 +55,7 @@ const ahead = (across, distance) => [across, -distance];
 const bearing = (x, z) => Math.atan2(x, -z);
 export const CASTLE_AT = Object.freeze(ahead(-22, 100));
 const VOLCANO_AT = ahead(-82, 96), TOWER_AT = ahead(13, 56);
+export const VOLCANO = Object.freeze({ base: 2, height: 34 });
 
 const seeded = seed => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const hex = value => Color3.FromHexString(value);
@@ -219,7 +220,7 @@ function buildCastle(shape) {
 }
 
 function buildVolcano(shape) {
-  const [vx, vz] = VOLCANO_AT, base = 10, height = 34, radius = 36, rim = 4.5, rings = 12, segments = 72, start = shape.roles.length;
+  const [vx, vz] = VOLCANO_AT, { base, height } = VOLCANO, radius = 36, rim = 4.5, rings = 12, segments = 72, start = shape.roles.length;
   const streaks = [9, 14, 18, 26];
   for (let k = 0; k <= rings; k++) {
     const t = k / rings;
@@ -229,7 +230,7 @@ function buildVolcano(shape) {
       const jag = 1 + 0.05 * Math.sin(a * 6) + 0.03 * Math.sin(a * 14 + 1) + (rib - 0.4) * 0.09 * (1 - t) + shoulder, r = (radius * (1 - t) + rim * t) * jag;
       const y = base + height * t ** 1.35 + Math.sin(a * 5 + 1) * 1.3 * t ** 4;
       const lava = t > 0.9 || (t > 0.3 && streaks.includes(s));
-      const id = shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', (0.6 + 0.3 * Math.max(0, Math.cos(a - 2.1)) + rib * 0.22 + (k % 2) * 0.03) * (1 - 0.32 * t ** 1.5));
+      const id = shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', (0.6 + 0.3 * Math.max(0, Math.cos(a - 2.1)) + rib * 0.22 + (k % 2) * 0.03) * (1 - 0.45 * t ** 1.5));
       shape.fogs[id] *= 1 - 0.42 * Math.min(1, t * 2.4);
     }
   }
@@ -352,7 +353,15 @@ function buildClouds(shape) {
   const bearings = [-1.25, -0.95, -0.62, -0.3, 0.02, 0.3, 0.55, 0.9, 1.6, 2.3, 3, -2.2, -3];
   for (const b of bearings) {
     const a = b + (random() - 0.5) * 0.12, r = 120 + random() * 38, x = Math.sin(a) * r, z = -Math.cos(a) * r, y = 19 + random() * 11, size = 6 + random() * 4;
-    const along = [Math.cos(a), Math.sin(a)], puff = (u, lift, s, stretch = 1) => shape.blob(x + along[0] * u, y + lift, z + along[1] * u, s * stretch, s * 0.62, s * 0.8, 'cloudShade', 'cloud', 0.7, 7, 14);
+    const along = [Math.cos(a), Math.sin(a)], puff = (u, lift, s, stretch = 1) => {
+      const cx = x + along[0] * u, cy = y + lift, cz = z + along[1] * u, rx = s * stretch, ry = s * 0.62, rz = s * 0.8, start = shape.roles.length;
+      shape.blob(cx, cy, cz, rx, ry, rz, 'cloudShade', 'cloud', 0.7, 7, 14);
+      for (let i = start; i < shape.roles.length; i++) {
+        const nx = (shape.positions[i * 3] - cx) / rx, ny = (shape.positions[i * 3 + 1] - cy) / ry, nz = (shape.positions[i * 3 + 2] - cz) / rz;
+        const band = smooth(-0.1, 0.3, (nx * SUN_TOWARD[0] + ny * SUN_TOWARD[1] + nz * SUN_TOWARD[2]) / Math.max(0.001, Math.hypot(nx, ny, nz)));
+        shape.roles[i] = band > 0.5 ? 'cloud' : 'cloudShade'; shape.shades[i] = 0.84 + 0.2 * band;
+      }
+    };
     for (let k = -2; k <= 2; k++) puff(k * size * 0.9, 0, size * (0.9 + random() * 0.3), 1.35);
     for (let k = -1; k <= 1; k++) puff(k * size * 0.95 + (random() - 0.5) * 2, size * 0.75, size * (1 + random() * 0.35));
     puff((random() - 0.5) * size, size * 1.45, size * (0.8 + random() * 0.3));
@@ -450,7 +459,7 @@ export const PLUME = Object.freeze({ segments: 12, height: 9, lean: 30, base: 3.
 export function plumeShape() {
   const [vx, vz] = VOLCANO_AT, positions = [], uvs = [], uv2s = [], indices = [], side = new Vector3(0, 1, 0).cross(new Vector3(vx, 0, vz)).normalize();
   for (let k = 0; k <= PLUME.segments; k++) {
-    const t = k / PLUME.segments, y = 43 + PLUME.height * Math.sqrt(t), drift = PLUME.lean * t, half = PLUME.base + (PLUME.top - PLUME.base) * t;
+    const t = k / PLUME.segments, y = VOLCANO.base + VOLCANO.height - 1 + PLUME.height * Math.sqrt(t), drift = PLUME.lean * t, half = PLUME.base + (PLUME.top - PLUME.base) * t;
     for (const u of [-1, 1]) positions.push(vx + drift + side.x * half * u, y, vz + side.z * half * u), uvs.push(u, t), uv2s.push(0, 1);
     if (k) indices.push(k * 2 - 2, k * 2 - 1, k * 2 + 1, k * 2 - 2, k * 2 + 1, k * 2);
   }
@@ -544,7 +553,7 @@ export function vistaColor(palette, shape, i, out, glow) {
     const low = hex(palette.horizon), mid = hex(palette.high), high = hex(palette.zenith), below = hex(palette.below);
     color = y < 0 ? Color3.Lerp(low, below, smooth(0, -0.2, y)) : y < 0.35 ? Color3.Lerp(low, mid, smooth(0, 0.35, y)) : Color3.Lerp(mid, high, smooth(0.35, 0.95, y));
     const toward = Math.max(0, (x * glow.x + z * glow.z) / Math.max(0.001, Math.hypot(x, z)));
-    color = Color3.Lerp(color, hex(palette.glow), toward ** 5 * (1 - smooth(0, 0.45, y)) * 0.75);
+    color = Color3.Lerp(color, hex(palette.glow), toward ** 3 * (1 - smooth(0, 0.7, y)) * 0.7);
   } else if (role === 'window' || role === 'windowWarm') {
     const lit = shape.thresholds[i] < glow.lit;
     color = hex(lit ? palette[role] : palette.windowDark);
