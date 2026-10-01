@@ -513,3 +513,29 @@ test('the volcano summit glows with molten lava even at noon', () => {
   assert.ok(red > 0.85 && red - blue > 0.35, `rim lava r ${red.toFixed(2)} b ${blue.toFixed(2)}`);
   engine.dispose();
 });
+
+test('volcano lava keeps an ember hue in rain and takes some of the noon haze by day', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const rim = () => {
+    const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-land'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color');
+    const ids = shape.roles.flatMap((role, i) => role === 'ember' && shape.positions[i * 3 + 1] > PEAK - 6 ? [i] : []);
+    return [0, 1, 2].map(c => ids.reduce((sum, i) => sum + colors[i * 4 + c], 0) / ids.length);
+  };
+  world.setTheme('rain');
+  const [rr, rg, rb] = rim();
+  assert.ok(rr > rb * 3 && rr > rg * 1.8, `rain lava ${[rr, rg, rb].map(v => v.toFixed(2))}`);
+  world.setTheme('day');
+  assert.ok(rim()[2] > 0.45, `day lava blue ${rim()[2].toFixed(2)}`);
+  engine.dispose();
+});
+
+test('cloud puffs shade from sunlit to shadowed gradually, with no hard colour step between neighbouring vertices by day', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true); world.setTheme('day');
+  const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-clouds'), colors = mesh.getVerticesData('color'), indices = mesh.getIndices();
+  let step = 0;
+  for (let t = 0; t < indices.length; t += 3) for (const [a, b] of [[indices[t], indices[t + 1]], [indices[t + 1], indices[t + 2]], [indices[t], indices[t + 2]]]) for (let c = 0; c < 3; c++) step = Math.max(step, Math.abs(colors[a * 4 + c] - colors[b * 4 + c]));
+  assert.ok(step < 0.26, `largest step ${step.toFixed(3)}`);
+  engine.dispose();
+});

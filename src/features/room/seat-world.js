@@ -24,7 +24,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffeccc', cloudShade: '#bdb8dc', cloudFog: 0.42,
-    castle: '#687088', castleRoof: '#3a5a74', rock: '#5c3e38', ember: '#e2683c', smoke: '#8c827e', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
+    castle: '#687088', castleRoof: '#3a5a74', rock: '#5c3e38', ember: '#e2683c', emberFog: 0.75, smoke: '#8c827e', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
     light: 0, night: null,
   },
   rain: {
@@ -33,7 +33,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#3e3a3a', leaf: '#3c5448', leafLight: '#4a6454', walls: ['#b8ab9c', '#a8958e', '#9ea0a2', '#bcae90'], roofs: ['#6a4848', '#4a5468', '#5a5068', '#7a5a4a'],
     stone: '#747880', water: '#5a6a7c', glint: '#c8ccd0', window: '#ffc27a', windowWarm: '#ffaa66', windowDark: '#3a4050', lamp: '#ffd49a',
     star: '#5c6878', moon: '#c8ccd0', cloud: '#9aa3ac', cloudShade: '#808a94', cloudFog: 0.75,
-    castle: '#5a606c', castleRoof: '#3a4450', rock: '#4a4a50', ember: '#8a5a50', smoke: '#6a707a', ruin: '#6a6e70', moss: '#4a6050', rune: '#a0c8d0', bird: '#2a2e36', spirit: '#c8e0c8', snow: '#b8c0c8',
+    castle: '#5a606c', castleRoof: '#3a4450', rock: '#4a4a50', ember: '#80361a', emberFog: 0.2, smoke: '#6a707a', ruin: '#6a6e70', moss: '#4a6050', rune: '#a0c8d0', bird: '#2a2e36', spirit: '#c8e0c8', snow: '#b8c0c8',
     light: 0.55, night: null,
   },
 });
@@ -359,8 +359,8 @@ function buildClouds(shape) {
       shape.blob(cx, cy, cz, rx, ry, rz, 'cloudShade', 'cloud', 0.7, 7, 14);
       for (let i = start; i < shape.roles.length; i++) {
         const nx = (shape.positions[i * 3] - cx) / rx, ny = (shape.positions[i * 3 + 1] - cy) / ry, nz = (shape.positions[i * 3 + 2] - cz) / rz;
-        const band = smooth(-0.1, 0.3, (nx * SUN_TOWARD[0] + ny * SUN_TOWARD[1] + nz * SUN_TOWARD[2]) / Math.max(0.001, Math.hypot(nx, ny, nz)));
-        shape.roles[i] = band > 0.5 ? 'cloud' : 'cloudShade'; shape.shades[i] = 0.84 + 0.2 * band;
+        const band = smooth(-0.5, 0.6, (nx * SUN_TOWARD[0] + ny * SUN_TOWARD[1] + nz * SUN_TOWARD[2]) / Math.max(0.001, Math.hypot(nx, ny, nz)));
+        shape.roles[i] = band > 0.5 ? 'cloud' : 'cloudShade'; shape.shades[i] = 0.84 + 0.2 * band; shape.thresholds[i] = band;
       }
     };
     for (let k = -2; k <= 2; k++) puff(k * size * 0.9, 0, size * (0.9 + random() * 0.3), 1.35);
@@ -563,6 +563,8 @@ export function vistaColor(palette, shape, i, out, glow) {
   } else if (role === 'window' || role === 'windowWarm') {
     const lit = shape.thresholds[i] < glow.lit;
     color = hex(lit ? palette[role] : palette.windowDark);
+  } else if (role === 'cloud' || role === 'cloudShade') {
+    color = Color3.Lerp(hex(palette.cloudShade), hex(palette.cloud), shape.thresholds[i]).scale(shade);
   } else if (role === 'star') {
     color = Color3.Lerp(hex(palette.high), hex(palette.star), shape.thresholds[i] < glow.stars ? shade : 0);
   } else {
@@ -570,7 +572,7 @@ export function vistaColor(palette, shape, i, out, glow) {
     const value = Array.isArray(palette[key]) ? palette[key][index] : palette[role] ?? SHELL_ROLES[role] ?? palette.stone;
     color = hex(value).scale(shade);
   }
-  const fog = ['lamp', 'spirit', 'window', 'windowWarm', 'glint', 'star', 'moon', 'ember', 'rune'].includes(role) ? shape.fogs[i] * 0.45 : role.startsWith('cloud') ? shape.fogs[i] * palette.cloudFog : shape.fogs[i];
+  const fog = role === 'ember' ? shape.fogs[i] * (palette.emberFog ?? 0.45) : ['lamp', 'spirit', 'window', 'windowWarm', 'glint', 'star', 'moon', 'rune'].includes(role) ? shape.fogs[i] * 0.45 : role.startsWith('cloud') ? shape.fogs[i] * palette.cloudFog : shape.fogs[i];
   Color3.LerpToRef(color, hex(palette.haze), fog * 0.82, out);
   return out;
 }
