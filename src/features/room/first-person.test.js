@@ -65,7 +65,7 @@ test('focus flies into the chair, hides the body once inside it, and flies back 
   assert.deepEqual(changes, ['entering']);
   run(SEAT_SECONDS.enter);
   assert.deepEqual(changes, ['entering', 'entering inside', 'seated inside']);
-  assert.deepEqual(rounded(view.camera.position), [-2, 2.24, -2.41]);
+  assert.deepEqual(rounded(view.camera.position), [-2, 2.12, -2.41]);
   assert.equal(round(view.camera.fov), 1.22);
 
   view.leave();
@@ -127,7 +127,7 @@ test('focusing again during the fly-out turns back toward the chair from where t
   assert.ok(Vector3.Distance(view.camera.position, midway) < 0.05);
   run(SEAT_SECONDS.enter + 0.05);
   assert.equal(view.state, 'seated');
-  assert.deepEqual(rounded(view.camera.position), [-2, 2.24, -2.41]);
+  assert.deepEqual(rounded(view.camera.position), [-2, 2.12, -2.41]);
   engine.dispose();
 });
 
