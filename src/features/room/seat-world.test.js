@@ -4,9 +4,7 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { heightAt } from '../../core/world-terrain.js';
-import { createSeatWorld, valleyMist, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VOLCANO_AT, TOWER_AT, CASTLE_AT, LANDMARK_SCALE, valleyFloor, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, VOLCANO, SEAT_DRAPE, BUTTERFLY_WING } from './seat-world.js';
-
-const PEAK = VOLCANO.base + VOLCANO.height, [VX, VZ] = VOLCANO_AT, fromVolcano = (x, z) => Math.hypot(x - VX, z - VZ);
+import { createSeatWorld, valleyMist, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, valleyFloor, VISTA_THEMES, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, SEAT_DRAPE, BUTTERFLY_WING } from './seat-world.js';
 
 const setup = () => { const engine = new NullEngine(), scene = new Scene(engine); return { engine, scene, world: createSeatWorld(scene, new TransformNode('room', scene)) }; };
 const litWindows = world => {
@@ -91,16 +89,13 @@ test('the vista is built ahead of the first sit but shown only when the chair as
   engine.dispose();
 });
 
-test('the castle, the volcano and the watchtower all stand inside the view from the chair', () => {
+test('the fallback valley is calm hills, hamlet, woods and ruins, with no castle, volcano, lava, glyph tower or smoke plume', () => {
   const { engine, world } = setup();
-  world.prepare();
-  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
-  for (const role of ['castle', 'rock', 'rune']) {
-    let x = 0, z = 0, count = 0;
-    shape.roles.forEach((each, i) => { if (each === role) { x += shape.positions[i * 3]; z += shape.positions[i * 3 + 2]; count++; } });
-    const bearing = Math.atan2(x / count, -z / count);
-    assert.ok(count > 0 && bearing > -0.95 && bearing < 0.45, `${role} sits ${bearing.toFixed(2)} rad off the window`);
-  }
+  world.setEnabled(true);
+  const land = world.meshes.find(mesh => mesh.name === 'seat-world-land'), effects = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects');
+  assert.deepEqual([...new Set(land.metadata.shape.roles)].sort(), ['cliff', 'far', 'field', 'glint', 'grass', 'leaf', 'leafLight', 'meadow', 'mid', 'moss', 'roofs0', 'roofs1', 'roofs2', 'roofs3', 'ruin', 'snow', 'stone', 'trunk', 'valley', 'walls0', 'walls1', 'walls2', 'walls3', 'water', 'window', 'windowWarm']);
+  const kinds = effects.getVerticesData('uv2').filter((_, k) => k % 2 === 1).map(Math.floor);
+  assert.deepEqual([...new Set(kinds)].sort(), [0, 2], 'the sky effects are sunbeams and rain only');
   engine.dispose();
 });
 
@@ -135,7 +130,7 @@ test('cumulus bank up in the view from the chair, and the day sun stays out of t
   engine.dispose();
 });
 
-test('the dusk moon rises in open sky beside the tower, clear of the volcano and castle', () => {
+test('the dusk moon rises in open sky just right of the window centre and keeps its bearing through the session', () => {
   const { engine, world } = setup();
   world.setTheme('dusk'); world.setEnabled(true);
   const moon = world.meshes.find(mesh => mesh.name === 'seat-world-moon'), bearing = () => Math.atan2(moon.position.x, -moon.position.z);
@@ -144,7 +139,7 @@ test('the dusk moon rises in open sky beside the tower, clear of the volcano and
     assert.ok(Math.abs(bearing() - 0.08) < 0.01, `moon bearing ${bearing().toFixed(2)} at progress ${progress}`);
   }
   world.setTheme('day');
-  assert.ok(bearing() < -0.5, 'the day sun keeps its heading over the volcano side');
+  assert.ok(bearing() < -0.5, 'the day sun keeps its heading over the left of the valley');
   engine.dispose();
 });
 
@@ -210,22 +205,6 @@ test('the far ranges in view wear snow above the snow line and turn sunlit and s
   engine.dispose();
 });
 
-test('lava runs unbroken from the volcano crater down its ribbed slopes', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true);
-  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
-  const columns = new Map();
-  for (let i = 0; i < shape.roles.length; i++) {
-    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2];
-    if (shape.roles[i] !== 'ember' || fromVolcano(x, z) > 40 || y > PEAK - 4) continue;
-    const column = Math.round(Math.atan2(z - VZ, x - VX) * 100);
-    columns.set(column, [...(columns.get(column) ?? []), y].sort((a, b) => a - b));
-  }
-  const rivers = [...columns.values()].filter(heights => heights.length >= 6 && heights[0] < 20);
-  assert.equal(rivers.length, 4);
-  engine.dispose();
-});
-
 test('tree canopies are sunlit on top and deep in shade beneath', () => {
   const { engine, world } = setup();
   world.setEnabled(true);
@@ -261,30 +240,6 @@ test('the meadow breaks into warm yellow-green patches warmer than the plain gra
     world.setTheme(theme);
     assert.ok(warmth(paint._colors3.warm) > warmth(paint._colors3.tip) + 0.15, theme);
   }
-  engine.dispose();
-});
-
-test('the castle keep rises into a tall sanctum spire above its curtain wall', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true);
-  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
-  const heights = role => shape.roles.flatMap((r, i) => r === role ? [shape.positions[i * 3 + 1]] : []);
-  const stone = heights('castle'), roofs = heights('castleRoof');
-  assert.ok(Math.max(...roofs) - Math.min(...stone) > 27 * LANDMARK_SCALE.castle);
-  engine.dispose();
-});
-
-test('smoke leaves the volcano crater, widens downwind and glows with ember light after dark', () => {
-  const { positions } = plumeShape(), at = k => positions.slice(k * 6, k * 6 + 6), last = positions.length / 6 - 1;
-  const width = k => Math.hypot(at(k)[0] - at(k)[3], at(k)[2] - at(k)[5]), middle = k => (at(k)[0] + at(k)[3]) / 2;
-  assert.ok(Math.abs(middle(0) - VX) < 1 && Math.abs(at(0)[1] - (PEAK - 1)) < 0.5, 'starts at the crater');
-  assert.ok(middle(last) > middle(0) + 20 && width(last) > width(0) * 2);
-  const { engine, world } = setup();
-  world.setEnabled(true);
-  const paint = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects').material;
-  world.setTheme('day'); const day = paint._floats.glow;
-  world.setTheme('dusk'); assert.ok(paint._floats.glow > day);
-  world.animate(3, true); assert.equal(paint._floats.time, 0);
   engine.dispose();
 });
 
@@ -360,25 +315,6 @@ test('dusk spirits are soft round motes turned toward the chair, and day butterf
   engine.dispose();
 });
 
-test('the volcano rises in uneven shoulders to a broken crater rim and darkens toward its summit', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true);
-  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
-  const rock = [];
-  for (let i = 0; i < shape.roles.length; i++) {
-    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2];
-    if (shape.roles[i] === 'rock' && fromVolcano(x, z) < 40) rock.push({ y, shade: shape.shades[i], reach: fromVolcano(x, z) });
-  }
-  const mean = list => list.reduce((sum, each) => sum + each.shade, 0) / list.length;
-  const foot = rock.filter(each => each.y < VOLCANO.base + 2), summit = rock.filter(each => each.y > PEAK - 14);
-  assert.ok(mean(summit) < mean(foot) * 0.8, `summit shade ${mean(summit).toFixed(2)} against foot ${mean(foot).toFixed(2)}`);
-  const rim = shape.roles.map((role, i) => role === 'ember' && fromVolcano(shape.positions[i * 3], shape.positions[i * 3 + 2]) < 8 ? shape.positions[i * 3 + 1] : null).filter(y => y !== null && y > PEAK - 4);
-  assert.ok(Math.max(...rim) - Math.min(...rim) > 2, 'the crater rim is broken, not level');
-  const reaches = foot.map(each => each.reach);
-  assert.ok(Math.max(...reaches) / Math.min(...reaches) > 1.25, 'the foot spreads in uneven shoulders');
-  engine.dispose();
-});
-
 test('the moon carries faint maria rather than dark cartoon craters', () => {
   const { engine, world } = setup();
   world.setTheme('dusk'); world.setEnabled(true);
@@ -388,32 +324,15 @@ test('the moon carries faint maria rather than dark cartoon craters', () => {
   engine.dispose();
 });
 
-test('the valley fades into haze with distance, so the tower and the mid-field woods sit well back from the sill', () => {
+test('the valley fades into haze with distance, so the mid-field woods sit well back from the sill', () => {
   const { engine, world } = setup();
   world.setEnabled(true);
   const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
-  const fogAt = (low, high) => { const list = []; for (let i = 0; i < shape.roles.length; i++) { const d = Math.hypot(shape.positions[i * 3], shape.positions[i * 3 + 2]); if (d > low && d < high && shape.roles[i] !== 'ember') list.push(shape.fogs[i]); } return list.reduce((a, b) => a + b, 0) / list.length; };
+  const fogAt = (low, high) => { const list = []; for (let i = 0; i < shape.roles.length; i++) { const d = Math.hypot(shape.positions[i * 3], shape.positions[i * 3 + 2]); if (d > low && d < high) list.push(shape.fogs[i]); } return list.reduce((a, b) => a + b, 0) / list.length; };
   const near = fogAt(12, 22), middle = fogAt(50, 62), far = fogAt(140, 175);
   assert.ok(near < 0.12, `near haze ${near.toFixed(2)}`);
-  assert.ok(middle > 0.35, `haze at the tower's distance ${middle.toFixed(2)}`);
+  assert.ok(middle > 0.35, `haze in the middle distance ${middle.toFixed(2)}`);
   assert.ok(far > middle && far < 1, 'haze keeps building toward the ranges');
-  engine.dispose();
-});
-
-test('the watchtower glows with glyph lines up every tier and splays its crown claws outward', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true);
-  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
-  const runes = [], stone = [];
-  for (let i = 0; i < shape.roles.length; i++) {
-    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2], reach = Math.hypot(x - TOWER_AT[0], z - TOWER_AT[1]);
-    if (reach > 5) continue;
-    if (shape.roles[i] === 'rune') runes.push(y); else if (shape.roles[i] === 'ruin') stone.push({ y, reach });
-  }
-  const tiers = new Set(runes.map(y => Math.floor(y / (3 * LANDMARK_SCALE.tower))));
-  assert.ok(tiers.size >= 5, `glyphs cover ${tiers.size} bands of the tower`);
-  const top = Math.max(...stone.map(each => each.y)), crown = stone.filter(each => each.y > top - 0.1);
-  assert.ok(crown.length >= 4 && crown.every(each => each.reach > 2.4 * LANDMARK_SCALE.tower), 'claw tips lean out past the crown platform');
   engine.dispose();
 });
 
@@ -446,26 +365,11 @@ test('the meadow ruins stay low and broad, a broken arch among stumps rather tha
   const { engine, world } = setup();
   world.setEnabled(true);
   const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
-  const stones = landBoxes(shape).filter(box => box.role === 'ruin' && Math.hypot(box.x - TOWER_AT[0], box.z - TOWER_AT[1]) > 8 && box.tall > box.long);
+  const stones = landBoxes(shape).filter(box => box.role === 'ruin' && box.tall > box.long);
   assert.ok(stones.length >= 20, `${stones.length} upright ruin stones`);
   for (const stone of stones) assert.ok(stone.tall <= stone.long * 3 && stone.tall < 3.6, `a ruin stone ${stone.tall.toFixed(2)} tall and ${stone.long.toFixed(2)} wide`);
   const lintels = landBoxes(shape).filter(box => box.role === 'ruin' && box.long > 3.2 && box.tall > 0.7 && box.tall < 0.9);
   assert.ok(lintels.length >= 3, `${lintels.length} arch lintels`);
-  engine.dispose();
-});
-
-test('the volcano foot melts into the valley haze while its upper slopes keep a little more shape', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true);
-  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata, foot = [], slope = [], plain = [];
-  for (let i = 0; i < shape.roles.length; i++) {
-    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2], reach = fromVolcano(x, z);
-    if (shape.roles[i] === 'rock' && reach < 40) (y < VOLCANO.base + 1 ? foot : y > VOLCANO.base + 12 ? slope : []).push(shape.fogs[i]);
-    else if (shape.roles[i] !== 'rock' && reach > 36 && reach < 48 && y < 20) plain.push(shape.fogs[i]);
-  }
-  const mean = list => list.reduce((sum, each) => sum + each, 0) / list.length;
-  assert.ok(mean(foot) > mean(plain) * 0.85, `foot haze ${mean(foot).toFixed(2)} against the plain ${mean(plain).toFixed(2)}`);
-  assert.ok(mean(slope) < mean(foot) * 0.85, `slope haze ${mean(slope).toFixed(2)} against the foot ${mean(foot).toFixed(2)}`);
   engine.dispose();
 });
 
@@ -489,13 +393,6 @@ test('the dusk moon glows warm cream through the haze, not grey', () => {
     assert.ok(r > 0.8 && r - b > 0.22 && g - b > 0.12, `moon vertex ${[r, g, b].map(v => v.toFixed(2))}`);
   }
   engine.dispose();
-});
-
-test('the volcano crater and the top of its plume sit low enough to stay inside the window from the raised seat', () => {
-  const { positions } = plumeShape(), tops = [];
-  for (let i = 1; i < positions.length; i += 3) tops.push(positions[i]);
-  assert.ok(PEAK <= 38, `crater at ${PEAK}`);
-  assert.ok(Math.max(...tops) < 48, `plume tops out at ${Math.max(...tops).toFixed(1)}`);
 });
 
 test('the meadow ruin stumps wear thick moss caps as wide as the stone, in warm sandstone by day', () => {
@@ -537,22 +434,6 @@ test('the sky carries low banks, tall cumulus and high wisps on cards that face 
   engine.dispose();
 });
 
-test('no cloud hangs in front of the volcano plume, and the smoke stands tall and dark enough to read by day', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true);
-  const bearing = Math.atan2(VX, -VZ), plumeTop = Math.max(...plumeShape().positions.filter((_, i) => i % 3 === 1));
-  for (const card of cloudCards(world)) {
-    const overlaps = Math.abs(card.bearing - bearing) < 0.25 + card.across / 2 / card.distance;
-    if (overlaps) assert.ok(card.distance > Math.hypot(VX, VZ) || card.low > plumeTop, `a cloud ${card.distance.toFixed(0)} away in front of the plume`);
-  }
-  const { positions } = plumeShape(), ys = [];
-  for (let i = 1; i < positions.length; i += 3) ys.push(positions[i]);
-  assert.ok(Math.max(...ys) - Math.min(...ys) >= 11, 'the plume stands tall');
-  const [r, g, b] = [1, 3, 5].map(k => parseInt(VISTA_THEMES.day.smoke.slice(k, k + 2), 16));
-  assert.ok((r + g + b) / 3 < 150, `day smoke ${VISTA_THEMES.day.smoke} reads against the pale sky`);
-  engine.dispose();
-});
-
 test('the daytime field reads as soft bright gold-green, with blade roots within a fifth of the tip brightness', () => {
   const luma = color => 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b, day = grassTones(vistaPalette('day'));
   assert.ok(luma(day.root) > 0.5);
@@ -579,44 +460,6 @@ test('rain clouds melt into the overcast haze instead of floating as hard dark l
   let gap = 0;
   shape.roles.forEach((_, i) => { gap += Math.max(...sky.map((v, c) => Math.abs(colors[i * 4 + c] - v))) / shape.roles.length; });
   assert.ok(gap < 0.065, `rain clouds sit ${gap.toFixed(3)} from the haze`);
-  engine.dispose();
-});
-
-test('by day the far volcano recedes into blue air instead of standing out in saturated rock', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true); world.setTheme('day');
-  const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-land'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color');
-  const haze = [1, 3, 5].map(k => parseInt(VISTA_THEMES.day.haze.slice(k, k + 2), 16) / 255), gaps = [];
-  shape.roles.forEach((role, i) => { if (role === 'rock' && fromVolcano(shape.positions[i * 3], shape.positions[i * 3 + 2]) < 40) gaps.push(Math.hypot(...haze.map((c, k) => colors[i * 4 + k] - c))); });
-  const gap = gaps.reduce((sum, each) => sum + each, 0) / gaps.length;
-  assert.ok(gap < 0.45, `volcano rock sits ${gap.toFixed(3)} from the day haze`);
-  engine.dispose();
-});
-
-test('the volcano summit glows with molten lava even at noon', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true); world.setTheme('day');
-  const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-land'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color');
-  const rim = shape.roles.flatMap((role, i) => role === 'ember' && shape.positions[i * 3 + 1] > PEAK - 6 ? [i] : []);
-  const red = rim.reduce((sum, i) => sum + colors[i * 4], 0) / rim.length, blue = rim.reduce((sum, i) => sum + colors[i * 4 + 2], 0) / rim.length;
-  assert.ok(rim.length >= 72 * 2, `${rim.length} rim lava vertices`);
-  assert.ok(red > 0.85 && red - blue > 0.35, `rim lava r ${red.toFixed(2)} b ${blue.toFixed(2)}`);
-  engine.dispose();
-});
-
-test('volcano lava keeps an ember hue in rain and takes some of the noon haze by day', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true);
-  const rim = () => {
-    const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-land'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color');
-    const ids = shape.roles.flatMap((role, i) => role === 'ember' && shape.positions[i * 3 + 1] > PEAK - 6 ? [i] : []);
-    return [0, 1, 2].map(c => ids.reduce((sum, i) => sum + colors[i * 4 + c], 0) / ids.length);
-  };
-  world.setTheme('rain');
-  const [rr, rg, rb] = rim();
-  assert.ok(rr > rb * 3 && rr > rg * 1.8, `rain lava ${[rr, rg, rb].map(v => v.toFixed(2))}`);
-  world.setTheme('day');
-  assert.ok(rim()[2] > 0.45, `day lava blue ${rim()[2].toFixed(2)}`);
   engine.dispose();
 });
 
@@ -703,7 +546,7 @@ test('the painted sky, clouds and moon skip the room tone curve, so they match t
   engine.dispose();
 });
 
-test('from the desk chair the valley falls away below the eye, and the castle, volcano and ranges sit small in the distance', () => {
+test('from the desk chair the valley falls away below the eye, and the ranges sit small in the distance', () => {
   const { engine, world } = setup();
   world.setEnabled(true);
   const { positions, roles } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata.shape, eye = [-2, 2.24, -2.41];
@@ -711,8 +554,6 @@ test('from the desk chair the valley falls away below the eye, and the castle, v
   const highest = (test, reach = Infinity) => { let top = -90; for (let i = 0; i < roles.length; i++) { const x = positions[i * 3], z = positions[i * 3 + 2]; if (Math.abs(Math.atan2(x, -z) + 0.2) < 0.9 && test(roles[i], Math.hypot(x, z), x, z) && Math.hypot(x, z) < reach) top = Math.max(top, rise(i)); } return top; };
   assert.ok(highest((role, r) => ['valley', 'field', 'mid'].includes(role) && r > 20, 140) < 0.5, 'the valley floor and the ridge in front of the ranges stay under the eye');
   assert.ok(highest(role => role === 'far' || role === 'snow') < 6, 'the far ranges rise only a few degrees above the horizon');
-  assert.ok(highest((role, r, x, z) => Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1]) < 6) < 8, 'the castle stands small on its mound');
-  assert.ok(highest((role, r, x, z) => fromVolcano(x, z) < VOLCANO.radius) < 12, 'the volcano rises low on the far side of the valley');
   engine.dispose();
 });
 
@@ -727,14 +568,28 @@ test('when the outdoor world shows through the window, the painted backdrop, its
   assert.deepEqual([day.sky, day.land, day.grass, day.clouds, day.moon], [false, false, false, false, false]);
   assert.deepEqual([day.spirits, day.flock, day['sky-effects']], [true, true, true]);
   const effects = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects').material;
-  assert.deepEqual([effects._floats.plume, effects._floats.rays], [0, 0]);
+  assert.equal(effects._floats.rays, 0);
   world.setTheme('dusk');
   assert.equal(shown().moon, false);
   world.setTheme('day'); world.setBackdrop(true);
   assert.equal(shown().land, true);
-  assert.deepEqual([effects._floats.plume, effects._floats.rays], [1, 1]);
+  assert.equal(effects._floats.rays, 1);
   world.setTheme('dusk');
   assert.equal(shown().moon, true);
+});
+
+test('with the outdoor world at the window, preparing and recoloring build no painted backdrop, and bringing it back builds it in the current light with the dusk moon up', () => {
+  const { engine, world } = setup(), reference = setup();
+  const names = () => world.meshes.map(mesh => mesh.name.replace('seat-world-', '')).sort();
+  const colors = (each, name) => Array.from(each.meshes.find(mesh => mesh.name === name).getVerticesData('color'));
+  world.setBackdrop(false); world.prepare(); world.setTheme('dusk'); world.setProgress(0.6); world.setEnabled(true); world.animate(0.5, false);
+  assert.deepEqual(names(), ['flock', 'moon', 'shooting', 'sky-effects', 'spirits']);
+  world.setBackdrop(true);
+  assert.deepEqual(names(), ['clouds', 'flock', 'grass', 'land', 'moon', 'shooting', 'sky', 'sky-effects', 'spirits']);
+  reference.world.setTheme('dusk'); reference.world.setProgress(0.6); reference.world.setEnabled(true);
+  for (const name of ['seat-world-sky', 'seat-world-land', 'seat-world-clouds']) assert.deepEqual(colors(world, name), colors(reference.world, name), `${name} is painted in the dusk light`);
+  assert.equal(world.meshes.find(mesh => mesh.name === 'seat-world-moon').isEnabled(false), true);
+  engine.dispose(); reference.engine.dispose();
 });
 
 test('with the outdoor world behind the window, focus spirits rise from its real ground instead of the painted hills', () => {

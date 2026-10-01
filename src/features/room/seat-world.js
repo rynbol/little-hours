@@ -17,7 +17,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#46423a', leaf: '#3e5238', leafLight: '#7a8e52', walls: ['#d8b890', '#c8a088', '#b0a8a0', '#e0c49a'], roofs: ['#6a3f3a', '#4a3a3a', '#7a4a3a', '#3f4a5a'],
     stone: '#7a7672', water: '#6a7a88', glint: '#ffe0b0', window: '#ffc978', windowWarm: '#ffa860', windowDark: '#3a3c40', lamp: '#ffdca0',
     star: '#fff4d8', moon: '#ffe6b4', cloud: '#ffe2b0', cloudShade: '#8c8a96', cloudFog: 0.14,
-    castle: '#5c6070', castleRoof: '#363c4a', rock: '#4e4446', ember: '#ff6a3a', emberFog: 0.6, smoke: '#6c6660', ruin: '#7a7670', moss: '#5a6440', rune: '#ffb060', bird: '#2a2a2c', spirit: '#d8ffb8', snow: '#f0d8c0',
+    ruin: '#7a7670', moss: '#5a6440', bird: '#2a2a2c', spirit: '#d8ffb8', snow: '#f0d8c0',
     light: 0.35, night: { zenith: '#141c2a', high: '#26323c', horizon: '#7a6450', glow: '#c89a70', haze: '#3c4650', hazeSun: '#6a5a4c', mist: '#3a424a', cloud: '#4c5258', cloudShade: '#2a3038' },
   },
   day: {
@@ -26,7 +26,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#5c6440', leaf: '#4a7436', leafLight: '#86b448', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a698', water: '#6aa8c4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#a5c2c8', moon: '#fffbea', cloud: '#f6f2e0', cloudShade: '#b2c6ce', cloudFog: 0.16,
-    castle: '#7a8090', castleRoof: '#4a6274', rock: '#6a5e5c', ember: '#d8703c', emberFog: 0.95, smoke: '#8c8680', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
+    ruin: '#c4b08e', moss: '#7fa848', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
     aerial: 1.12, light: 0, night: null,
   },
   rain: {
@@ -35,7 +35,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#3a3c32', leaf: '#3d4c2d', leafLight: '#4a5a36', walls: ['#a8a08e', '#9a8c80', '#909290', '#aca284'], roofs: ['#5a4440', '#444c54', '#504a54', '#6a5040'],
     stone: '#666a62', water: '#4e5a58', glint: '#a8aca0', window: '#ffc27a', windowWarm: '#ffaa66', windowDark: '#3a3e38', lamp: '#ffd49a',
     star: '#474d42', moon: '#a8aca0', cloud: '#5a6052', cloudShade: '#3e443a', cloudFog: 0.6,
-    castle: '#525a58', castleRoof: '#363e40', rock: '#44443e', ember: '#80361a', emberFog: 0.2, smoke: '#5a5e56', ruin: '#62665e', moss: '#4a5a3c', rune: '#a0c8d0', bird: '#262a26', spirit: '#c8e0c8', snow: '#a8b0a8',
+    ruin: '#62665e', moss: '#4a5a3c', bird: '#262a26', spirit: '#c8e0c8', snow: '#a8b0a8',
     aerial: 1.1, light: 0.55, night: null,
   },
 });
@@ -55,11 +55,6 @@ const SUN_RAYS = [[-44, 72, 10, 80], [-20, 84, 7, 90], [2, 66, 11, 75], [22, 92,
 const SPIRITS = 34, SPIRIT_SECONDS = 40, SHOOTING_SECONDS = 23;
 const ahead = (across, distance) => [across, -distance];
 const bearing = (x, z) => Math.atan2(x, -z);
-export const CASTLE_AT = Object.freeze(ahead(-16, 124));
-export const VOLCANO_AT = Object.freeze(ahead(-94, 118)), TOWER_AT = Object.freeze(ahead(18, 72));
-export const VOLCANO = Object.freeze({ base: -2, height: 29, radius: 22 });
-export const LANDMARK_SCALE = Object.freeze({ castle: 0.46, tower: 0.62 });
-const VOLCANO_BEARING = Math.atan2(VOLCANO_AT[0], -VOLCANO_AT[1]);
 
 const seeded = seed => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const hex = value => Color3.FromHexString(value);
@@ -94,10 +89,6 @@ function createShape() {
       shape.quad(a, b, b + segments, a + segments);
     }
   };
-  shape.spire = (x, y, z, half, height, role) => {
-    const apex = shape.vertex(x, y + height, z, role, 1.1), base = [[-1, 1, 1], [1, 1, 0.92], [1, -1, 0.7], [-1, -1, 0.8]].map(([u, v, s]) => shape.vertex(x + u * half, y, z + v * half, role, s));
-    for (let k = 0; k < 4; k++) shape.tri(apex, base[k], base[(k + 1) % 4]);
-  };
   return shape;
 }
 
@@ -106,11 +97,10 @@ function terrainHeight(x, z) {
   const cliff = -8 * smooth(8.5, 20, r + Math.sin(a * 5) * 1.6);
   const basin = 4.5 * smooth(30, 150, r);
   const rolling = (Math.sin(x * 0.07) * Math.cos(z * 0.06) * 1.4 + Math.sin(x * 0.029 + 1) * Math.cos(z * 0.034 + 2) * 2.6 + Math.sin(x * 0.16 + z * 0.12) * 0.5) * smooth(26, 45, r);
-  const mound = 3 * (1 - smooth(6, 18, Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1])));
   const crest = (k, phase, power) => (1 - Math.abs(Math.sin(a * k + phase))) ** power;
   const ridge = smooth(92, 112, r) * (1 - smooth(122, 140, r)) * (1.5 + crest(7, 1.1, 2) * 4 + crest(17, 0.4, 2) * 1.5);
   const ranges = smooth(136, 166, r) * (3 + crest(5, 0.3, 1.4) * 9 + crest(13, 2, 2) * 5 + crest(29, 1, 2.5) * 2 + Math.max(0, Math.sin(a * 3 + 0.4)) * 9);
-  return cliff + basin + rolling + mound + ridge + ranges;
+  return cliff + basin + rolling + ridge + ranges;
 }
 
 export const SNOW_LINE = 10.5;
@@ -205,93 +195,6 @@ function buildHamlet(shape) {
   for (let i = -3; i <= 3; i++) { const cos = Math.cos(bridgeYaw), sin = Math.sin(bridgeYaw); shape.box(bx + i * 1.1 * cos, terrainHeight(bx, bz) + 0.5 + Math.cos(i / 3 * 1.2) * 1.2, bz - i * 1.1 * sin, 1.15, 0.5, 2.2, bridgeYaw, 'stone'); }
 }
 
-function shrink(shape, start, [cx, cy, cz], scale) {
-  for (let i = start; i < shape.roles.length; i++) {
-    const x = cx + (shape.positions[i * 3] - cx) * scale, y = cy + (shape.positions[i * 3 + 1] - cy) * scale, z = cz + (shape.positions[i * 3 + 2] - cz) * scale, keep = shape.fogs[i] / Math.max(1e-6, aerial(Math.hypot(shape.positions[i * 3], shape.positions[i * 3 + 2])));
-    shape.positions[i * 3] = x; shape.positions[i * 3 + 1] = y; shape.positions[i * 3 + 2] = z;
-    shape.fogs[i] = aerial(Math.hypot(x, z)) * keep; shape.mists[i] = valleyMist(x, y, z);
-  }
-}
-
-function buildCastle(shape) {
-  const [cx, cz] = CASTLE_AT, g = terrainHeight(cx, cz) - 0.5, random = seeded(43);
-  const start = shape.roles.length;
-  const tower = (x, z, w, h, roof) => { shape.box(cx + x, g + h / 2, cz + z, w, h, w, 0, 'castle'); shape.box(cx + x, g + h + 0.15, cz + z, w * 1.18, 0.3, w * 1.18, 0, 'castle', 1.1); shape.spire(cx + x, g + h + 0.3, cz + z, w * 0.62, roof, 'castleRoof'); };
-  const ring = Array.from({ length: 10 }, (_, i) => { const a = i / 10 * Math.PI * 2; return [Math.cos(a) * 10, Math.sin(a) * 7.5]; });
-  ring.forEach(([x0, z0], i) => {
-    const [x1, z1] = ring[(i + 1) % 10], length = Math.hypot(x1 - x0, z1 - z0);
-    shape.box(cx + (x0 + x1) / 2, g + 1.7, cz + (z0 + z1) / 2, length + 0.4, 3.4, 0.9, Math.atan2(-(z1 - z0), x1 - x0), 'castle', 0.92);
-    if (i % 2 === 0) tower(x0, z0, 1.7, 5 + random() * 1.5, 2.6);
-  });
-  shape.box(cx, g + 5.5, cz, 7.5, 11, 6, 0, 'castle');
-  shape.box(cx, g + 13, cz, 4.6, 4, 4, 0, 'castle', 1.05);
-  shape.box(cx, g + 15.2, cz, 5.2, 0.4, 4.6, 0, 'castle', 1.1);
-  shape.box(cx, g + 18, cz, 2.8, 5.6, 2.6, 0, 'castle', 1.02);
-  shape.spire(cx, g + 20.8, cz, 1.9, 7.5, 'castleRoof');
-  for (const side of [-1, 1]) { shape.box(cx + side * 2.9, g + 16.5, cz + 1.2, 1, 5, 1, 0, 'castle', 0.95); shape.spire(cx + side * 2.9, g + 19, cz + 1.2, 0.75, 3.4, 'castleRoof'); }
-  for (const [x, z, w, h, roof] of [[-4.6, 0.6, 2.2, 14, 4.2], [4.6, 0.6, 2.2, 13, 4], [-2.6, -3.8, 1.6, 10, 3.2], [3, -3.4, 1.7, 11.5, 3.4], [0, 3.6, 1.5, 7.5, 2.6]]) tower(x, z, w, h, roof);
-  const face = (x, y, z, columns, rows, width) => {
-    for (let row = 0; row < rows; row++) for (let c = 0; c < columns; c++) {
-      if (random() < 0.15) continue;
-      const u = x - width / 2 + (c + 0.5) * width / columns, v = y + row * 1.5, t = random(), role = random() < 0.35 ? 'windowWarm' : 'window';
-      shape.quad(shape.vertex(u - 0.22, v, z, role, 1, t), shape.vertex(u + 0.22, v, z, role, 1, t), shape.vertex(u + 0.22, v + 0.6, z, role, 1, t), shape.vertex(u - 0.22, v + 0.6, z, role, 1, t));
-    }
-  };
-  face(cx, g + 3.5, cz + 3.05, 6, 5, 6.6); face(cx, g + 11.8, cz + 2.05, 3, 2, 3.8);
-  face(cx - 4.6, g + 6, cz + 1.75, 1, 5, 1.4); face(cx + 4.6, g + 6, cz + 1.75, 1, 5, 1.4); face(cx, g + 16.5, cz + 1.35, 2, 2, 1.8);
-  for (let i = start; i < shape.roles.length; i++) if (shape.roles[i].startsWith('castle')) shape.fogs[i] *= 0.72;
-  shrink(shape, start, [cx, g, cz], LANDMARK_SCALE.castle);
-}
-
-function buildVolcano(shape) {
-  const [vx, vz] = VOLCANO_AT, { base, height, radius } = VOLCANO, rim = 3, rings = 12, segments = 72, start = shape.roles.length;
-  const streaks = [9, 14, 18, 26];
-  for (let k = 0; k <= rings; k++) {
-    const t = k / rings;
-    for (let s = 0; s < segments; s++) {
-      const a = s / segments * Math.PI * 2, rib = (1 - Math.abs(Math.sin(a * 9 + Math.sin(a * 2) * 0.8))) ** 2;
-      const shoulder = 0.09 * Math.sin(k * 1.3 + a * 2 + 0.5) * Math.sin(Math.PI * t) + 0.07 * Math.sin(a * 3 + 0.7) * (1 - t);
-      const jag = 1 + 0.05 * Math.sin(a * 6) + 0.03 * Math.sin(a * 14 + 1) + (rib - 0.4) * 0.09 * (1 - t) + shoulder, r = (radius * (1 - t) + rim * t) * jag;
-      const y = base + height * t ** 1.35 + Math.sin(a * 5 + 1) * 1.3 * t ** 4;
-      const lava = t > 0.85 || (t > 0.3 && streaks.includes(s));
-      const id = shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', lava ? 1.1 + 0.3 * t : (0.6 + 0.3 * Math.max(0, Math.cos(a - 2.1)) + rib * 0.22 + (k % 2) * 0.03) * (1 - 0.45 * t ** 1.5));
-      shape.fogs[id] *= 1 - 0.2 * Math.min(1, t * 2.4);
-    }
-  }
-  for (let k = 0; k < rings; k++) for (let s = 0; s < segments; s++) {
-    const a = start + k * segments + s, b = start + k * segments + (s + 1) % segments;
-    shape.quad(a, a + segments, b + segments, b);
-  }
-  const top = base + height, crater = shape.vertex(vx, top - 2, vz, 'ember', 1.6), lip = start + rings * segments;
-  for (let s = 0; s < segments; s++) shape.tri(crater, lip + s, lip + (s + 1) % segments);
-}
-
-function buildWatchtower(shape) {
-  const [tx, tz] = TOWER_AT, g = terrainHeight(tx, tz) - 0.3, start = shape.roles.length;
-  let y = g;
-  shape.blob(tx, g, tz, 4.4, 1.7, 4.4, 'rock', 'moss', 0.7, 3, 10);
-  for (const [w, h, twist] of [[3.4, 3, 0], [2.6, 5, 0.25], [2.1, 4.5, 0.5], [1.7, 3.5, 0.8]]) {
-    shape.box(tx, y + h / 2, tz, w, h, w, twist, 'ruin', 0.8); shape.box(tx, y + h, tz, w + 0.3, 0.25, w + 0.3, twist, 'moss');
-    for (const [u, v] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-      const lx = u * (w / 2 + 0.02), lz = v * (w / 2 + 0.02), fx = tx + lx * Math.cos(twist) + lz * Math.sin(twist), fz = tz - lx * Math.sin(twist) + lz * Math.cos(twist), across = (size, thin) => v ? [size, thin] : [thin, size];
-      const [sw, sd] = across(0.14, 0.06), [bw, bd] = across(w * 0.6, 0.06);
-      shape.box(fx, y + h * 0.5, fz, sw, h * 0.7, sd, twist, 'rune', 0.9);
-      shape.box(fx, y + h * 0.3, fz, bw, 0.1, bd, twist, 'rune', 0.8);
-    }
-    y += h;
-  }
-  shape.box(tx, y + 0.3, tz, 3.2, 0.5, 3.2, 0.8, 'ruin', 1.05);
-  for (const [dx, dz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-    const bx = tx + dx * 1.15, bz = tz + dz * 1.15, tip = shape.vertex(tx + dx * 1.9, y + 3, tz + dz * 1.9, 'ruin', 1);
-    const foot = [0, 1, 2].map(k => { const a = k / 3 * Math.PI * 2; return shape.vertex(bx + Math.cos(a) * 0.25, y + 0.5, bz + Math.sin(a) * 0.25, 'ruin', 0.75 + k * 0.1); });
-    for (let k = 0; k < 3; k++) shape.tri(tip, foot[k], foot[(k + 1) % 3]);
-  }
-  const cy = y + 2.1, c = [shape.vertex(tx, cy + 1.6, tz, 'rune', 1.2), shape.vertex(tx, cy - 1.2, tz, 'rune', 0.8)];
-  const ring = [[0.8, 0], [0, 0.8], [-0.8, 0], [0, -0.8]].map(([dx, dz], k) => shape.vertex(tx + dx, cy, tz + dz, 'rune', k % 2 ? 1 : 0.9));
-  for (let k = 0; k < 4; k++) { shape.tri(c[0], ring[k], ring[(k + 1) % 4]); shape.tri(c[1], ring[(k + 1) % 4], ring[k]); }
-  shrink(shape, start, [tx, g, tz], LANDMARK_SCALE.tower);
-}
-
 function shardTop(shape, x, y, z, radius, rise) {
   const tip = shape.vertex(x + radius * 0.4, y + rise, z, 'ruin', 1.05);
   const foot = [0, 1, 2].map(k => { const a = k / 3 * Math.PI * 2 + 0.3; return shape.vertex(x + Math.cos(a) * radius, y, z + Math.sin(a) * radius, 'ruin', 0.82 + k * 0.08); });
@@ -351,7 +254,7 @@ function buildForest(shape) {
   }
   for (let placed = 0, tries = 0; placed < FOREST.trees && tries < FOREST.trees * 12; tries++) {
     const a = (random() - 0.5) * 3.3, r = 24 + random() ** 0.8 * 112, x = Math.sin(a) * r, z = -Math.cos(a) * r;
-    if (forestField(x, z) < 0.15 || nearRiver(x, z) < 4 || Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1]) < 9 || Math.hypot(x - TOWER_AT[0], z - TOWER_AT[1]) < 5) continue;
+    if (forestField(x, z) < 0.15 || nearRiver(x, z) < 4) continue;
     const tall = 3.2 + random() * 2.6;
     if (r < 55) roundTree(shape, x, z, tall, random, 3, 4, 8);
     else if (r < 90) roundTree(shape, x, z, tall, random, 2, 3, 7);
@@ -383,7 +286,6 @@ function buildClouds(shape) {
     for (let k = 0; k < count; k++) {
       const a = -1.45 + (k + 0.2 + random() * 0.6) / count * 2.7 + bank * 0.17;
       const span = (range, t) => range[0] + (range[1] - range[0]) * t, r = span(distance, random()), y = span(height, random()), w = span(width, random()) / 2, h = span(tall, random()) / 2, seed = random() * 97;
-      if (kind === 0 && r < Math.hypot(...VOLCANO_AT) + 4 && Math.abs(a - VOLCANO_BEARING) < 0.3 + w / r) continue;
       const x = Math.sin(a) * r, z = -Math.cos(a) * r, sx = Math.cos(a), sz = Math.sin(a);
       const [base, waist, crown] = [-1, CLOUD_WAIST, 1].map(v => [-1, 1].map(u => {
         const id = shape.vertex(x + sx * w * u, y + h * v, z + sz * w * u, v === -1 ? 'cloudShade' : 'cloud', 1, v === -1 ? 0 : 1);
@@ -529,10 +431,10 @@ const LAND_FRAGMENT = `precision highp float;
 varying vec3 vColor; varying float vCloud;
 void main() { gl_FragColor = vec4(vColor * (1. - vCloud * .4), 1.); }`;
 const SKY_EFFECT_VERTEX = `precision highp float;
-attribute vec3 position; attribute vec2 uv, uv2; uniform mat4 world, viewProjection; uniform float rain, plume; varying vec2 vUv, vKind;
-void main() { vUv = uv; vKind = uv2; gl_Position = (uv2.y > 1.5 && rain < .01) || (uv2.y > .5 && uv2.y < 1.5 && plume < .5) ? vec4(0.) : viewProjection * world * vec4(position, 1.); }`;
+attribute vec3 position; attribute vec2 uv, uv2; uniform mat4 world, viewProjection; uniform float rain; varying vec2 vUv, vKind;
+void main() { vUv = uv; vKind = uv2; gl_Position = uv2.y > 1.5 && rain < .01 ? vec4(0.) : viewProjection * world * vec4(position, 1.); }`;
 const SKY_EFFECT_FRAGMENT = `precision highp float;
-varying vec2 vUv, vKind; uniform float time, rays, glow, rain; uniform vec3 tint, smoke, ember, haze;
+varying vec2 vUv, vKind; uniform float time, rays, rain; uniform vec3 tint, haze;
 ${CLOUD_SHADE}
 void main() {
   if (vKind.y > 1.5) {
@@ -543,29 +445,11 @@ void main() {
     gl_FragColor = vec4(mix(haze, vec3(1.), .3) * a, a);
     return;
   }
-  if (vKind.y < .5) {
-    float across = 1. - smoothstep(0., 1., abs(vUv.x)), along = smoothstep(0., .08, vUv.y) * (1. - smoothstep(.4, .95, vUv.y));
-    float breathe = .7 + .3 * sin(time * .23 + vUv.y * 2. + vKind.x);
-    float a = across * across * along * breathe * rays * .32;
-    gl_FragColor = vec4(tint * a, a);
-    return;
-  }
-  float body = 1. - smoothstep(.25, 1., abs(vUv.x)), rise = smoothstep(0., .02, vUv.y) * (1. - smoothstep(.35, 1., vUv.y));
-  float wisp = noise(vec2(vUv.x * 2.2, vUv.y * 5. - time * .09)) * .6 + noise(vec2(vUv.x * 5. + 3., vUv.y * 11. - time * .16)) * .4;
-  float a = body * rise * mix(1., smoothstep(.25, .65, wisp), smoothstep(0., .3, vUv.y)) * .9;
-  vec3 c = mix(mix(smoke, ember, pow(1. - vUv.y, 2.5) * glow), haze, .25);
-  gl_FragColor = vec4(c * a, a);
+  float across = 1. - smoothstep(0., 1., abs(vUv.x)), along = smoothstep(0., .08, vUv.y) * (1. - smoothstep(.4, .95, vUv.y));
+  float breathe = .7 + .3 * sin(time * .23 + vUv.y * 2. + vKind.x);
+  float a = across * across * along * breathe * rays * .32;
+  gl_FragColor = vec4(tint * a, a);
 }`;
-export const PLUME = Object.freeze({ segments: 12, height: 13, lean: 22, base: 3, top: 9 });
-export function plumeShape() {
-  const [vx, vz] = VOLCANO_AT, positions = [], uvs = [], uv2s = [], indices = [], side = new Vector3(0, 1, 0).cross(new Vector3(vx, 0, vz)).normalize();
-  for (let k = 0; k <= PLUME.segments; k++) {
-    const t = k / PLUME.segments, y = VOLCANO.base + VOLCANO.height - 1 + PLUME.height * Math.sqrt(t), drift = PLUME.lean * t, half = PLUME.base + (PLUME.top - PLUME.base) * t;
-    for (const u of [-1, 1]) positions.push(vx + drift + side.x * half * u, y, vz + side.z * half * u), uvs.push(u, t), uv2s.push(0, 1);
-    if (k) indices.push(k * 2 - 2, k * 2 - 1, k * 2 + 1, k * 2 - 2, k * 2 + 1, k * 2);
-  }
-  return { positions, uvs, uvs2: uv2s, indices };
-}
 export const SUN_POINT = Object.freeze([-50, 134, -81]);
 export function sunRayShape() {
   const positions = [], uvs = [], uv2s = [], indices = [];
@@ -591,7 +475,7 @@ export function rainShape() {
   return { positions, uvs, uvs2: uv2s, indices };
 }
 function skyEffectShape() {
-  const parts = [sunRayShape(), plumeShape(), rainShape()], merged = { positions: [], uvs: [], uvs2: [], indices: [] };
+  const parts = [sunRayShape(), rainShape()], merged = { positions: [], uvs: [], uvs2: [], indices: [] };
   for (const part of parts) {
     const offset = merged.positions.length / 3;
     merged.positions.push(...part.positions); merged.uvs.push(...part.uvs); merged.uvs2.push(...part.uvs2); merged.indices.push(...part.indices.map(i => i + offset));
@@ -693,8 +577,8 @@ export function vistaColor(palette, shape, i, out, glow) {
     const value = Array.isArray(palette[key]) ? palette[key][index] : palette[role] ?? SHELL_ROLES[role] ?? palette.stone;
     color = tone(value).scale(shade);
   }
-  const glowing = ['lamp', 'spirit', 'window', 'windowWarm', 'glint', 'star', 'moon', 'rune'].includes(role), ground = role !== 'ember' && !glowing && !role.startsWith('cloud');
-  const fog = role === 'ember' ? shape.fogs[i] * (palette.emberFog ?? 0.45) : glowing ? shape.fogs[i] * 0.45 : role.startsWith('cloud') ? shape.fogs[i] * palette.cloudFog : shape.fogs[i] * (palette.aerial ?? 1);
+  const glowing = ['lamp', 'spirit', 'window', 'windowWarm', 'glint', 'star', 'moon'].includes(role), ground = !glowing && !role.startsWith('cloud');
+  const fog = glowing ? shape.fogs[i] * 0.45 : role.startsWith('cloud') ? shape.fogs[i] * palette.cloudFog : shape.fogs[i] * (palette.aerial ?? 1);
   if (ground && palette.mist) Color3.LerpToRef(color, tone(palette.mist), (shape.mists?.[i] ?? 0) * palette.mistStrength, color);
   const x = shape.positions[i * 3], z = shape.positions[i * 3 + 2], sunward = Math.max(0, (x * glow.x + z * glow.z) / Math.max(0.001, Math.hypot(x, z))) ** 16;
   const amount = Math.min(1, fog * 0.82);
@@ -731,17 +615,22 @@ export function createSeatWorld(scene, parent) {
   const landPaint = new ShaderMaterial('seat-world-land-paint', scene, { vertexSource: LAND_VERTEX, fragmentSource: LAND_FRAGMENT }, { attributes: ['position', 'color'], uniforms: ['world', 'viewProjection', 'time', 'shadow'] });
   landPaint.backFaceCulling = false; landPaint.setFloat('time', 0); landPaint.setFloat('shadow', 0);
   grassPaint.backFaceCulling = false; grassPaint.setFloat('time', 0); grassPaint.setFloat('shadow', 0);
-  const skyEffectPaint = new ShaderMaterial('seat-world-sky-effects-paint', scene, { vertexSource: SKY_EFFECT_VERTEX, fragmentSource: SKY_EFFECT_FRAGMENT }, { attributes: ['position', 'uv', 'uv2'], uniforms: ['world', 'viewProjection', 'time', 'rays', 'glow', 'rain', 'plume', 'tint', 'smoke', 'ember', 'haze'], needAlphaBlending: true });
+  const skyEffectPaint = new ShaderMaterial('seat-world-sky-effects-paint', scene, { vertexSource: SKY_EFFECT_VERTEX, fragmentSource: SKY_EFFECT_FRAGMENT }, { attributes: ['position', 'uv', 'uv2'], uniforms: ['world', 'viewProjection', 'time', 'rays', 'rain', 'tint', 'haze'], needAlphaBlending: true });
   const cloudPaint = new ShaderMaterial('seat-world-cloud-paint', scene, { vertexSource: CLOUD_VERTEX, fragmentSource: CLOUD_FRAGMENT }, { attributes: ['position', 'color', 'uv', 'uv2'], uniforms: ['world', 'viewProjection', 'time'], needAlphaBlending: true });
   cloudPaint.backFaceCulling = false; cloudPaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; cloudPaint.disableDepthWrite = true; cloudPaint.setFloat('time', 0);
-  skyEffectPaint.backFaceCulling = false; skyEffectPaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; skyEffectPaint.disableDepthWrite = true; skyEffectPaint.setFloat('time', 0); skyEffectPaint.setFloat('rays', 0); skyEffectPaint.setFloat('glow', 0); skyEffectPaint.setFloat('plume', 1);
-  let sky = null, land, grass, skyEffects, cloudRoot, clouds, flockRoot, flock, moon, shooting, spirits;
-  function build() {
-    sky = make('sky', buildSky); land = make('land', shape => { buildLand(shape); buildHamlet(shape); buildForest(shape); buildRuins(shape); buildCastle(shape); buildWatchtower(shape); buildVolcano(shape); }, landPaint);
+  skyEffectPaint.backFaceCulling = false; skyEffectPaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; skyEffectPaint.disableDepthWrite = true; skyEffectPaint.setFloat('time', 0); skyEffectPaint.setFloat('rays', 0);
+  let built = false, sky = null, land, grass, skyEffects, cloudRoot, clouds, flockRoot, flock, moon, shooting, spirits;
+  function buildBackdrop() {
+    sky = make('sky', buildSky); land = make('land', shape => { buildLand(shape); buildHamlet(shape); buildForest(shape); buildRuins(shape); }, landPaint);
     grass = new Mesh('seat-world-grass', scene); Object.assign(new VertexData(), grassBlades()).applyToMesh(grass); grass.material = grassPaint; grass.parent = root; grass.isPickable = false; grass.metadata = { castShadow: false, seatWorld: true };
-    skyEffects = new Mesh('seat-world-sky-effects', scene); Object.assign(new VertexData(), skyEffectShape()).applyToMesh(skyEffects); skyEffects.material = skyEffectPaint; skyEffects.parent = root; skyEffects.isPickable = false; skyEffects.metadata = { castShadow: false, seatWorld: true };
     cloudRoot = new TransformNode('seat-world-cloud-drift', scene); cloudRoot.parent = root;
     clouds = make('clouds', buildClouds, cloudPaint, cloudRoot); clouds.setVerticesData('uv', clouds.metadata.shape.uvs); clouds.setVerticesData('uv2', clouds.metadata.shape.seeds);
+    colorKey = '';
+  }
+  function build() {
+    built = true;
+    if (backdrop) buildBackdrop();
+    skyEffects = new Mesh('seat-world-sky-effects', scene); Object.assign(new VertexData(), skyEffectShape()).applyToMesh(skyEffects); skyEffects.material = skyEffectPaint; skyEffects.parent = root; skyEffects.isPickable = false; skyEffects.metadata = { castShadow: false, seatWorld: true };
     flockRoot = new TransformNode('seat-world-flock-flight', scene); flockRoot.parent = root; flockRoot.position.y = FLOCK.y;
     flock = make('flock', buildBirds, unlit, flockRoot);
     moon = make('moon', buildMoon); shooting = make('shooting', buildShootingStar); spirits = make('spirits', buildSpirit, spiritPaint);
@@ -749,7 +638,7 @@ export function createSeatWorld(scene, parent) {
     spirits.thinInstanceSetBuffer('matrix', spiritMatrices, 16, false); spirits.alwaysSelectAsActiveMesh = true;
   }
   let shell = null, shellKey = '', theme = 'dusk', progress = 0, colorKey = '', seconds = 0, backdrop = true;
-  function showBackdrop() { for (const mesh of [sky, land, grass, clouds]) mesh?.setEnabled(backdrop); skyEffectPaint.setFloat('plume', backdrop ? 1 : 0); skyEffectPaint.setFloat('rays', sunRays()); if (moon) placeMoon(); }
+  function showBackdrop() { for (const mesh of [sky, land, grass, clouds]) mesh?.setEnabled(backdrop); skyEffectPaint.setFloat('rays', sunRays()); if (moon) placeMoon(); }
   const sunRays = () => backdrop ? SUN_RAY_STRENGTH[theme] ?? 0 : 0;
   const glow = { x: 0, z: -1, lit: 0, stars: 1 };
   const temp = new Color3(), matrix = new Matrix(), scale = new Vector3(1, 1, 1), spot = new Vector3(), turn = new Quaternion();
@@ -772,17 +661,17 @@ export function createSeatWorld(scene, parent) {
     moon.setEnabled(theme !== 'rain' && backdrop);
   }
   function recolor() {
-    if (!sky) return;
+    if (!built) return;
     const key = `${theme}:${Math.round(progress * 60)}`; if (key === colorKey) return; colorKey = key;
     const palette = vistaPalette(theme, progress);
     glow.lit = windowsLit(theme, progress); glow.stars = theme === 'dusk' ? 0.55 + progress * 0.45 : 0;
     placeMoon();
-    for (const mesh of [sky, land, clouds, flock, moon, shooting, spirits]) paint(mesh, palette);
+    for (const mesh of [sky, land, clouds, flock, moon, shooting, spirits]) if (mesh) paint(mesh, palette);
     fadeSpirits();
     const tones = grassTones(palette);
     for (const [name, value] of Object.entries(tones)) grassPaint.setColor3(name, value); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
     skyEffectPaint.setFloat('rays', sunRays()); skyEffectPaint.setColor3('tint', Color3.Lerp(Color3.White(), hex(palette.glow), 0.6));
-    skyEffectPaint.setColor3('smoke', hex(palette.smoke)); skyEffectPaint.setColor3('ember', hex(palette.ember)); skyEffectPaint.setColor3('haze', hex(palette.haze)); skyEffectPaint.setFloat('glow', theme === 'day' ? 0.8 : 1); skyEffectPaint.setFloat('rain', theme === 'rain' ? 1 : 0);
+    skyEffectPaint.setColor3('haze', hex(palette.haze)); skyEffectPaint.setFloat('rain', theme === 'rain' ? 1 : 0);
   }
   function setShell(style, wallPaint = {}, doors = []) {
     const base = SHELL_PAINT[style] || SHELL_PAINT.retreat, key = JSON.stringify([style, wallPaint, doors]);
@@ -823,7 +712,7 @@ export function createSeatWorld(scene, parent) {
   function animate(delta, reduced) {
     if (!root.isEnabled(false)) return;
     seconds += reduced ? 0 : delta;
-    cloudRoot.rotation.y = seconds * 0.004;
+    if (cloudRoot) cloudRoot.rotation.y = seconds * 0.004;
     grassPaint.setFloat('time', seconds); landPaint.setFloat('time', seconds); cloudPaint.setFloat('time', seconds); skyEffectPaint.setFloat('time', seconds);
     const run = (seconds % FLOCK_SECONDS) / FLOCK_SECONDS * 2;
     flockRoot.rotation.y = -(FLOCK.center - FLOCK.span / 2 + FLOCK.span * Math.min(1, run));
@@ -842,10 +731,10 @@ export function createSeatWorld(scene, parent) {
     setTheme(next) { theme = VISTA_THEMES[next] ? next : 'dusk'; recolor(); },
     setProgress(next) { progress = Math.min(1, Math.max(0, Number(next) || 0)); recolor(); },
     setShell,
-    prepare() { if (!sky) { build(); recolor(); showBackdrop(); } },
+    prepare() { if (!built) { build(); recolor(); showBackdrop(); } },
     get backdrop() { return backdrop; },
-    setBackdrop(next) { backdrop = Boolean(next); showBackdrop(); },
-    setEnabled(enabled) { if (enabled && !sky) { build(); showBackdrop(); } root.setEnabled(enabled); if (enabled) { recolor(); placeSpirits(true); } },
+    setBackdrop(next) { backdrop = Boolean(next); if (backdrop && built && !sky) { buildBackdrop(); recolor(); } showBackdrop(); },
+    setEnabled(enabled) { if (enabled && !built) { build(); showBackdrop(); } root.setEnabled(enabled); if (enabled) { recolor(); placeSpirits(true); } },
     animate,
     dispose() { root.dispose(false, false); unlit.dispose(); lit.dispose(); grassPaint.dispose(); landPaint.dispose(); skyEffectPaint.dispose(); spiritPaint.dispose(); },
   };

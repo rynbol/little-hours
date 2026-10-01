@@ -41,6 +41,7 @@ Options:
   --turn <n>         house shots: press the turn buttons n times first (negative turns left)
   --closed           house shots: close the house first
   --look <degrees>   focus shots: drag the view round by this many degrees first
+  --backdrop         focus shots: show the painted fallback valley the window falls back to when the outdoor world cannot build
   --probe "<expr>"   shots: print an expression evaluated with the live Babylon scene bound to scene
   --before "<expr>"  shots: evaluate an expression with scene bound before the picture is taken
   --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
@@ -273,6 +274,7 @@ async function shots() {
         await app.drag({ x: viewport.width / 2, y }, { x: viewport.width / 2 + step, y });
       }
       if (options.turn || options.closed || options.look) await app.settle();
+      if (options.backdrop) await app.js(`window.__littleHours.room.diagnostics().seat.world.setBackdrop(true)`);
       if (options.before) await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; ${options.before}; })()`);
       await sleep(Number(options.wait || 600));
       const file = await app.shot(join(out, `${name}-${list.length > 1 ? (side === list[0] ? 'this' : String(options.against).replace(/[^\w.-]+/g, '_')) : 'this'}.jpg`));

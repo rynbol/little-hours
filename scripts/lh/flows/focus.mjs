@@ -18,6 +18,8 @@ export default {
     const outdoorFrames = `window.__littleHours.room.diagnostics().seat.world.outdoorScene?.getFrameId() ?? -1`, seatedFrames = await app.js(outdoorFrames);
     await app.waitFor(`${outdoorFrames} > ${seatedFrames} + 3`, { what: 'the outdoor world to draw behind the room from the chair' });
     check('the chair looks out on the real-scale outdoor world drawn behind the room, with the painted backdrop put away', await app.js(`(() => { const { world } = window.__littleHours.room.diagnostics().seat; return world.outdoor && !world.backdrop && world.outdoorScene.activeCamera.maxZ > 10000; })()`));
+    const fallback = await app.js(`(() => { const d = window.__littleHours.room.diagnostics(), land = () => d.scene.getMeshByName('seat-world-land'), world = () => window.__littleHours.room.diagnostics().seat.world, unbuilt = !land(); d.seat.world.setBackdrop(true); const shown = world().backdrop && land().isEnabled(); d.seat.world.setBackdrop(false); return { unbuilt, shown, putAway: !world().backdrop && !land().isEnabled() }; })()`);
+    check('the painted fallback valley is not built while the outdoor world shows, and can be brought back behind the window for inspection and put away again', Object.values(fallback).every(Boolean), fallback);
     const box = await app.box('#room-canvas'), before = await app.js(`window.__littleHours.room.diagnostics().seat.look.yaw`);
     await app.drag({ x: box.x, y: box.y }, { x: box.x + 160, y: box.y });
     await app.waitFor(`Math.abs(window.__littleHours.room.diagnostics().seat.look.yaw - ${before}) > 0.4`, { what: 'dragging to look around the room' });
