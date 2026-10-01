@@ -120,12 +120,12 @@ def lamp(x, y, z):
 
 
 def mug(x, y, z):
-    f = Frame((x, y, z))
+    f = Frame((x, y, z), (0, -1.1, 0))
     outer = [(0.0, 0.0), (0.075, 0.0), (0.082, 0.006), (0.09, 0.05), (0.1, 0.17), (0.104, 0.19), (0.094, 0.192), (0.088, 0.17), (0.08, 0.05), (0.0, 0.05)]
     parts = [lathe(outer, (0, 0, 0), '#e7dec7', segments=36, surface='ceramic', frame=f),
              cylinder(0.089, 0.089, 0.004, (0, 0.165, 0), '#6b4a33', segments=36, frame=f),
              cylinder(0.097, 0.092, 0.022, (0, 0.11, 0), '#c98f66', segments=36, surface='ceramic', frame=f),
-             torus(0.055, 0.016, (0.105, 0.1, 0), '#e7dec7', rotation=(0, 0, -math.pi / 2), arc=math.pi, major_segments=14, surface='ceramic', frame=f)]
+             tube([(0.088, 0.155, 0), (0.13, 0.158, 0), (0.158, 0.135, 0), (0.162, 0.1, 0), (0.145, 0.07, 0), (0.084, 0.06, 0)], 0.015, '#e7dec7', surface='ceramic', frame=f)]
     parts.append(cylinder(0.12, 0.12, 0.01, (0, -0.003, 0), '#9c7a5b', segments=36, bevel=0.004, surface='wood', frame=f))
     return parts
 

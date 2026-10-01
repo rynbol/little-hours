@@ -90,3 +90,17 @@ test('the desk lamp shade glows evenly from within instead of being lit across i
   assert.ok(!layers['detail-paint'].includes('#d6a766'), 'no lit cloth shade is left to catch the bulb light across its pleats');
   disposeDetails(scene); engine.dispose();
 });
+
+test('the desk mug turns its handle toward the seat so it reads in profile from the chair', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const paint = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint'), positions = paint.getVerticesData('position');
+  let handle = 0, seatward = 0;
+  for (let i = 0; i < positions.length; i += 3) {
+    const dx = positions[i] - 0.83, y = positions[i + 1] - 1.26, dz = positions[i + 2] + 0.13;
+    if (y > 0.07 && y < 0.15 && Math.hypot(dx, dz) > 0.135 && Math.hypot(dx, dz) < 0.19) { handle++; if (dz > 0.06) seatward++; }
+  }
+  assert.ok(handle > 20, `${handle} handle vertices beside the mug`);
+  assert.ok(seatward / handle > 0.8, `${seatward} of ${handle} handle vertices face the seat`);
+  disposeDetails(scene); engine.dispose();
+});
