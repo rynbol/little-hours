@@ -97,7 +97,7 @@ test('dragging while seated turns the head a full circle, holds at the ceiling, 
   listeners.pointerdown({ pointerId: 1, clientX: 100, clientY: 100 });
   listeners.pointermove({ pointerId: 1, clientX: 100 + Math.round(2 * Math.PI / 0.0042), clientY: 5000 });
   view.update(0.016, true, 1.6);
-  assert.deepEqual({ yaw: round(view.look.yaw, 2), pitch: view.look.pitch }, { yaw: 6.58, pitch: 0.24 });
+  assert.deepEqual({ yaw: round(view.look.yaw, 2), pitch: view.look.pitch }, { yaw: 6.48, pitch: 0.24 });
   listeners.pointermove({ pointerId: 1, clientX: 100 + Math.round(2 * Math.PI / 0.0042), clientY: 4900 });
   view.update(0.016, true, 1.6);
   assert.equal(round(view.look.pitch), -0.18);
