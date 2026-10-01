@@ -70,18 +70,15 @@ def chair(cloth=SAGE, frame_wood=DARK, arm=WOOD):
 
 def laptop():
     f = Frame((0, 1.29, -0.43))
-    parts = [rbox([0.97, 0.04, 0.62], (0, 0, 0), WALNUT, bevel=0.03, surface='wood', frame=f, dice=0.06),
+    parts = [rbox([0.97, 0.06, 0.62], (0, -0.01, 0), WALNUT, bevel=0.03, surface='wood', frame=f, dice=0.06),
              rbox([0.72, 0.006, 0.26], (0, 0.021, -0.07), '#3d2b22', bevel=0.004, frame=f),
              rbox([0.29, 0.003, 0.15], (0, 0.0205, 0.19), LAPTOP_BRASS, bevel=0.006, surface='metal', layer='metal', frame=f),
-             rbox([0.27, 0.004, 0.13], (0, 0.021, 0.19), LEATHER, bevel=0.01, surface='cloth', frame=f),
-             rbox([0.9, 0.009, 0.006], (0, -0.006, 0.311), LAPTOP_BRASS, bevel=0.002, surface='metal', layer='metal', frame=f)]
+             rbox([0.27, 0.004, 0.13], (0, 0.021, 0.19), LEATHER, bevel=0.01, surface='cloth', frame=f)]
     for x in (-1, 1):
-        parts.append(rbox([0.006, 0.009, 0.52], (x * 0.486, -0.006, 0.0), LAPTOP_BRASS, bevel=0.002, surface='metal', layer='metal', frame=f))
-    for x in (-1, 1):
-        parts.append(rbox([0.06, 0.044, 0.06], (x * 0.457, 0, 0.282), LAPTOP_BRASS, bevel=0.018, surface='metal', layer='metal', frame=f))
-    parts.append(rod((-0.4, 0.024, -0.3), (0.4, 0.024, -0.3), 0.017, LAPTOP_BRASS, sides=16, surface='metal', layer='metal', frame=f))
-    for x in (-0.41, 0.41):
-        parts.append(rod((x - 0.012, 0.024, -0.3), (x + 0.012, 0.024, -0.3), 0.02, LAPTOP_BRASS, sides=16, surface='metal', layer='metal', frame=f))
+        parts.append(rbox([0.09, 0.066, 0.09], (x * 0.45, -0.01, 0.27), LAPTOP_BRASS, bevel=0.03, surface='metal', layer='metal', frame=f))
+    parts.append(rod((-0.36, 0.024, -0.3), (0.36, 0.024, -0.3), 0.028, LAPTOP_BRASS, sides=10, surface='metal', layer='metal', frame=f))
+    for x in (-0.4, 0.4):
+        parts.append(rod((x - 0.04, 0.024, -0.3), (x + 0.04, 0.024, -0.3), 0.032, WALNUT, sides=10, surface='wood', frame=f))
     pitch, gap = 0.05, 0.006
     for row, widths in enumerate(KEY_ROWS):
         x, z = -pitch * 6.5, -0.17 + row * 0.048
@@ -94,14 +91,16 @@ def laptop():
             parts.append(rbox([w - 0.009, 0.004, 0.028], (centre, 0.0305, z - 0.002), '#e0bb82' if accent else KEY_TOP, bevel=0.003, segments=2, frame=f))
             x += units * pitch
     lid = Frame((0, 0.022, -0.29), (-0.28, 0, 0), f)
-    parts.append(rbox([0.97, 0.62, 0.03], (0, 0.31, 0), WALNUT, bevel=0.03, surface='wood', frame=lid, dice=0.06))
+    parts.append(rbox([0.97, 0.62, 0.05], (0, 0.31, -0.01), WALNUT, bevel=0.035, surface='wood', frame=lid, dice=0.06))
+    for size, centre in (([0.97, 0.06, 0.02], (0, 0.03)), ([0.97, 0.045, 0.02], (0, 0.5975)), ([0.036, 0.62, 0.02], (-0.467, 0.31)), ([0.036, 0.62, 0.02], (0.467, 0.31))):
+        parts.append(rbox(size, (centre[0], centre[1], 0.025), WALNUT, bevel=0.009, surface='wood', frame=lid))
     parts.append(rbox([0.93, 0.584, 0.006], (0, 0.314, 0.016), '#2b2420', bevel=0.004, frame=lid))
     parts.append(rbox([0.914, 0.568, 0.004], (0, 0.314, 0.02), '#efe2c4', bevel=0.002, layer='glow', frame=lid))
     for sx in (-1, 1):
         for sy in (0, 1):
             cx, cy = sx * 0.468, 0.01 + sy * 0.6
-            parts.append(rbox([0.05, 0.01, 0.005], (cx - sx * 0.02, cy, 0.0165), LAPTOP_BRASS, bevel=0.002, surface='metal', layer='metal', frame=lid))
-            parts.append(rbox([0.01, 0.05, 0.005], (cx, cy + (0.02 if sy == 0 else -0.02), 0.0165), LAPTOP_BRASS, bevel=0.002, surface='metal', layer='metal', frame=lid))
+            parts.append(rbox([0.07, 0.016, 0.006], (cx - sx * 0.027, cy, 0.036), LAPTOP_BRASS, bevel=0.003, surface='metal', layer='metal', frame=lid))
+            parts.append(rbox([0.016, 0.07, 0.006], (cx, cy + (0.027 if sy == 0 else -0.027), 0.036), LAPTOP_BRASS, bevel=0.003, surface='metal', layer='metal', frame=lid))
     parts.append(rbox([0.22, 0.48, 0.004], (-0.31, 0.314, 0.023), '#e3cfa8', bevel=0.002, layer='glow', frame=lid))
     parts.append(rbox([0.6, 0.46, 0.004], (0.12, 0.314, 0.023), '#fbf3df', bevel=0.002, layer='glow', frame=lid))
     parts.append(rbox([0.32, 0.02, 0.003], (0.03, 0.49, 0.026), '#a97b52', bevel=0.001, layer='glow', frame=lid))
@@ -109,8 +108,8 @@ def laptop():
         parts.append(rbox([0.48 if i < 7 else 0.24, 0.008, 0.003], (0.12 if i < 7 else 0.0, 0.45 - i * 0.042, 0.026), '#cdb48c', bevel=0.001, layer='glow', frame=lid))
     for i in range(4):
         parts.append(rbox([0.14 - i * 0.015, 0.012, 0.003], (-0.31, 0.48 - i * 0.05, 0.026), '#a97b52', bevel=0.001, layer='glow', frame=lid))
-    parts.append(sphere((0.05, 0.05, 0.004), (0.2, 0.36, -0.017), '#e8c079', subdivisions=2, frame=lid))
-    parts.append(sphere((0.022, 0.034, 0.004), (0.2, 0.43, -0.018), '#8fa878', subdivisions=2, frame=lid))
+    parts.append(sphere((0.05, 0.05, 0.004), (0.2, 0.36, -0.037), '#e8c079', subdivisions=2, frame=lid))
+    parts.append(sphere((0.022, 0.034, 0.004), (0.2, 0.43, -0.038), '#8fa878', subdivisions=2, frame=lid))
     return parts
 
 

@@ -84,6 +84,22 @@ test('the study laptop is a walnut case with brass fittings and a sepia screen, 
   disposeDetails(scene); engine.dispose();
 });
 
+test('the laptop is a chunky slate: a thick base down to the desk, a raised walnut bezel round the screen and a fat hinge barrel', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const meshes = createDetail('study-desk', scene).getChildMeshes(), layer = name => meshes.find(mesh => mesh.material.name === name);
+  const select = (mesh, hex) => { const positions = mesh.getVerticesData('position'), { slots, palette } = mesh.metadata, slot = palette.indexOf(hex), found = []; slots.forEach((s, v) => { if (s === slot) found.push(positions.slice(v * 3, v * 3 + 3)); }); return found; };
+  const walnut = select(layer('detail-paint'), LAPTOP.walnut), brass = select(layer('detail-metal'), LAPTOP.brass);
+  const base = walnut.filter(([x, , z]) => Math.abs(x) < 0.49 && z > -0.74 && z < -0.12);
+  assert.ok(Math.min(...base.map(([, y]) => y)) < 1.256, 'the base is thick enough to sit on the desk boards');
+  const tilt = 0.28, lidLocal = ([x, y, z]) => { const dy = y - 1.312, dz = z + 0.72; return [x, dy * Math.cos(tilt) - dz * Math.sin(tilt), dy * Math.sin(tilt) + dz * Math.cos(tilt)]; };
+  const bezel = walnut.map(lidLocal).filter(([x, y, z]) => Math.abs(x) < 0.49 && y > -0.01 && y < 0.63 && z > 0.03);
+  assert.ok(bezel.length > 100, `${bezel.length} walnut bezel vertices stand proud of the screen`);
+  const hinge = brass.filter(([x, y, z]) => Math.abs(x) < 0.3 && Math.hypot(y - 1.314, z + 0.73) < 0.05);
+  assert.ok(Math.max(...hinge.map(([, y, z]) => Math.hypot(y - 1.314, z + 0.73))) > 0.026, 'the hinge barrel is fat');
+  disposeDetails(scene); engine.dispose();
+});
+
 test('the desk lamp shade glows evenly from within instead of being lit across its pleats', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
