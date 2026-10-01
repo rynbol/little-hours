@@ -19,7 +19,7 @@ export function terrainRing(index, rings = TERRAIN_RINGS) {
   const { radius, step } = rings[index], inner = index ? rings[index - 1].radius : 0, coarse = rings[index + 1]?.step ?? 0;
   const n = Math.round(radius * 2 / step) + 1, positions = new Float32Array(n * n * 3), normals = new Float32Array(n * n * 3), colors = new Float32Array(n * n * 4), indices = [];
   for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
-    const x = -radius + i * step, z = -radius + j * step, v = i * n + j, y = edgeHeight(x, z, radius, coarse), normal = normalAt(x, z, Math.max(1, step * 0.75));
+    const x = -radius + i * step, z = -radius + j * step, v = i * n + j, y = edgeHeight(x, z, radius, coarse), normal = normalAt(x, z, Math.max(1, step * 1.5));
     positions.set([x, y, z], v * 3); normals.set(normal, v * 3);
     colors.set([canopyAt(x, z), 1 - Math.min(1, riverDistance(x, z) / (WORLD.river.width * 3)), 0, 1], v * 4);
   }

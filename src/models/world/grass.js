@@ -11,8 +11,8 @@ import { followEye } from './world-glsl.js';
 
 export const GRASS = Object.freeze({
   layers: Object.freeze([
-    Object.freeze({ period: 16, blades: 12000, reach: 8, width: 0.042, height: 0.6 }),
-    Object.freeze({ period: 48, blades: 20000, reach: 24, width: 0.065, height: 0.58 }),
+    Object.freeze({ period: 16, blades: 12000, reach: 8, width: 0.022, height: 0.55 }),
+    Object.freeze({ period: 48, blades: 20000, reach: 24, width: 0.04, height: 0.52 }),
   ]),
   step: 2, texels: 41, recentre: 8,
   clearing: Object.freeze({ halfWidth: 6.6, halfDepth: 5.2 }),
@@ -53,7 +53,7 @@ function seeded(seed) {
   return () => { state = (state + 0x6d2b79f5) >>> 0; let t = Math.imul(state ^ (state >>> 15), 1 | state); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
-const BLADE_ROWS = Object.freeze([[-1, 0], [1, 0], [-0.8, 0.55], [0.8, 0.55], [0, 1]]);
+const BLADE_ROWS = Object.freeze([[-1, 0], [1, 0], [-0.62, 0.5], [0.62, 0.5], [0, 1]]);
 
 export function grassBlades(layers = GRASS.layers) {
   const total = layers.reduce((sum, layer) => sum + layer.blades, 0), random = seeded(29);
@@ -94,6 +94,7 @@ void main() {
   vec4 surface = groundAt(base); vec3 n = surface.xyz;
   grow *= smoothstep(.76, .86, n.y) * smoothstep(${(WORLD.river.width * 0.8).toFixed(1)}, ${(WORLD.river.width * 1.1).toFixed(1)}, riverOffset(base)) * (1. - smoothstep(330., 380., surface.w));
   grow *= 1. - step(abs(base.x), ${GRASS.clearing.halfWidth.toFixed(2)}) * step(abs(base.y), ${GRASS.clearing.halfDepth.toFixed(2)});
+  grow *= smoothstep(.55, 1.5, pathOffset(base));
   float clump = .55 + .9 * worldNoise(base / 1.9 + 3.7);
   float height = ${perLayer('height')} * (.55 + .9 * seed) * clump * grow;
   float width = ${perLayer('width')} * (.75 + .5 * fract(seed * 7.31)) * grow;
@@ -101,12 +102,12 @@ void main() {
   float turn = seed * 43.7; vec2 face = normalize(mix(vec2(cos(turn), sin(turn)), across, .6));
   float gust = groundGust(base), bend = t * t * height;
   float flutter = sin(time * 2.6 + seed * 31.) * gusts * .05;
-  vec2 lean = vec2(cos(turn * 1.7), sin(turn * 1.7)) * .42 + windDir * (.08 + .3 * gust + flutter);
+  vec2 lean = vec2(cos(turn * 1.7), sin(turn * 1.7)) * .16 + windDir * (.34 + .34 * gust + flutter);
   vec2 xz = base + face * blade.x * width + lean * bend;
   vec3 p = vec3(xz.x, surface.w - .04 + t * height * (1. - .18 * dot(lean, lean) * t), xz.y);
   vec3 soil = groundAlbedo(base, surface.w, n, 0., dist).rgb, field = soil * mix(.84, 1.1, worldNoise(base / 2.7 + 9.1)) * (.94 + .12 * fract(seed * 13.7));
-  vec3 tip = mix(soil, mix(grassLight, grassWarm, .3) * 1.12, .6);
-  vec3 color = t < .5 ? mix(field * vec3(.5, .63, .6), field, t / .5) : mix(field, tip, (t - .5) / .5);
+  vec3 tip = mix(field, grassTip, .45 + .55 * fract(seed * 5.3));
+  vec3 color = t < .5 ? mix(field * vec3(.6, .7, .62), field, t / .5) : mix(field, tip, smoothstep(.5, 1., t));
   color *= 1. + .1 * smoothstep(.7, 1., gust) * t;
   color = mix(color, soil, inner ? 0. : smoothstep(reach * .45, reach * .9, dist));
   vec4 worldPos = world * vec4(p, 1.);

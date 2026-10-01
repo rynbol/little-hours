@@ -11,7 +11,7 @@ test('terrain paint stops wind gusts when still and takes every ground colour fr
   const { paint, setTheme } = createTerrainPaint(scene, { still: true });
   assert.equal(paint._floats.gusts, 0);
   setTheme(WORLD_ATMOSPHERES.rain);
-  for (const key of ['grass', 'grassLight', 'grassWarm', 'forestFloor', 'rock', 'rockDark', 'dirt', 'sand', 'snow']) {
+  for (const key of ['grass', 'grassLight', 'grassWarm', 'grassTip', 'forestFloor', 'rock', 'rockDark', 'dirt', 'sand', 'snow']) {
     assert.ok(GROUND_UNIFORMS.includes(key), key);
     assert.equal(paint._colors3[key].toHexString().toLowerCase(), WORLD_ATMOSPHERES.rain[key], key);
   }

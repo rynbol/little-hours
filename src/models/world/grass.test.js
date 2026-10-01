@@ -13,8 +13,11 @@ const close = (actual, expected, label) => assert.ok(Math.abs(actual - expected)
 
 test('grass roots sit on the rendered terrain triangles, not the analytic height', () => {
   close(surfaceAt(40, -40), heightAt(40, -40), 'grid vertex');
-  close(surfaceAt(41, -39.5), -21.509562509, 'lower triangle');
-  close(surfaceAt(41.5, -38.5), -21.421684834, 'upper triangle');
+  close(surfaceAt(41, -39.5), -9.439169868, 'lower triangle');
+  const corner = heightAt(40, -40);
+  close(surfaceAt(41, -39.5), corner + (heightAt(42, -40) - corner) * 0.5 + (heightAt(40, -38) - corner) * 0.25, 'lower triangle plane');
+  assert.ok(Math.abs(surfaceAt(41, -39.5) - heightAt(41, -39.5)) > 1e-4);
+  close(surfaceAt(41.5, -38.5), -9.371802868, 'upper triangle');
   assert.equal(surfaceAt(0, 0), 0);
 });
 
@@ -30,7 +33,7 @@ test('the ground grid recentres on the camera and reuses texels it already holds
   fresh.centre(33, -52);
   assert.deepEqual(moved.origin, fresh.origin);
   assert.deepEqual(moved.data, fresh.data);
-  assert.deepEqual(Array.from(fresh.data.slice(0, 4), value => Math.round(value * 1e3) / 1e3), [0.06, 0.992, -0.113, -23.303]);
+  assert.deepEqual(Array.from(fresh.data.slice(0, 4), value => Math.round(value * 1e3) / 1e3), [0.04, 0.995, -0.088, -10.925]);
 });
 
 test('two blade layers tile their own periods with five vertices and three triangles each', () => {
@@ -43,7 +46,7 @@ test('two blade layers tile their own periods with five vertices and three trian
     reach[layer] = Math.max(reach[layer], positions[v * 3], positions[v * 3 + 2]);
   }
   assert.deepEqual(reach.map(Math.ceil), [16, 48]);
-  assert.deepEqual(Array.from(positions.slice(1, 15).filter((_, i) => i % 3 === 0)), [0, 0, 0.550000011920929, 0.550000011920929, 1]);
+  assert.deepEqual(Array.from(positions.slice(1, 15).filter((_, i) => i % 3 === 0)), [0, 0, 0.5, 0.5, 1]);
 });
 
 test('world grass follows the camera in steps, takes the theme and stays still when asked', () => {

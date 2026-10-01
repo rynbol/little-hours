@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { heightAt } from '../../core/world-terrain.js';
+import { heightAt, normalAt } from '../../core/world-terrain.js';
 import { terrainRing } from './terrain-mesh.js';
 
 const RINGS = [{ radius: 16, step: 2 }, { radius: 64, step: 8 }];
@@ -26,4 +26,22 @@ test('a coarse ring leaves a hole where the finer ring sits', () => {
     assert.ok(!(xs.every(x => Math.abs(x) <= 16) && zs.every(z => Math.abs(z) <= 16)), 'no triangle inside the inner ring');
   }
   assert.equal(indices.length / 3, 16 * 16 * 2 - 4 * 4 * 2);
+});
+
+test('far mountain normals are averaged wider than the grid so slopes shade smoothly instead of in facets', () => {
+  const ring = { radius: 4480, step: 128 }, n = Math.round(ring.radius * 2 / ring.step) + 1, { normals } = terrainRing(0, [ring]);
+  const coordinate = i => -ring.radius + i * ring.step;
+  const neighbourAgreement = normalOf => {
+    let sum = 0, count = 0;
+    for (let i = 0; i < n - 1; i++) for (let j = 0; j < n; j++) {
+      if (Math.hypot(coordinate(i), coordinate(j)) < 2000) continue;
+      const a = normalOf(i, j), b = normalOf(i + 1, j);
+      sum += a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; count++;
+    }
+    return sum / count;
+  };
+  const meshed = neighbourAgreement((i, j) => normals.subarray((i * n + j) * 3, (i * n + j) * 3 + 3));
+  const perStep = neighbourAgreement((i, j) => normalAt(coordinate(i), coordinate(j), ring.step * 0.75));
+  assert.equal(Math.round(meshed * 1000) / 1000, 0.933);
+  assert.ok(meshed > perStep + 0.05, `${meshed} vs ${perStep}`);
 });
