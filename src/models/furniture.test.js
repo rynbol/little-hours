@@ -98,7 +98,22 @@ test('the desk tea steam is a short soft wisp that fades out at its sides instea
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
 
-test('the moon tree canopy takes on the dusk room light instead of keeping its sunlit day green, and gets that green back by day', () => {
+test('the moon tree grows pads of clearly different sizes and flatness instead of one repeated ball', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), pads = [], addMesh = scene.addMesh.bind(scene);
+  scene.addMesh = (mesh, recursive) => {
+    if (mesh.name === 'moonleaf-clump') mesh.onDisposeObservable.add(() => { const { x, y } = mesh.getBoundingInfo().boundingBox.extendSize; pads.push({ width: x, flatness: y / x }); });
+    return addMesh(mesh, recursive);
+  };
+  try {
+    createFurniture('moon-tree', scene);
+    const widths = pads.map(pad => pad.width), flatness = pads.map(pad => pad.flatness);
+    assert.ok(pads.length >= 20, `the canopy batches ${pads.length} pads`);
+    assert.ok(Math.max(...widths) / Math.min(...widths) > 2.5, `the widest pad is ${(Math.max(...widths) / Math.min(...widths)).toFixed(2)}x the narrowest`);
+    assert.ok(Math.max(...flatness) - Math.min(...flatness) > 0.2, `pad flatness runs ${Math.min(...flatness).toFixed(2)}-${Math.max(...flatness).toFixed(2)}`);
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('the moon tree canopy dims and softens in the dusk and rain light but stays a green that leans to its cool shade instead of khaki, and gets its sunlit green back by day', () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   try {
     const tree = createFurniture('moon-tree', scene), canopy = tree.getChildMeshes(false).find(mesh => mesh.name === 'swaying-leaf-canopy'), day = Array.from(canopy.getVerticesData('color'));
@@ -107,8 +122,11 @@ test('the moon tree canopy takes on the dusk room light instead of keeping its s
     const fresh = look(day);
     tree.metadata.lightLeaves(ROOM_LIGHTS.dusk.leaves);
     const dusk = look(Array.from(canopy.getVerticesData('color')));
-    assert.ok(fresh.hue > 85 && dusk.hue < fresh.hue - 8 && dusk.hue > 75, `the canopy hue goes from ${fresh.hue.toFixed(0)} by day to a muted olive green ${dusk.hue.toFixed(0)} at dusk, warmer but still a plant under the warm lamps`);
+    assert.ok(fresh.hue > 85 && dusk.hue >= fresh.hue, `the canopy hue goes from ${fresh.hue.toFixed(0)} by day to ${dusk.hue.toFixed(0)} at dusk, so the warm lamps and haze land on a green, not khaki`);
     assert.ok(dusk.saturation < fresh.saturation * 0.75, `the dusk canopy saturation is ${dusk.saturation.toFixed(2)}, against ${fresh.saturation.toFixed(2)} by day`);
+    tree.metadata.lightLeaves(ROOM_LIGHTS.rain.leaves);
+    const rain = look(Array.from(canopy.getVerticesData('color')));
+    assert.ok(rain.hue >= fresh.hue && rain.saturation < fresh.saturation, `the rain canopy hue is ${rain.hue.toFixed(0)} at saturation ${rain.saturation.toFixed(2)}`);
     tree.metadata.lightLeaves(ROOM_LIGHTS.day.leaves);
     assert.deepEqual(Array.from(canopy.getVerticesData('color')), day, 'the day canopy is exactly its own colours');
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }

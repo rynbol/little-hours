@@ -502,7 +502,7 @@ function petBed(parent) {
   box(tag, [0.12, 0.035, 0.018], [0, 0, 0], C.cream, 0.008);
   for (const x of [-0.06, 0.06]) for (const y of [-0.016, 0.016]) sphere(tag, [0.02, 0.02, 0.012], [x, y, 0], C.cream);
 }
-export const MOON_CANOPY = Object.freeze({ core: '#335a52', under: '#3c6b64', side: '#78b84c', top: '#a4ec5c', rim: '#d8f090', sun: [-0.3, 0.82, 0.48], mottle: 0.015 });
+export const MOON_CANOPY = Object.freeze({ core: '#335a52', under: '#3c6b64', side: '#78b84c', top: '#a4ec5c', rim: '#d8f090', sun: [-0.3, 0.82, 0.48], mottle: 0.015, towardShade: 0.35 });
 export const LEAF_OUTLINE = Object.freeze([[0, 0], [0.25, 0.8], [0.75, 0.8], [1, 0], [0.75, -0.8], [0.25, -0.8]]);
 export function leafClump(parent, center, radii, seed, leaves) {
   const positions = [], indices = [], colors = [], normals = [];
@@ -581,9 +581,9 @@ function moonTree(parent, canopyOnly = false) {
       const twig = [fork[0] + Math.cos(turn) * 0.14, fork[1] + 0.14, fork[2] + Math.sin(turn) * 0.14];
       if (!canopyOnly) { rod(parent, [0, height - 0.05, 0], end, 0.020, '#816746'); rod(parent, fork, twig, 0.010, '#816746'); }
       else {
-        const seed = tier * 3 + branch, size = (tier === 3 ? 0.85 : 1) * (0.9 + vary(seed) * 0.2), small = 0.85 + vary(seed + 12) * 0.3;
-        leafClump(parent, [end[0] * 1.04, end[1] + 0.04, end[2] * 1.04], [0.25 * size, 0.18 * size, 0.25 * size], seed, 110);
-        leafClump(parent, [twig[0], twig[1] + 0.07, twig[2]], [0.15 * small, 0.115 * small, 0.15 * small], seed + 12, 52);
+        const seed = tier * 3 + branch, size = (tier === 3 ? 0.85 : 1) * (0.7 + vary(seed) * 0.6), small = 0.6 + vary(seed + 12) * 0.8, squash = 0.62 + vary(seed + 30) * 0.24;
+        leafClump(parent, [end[0] * 1.04, end[1] + 0.04, end[2] * 1.04], [0.25 * size, 0.25 * squash * size, 0.25 * size * (0.85 + vary(seed + 40) * 0.3)], seed, Math.round(110 * size));
+        leafClump(parent, [twig[0], twig[1] + 0.07, twig[2]], [0.15 * small, 0.15 * (squash + 0.05) * small, 0.15 * small], seed + 12, Math.round(52 * small));
       }
     }
   }
@@ -939,18 +939,20 @@ function recordSleeve(parent) {
 
 function lightLeaves(canopy) {
   canopy.markVerticesDataAsUpdatable('color', true);
-  const painted = Float32Array.from(canopy.getVerticesData('color')), shown = new Float32Array(painted);
+  const painted = Float32Array.from(canopy.getVerticesData('color')), shown = new Float32Array(painted), paint = new Color3(), leaf = new Color3(), lit = new Color3();
   let current = null;
   return leaves => {
     if (leaves === current) return;
     current = leaves;
     const [hex, amount] = leaves, tint = Color3.FromHexString(hex);
-    const tintLuma = Math.max(0.01, 0.2126 * tint.r + 0.7152 * tint.g + 0.0722 * tint.b);
-    for (let i = 0; i < painted.length; i += 4) {
+    const tintLuma = Math.max(0.01, 0.2126 * tint.r + 0.7152 * tint.g + 0.0722 * tint.b), shade = Color3.FromHexString(MOON_CANOPY.under).toHSV().r;
+    shown.set(painted);
+    if (amount) for (let i = 0; i < painted.length; i += 4) {
       const luma = (0.2126 * painted[i] + 0.7152 * painted[i + 1] + 0.0722 * painted[i + 2]) / tintLuma;
-      shown[i] = painted[i] + (tint.r * luma - painted[i]) * amount;
-      shown[i + 1] = painted[i + 1] + (tint.g * luma - painted[i + 1]) * amount;
-      shown[i + 2] = painted[i + 2] + (tint.b * luma - painted[i + 2]) * amount;
+      paint.set(painted[i], painted[i + 1], painted[i + 2]).toHSVToRef(leaf);
+      paint.set(painted[i] + (tint.r * luma - painted[i]) * amount, painted[i + 1] + (tint.g * luma - painted[i + 1]) * amount, painted[i + 2] + (tint.b * luma - painted[i + 2]) * amount).toHSVToRef(lit);
+      Color3.HSVtoRGBToRef(leaf.r + (shade - leaf.r) * amount * MOON_CANOPY.towardShade, lit.g, lit.b, lit);
+      shown[i] = lit.r; shown[i + 1] = lit.g; shown[i + 2] = lit.b;
     }
     streamVertices(canopy, 'color', shown);
   };

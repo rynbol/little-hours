@@ -214,17 +214,22 @@ def sheet(width, depth, frame, colour, lift):
 
 def writing(frame):
     parts = []
+    hand = lambda n: (math.sin(n * 12.9898 + 4.1414) * 43758.5453) % 1.0
     for line, words in enumerate(((0.05, 0.034, 0.07, 0.045), (0.06, 0.03, 0.05), (0.04, 0.066, 0.028, 0.05), (0.07, 0.04))):
         x, base = -0.15, -0.104 + line * 0.035 - 0.011
         for w, length in enumerate(words):
-            steps = max(6, int(length / 0.0045))
-            points = []
-            for k in range(steps + 1):
-                t = k / steps
-                hump = abs(math.sin(t * steps * 1.3 + line + w)) * 0.0065 * (1.25 if k % 5 == 2 else 1.0)
-                points.append((x + t * length, 0.0018, base - hump))
+            seed, end, points, letter = line * 13 + w * 5, x + length, [], 0
+            while x < end:
+                width, shape = 0.0055 + 0.0065 * hand(seed * 7 + letter), hand(seed * 11 + letter)
+                rise = 0.0115 if shape > 0.8 else -0.0055 if shape < 0.12 else 0.0038 + 0.0022 * hand(seed * 3 + letter)
+                drift = 0.0009 * math.sin(x * 80 + seed)
+                for u in (0.0, 0.25, 0.5, 0.75):
+                    lift = rise * math.sin(math.pi * u)
+                    points.append((x + u * width + 0.3 * lift, 0.0018, base + drift - lift))
+                x, letter = x + width, letter + 1
+            points.append((x, 0.0018, base + 0.0009 * math.sin(x * 80 + seed)))
             parts.append(tube(points, 0.0011, INK, frame=frame, resolution=1))
-            x += length + 0.016
+            x += 0.016
     return parts
 
 

@@ -282,7 +282,7 @@ test('from the chair the desk wood reads a soft honey oak that drifts slowly in 
   const at = (sorted, share) => sorted[Math.floor(sorted.length * share)], sorted = values => values.sort((a, b) => a - b);
   const wood = [...slots.keys()].filter(v => surfaces[v] === 9 && ['#aa7954', '#73533d'].includes(palette[slots[v]]));
   const hues = sorted(wood.map(v => hsv(colors, v)[0])), saturations = sorted(wood.map(v => hsv(colors, v)[1]));
-  assert.ok(at(hues, 0.1) >= 28.5 && at(hues, 0.9) <= 33, `desk wood hue runs ${at(hues, 0.1).toFixed(1)}-${at(hues, 0.9).toFixed(1)}`);
+  assert.ok(at(hues, 0.1) >= 34.5 && at(hues, 0.9) <= 39, `desk wood hue runs ${at(hues, 0.1).toFixed(1)}-${at(hues, 0.9).toFixed(1)}`);
   assert.ok(at(saturations, 0.9) <= 0.38, `desk wood saturation reaches ${at(saturations, 0.9).toFixed(2)}`);
   const boards = wood.filter(v => palette[slots[v]] === '#aa7954'), drift = sorted(boards.map(v => colors[v * 4 + 1] / baseColors[v * 4 + 1]));
   assert.ok(at(drift, 0.9) / at(drift, 0.1) >= 1.04, `the board tone drifts ${((at(drift, 0.9) / at(drift, 0.1) - 1) * 100).toFixed(1)}% across the desk`);
@@ -300,6 +300,22 @@ test('from the chair the desk wood reads a soft honey oak that drifts slowly in 
   const sakuraHue = Color3.FromHexString('#c39e70').toHSV().r, ratio = sakura.getVerticesData('color')[top * 4] / sakura.metadata.baseColors[top * 4] / sakura.metadata.tones[top];
   assert.ok(Math.abs(hsv(sakura.getVerticesData('color'), top)[0] - sakuraHue) < 1.5, 'sakura wood keeps its own hue');
   assert.ok(Math.abs(ratio - Color3.FromHexString('#c39e70').r / Color3.FromHexString('#aa7954').r) < 0.01, 'sakura wood is cut from the model colour, not the close-up one');
+  disposeDetails(scene); engine.dispose();
+});
+
+test('the notepad hand rises into tall letters and dips below the line instead of one short squiggle repeated on every line', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const paint = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint'), { slots, palette } = paint.metadata, positions = paint.getVerticesData('position');
+  const ink = [...slots.keys()].filter(v => palette[slots[v]] === '#4d4744').map(v => [positions[v * 3], positions[v * 3 + 2]]).sort((a, b) => a[1] - b[1]), lines = [];
+  for (const point of ink) { const line = lines.at(-1); if (line && point[1] - line.at(-1)[1] < 0.006) line.push(point); else lines.push([point]); }
+  assert.equal(lines.length, 4, 'the page holds four written lines');
+  for (const line of lines) {
+    const [x, z] = [0, 1].map(axis => line.reduce((sum, point) => sum + point[axis], 0) / line.length);
+    const tilt = line.reduce((sum, point) => sum + (point[0] - x) * (point[1] - z), 0) / line.reduce((sum, point) => sum + (point[0] - x) ** 2, 0);
+    const offsets = line.map(point => point[1] - z - tilt * (point[0] - x)), spread = Math.max(...offsets) - Math.min(...offsets);
+    assert.ok(spread > 0.016, `a written line spans ${(spread * 1000).toFixed(1)} mm from its tallest letter to its lowest tail`);
+  }
   disposeDetails(scene); engine.dispose();
 });
 

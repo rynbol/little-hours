@@ -66,7 +66,7 @@ export const isDetailLoaded = type => loaded.has(type);
 
 const bytes = text => { const raw = atob(text), out = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i); return out.buffer; };
 
-export const CLOSE_UP_PAINT = Object.freeze({ woodHues: Object.freeze([30, 60]), woodSaturation: 0.35, kept: Object.freeze({ [LAPTOP.walnut]: '#6b5542' }), drift: Object.freeze({ depth: 0.16, along: 0.9, across: 3.2 }), darkest: 0.26, darkestKept: 0.75, shadowed: Object.freeze({ '#3d2b22': 1.3, '#22170f': 1.25 }) });
+export const CLOSE_UP_PAINT = Object.freeze({ woodHues: Object.freeze([36, 60]), woodSaturation: 0.35, kept: Object.freeze({ [LAPTOP.walnut]: '#6b5542' }), drift: Object.freeze({ depth: 0.16, along: 0.9, across: 3.2 }), darkest: 0.26, darkestKept: 0.75, shadowed: Object.freeze({ '#3d2b22': 1.3, '#22170f': 1.25 }) });
 const luma = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 function honeyRatio(hex) {
   const model = Color3.FromHexString(hex), [hue, saturation, value] = model.toHSV().asArray(), [lowest, highest] = CLOSE_UP_PAINT.woodHues;
