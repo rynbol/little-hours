@@ -4,7 +4,8 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { heightAt } from '../../core/world-terrain.js';
-import { createSeatWorld, valleyMist, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, valleyFloor, VISTA_THEMES, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, SEAT_DRAPE, BUTTERFLY_WING } from './seat-world.js';
+import { createSeatWorld, valleyMist, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, valleyFloor, VISTA_THEMES, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, SEAT_DRAPE, BUTTERFLY_WING, SHELL_PAINT } from './seat-world.js';
+import { SURFACES } from '../../core/surfaces.js';
 
 const setup = () => { const engine = new NullEngine(), scene = new Scene(engine); return { engine, scene, world: createSeatWorld(scene, new TransformNode('room', scene)) }; };
 const litWindows = world => {
@@ -637,4 +638,10 @@ test('with the outdoor world behind the window, focus spirits rise from its real
     assert.ok(above > 0 && above < 14, `a spirit ${above.toFixed(1)} m above the real ground at ${m[12].toFixed(0)}, ${m[14].toFixed(0)}`);
   }
   engine.dispose();
+});
+
+test('each retreat wall paint repaints the wood wainscot seen from the chair, which stays warm wood by default', () => {
+  const { wainscot } = SHELL_PAINT.retreat;
+  assert.equal(wainscot, '#7a6243');
+  assert.deepEqual(SURFACES.retreat.walls.slice(1).map(choice => choice.paint[wainscot]), ['#7a5957', '#4b5d6e', '#6f5537']);
 });

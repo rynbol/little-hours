@@ -41,7 +41,7 @@ export const VISTA_THEMES = Object.freeze({
 });
 
 export const SHELL_PAINT = Object.freeze({
-  retreat: { wall: '#c9bba2', wainscot: '#52695c', trim: '#654939', ceiling: '#d6c3a2', beam: '#6b4b37', door: '#8a6446' },
+  retreat: { wall: '#c9bba2', wainscot: '#7a6243', trim: '#654939', ceiling: '#d6c3a2', beam: '#6b4b37', door: '#8a6446' },
   sakura: { wall: '#e8ddc4', wainscot: '#a77b53', trim: '#8a6444', ceiling: '#eadcbe', beam: '#8a6444', door: '#a77b53' },
   cloud: { wall: '#dcbfcf', wainscot: '#eee1d4', trim: '#d5b9bb', ceiling: '#f1e1e4', beam: '#d5b9bb', door: '#c9a9b4' },
   metro: { wall: '#5b4f5b', wainscot: '#343546', trim: '#262d3f', ceiling: '#3c4256', beam: '#262d3f', door: '#4a3e4a' },

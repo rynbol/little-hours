@@ -9,9 +9,9 @@ export const SURFACES = {
   retreat: {
     walls: [
       choice('', 'Sage and cream', ['#80917d', '#c9bba2']),
-      choice('rose', 'Rose and linen', ['#b28e88', '#ddcdb9'], { '#80917d': '#b28e88', '#c9bba2': '#ddcdb9', '#52695c': '#7a5957', '#647869': '#8c6a66' }),
-      choice('blue', 'Dusk blue', ['#7f93a3', '#cfc6b3'], { '#80917d': '#7f93a3', '#c9bba2': '#cfc6b3', '#52695c': '#4b5d6e', '#647869': '#5d7082' }),
-      choice('honey', 'Honey and oat', ['#b9955f', '#dccbaa'], { '#80917d': '#b9955f', '#c9bba2': '#dccbaa', '#52695c': '#6f5537', '#647869': '#826545' }),
+      choice('rose', 'Rose and linen', ['#b28e88', '#ddcdb9'], { '#80917d': '#b28e88', '#c9bba2': '#ddcdb9', '#7a6243': '#7a5957', '#8c7551': '#8c6a66' }),
+      choice('blue', 'Dusk blue', ['#7f93a3', '#cfc6b3'], { '#80917d': '#7f93a3', '#c9bba2': '#cfc6b3', '#7a6243': '#4b5d6e', '#8c7551': '#5d7082' }),
+      choice('honey', 'Honey and oat', ['#b9955f', '#dccbaa'], { '#80917d': '#b9955f', '#c9bba2': '#dccbaa', '#7a6243': '#6f5537', '#8c7551': '#826545' }),
     ],
     floor: [
       choice('', 'Honey oak', ['#92654a', '#a27352']),

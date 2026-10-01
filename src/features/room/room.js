@@ -230,9 +230,9 @@ export function createRoom(container, options = {}) {
     const curveTop = archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2));
     retreatWalls.push({ wall: 'back', size: [archRadius * 2 / 44 + 0.012, 5.42 - curveTop, 0.22], xyz: [x, (5.42 + curveTop) / 2, -4.6], hex: '#80917d' });
   }
-  const panel = material('#52695c'), inset = material('#647869'), carved = material('#a78053');
+  const panel = material('#7a6243'), inset = material('#8c7551'), carved = material('#a78053');
   // The retreat's wall and floor paint, by design color, for a room's choices.
-  const retreatSurfaces = { walls: [['#80917d', palette.sage], ['#c9bba2', palette.cream], ['#52695c', panel], ['#647869', inset]], floor: [...boardPaint] };
+  const retreatSurfaces = { walls: [['#80917d', palette.sage], ['#c9bba2', palette.cream], ['#7a6243', panel], ['#8c7551', inset]], floor: [...boardPaint] };
   box([0.14, 1.1, 9.02], [-5.76, 0.80, 0], panel);
   box([11.72, 1.1, 0.14], [0.04, 0.80, -4.42], panel);
   for (let i = 0; i < 14; i++) {
@@ -295,7 +295,7 @@ export function createRoom(container, options = {}) {
     }
     skyTexture.update(true);
   }
-  const windowFrame = material('#8f6a4c'), windowDark = material('#634632'), glazing = material('#4d3f35');
+  const windowFrame = material('#96815d'), windowDark = material('#634632'), glazing = material('#4d3f35');
   [-1, 1].forEach(side => {
     const x = archCenter + side * archRadius, height = archSpring - windowBottom, middle = (archSpring + windowBottom) / 2;
     box([0.18, height, 0.34], [x, middle, -4.43], windowFrame, 0.025);
@@ -458,12 +458,12 @@ export function createRoom(container, options = {}) {
   const scatter = (i, salt) => { const v = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453; return v - Math.floor(v); };
   const rainSeeds = Array.from({ length: 72 }, (_, i) => { const x = -4.7 + (i + 0.5 + (scatter(i, 1) - 0.5) * 0.9) / 72 * 3.98; return { x, y: scatter(i, 2), speed: 0.5 + scatter(i, 3) * 0.4, length: 0.06 + scatter(i, 4) * 0.06, top: archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2)) - 0.12 }; });
   const rainLines = rainSeeds.map(seed => [new Vector3(seed.x, 2, -4.52), new Vector3(seed.x - seed.length * 0.13, 2 + seed.length, -4.52)]);
-  const rain = MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, updatable: true }, scene); rain.color = color('#dbe4ec'); const windowRainAlpha = 0.32; rain.alpha = windowRainAlpha; rain.isPickable = false; rain.setEnabled(false);
+  const rain = MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, updatable: true, useVertexAlpha: true }, scene); rain.color = color('#dbe4ec'); const windowRainAlpha = 0.32; rain.alpha = windowRainAlpha; rain.isPickable = false; rain.setEnabled(false);
   const rainPositions = Float32Array.from(rain.getVerticesData('position'));
   rain.setBoundingInfo(new BoundingInfo(new Vector3(-4.75, 1.55, -4.53), new Vector3(-0.65, 5.28, -4.51)));
   // Forty-eight drifting motes share one draw; size and tint vary per instance.
   const fireflies = MeshBuilder.CreateSphere('floating-fireflies', { diameter: 0.07, segments: 3 }, scene); fireflies.material = moteGlow; fireflies.isPickable = false; fireflies.metadata = { castShadow: false }; fireflies.alwaysSelectAsActiveMesh = true;
-  const fireflySeeds = Array.from({ length: 48 }, (_, i) => ({ x: -4.7 + ((i * 0.618033) % 1) * 9.8, y: 1.15 + ((i * 0.377) % 1) * 3.5, z: -3.6 + ((i * 0.713) % 1) * 6.3, scale: 0.65 + ((i * 0.413) % 1) * 0.65 }));
+  const fireflySeeds = Array.from({ length: 48 }, (_, i) => ({ x: -4.2 + ((i * 0.618033) % 1) * 9.3, y: 1.15 + ((i * 0.377) % 1) * 3.5, z: -3.0 + ((i * 0.713) % 1) * 5.7, scale: 0.65 + ((i * 0.413) % 1) * 0.65 }));
   function seedParticles(mesh, seeds, minimumIntensity = 0.45) {
     const matrices = new Float32Array(seeds.length * 16), colors = new Float32Array(seeds.length * 4);
     seeds.forEach((seed, i) => {
@@ -1908,7 +1908,7 @@ export function createRoom(container, options = {}) {
     animateAvatarCamera(companionDelta);
     if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
     if (storybook.amount !== seatView.blend) { gradeFocus(scene.imageProcessingConfiguration.colorCurves, seatView.blend); bloom.intensity = roomBloom(theme, seatView.blend); }
-    storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = windowSun(theme, seatView.blend, sun.diffuse); aimDeskLamp(seatView.blend); rain.alpha = windowRainAlpha * (1 - seatView.blend);
+    storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = windowSun(theme, seatView.blend, sun.diffuse); aimDeskLamp(seatView.blend); rain.alpha = windowRainAlpha * (1 - seatView.blend); rain.isVisible = rain.alpha > 0.005;
     sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend);
     seatWorld.animate(companionDelta, reducedMotion);
     passages?.animate(companionDelta, houseHover, reducedMotion, lockedDoor, openingDoor);
