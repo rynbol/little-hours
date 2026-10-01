@@ -1,18 +1,7 @@
-.session-kind { grid-column: 1 / -1; margin: 12px 0 0; color: #5c5147; text-align: center; font-size: 13px; }
-.session-result { grid-column: 1 / -1; margin-top: 14px; padding: 14px; border: 1px solid #d9ccba; border-radius: 14px; background: #f2ebdf; }
+.session-kind { margin: 12px 0 0; color: #5c5147; text-align: center; font-size: 13px; }
+.session-result { margin-top: 14px; padding: 14px; border: 1px solid #d9ccba; border-radius: 14px; background: #f2ebdf; }
 .session-result p { margin: 0 0 12px; color: #51463b; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .break-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .break-actions button { flex: 1; min-height: 44px; justify-content: center; }
-.week-history { margin-top: 16px; font-size: 12px; color: #5c5147; }
-.week-history ul { list-style: none; padding: 0; margin: 8px 0; }
-.week-history ul li { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; }
-.recent-sessions { padding-left: 20px; border-top: 1px solid #d9ccba; padding-top: 10px; }
-.recent-sessions li { padding: 4px 0; line-height: 1.5; overflow-wrap: anywhere; }
-.history-note { font-size: 11px; line-height: 1.6; color: #685e52; margin: 12px 0 0; }
-.journal-sessions span { overflow-wrap: anywhere; }
 #replace-session { max-width: min(400px, calc(100vw - 32px)); }
 #replace-session p { line-height: 1.6; color: #51463b; }
-@media (min-width: 721px) and (max-width: 999px) {
-  .session-kind { grid-row: 10; }
-  .session-result { grid-row: 11; }
-}

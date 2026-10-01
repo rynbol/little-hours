@@ -158,9 +158,5 @@ export function createPetUI(app) {
     if (focus) { $('#pet-adopt-name').focus({ preventScroll: true }); box.scrollIntoView({ block: 'nearest', behavior: 'instant' }); }
   }
   function welcome() { if (bondLevel(app.state.petBonds[app.state.pet]).index >= 1 && available()) app.room?.invitePet(); }
-  function previewAdoption(id) {
-    if (!available() || !PETS[id] || app.state.pets.includes(id)) return;
-    app.panels.open('pet'); offered = id; $('#pet-collection').open = true; offer(id);
-  }
-  return { name, feedback, renderName, onPetCarry, renderPanel, sync, refreshCare, welcome, previewAdoption, close, diagnostics: () => closeup?.diagnostics() || null };
+  return { name, feedback, renderName, onPetCarry, renderPanel, sync, refreshCare, welcome, close, diagnostics: () => closeup?.diagnostics() || null };
 }

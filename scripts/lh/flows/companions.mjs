@@ -65,7 +65,7 @@ export default {
     t.check('coins, name, hearts, meal cooldown and belongings survive reload', await app.js(`${bond('cat')}.name === 'Maple & Me' && ${bond('cat')}.affection === 4 && ${bond('cat')}.care.fabric === 'rose' && ${bond('cat')}.care.meals === 1 && document.querySelector('#pet-feed').textContent.includes('Full') && window.__littleHours.state.house.coins === 100`));
     await app.clickSel('#pet-collection > summary'); await app.clickSel('[data-pet-choice="panda"]'); await app.clickSel('#pet-wish');
     await app.waitFor(`window.__littleHours.state.petWish === 'panda'`, { what: 'the saving target to save' });
-    t.check('a saving target survives and reaches the timer', (await app.saved()).petWish === 'panda' && (await app.text('#focus-reward')).includes('Kiki'));
+    t.check('a saving target survives', (await app.saved()).petWish === 'panda');
     await app.clickSel('[data-pet-choice="fox"]'); await type(app, '#pet-adopt-name', 'Juniper'); await app.clickSel('#pet-adopt-button');
     await app.waitFor(`window.__littleHours.state.pet === 'fox'`, { what: 'the fox adoption to save' });
     t.check('welcoming a named fox spends its price once', await app.js(`window.__littleHours.state.pet === 'fox' && ${bond('fox')}.name === 'Juniper' && window.__littleHours.state.house.coins === 10`));

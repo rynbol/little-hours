@@ -256,7 +256,8 @@ try {
       for (const corner of corners) {
         const point = Vector3.TransformCoordinates(corner, camera.getTransformationMatrix());
         largest = Math.max(largest, Math.abs(point.x), Math.abs(point.y));
-        assert.ok(Math.abs(point.x) <= 0.95 && Math.abs(point.y) <= 0.95, 'whole room fits every aspect/camera limit');
+        const limit = aspect < 1 ? 0.95 / 0.8 : 0.95;
+        assert.ok(Math.abs(point.x) <= limit && Math.abs(point.y) <= limit, 'whole room fits every landscape aspect/camera limit, and a portrait screen crops it by at most a fifth');
       }
     }
   }

@@ -3,8 +3,8 @@ export default {
   async run(t) {
     const { check, sleep } = t;
     const app = await t.open({ seed: 'one-room-rich' });
-    await t.steps.openProgress(app); await app.clickSel('#focus-garden'); await app.settle();
-    check('the focus invitation opens the garden', await app.text('#house-detail h2') === 'Your garden');
+    await t.steps.openHouse(app); await app.clickSel('#house-open-garden'); await app.settle();
+    check('the house page opens the garden', await app.text('#house-detail h2') === 'Your garden');
     check('an empty garden arrives without a seed card or a spots shelf', !await app.visible('#garden-card') && !await app.visible('#garden-spots'));
     await app.clickSel('#garden-spot-0'); await app.clickSel('#seed-moonflower'); await sleep(400); await t.shot(app, 'seeds');
     await app.clickSel('#garden-plant-seed');
@@ -14,12 +14,12 @@ export default {
     await app.clickSel('#garden-study'); await app.clickSel('#start-button');
     await app.waitFor(`(JSON.parse(localStorage.getItem('little-hours-v1') || 'null')?.session?.running)`, { what: 'focus to start' }).catch(() => null);
     check('focus captures this plant', (await app.saved()).session.plantId === 'plant-1');
-    await t.steps.openProgress(app); await app.clickSel('#focus-garden'); await app.settle();
+    await t.steps.openHouse(app); await app.clickSel('#house-open-garden'); await app.settle();
     check('a focused garden visit keeps you on the bench with your pet', await app.js(`(() => { const d = window.__littleHours.house.diagnostics(); return d.stroll?.sit === 1 && Boolean(d.strollPet) && d.scene.getTransformNodeByName('house-stroll').isEnabled(); })()`));
     await t.shot(app, 'focused-bench');
     await app.clickSel('#house-canvas [data-room="garden-exit"]'); await app.settle();
-    await app.clickSel('#back-to-room'); await app.clickSel('#start-button'); await t.steps.openProgress(app); await app.clickSel('#focus-garden'); await app.settle();
-    await app.clickSel('#garden-card-close'); await app.clickSel('#garden-spot-1'); await app.clickSel('#seed-cosmos'); await app.clickSel('#garden-plant-seed');
+    await app.clickSel('#back-to-room'); await app.clickSel('#start-button'); await t.steps.openHouse(app); await app.clickSel('#house-open-garden'); await app.settle();
+    if (await app.visible('#garden-card-close')) await app.clickSel('#garden-card-close'); await app.clickSel('#garden-spot-1'); await app.clickSel('#seed-cosmos'); await app.clickSel('#garden-plant-seed');
     await app.waitFor(`(JSON.parse(localStorage.getItem('little-hours-v1') || 'null')?.garden?.plants.length === 2)`, { what: 'the second seed to save' }).catch(() => null);
     saved = await app.saved();
     check('later seeds cost ten coins and keep the paused target', saved.house.coins === 290 && saved.garden.plants.length === 2 && saved.session.plantId === 'plant-1', saved.garden);
@@ -27,12 +27,12 @@ export default {
     await app.waitFor(`(JSON.parse(localStorage.getItem('little-hours-v1') || 'null')?.garden?.plants.length === 3)`, { what: 'the replanted seed to save' }).catch(() => null);
     saved = await app.saved();
     check('replanting keeps the previous plant in the collection', saved.garden.plants.length === 3 && saved.garden.plants[1].slot === null && saved.garden.plants[2].slot === 1);
-    await app.reload(); await t.steps.openProgress(app); await app.clickSel('#focus-garden'); await app.settle();
+    await app.reload(); await t.steps.openHouse(app); await app.clickSel('#house-open-garden'); await app.settle();
     check('the planted collection survives reload', (await app.saved()).garden.plants.length === 3);
     await t.close(app);
     for (const phone of [false, true]) {
       const garden = await t.open({ seed: 'garden-grown', ...(phone ? { width: 390, height: 844, scale: 2, reducedMotion: true } : {}), label: phone ? 'phone' : 'bloom' });
-      await t.steps.openProgress(garden); await garden.clickSel('#focus-garden'); await garden.settle();
+      await t.steps.openHouse(garden); await garden.clickSel('#house-open-garden'); await garden.settle();
       await garden.clickSel('#garden-spot-0');
       check(`${phone ? 'phone' : 'desktop'}: mature plants stay in the garden`, await garden.visible('.garden-bloom-note'));
       check(`${phone ? 'phone' : 'desktop'}: no horizontal overflow`, await garden.js('document.documentElement.scrollWidth <= innerWidth'));

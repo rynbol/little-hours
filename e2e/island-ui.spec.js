@@ -99,7 +99,7 @@ test('island postcards preserve the rendered house and include only the chosen s
   await arrive(page);
   const before = restoreState(await saved(page)).house;
   for (const night of [true, false]) {
-    if (!night) await page.locator('#time-toggle').click();
+    if (!night) { await page.locator('#back-to-room').click(); await page.locator('#room-more-toggle').click(); await page.locator('#time-toggle').click(); await page.locator('#rooms-button').click(); }
     await expect(page.locator('.island-sky [data-celestial="moon"]')).toHaveCount(night ? 1 : 0);
     await page.locator('#house-postcard').click();
     await expect(page.locator('#house-postcard-dialog')).toBeVisible();
