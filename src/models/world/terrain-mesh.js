@@ -4,7 +4,8 @@ export const TERRAIN_RINGS = Object.freeze([
   Object.freeze({ radius: 160, step: 2 }),
   Object.freeze({ radius: 640, step: 8 }),
   Object.freeze({ radius: 2560, step: 32 }),
-  Object.freeze({ radius: 10240, step: 128 }),
+  Object.freeze({ radius: 6400, step: 64 }),
+  Object.freeze({ radius: 12800, step: 256 }),
 ]);
 
 function edgeHeight(x, z, radius, coarse) {

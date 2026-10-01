@@ -11,7 +11,7 @@ import { SKY_GLSL, SKY_UNIFORMS, applySkyTheme } from './sky.js';
 const peak = Object.freeze({ x: -4237, z: -6192, summit: 2150, radius: 3000, snowLine: 1300 });
 
 export const LANDMARKS = Object.freeze({
-  observatory: Object.freeze({ x: 500, z: -3470, drum: 64, tower: 112 }),
+  observatory: Object.freeze({ x: 643, z: -3035, drum: 64, tower: 112 }),
   peak,
   falls: Object.freeze({ x: -611, z: -590, height: 100, width: 42, depth: 30 }),
   windmills: Object.freeze([Object.freeze({ x: -1070, z: -1321, height: 50 }), Object.freeze({ x: 253, z: -1096, height: 50 }), Object.freeze({ x: 403, z: -1050, height: 44 })]),
@@ -22,7 +22,11 @@ export const MIST = Object.freeze({ puffs: 8, period: 16 });
 export const SAIL_TURN = 0.32;
 
 const VEIL_KINDS = Object.freeze({ cap: 0, falls: 1, mist: 2 });
-const WINDOW_GLOW = Object.freeze({ day: 0.2, dusk: 1.15, rain: 0.9 });
+const THEME_LIGHT = Object.freeze({
+  day: Object.freeze({ lampGain: 0.2, sunRim: 0, wet: 0 }),
+  dusk: Object.freeze({ lampGain: 1.15, sunRim: 1, wet: 0 }),
+  rain: Object.freeze({ lampGain: 0.9, sunRim: 0, wet: 1 }),
+});
 
 const PAINT = Object.freeze({
   stone: [0.76, 0.74, 0.69], terrace: [0.6, 0.61, 0.6], paving: [0.66, 0.66, 0.63], verdigris: [0.43, 0.65, 0.6], slit: [0.22, 0.27, 0.31], pane: [0.3, 0.28, 0.25],
@@ -33,6 +37,7 @@ const PAINT = Object.freeze({
 
 const SAIL_AXIS = Object.freeze([0, 0, -1]);
 const NO_SPIN = Object.freeze([0, 0, 0, 0]);
+const SLIT_HALF = 9;
 const glsl = value => value.toFixed(4);
 const toward = (x, z) => { const length = Math.hypot(x, z); return [x / length, z / length]; };
 
@@ -87,10 +92,10 @@ function buildObservatory({ lathe, panel }, { x, z, drum, tower }) {
   const crown = rim + dome * 0.94;
   lathe([x, z], [[7, crown - 3], [7, crown + 9], [9, crown + 9], [0, crown + 15]], { albedo: PAINT.verdigris }, 16);
   const slitTurn = 0.45, slitAt = [ex * Math.cos(slitTurn) - ez * Math.sin(slitTurn), ex * Math.sin(slitTurn) + ez * Math.cos(slitTurn)], slitSide = [slitAt[1], -slitAt[0]];
-  for (let i = 1; i < 11; i++) {
+  for (let i = 0; i < 12; i++) {
     const point = (k, side) => { const a = k / 12 * Math.PI / 2, out = Math.cos(a) * (dome + 0.8); return [x + slitAt[0] * out + slitSide[0] * side, rim + Math.sin(a) * (dome + 0.8) * 0.94, z + slitAt[1] * out + slitSide[1] * side]; };
     const a = (i + 0.5) / 12 * Math.PI / 2;
-    panel([point(i, -5), point(i, 5), point(i + 1, 5), point(i + 1, -5)], [slitAt[0] * Math.cos(a), Math.sin(a), slitAt[1] * Math.cos(a)], { albedo: PAINT.slit });
+    panel([point(i, -SLIT_HALF), point(i, SLIT_HALF), point(i + 1, SLIT_HALF), point(i + 1, -SLIT_HALF)], [slitAt[0] * Math.cos(a), Math.sin(a), slitAt[1] * Math.cos(a)], { albedo: PAINT.slit });
   }
   const window = (cx, cz, facing, low, high, half, lamp) => {
     const [nx, nz] = facing, side = [nz, -nx];
@@ -137,16 +142,16 @@ function buildPeak({ sheet }, { x, z, summit, radius }) {
 }
 
 const BUTTE_STEPS = Object.freeze([-1, -0.6, -0.3, -0.1, 0, 1.5, 3, 4.5, 6, 9, 12, 15, 18, 20, 22.5, 25, 27, 33, 42, 55, 75]);
-const tieredBluff = m => 0.3 * (1 - smooth(0, 6, m)) + 0.05 * (1 - smooth(6, 18, m)) + 0.3 * (1 - smooth(18, 27, m)) + 0.35 * (1 - smooth(27, 75, m));
+const tieredBluff = (m, tilt) => (0.3 + 0.1 * tilt) * (1 - smooth(0, 6, m)) + 0.05 * (1 - smooth(6, 18, m)) + (0.3 - 0.1 * tilt) * (1 - smooth(18, 27, m)) + 0.35 * (1 - smooth(27, 75, m));
 const sheerBluff = m => 0.65 * (1 - smooth(0, 8, m)) + 0.35 * (1 - smooth(8, 60, m));
 
 function buildFalls({ sheet }, { x, z, height, width, depth }) {
   const ground = heightAt(x, z), root = footing(x, z, width + 60) - 6, top = ground + height, columns = 72, [ex, ez] = toward(-x, -z), face = Math.atan2(ez, ex);
-  const plateau = a => (1 + noise2(Math.cos(a) * 1.8, Math.sin(a) * 1.8, 91) * 0.14 + noise2(Math.cos(a) * 5, Math.sin(a) * 5, 93) * 0.06) / Math.hypot(Math.cos(a - face - Math.PI / 2) / width, Math.sin(a - face - Math.PI / 2) / depth);
+  const plateau = a => (1 + noise2(Math.cos(a) * 1.8, Math.sin(a) * 1.8, 91) * 0.22 + noise2(Math.cos(a) * 5, Math.sin(a) * 5, 93) * 0.09) / Math.hypot(Math.cos(a - face - Math.PI / 2) / width, Math.sin(a - face - Math.PI / 2) / depth);
   const channel = a => Math.exp(-((Math.atan2(Math.sin(a - face), Math.cos(a - face)) / 0.16) ** 2));
   const level = (m, a) => {
-    const open = channel(a), crown = 0.03 * (1 - smooth(-30, 0, m)) + noise2(Math.cos(a) * 4, Math.sin(a) * 4, 94) * 0.04 * (1 - smooth(-4, 2, m));
-    return root + (top - root) * (tieredBluff(m) + (sheerBluff(m) - tieredBluff(m)) * open + crown) - 6 * open * (1 - smooth(-24, -2, m)) * smooth(-40, -14, m);
+    const open = channel(a), tilt = noise2(Math.cos(a) * 1.4, Math.sin(a) * 1.4, 96) * 1.6, ledge = m + noise2(Math.cos(a) * 2.6, Math.sin(a) * 2.6, 97) * 7, crown = 0.03 * (1 - smooth(-30, 0, m)) + noise2(Math.cos(a) * 4, Math.sin(a) * 4, 94) * 0.04 * (1 - smooth(-4, 2, m));
+    return root + (top - root) * (tieredBluff(ledge, tilt) + (sheerBluff(m) - tieredBluff(ledge, tilt)) * open + crown) - 6 * open * (1 - smooth(-24, -2, m)) * smooth(-40, -14, m);
   };
   sheet(BUTTE_STEPS.length - 1, columns, (r, c) => {
     const a = c / columns * Math.PI * 2, edge = plateau(a), step = BUTTE_STEPS[r], m = step < 0 ? step * edge : step, y = level(m, a);
@@ -221,19 +226,22 @@ void main() {
 const SOLID_FRAGMENT = `precision highp float;
 varying vec3 vWorld, vNormal, vAlbedo; varying vec2 vMarks; varying float vSail;
 uniform vec3 eye, sun, sunColor, skyAmbient, groundAmbient, shadowTint, fogNear, fogFar, fogSun, lamp, snow;
-uniform float sunStrength, shadowLift, fogDensity, fogHeight, lampGain;
+uniform float sunStrength, shadowLift, fogDensity, fogHeight, lampGain, sunRim, wet;
 ${WORLD_GLSL}
 void main() {
   vec3 n = normalize(vNormal), toEye = normalize(eye - vWorld);
   float snowy = 0.;
   if (vMarks.y > 0.) snowy = smoothstep(-90., 90., vWorld.y - ${glsl(LANDMARKS.peak.snowLine)} + (worldFbm(vWorld.xz / 260.) - .5) * 420.) * smoothstep(.05, .35, n.y);
-  vec3 albedo = mix(vAlbedo, snow, snowy);
+  vec3 albedo = mix(vAlbedo, snow, snowy) * (1. - .3 * wet * (1. - snowy));
   float lit = clamp((dot(n, sun) + .3) / 1.3, 0., 1.);
   vec3 ambient = mix(groundAmbient, skyAmbient, n.y * .5 + .5);
   vec3 color = albedo * mix(shadowTint * shadowLift + ambient * (.55 + .9 * snowy), sunColor * sunStrength, lit);
   float rim = pow(1. - clamp(dot(n, toEye), 0., 1.), 3.) * clamp(dot(-toEye, sun) * 1.5, 0., 1.) * (.2 + .8 * snowy);
   color += sunColor * sunStrength * (rim * .55 + albedo * vSail * pow(max(dot(-toEye, sun), 0.), 2.) * .5);
-  color = worldAir(color, mix(vWorld, eye, .5 * snowy), eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight);
+  color = worldAir(color, mix(vWorld, eye, .5 * snowy - .7 * wet), eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight);
+  vec3 view = normalize(vec3(toEye.x, 0., toEye.z)), sunFlat = vec3(sun.x, 0., sun.z), sunAcross = normalize(sunFlat - view * dot(sunFlat, view) + vec3(0., 1e-4, 0.));
+  float sunSide = (.5 + .5 * smoothstep(.05, .55, dot(n, sunAcross))) * (.6 + .4 * pow(1. - clamp(dot(n, toEye), 0., 1.), 1.2));
+  color = mix(color, mix(sunColor, vec3(1.), .4), snowy * sunRim * sunSide * .7);
   color += lamp * vMarks.x * lampGain * mix(.35, 1., exp(-distance(eye, vWorld) * fogDensity * .5));
   gl_FragColor = vec4(color, 1.);
 }`;
@@ -270,7 +278,7 @@ void main() {
 const VEIL_FRAGMENT = `precision highp float;
 varying vec3 vWorld, vRight, vUp; varying vec2 vCorner; varying float vAlpha, vSeed, vKind;
 uniform vec3 eye, sunColor, skyAmbient, shadowTint, fogNear, cloudLit, cloudShade, cloudRim;
-uniform float time, sunStrength, shadowLift, fogDensity, fogHeight;
+uniform float time, sunStrength, shadowLift, fogDensity, fogHeight, wet;
 ${WORLD_GLSL}
 ${SKY_GLSL}
 void main() {
@@ -278,8 +286,8 @@ void main() {
     float streak = worldNoise(vec2(vCorner.x * 1.6 + 3., vCorner.y * 22. - time * 1.4)), fine = worldNoise(vec2(vCorner.x * 5. + 9., vCorner.y * 60. - time * 3.2));
     float edge = 1. - smoothstep(.35, 1., abs(vCorner.x) + (streak - .5) * .5);
     float alpha = edge * (.5 + .35 * streak + .15 * fine) * smoothstep(0., .04, vCorner.y) * (1. - .55 * smoothstep(.75, 1., vCorner.y));
-    vec3 water = vec3(.86, .92, .94) * mix(shadowTint * shadowLift + skyAmbient * .55, sunColor * sunStrength, .45 + .4 * streak);
-    gl_FragColor = vec4(worldAir(water, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), alpha);
+    vec3 water = vec3(.86, .92, .94) * mix(shadowTint * shadowLift + skyAmbient * (.55 + .6 * wet), sunColor * sunStrength, .45 + .4 * streak);
+    gl_FragColor = vec4(worldAir(water, mix(vWorld, eye, .45 * wet), eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), min(alpha * (1. + .5 * wet), 1.));
     return;
   }
   float d = length(vCorner), lumpy = worldNoise(vCorner * 2.6 + vSeed) - .5;
@@ -294,10 +302,11 @@ void main() {
 
 const LIGHT_COLORS = ['sunColor', 'skyAmbient', 'groundAmbient', 'shadowTint'];
 const LIGHT_FLOATS = ['sunStrength', 'shadowLift'];
+const THEME_FLOATS = Object.keys(THEME_LIGHT.day);
 const CLOUD_COLORS = ['cloudLit', 'cloudShade', 'cloudRim'];
 const LAMP = '#ffbf6e';
 
-export const windowGlow = atmosphere => WINDOW_GLOW[Object.keys(WORLD_ATMOSPHERES).find(name => WORLD_ATMOSPHERES[name] === atmosphere)] ?? WINDOW_GLOW.day;
+export const themeLight = atmosphere => THEME_LIGHT[Object.keys(WORLD_ATMOSPHERES).find(name => WORLD_ATMOSPHERES[name] === atmosphere)] ?? THEME_LIGHT.day;
 
 function landmarkMesh(name, scene, root, data, material) {
   const mesh = new Mesh(name, scene);
@@ -309,8 +318,8 @@ function landmarkMesh(name, scene, root, data, material) {
 
 export function createWorldLandmarks(scene, { root, still }) {
   const uniforms = ['world', 'view', 'viewProjection', ...AIR_UNIFORMS, ...LIGHT_COLORS, ...LIGHT_FLOATS];
-  const solidPaint = new ShaderMaterial('world-landmark-paint', scene, { vertexSource: SOLID_VERTEX, fragmentSource: SOLID_FRAGMENT }, { attributes: ['position', 'normal', 'color', 'uv', 'spin'], uniforms: [...uniforms, 'lamp', 'snow', 'lampGain'] });
-  const veilPaint = new ShaderMaterial('world-landmark-veil-paint', scene, { vertexSource: VEIL_VERTEX, fragmentSource: VEIL_FRAGMENT }, { attributes: ['position', 'color', 'uv', 'uv2'], uniforms: [...new Set([...uniforms, ...CLOUD_COLORS, ...SKY_UNIFORMS])], needAlphaBlending: true });
+  const solidPaint = new ShaderMaterial('world-landmark-paint', scene, { vertexSource: SOLID_VERTEX, fragmentSource: SOLID_FRAGMENT }, { attributes: ['position', 'normal', 'color', 'uv', 'spin'], uniforms: [...uniforms, 'lamp', 'snow', ...THEME_FLOATS] });
+  const veilPaint = new ShaderMaterial('world-landmark-veil-paint', scene, { vertexSource: VEIL_VERTEX, fragmentSource: VEIL_FRAGMENT }, { attributes: ['position', 'color', 'uv', 'uv2'], uniforms: [...new Set([...uniforms, ...CLOUD_COLORS, ...SKY_UNIFORMS, 'wet'])], needAlphaBlending: true });
   solidPaint.backFaceCulling = false; veilPaint.backFaceCulling = false; veilPaint.disableDepthWrite = true;
   const paints = [solidPaint, veilPaint];
   for (const paint of paints) followEye(scene, paint, still);
@@ -331,7 +340,9 @@ export function createWorldLandmarks(scene, { root, still }) {
       applySkyTheme(veilPaint, atmosphere);
       for (const key of CLOUD_COLORS) veilPaint.setColor3(key, Color3.FromHexString(atmosphere[key]));
       solidPaint.setColor3('snow', Color3.FromHexString(atmosphere.snow));
-      solidPaint.setFloat('lampGain', windowGlow(atmosphere));
+      const light = themeLight(atmosphere);
+      for (const key of THEME_FLOATS) solidPaint.setFloat(key, light[key]);
+      veilPaint.setFloat('wet', light.wet);
     },
   };
 }

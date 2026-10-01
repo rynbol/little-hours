@@ -14,9 +14,9 @@ export const GRASS = Object.freeze({
   layers: Object.freeze([
     Object.freeze({ period: 16, blades: 12000, reach: 8, width: 0.022, height: 0.55 }),
     Object.freeze({ period: 48, blades: 20000, reach: 24, width: 0.04, height: 0.52 }),
-    Object.freeze({ period: 128, blades: 40000, reach: 64, width: 0.09, height: 0.56 }),
+    Object.freeze({ period: 160, blades: 56000, reach: 80, width: 0.11, height: 0.6 }),
   ]),
-  step: 2, texels: 69, recentre: 8,
+  step: 2, texels: 89, recentre: 8,
   clearing: Object.freeze({ halfWidth: 6.6, halfDepth: 5.2 }),
 });
 
@@ -90,14 +90,14 @@ void main() {
   float period = ${perLayer('period')}, reach = ${perLayer('reach')};
   vec2 base = position.xz + period * floor((eye.xz - position.xz) / period + .5);
   float dist = length(base - eye.xz), t = position.y, seed = blade.z;
-  float keep = inner ? 1. - smoothstep(reach * .55, reach, dist) : 1. - smoothstep(reach * .45, reach, dist);
+  float keep = inner ? 1. - smoothstep(reach * .55, reach, dist) : 1. - smoothstep(reach * .55, reach, dist);
   float grow = clamp((keep - blade.y) * 5., 0., 1.);
   vec4 aim = viewProjection * world * vec4(base.x, eye.y - 1.5, base.y, 1.);
   if (keep <= blade.y || aim.w < -1. || abs(aim.x) > aim.w * 1.1 + 1.5) { vColor = vec3(0.); gl_Position = vec4(2., 2., 2., 1.); return; }
   vec4 surface = groundAt(base); vec3 n = surface.xyz;
   grow *= smoothstep(.76, .86, n.y) * smoothstep(${(WORLD.river.width * 0.8).toFixed(1)}, ${(WORLD.river.width * 1.1).toFixed(1)}, riverOffset(base)) * (1. - smoothstep(330., 380., surface.w));
   grow *= 1. - step(abs(base.x), ${GRASS.clearing.halfWidth.toFixed(2)}) * step(abs(base.y), ${GRASS.clearing.halfDepth.toFixed(2)});
-  grow *= smoothstep(.55, 1.5, pathOffset(base));
+  grow *= smoothstep(1.1, 1.9, pathOffset(base));
   for (int i = 0; i < ${MEADOW_ROCKS.length}; i++) grow *= smoothstep(stones[i].z * .8, stones[i].z, distance(base, stones[i].xy));
   float clump = .55 + .9 * worldNoise(base / 1.9 + 3.7);
   float bloom = step(fract(seed * 91.7), smoothstep(.6, .78, worldNoise(base / 7. + 17.3)) * .3) * (1. - smoothstep(40., 55., dist));
@@ -116,7 +116,7 @@ void main() {
   vec3 color = t < .5 ? mix(field * vec3(.3, .42, .28), field, t / .5) : mix(field, tip, smoothstep(.5, 1., t));
   vec3 petal = fract(seed * 37.1) < .1 ? flowerLilac : worldNoise(base / 19. + 41.) < .42 ? flowerWhite : flowerYellow;
   color = mix(color, petal * (t < .85 ? .82 : 1.), bloom);
-  color *= 1. + .1 * smoothstep(.7, 1., gust) * t;
+  color *= 1. + .22 * smoothstep(.55, 1., gust) * t;
   color = mix(color, soil, last ? smoothstep(reach * .7, reach * .98, dist) : 0.);
   vec4 worldPos = world * vec4(p, 1.);
   vec3 toward = normalize(worldPos.xyz - eye);

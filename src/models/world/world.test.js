@@ -16,8 +16,8 @@ test('every world theme sets the same lighting and palette with the sun above th
 
 test('the outdoor world builds terrain rings and a sky that switch theme together', () => {
   const scene = new Scene(new NullEngine()), world = createOutdoorWorld(scene, { theme: 'day' });
-  assert.deepEqual(world.terrain.map(mesh => mesh.name), ['world-terrain-0', 'world-terrain-1', 'world-terrain-2', 'world-terrain-3']);
-  assert.ok(world.terrain.every(mesh => mesh.getTotalVertices() > 20000));
+  assert.deepEqual(world.terrain.map(mesh => mesh.name), ['world-terrain-0', 'world-terrain-1', 'world-terrain-2', 'world-terrain-3', 'world-terrain-4']);
+  assert.deepEqual(world.terrain.map(mesh => mesh.getTotalVertices()), [25921, 25921, 25921, 40401, 10201]);
   assert.equal(world.sky.infiniteDistance, true);
   const terrainPaint = world.terrain[0].material, skyPaint = world.sky.material;
   world.setTheme('dusk');

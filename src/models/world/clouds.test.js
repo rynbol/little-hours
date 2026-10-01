@@ -6,7 +6,8 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { heightAt, WORLD } from '../../core/world-terrain.js';
-import { CLOUD_KINDS, PLUME_COLUMN, clearsPlume, cloudCards, createWorldClouds } from './clouds.js';
+import { CLOUD_KINDS, PLUME_COLUMN, clearsPlume, clearsSuns, cloudCards, createWorldClouds } from './clouds.js';
+import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -33,6 +34,25 @@ test('no cloud or wisp starts in front of the volcano plume, and the shader keep
   assert.equal(clearsPlume({ x: PLUME_COLUMN.x * 0.3, y: 900, z: PLUME_COLUMN.z * 0.3, halfWidth: 300, halfHeight: 100 }), false);
   assert.equal(clearsPlume({ x: PLUME_COLUMN.x * 0.3, y: 200, z: PLUME_COLUMN.z * 0.3, halfWidth: 300, halfHeight: 100 }), true);
   assert.equal(clearsPlume({ x: 2000, y: 900, z: -2000, halfWidth: 300, halfHeight: 100 }), true);
+});
+
+test('no cloud is placed over the day or dusk sun, whatever the land beneath it', () => {
+  for (const theme of ['day', 'dusk']) {
+    const [x, y, z] = WORLD_ATMOSPHERES[theme].sun, out = 3000, flat = Math.hypot(x, z);
+    assert.equal(clearsSuns({ x: x / flat * out, y: y / flat * out, z: z / flat * out, halfWidth: 300, halfHeight: 120 }), false, theme);
+  }
+  assert.equal(clearsSuns({ x: 3000, y: 600, z: 0, halfWidth: 300, halfHeight: 120 }), true);
+  assert.ok(cloudCards().filter(card => card.kind !== CLOUD_KINDS.mist).every(card => clearsSuns(card)));
+});
+
+test('day cumulus have warm white tops over blue-grey bases, and dusk bases glow peach under cream tops', () => {
+  const rgb = hex => Color3.FromHexString(hex), value = ({ r, g, b }) => Math.max(r, g, b);
+  const day = WORLD_ATMOSPHERES.day, dusk = WORLD_ATMOSPHERES.dusk;
+  const top = rgb(day.cloudLit), base = rgb(day.cloudShade), peach = rgb(dusk.cloudShade), cream = rgb(dusk.cloudLit);
+  assert.ok(value(top) > 0.98 && top.r >= top.g && top.g > top.b, 'day tops are warm white');
+  assert.ok(base.b > base.g && base.g > base.r && value(top) - value(base) > 0.2, 'day bases are a darker blue-grey');
+  assert.ok(peach.r > peach.g && peach.g > peach.b && peach.r - peach.b > 0.3, 'dusk bases are peach');
+  assert.ok(cream.r > peach.r && cream.g - peach.g > 0.15, 'dusk tops stay lighter than the peach bases');
 });
 
 test('every cloud, wisp and mist bank is one draw that takes the theme and drifts unless still', async () => {

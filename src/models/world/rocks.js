@@ -11,7 +11,7 @@ export const MEADOW_ROCKS = Object.freeze([
   Object.freeze({ ahead: 27, side: 2.6, size: [0.65, 0.42, 0.55] }),
   Object.freeze({ ahead: 38, side: -3, size: [0.9, 0.55, 0.75] }),
   Object.freeze({ ahead: 40, side: -4.9, size: [0.45, 0.3, 0.4] }),
-  Object.freeze({ ahead: 57, side: 3.2, size: [1.1, 0.65, 0.85] }),
+  Object.freeze({ ahead: 52, side: 3.2, size: [1.1, 0.65, 0.85] }),
 ]);
 
 const SINK = 0.3;

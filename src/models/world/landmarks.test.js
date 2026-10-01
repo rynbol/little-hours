@@ -40,12 +40,49 @@ test('the observatory, waterfall butte and windmills are rooted in the ground an
   assert.ok(geometry.positions.length / 3 < 16000);
 });
 
+test('the observatory, windmill hubs and waterfall lip rise clear of the skyline seen from the chair', () => {
+  const eye = [-2, 2.24, -2.4];
+  const skyline = ({ x, z }, short) => {
+    const reach = Math.hypot(x - eye[0], z - eye[2]);
+    let steepest = -Infinity;
+    for (let t = 30; t < reach - short; t += 10) steepest = Math.max(steepest, (heightAt(eye[0] + (x - eye[0]) * t / reach, eye[2] + (z - eye[2]) * t / reach) - eye[1]) / t);
+    return eye[1] + steepest * reach;
+  };
+  const { observatory, falls } = LANDMARKS;
+  const clear = [[observatory, observatory.drum * 2, heightAt(observatory.x, observatory.z) + observatory.tower * 0.6], [falls, falls.width + 20, heightAt(falls.x, falls.z) + falls.height * 0.5], ...LANDMARKS.windmills.map(windmill => [windmill, 15, heightAt(windmill.x, windmill.z) + windmill.height])];
+  for (const [site, short, mark] of clear) assert.ok(mark > skyline(site, short), `${site.x}, ${site.z} sits ${(skyline(site, short) - mark).toFixed(0)} m behind the skyline`);
+});
+
 test('the peak is one smooth sheet with shared vertices, not faceted panels', () => {
   const peak = new Set(near(LANDMARKS.peak, LANDMARKS.peak.radius * 0.9));
   let corners = 0;
   for (const index of geometry.indices) if (peak.has(index)) corners++;
   assert.ok(peak.size > 4000);
   assert.ok(corners / peak.size > 5.5, `${(corners / peak.size).toFixed(2)} triangle corners per vertex`);
+});
+
+test('the observatory slit is wide enough to read from the window', () => {
+  const slit = [];
+  for (let i = 0; i < geometry.colors.length / 4; i++) if (Math.abs(geometry.colors[i * 4] - 0.22) < 1e-3 && Math.abs(geometry.colors[i * 4 + 1] - 0.27) < 1e-3 && Math.abs(geometry.colors[i * 4 + 2] - 0.31) < 1e-3) slit.push(i);
+  let widest = 0;
+  for (const a of slit) for (const b of slit) {
+    const [ax, ay, az, bx, by, bz] = [a * 3, a * 3 + 1, a * 3 + 2, b * 3, b * 3 + 1, b * 3 + 2].map(k => geometry.positions[k]);
+    if (Math.abs(ay - by) < 0.01) widest = Math.max(widest, Math.hypot(ax - bx, az - bz));
+  }
+  assert.ok(slit.length > 0);
+  assert.ok(widest >= 16, `slit ${widest.toFixed(1)} m wide`);
+});
+
+test('the butte ledge steps up and down around its sides instead of a level ring', () => {
+  const { x, z } = LANDMARKS.falls, face = Math.atan2(-z, -x), sectors = 24, sides = Array.from({ length: sectors }, () => []);
+  const around = near(LANDMARKS.falls, 140).map(i => [Math.atan2(geometry.positions[i * 3 + 2] - z, geometry.positions[i * 3] - x), Math.hypot(geometry.positions[i * 3] - x, geometry.positions[i * 3 + 2] - z), geometry.positions[i * 3 + 1]]);
+  const top = Math.max(...around.map(([, , y]) => y));
+  for (const [a, r, y] of around) sides[Math.floor((a + Math.PI) / (2 * Math.PI) * sectors) % sectors].push([r, y]);
+  const ledges = sides.filter((_, k) => { const a = (k + 0.5) / sectors * 2 * Math.PI - Math.PI - face; return Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) > 0.6; }).map(side => {
+    const rim = Math.max(...side.filter(([, y]) => y > top - 8).map(([r]) => r));
+    return side.reduce((best, point) => Math.abs(point[0] - rim - 12) < Math.abs(best[0] - rim - 12) ? point : best)[1];
+  });
+  assert.ok(Math.max(...ledges) - Math.min(...ledges) > 12, `ledge varies ${(Math.max(...ledges) - Math.min(...ledges)).toFixed(1)} m`);
 });
 
 test('only the windmill sails carry a spin, one hub per windmill', () => {
@@ -60,7 +97,7 @@ test('only the windmill sails carry a spin, one hub per windmill', () => {
   for (const windmill of LANDMARKS.windmills) assert.ok([...hubs.values()].some(([x, z]) => Math.hypot(x - windmill.x, z - windmill.z) < 6));
 });
 
-test('the landmarks are two draws that take the theme and stand still under reduced motion', async () => {
+test('the landmarks are two draws that take the theme, wet in rain and rimmed at dusk, and stand still under reduced motion', async () => {
   const scene = new Scene(new NullEngine()); new FreeCamera('eye', new Vector3(-2, 60, -2.4), scene);
   const moving = createWorldLandmarks(scene, { root: new TransformNode('root', scene), still: false });
   const resting = createWorldLandmarks(scene, { root: new TransformNode('rest', scene), still: true });
@@ -74,6 +111,12 @@ test('the landmarks are two draws that take the theme and stand still under redu
   assert.equal(veil._colors3.sunColor.toHexString().toLowerCase(), '#ffb46a');
   assert.equal(solid._colors3.snow.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.snow);
   assert.ok(solid._floats.lampGain > dayGlow * 3);
+  assert.equal(solid._floats.sunRim, 1);
+  moving.setTheme(WORLD_ATMOSPHERES.rain);
+  assert.deepEqual([solid._floats.wet, veil._floats.wet, solid._floats.sunRim], [1, 1, 0]);
+  moving.setTheme(WORLD_ATMOSPHERES.day);
+  assert.deepEqual([solid._floats.wet, veil._floats.wet, solid._floats.sunRim], [0, 0, 0]);
+  moving.setTheme(WORLD_ATMOSPHERES.dusk);
   scene.render(); await wait(20); scene.render();
   assert.ok(solid._floats.time > 0 && veil._floats.time > 0);
   for (const mesh of resting.meshes) assert.equal(mesh.material._floats.time, 0);

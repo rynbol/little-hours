@@ -7,13 +7,12 @@ import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import '@babylonjs/core/Shaders/ShadersInclude/instancesDeclaration.js';
 import '@babylonjs/core/Shaders/ShadersInclude/instancesVertex.js';
 import { WORLD, riverDistance, smooth, noise2 } from '../../core/world-terrain.js';
-import { WORLD_ATMOSPHERES } from './atmosphere.js';
 import { WORLD_GLSL, AIR_UNIFORMS, applyAir, followEye } from './world-glsl.js';
 
 export const TREE_BANDS = Object.freeze([
-  Object.freeze({ from: 25, to: 450, spacing: 8, size: 1, behind: 450 }),
-  Object.freeze({ from: 450, to: 1300, spacing: 14, size: 1.7, behind: 200 }),
-  Object.freeze({ from: 1300, to: 3400, spacing: 24, size: 2.6, behind: 200 }),
+  Object.freeze({ from: 25, to: 450, spacing: 8, size: 1, clump: 1, spread: 1, lone: 1, behind: 450 }),
+  Object.freeze({ from: 450, to: 1300, spacing: 34, size: 1.7, clump: 3.2, spread: 1.7, lone: 0.3, behind: 200 }),
+  Object.freeze({ from: 1300, to: 3400, spacing: 60, size: 2.6, clump: 5, spread: 1.8, lone: 0.25, behind: 200 }),
 ]);
 export const WINDOW_EYE = Object.freeze({ x: -2, y: 2.24, z: -2.4 });
 export const VISTA = Object.freeze({ reach: 320, clearing: 170, bearing: -0.3, halfAngle: 1.25, dip: 0.022 });
@@ -28,12 +27,7 @@ export const NEAR_TREES = 115;
 const LONE_TREE_AREA = 70 * 70;
 const RIVER_CLEARANCE = WORLD.river.width * 1.4;
 
-const FOLIAGE = new Map([
-  [WORLD_ATMOSPHERES.day, { leafTop: '#92c840', leafUnder: '#3a6a30', leafBack: '#d8ea78', needleTop: '#4f8a3c', needleUnder: '#24452e', bark: '#76825a' }],
-  [WORLD_ATMOSPHERES.dusk, { leafTop: '#8fa04a', leafUnder: '#3a5642', leafBack: '#e8a050', needleTop: '#667a40', needleUnder: '#2a3a2c', bark: '#544c3c' }],
-  [WORLD_ATMOSPHERES.rain, { leafTop: '#64804a', leafUnder: '#3c4c36', leafBack: '#7a8458', needleTop: '#4a6040', needleUnder: '#33402f', bark: '#4a5038' }],
-]);
-const FOLIAGE_COLORS = Object.keys(FOLIAGE.get(WORLD_ATMOSPHERES.day));
+const FOLIAGE_COLORS = Object.freeze(['leafTop', 'leafUnder', 'leafBack', 'leafCrown', 'needleTop', 'needleUnder', 'bark']);
 const LIGHT_COLORS = ['sunColor', 'skyAmbient', 'groundAmbient', 'shadowTint'];
 
 const PART = Object.freeze({ bark: 0, mass: 0.16, leaf: 0.25, needle: 0.5, farLeaf: 0.75, farNeedle: 1 });
@@ -76,30 +70,31 @@ const sightLine = (px, pz) => {
 
 export function plantTrees(rings) {
   const ground = groundOf(rings), x = [], y = [], z = [], width = [], height = [], turn = [], kind = [];
-  const plant = (px, pz, at, grow, spin, conifer, tall) => {
+  const plant = (px, pz, at, grow, spin, conifer, tall, spread = 1) => {
     x.push(px); z.push(pz); y.push(at.y - 0.5 * grow); turn.push(spin);
-    width.push(grow); height.push(grow * tall); kind.push(conifer ? 1 : 0);
+    width.push(grow * spread); height.push(grow * tall); kind.push(conifer ? 1 : 0);
   };
   for (const hero of HERO_TREES) {
     const at = ground(hero.x, hero.z), top = WINDOW_EYE.y - hero.distance * VISTA.dip;
     if (at) plant(hero.x, hero.z, at, Math.max(0.6, Math.min(hero.size, (top - at.y) / (CROWN_TOP - 0.5))), hero.turn, false, 1);
   }
-  TREE_BANDS.forEach(({ from, to, spacing, size, behind }, band) => {
-    const cells = Math.ceil(to / spacing), lone = spacing * spacing / LONE_TREE_AREA, salt = band * 8;
+  TREE_BANDS.forEach(({ from, to, spacing, size, clump, spread, lone: loneShare, behind }, band) => {
+    const cells = Math.ceil(to / spacing), lone = loneShare * spacing * spacing / LONE_TREE_AREA, salt = band * 8;
     for (let gx = -cells; gx < cells; gx++) for (let gz = -cells; gz < Math.ceil(behind / spacing); gz++) {
       const px = (gx + hash(gx, gz, salt + 1)) * spacing, pz = (gz + hash(gx, gz, salt + 2)) * spacing, d = Math.hypot(px, pz);
       if (d < from || d >= to || pz > behind || riverDistance(px, pz) < RIVER_CLEARANCE) continue;
       if (HERO_TREES.some(hero => Math.hypot(px - hero.x, pz - hero.z) < HERO_CLEARANCE * hero.size)) continue;
       const at = ground(px, pz);
       if (!at) continue;
-      const grove = smooth(-0.1, 0.3, noise2(px / 150, pz / 150, 91) + 0.35 * noise2(px / 48, pz / 48, 92));
+      const grove = smooth(0.02, 0.32, noise2(px / 150, pz / 150, 91) + 0.35 * noise2(px / 48, pz / 48, 92));
       const meadow = lone * smooth(0.9, 0.96, at.up) * (1 - smooth(0.12, 0.35, at.cover)) * (at.wet > 0 ? 0 : 1);
       const forest = smooth(0.04, 0.3, at.cover) * grove * 1.3, roll = hash(gx, gz, salt + 3);
       if (roll >= forest && roll >= meadow) continue;
       const alone = roll >= forest, stand = smooth(-0.05, 0.35, noise2(px / 90, pz / 90, 93)), conifer = !alone && hash(gx, gz, salt + 4) < (0.85 * smooth(25, 120, at.y) + 0.5 * smooth(0.95, 0.85, at.up)) * stand;
-      const grow = size * (0.8 + 0.45 * hash(gx, gz, salt + 5)) * (alone ? 1.3 : 1), tall = 0.88 + 0.28 * hash(gx, gz, salt + 7);
+      const massed = !alone && !conifer, scale = 0.6 + 0.65 * hash(gx, gz, salt + 5) + 0.35 * smooth(0.4, 0.9, grove);
+      const grow = (massed ? clump : size) * scale * (alone ? 1.3 : 1), tall = 0.88 + 0.28 * hash(gx, gz, salt + 7);
       if (at.y - 0.5 * grow + grow * tall * (conifer ? 14.6 : CROWN_TOP) > sightLine(px, pz)) continue;
-      plant(px, pz, at, grow, hash(gx, gz, salt + 6) * Math.PI * 2, conifer, tall);
+      plant(px, pz, at, grow, hash(gx, gz, salt + 6) * Math.PI * 2, conifer, tall, massed ? spread : 1);
     }
   });
   return { count: x.length, x: Float32Array.from(x), y: Float32Array.from(y), z: Float32Array.from(z), width: Float32Array.from(width), height: Float32Array.from(height), turn: Float32Array.from(turn), kind: Uint8Array.from(kind) };
@@ -207,7 +202,7 @@ const TREE_VERTEX = `precision highp float;
 attribute vec3 position, normal; attribute vec4 color; attribute vec2 uv;
 uniform mat4 viewProjection; uniform float time; uniform vec3 eye;
 #include<instancesDeclaration>
-varying vec3 vWorld, vNormal, vRight; varying vec4 vPart; varying vec2 vUv; varying float vSeed;
+varying vec3 vWorld, vNormal, vRight; varying vec4 vPart; varying vec2 vUv; varying float vSeed, vSpread;
 ${WORLD_GLSL}
 void main() {
 #include<instancesVertex>
@@ -226,14 +221,14 @@ void main() {
     p.xyz += leaf * sway * .07 * vec3(sin(time * 2.3 + color.a * 40.), sin(time * 1.9 + color.a * 31.), cos(time * 2.1 + color.a * 23.));
     vNormal = mat3(finalWorld) * normal; vRight = vec3(1., 0., 0.);
   }
-  vWorld = p.xyz; vPart = color; vUv = uv; vSeed = worldHash(base.xz * .113 + 3.);
+  vWorld = p.xyz; vPart = color; vUv = uv; vSeed = worldHash(base.xz * .113 + 3.); vSpread = length(finalWorld[0].xyz) / length(finalWorld[1].xyz);
   gl_Position = viewProjection * p;
 }`;
 
 const TREE_FRAGMENT = `precision highp float;
-varying vec3 vWorld, vNormal, vRight; varying vec4 vPart; varying vec2 vUv; varying float vSeed;
+varying vec3 vWorld, vNormal, vRight; varying vec4 vPart; varying vec2 vUv; varying float vSeed, vSpread;
 uniform vec3 eye, sun, sunColor, skyAmbient, groundAmbient, shadowTint, fogNear, fogFar, fogSun;
-uniform vec3 leafTop, leafUnder, leafBack, needleTop, needleUnder, bark;
+uniform vec3 leafTop, leafUnder, leafBack, leafCrown, needleTop, needleUnder, bark;
 uniform float sunStrength, shadowLift, fogDensity, fogHeight, time;
 ${WORLD_GLSL}
 float leaves(vec2 uv, float seed) {
@@ -241,8 +236,8 @@ float leaves(vec2 uv, float seed) {
   float best = 0.;
   for (int i = 0; i <= 1; i++) for (int j = 0; j <= 1; j++) {
     vec2 c = cell + vec2(float(i), float(j)), centre = c + vec2(worldHash(c + 3.1), worldHash(c + 7.7)), d = g - centre, q = (centre - seed * 31.7) / 3.5 - 1.;
-    float h = worldHash(c), a = h * 6.283, x = (cos(a) * d.x + sin(a) * d.y) / .66, y = -sin(a) * d.x + cos(a) * d.y;
-    best = max(best, step(dot(q, q), .7) * step(abs(x), 1.) * step(abs(y), .52 * (1. - x * x)) * (.86 + .14 * h));
+    float h = worldHash(c), a = h * 6.283, x = (cos(a) * d.x + sin(a) * d.y) / .8, y = -sin(a) * d.x + cos(a) * d.y;
+    best = max(best, step(dot(q, q), .7) * step(x * x + y * y * 2.2, .55 + .25 * h) * (.88 + .12 * h));
   }
   return best;
 }
@@ -256,8 +251,10 @@ vec3 foliage(vec3 n, vec3 v, float ao, float needle, float tint, float leaf) {
   float wrap = clamp((dot(n, sun) + .45) / 1.45, 0., 1.), light = wrap * mix(.4, 1., ao);
   vec3 top = mix(leafTop, needleTop, needle), under = mix(leafUnder, needleUnder, needle);
   top = mix(top, top * vec3(1.12, 1.06, .78), tint * (1. - needle) * .6);
-  vec3 color = mix(under * (shade * 1.5 + .32), top * lit, light) * mix(.8, 1., clamp(n.y * .5 + .5, 0., 1.)) * mix(.7, 1., ao) * leaf;
-  color = mix(color, top * (lit * .45 + skyAmbient * .4), smoothstep(.3, .9, n.y) * ao * (1. - light) * .8 * leaf);
+  top = mix(top, top * vec3(.8, .92, 1.04), smoothstep(.5, 1., fract(tint * 7.31)) * (1. - needle) * .8);
+  vec3 color = mix(under * (shade * 1.5 + .32), top * lit, light) * mix(.84, 1., clamp(n.y * .5 + .5, 0., 1.)) * mix(.78, 1., ao) * leaf;
+  vec3 crown = mix(leafCrown, top * lit, needle * .5) * (top / max(mix(leafTop, needleTop, needle), vec3(.01)));
+  color = mix(color, crown * leaf, smoothstep(.12, .75, n.y) * mix(.5, 1., ao) * (1. - light * .6) * .9);
   float edge = pow(1. - abs(dot(v, n)), 3.);
   float through = pow(clamp(dot(-v, sun), 0., 1.), 4.) * (.3 + .7 * edge) * (1. - wrap * .5) * .6 * mix(.5, 1., ao);
   float rim = edge * wrap * .25;
@@ -282,8 +279,14 @@ void main() {
       ao = clamp(.3 + .45 * sqrt(1. - h) + .25 * t + .2 * (1. - tier), 0., 1.);
     } else {
       vec4 best = vec4(-1.);
-      clump(c, vec2(0., 7.9), 2.7, seed, best); clump(c, vec2(-2.9, 6.3), 2.2, seed, best); clump(c, vec2(2.8, 6.5), 2.2, seed, best);
-      clump(c, vec2(-1.4, 5.5), 2.3, seed, best); clump(c, vec2(1.5, 5.7), 2.3, seed, best); clump(c, vec2(.4, 9.3), 1.7, seed, best);
+      if (vSpread > 1.2) {
+        clump(c, vec2(-3.4, 6.), 2.1, seed, best); clump(c, vec2(-.9, 7.4), 2.6, seed, best); clump(c, vec2(2.1, 6.6), 2.4, seed, best); clump(c, vec2(3.9, 4.9), 1.5, seed, best);
+        clump(c, vec2(-2.5, 3.), 2.6, seed, best); clump(c, vec2(1., 3.2), 2.9, seed, best); clump(c, vec2(3.6, 2.6), 1.8, seed, best);
+        if (best.x < 0.) discard;
+      } else {
+        clump(c, vec2(0., 7.9), 2.7, seed, best); clump(c, vec2(-2.9, 6.3), 2.2, seed, best); clump(c, vec2(2.8, 6.5), 2.2, seed, best);
+        clump(c, vec2(-1.4, 5.5), 2.3, seed, best); clump(c, vec2(1.5, 5.7), 2.3, seed, best); clump(c, vec2(.4, 9.3), 1.7, seed, best);
+      }
       h = best.x;
       if (h < 0.) { if (abs(c.x) < .42 - c.y * .03 && c.y < 4.6) { color = bark * mix(shade * 1.25, lit, .25); gl_FragColor = vec4(worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), 1.); return; } discard; }
       vec2 dc = (c - vec2(0., 6.6)) / 5.2;
@@ -296,7 +299,7 @@ void main() {
     color = foliage(n, v, ao, needle, vSeed, mottle);
     float back = pow(clamp(dot(-v, sun), 0., 1.), 2.), band = smoothstep(120., 260., dist) * (1. - smoothstep(900., 1600., dist));
     color += (fogSun * .55 + leafBack * .2) * sunStrength * back * band * (.1 + .55 * (1. - sqrt(max(h, 0.))) * clamp(n.y + .4, 0., 1.));
-    vec3 field = mix(mix(leafUnder, needleUnder, needle) * (shade * 1.35 + .25), mix(leafTop, needleTop, needle) * lit, .45);
+    vec3 field = mix(mix(leafUnder, needleUnder, needle) * (shade * 1.35 + .25), mix(leafCrown, needleTop * lit, needle), .32);
     color = mix(color, field, smoothstep(300., 1500., dist) * .8);
   } else {
     vec2 q = vUv * 2. - 1.; float body = 1. - dot(q, q), seed = vPart.a, leaf;
@@ -312,7 +315,7 @@ void main() {
     } else {
       leaf = leaves(vUv, seed);
       if (leaf <= 0. && body < .62) discard;
-      if (leaf <= 0.) leaf = .72;
+      if (leaf <= 0.) leaf = .84;
     }
     color = foliage(normalize(vNormal), v, vPart.r, needle, vSeed, leaf);
   }
@@ -368,9 +371,7 @@ export function createWorldTrees(scene, { root, still, rings }) {
     planted, paint, meshes: tiers.map(tier => tier.mesh),
     setTheme(atmosphere) {
       applyAir(paint, atmosphere);
-      const foliage = FOLIAGE.get(atmosphere) || FOLIAGE.get(WORLD_ATMOSPHERES.day);
-      for (const key of FOLIAGE_COLORS) paint.setColor3(key, Color3.FromHexString(foliage[key]));
-      for (const key of LIGHT_COLORS) paint.setColor3(key, Color3.FromHexString(atmosphere[key]));
+      for (const key of [...FOLIAGE_COLORS, ...LIGHT_COLORS]) paint.setColor3(key, Color3.FromHexString(atmosphere[key]));
       paint.setFloat('sunStrength', atmosphere.sunStrength); paint.setFloat('shadowLift', atmosphere.shadowLift);
     },
   };

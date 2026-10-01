@@ -29,7 +29,7 @@ test('a coarse ring leaves a hole where the finer ring sits', () => {
 });
 
 test('far mountain normals are averaged wider than the grid so slopes shade smoothly instead of in facets', () => {
-  const ring = { radius: 4480, step: 128 }, n = Math.round(ring.radius * 2 / ring.step) + 1, { normals } = terrainRing(0, [ring]);
+  const ring = { radius: 6400, step: 64 }, n = Math.round(ring.radius * 2 / ring.step) + 1, { normals } = terrainRing(0, [ring]);
   const coordinate = i => -ring.radius + i * ring.step;
   const neighbourAgreement = normalOf => {
     let sum = 0, count = 0;
@@ -42,8 +42,8 @@ test('far mountain normals are averaged wider than the grid so slopes shade smoo
   };
   const meshed = neighbourAgreement((i, j) => normals.subarray((i * n + j) * 3, (i * n + j) * 3 + 3));
   const perStep = neighbourAgreement((i, j) => normalAt(coordinate(i), coordinate(j), ring.step * 0.75));
-  assert.equal(Math.round(meshed * 1000) / 1000, 0.933);
-  assert.ok(meshed > perStep + 0.05, `${meshed} vs ${perStep}`);
+  assert.equal(Math.round(meshed * 1000) / 1000, 0.981);
+  assert.ok(1 - meshed < (1 - perStep) * 0.5, `${meshed} vs ${perStep}`);
 });
 
 test('terrain vertices carry no rock moss and count as open ground, so the shared paint leaves them unchanged', () => {

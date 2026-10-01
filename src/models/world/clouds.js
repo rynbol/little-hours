@@ -8,6 +8,7 @@ import { heightAt, WORLD } from '../../core/world-terrain.js';
 import { WORLD_GLSL, AIR_UNIFORMS, applyAir, followEye } from './world-glsl.js';
 import { SKY_GLSL, SKY_UNIFORMS, applySkyTheme } from './sky.js';
 import { LANDMARKS, PLUME } from './landmarks.js';
+import { WORLD_ATMOSPHERES } from './atmosphere.js';
 
 export const CLOUD_KINDS = Object.freeze({ cumulus: 0, wisp: 1, mist: 2 });
 export const CLOUD_BANKS = Object.freeze([
@@ -25,6 +26,13 @@ export function clearsPlume({ x, y, z, halfWidth, halfHeight }, eye = [0, 0]) {
   return !above || apart > reach * 1.25 + 0.03;
 }
 
+const SUNS = ['day', 'dusk'].map(theme => WORLD_ATMOSPHERES[theme].sun);
+
+export function clearsSuns({ x, y, z, halfWidth, halfHeight }) {
+  const out = Math.hypot(x, z), bearing = Math.atan2(x, -z), up = Math.atan2(y, out);
+  return SUNS.every(([sunX, sunY, sunZ]) => Math.hypot((bearing - Math.atan2(sunX, -sunZ)) * out / halfWidth, (up - Math.asin(sunY)) * out / halfHeight) > 1.2);
+}
+
 const seeded = seed => () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const span = ([low, high], t) => low + (high - low) * t;
 
@@ -40,7 +48,7 @@ export function cloudCards(seed = WORLD.seed) {
       if (bank.kind === 'mist') { if (ground > WORLD.valleyFloor + 2) continue; base += ground; }
       else if (base < ground + 120) continue;
       const card = { kind: CLOUD_KINDS[bank.kind], x, y: base + halfHeight * 0.6, z, halfWidth, halfHeight, spin: bank.spin, seed: random() * 97 };
-      if (bank.kind !== 'mist' && !clearsPlume(card)) continue;
+      if (bank.kind !== 'mist' && !(clearsPlume(card) && clearsSuns(card))) continue;
       cards.push(card);
       placed++;
     }
@@ -99,11 +107,10 @@ void main() {
     }
     float body = lump + (n - .5) * .6 + (cloudCover - .55) * .5;
     a = smoothstep(0., .5, body) * smoothstep(-.9, -.55, p.y + (n - .5) * .2) * .96;
-    float lit = smoothstep(-.55, .55, p.y + (n - .5) * .8 + lump * .25);
+    float lit = smoothstep(-.55, .55, p.y + (n - .5) * .8 + lump * .1);
     color = mix(cloudShade, cloudLit, lit);
-    color = mix(color, cloudLit, toward * .5 * (1. - lit));
-    color = mix(color, cloudShade, toward * .2 * smoothstep(.1, 1.2, body));
-    color += cloudRim * smoothstep(0., .15, body) * pow(1. - smoothstep(0., .4, lump), 2.) * pow(toward, 4.) * sunStrength * .6;
+    color = mix(color, cloudShade, toward * .45 * smoothstep(.1, 1.2, body));
+    color += cloudRim * smoothstep(0., .15, body) * pow(1. - smoothstep(0., .4, lump), 2.) * pow(toward, 3.) * sunStrength * .8;
   } else if (kind < 1.5) {
     float streak = worldNoise(vec2(p.x * 1.3 + seed, p.y * 5. + time * .004)) * .6 + worldNoise(vec2(p.x * 3.2 - seed, p.y * 12.)) * .4;
     a = smoothstep(.45, .8, streak + (cloudCover - .55) * .3) * (1. - smoothstep(.45, 1., abs(p.x) / vAspect)) * (1. - smoothstep(.1, 1., abs(p.y))) * .55;
@@ -114,7 +121,7 @@ void main() {
     color = mix(fogNear, fogSun, toward * .6) * (.92 + .16 * smoothstep(-.5, .8, p.y));
   }
   vec3 ray = vWorld - eye;
-  color = kind > 1.5 ? worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight) : mix(color, worldSky(normalize(ray)), (1. - exp(-length(ray) * fogDensity * .3)) * .7);
+  color = kind > 1.5 ? worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight) : mix(color, worldSky(normalize(ray)), (1. - exp(-length(ray) * fogDensity * .3)) * .5);
   a *= vClear;
   gl_FragColor = vec4(color * a, a);
 }`;

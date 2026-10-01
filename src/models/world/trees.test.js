@@ -24,7 +24,7 @@ const conifers = trees => trees.kind.reduce((sum, kind) => sum + kind, 0);
 
 test('forests fill canopy ground while meadows get only a few lone broadleaf trees', () => {
   const trees = plantTrees(halfForest());
-  assert.equal(trees.count, 2404);
+  assert.equal(trees.count, 1847);
   let meadow = 0, meadowConifers = 0;
   for (let i = 0; i < trees.count; i++) {
     const d = Math.hypot(trees.x[i], trees.z[i]);
@@ -33,7 +33,7 @@ test('forests fill canopy ground while meadows get only a few lone broadleaf tre
     assert.ok(Math.abs(trees.x[i]) < 600 && Math.abs(trees.z[i]) < 600, `tree ${i} is off the terrain`);
     if (trees.x[i] < -20) { meadow++; meadowConifers += trees.kind[i]; }
   }
-  assert.equal(meadow, 91);
+  assert.equal(meadow, 67);
   assert.equal(meadowConifers, 0);
   assert.ok(Math.abs(trees.y[0] - (10 - 0.5 * trees.width[0])) < 1e-5);
 });
@@ -41,11 +41,33 @@ test('forests fill canopy ground while meadows get only a few lone broadleaf tre
 test('lowland forest is broadleaf and conifers only take the high ground', () => {
   const forestAt = y => plantTrees([flatRing(600, 20, () => ({ y, up: 1, cover: 1, wet: 0 }))]);
   assert.equal(conifers(forestAt(-40)), 0);
-  assert.equal(conifers(forestAt(200)), 1246);
+  assert.equal(conifers(forestAt(200)), 898);
+});
+
+test('far hills hold a few wide grove clumps instead of a carpet of single trees', () => {
+  const trees = plantTrees([flatRing(3400, 100, () => ({ y: -40, up: 1, cover: 1, wet: 0 }))]);
+  let far = 0, clumped = 0;
+  for (let i = HERO_TREES.length; i < trees.count; i++) {
+    if (Math.hypot(trees.x[i], trees.z[i]) < 450) continue;
+    far++;
+    if (trees.width[i] / trees.height[i] > 1.5) clumped++;
+  }
+  assert.equal(far, 2253);
+  assert.ok(clumped / far > 0.95, `${clumped} of ${far} far trees are clumps`);
+});
+
+test('valley canopy sizes range from about 0.6 to 1.6 so groves are not one stamped carpet', () => {
+  const trees = plantTrees([flatRing(600, 20, () => ({ y: -40, up: 1, cover: 1, wet: 0 }))]);
+  let smallest = Infinity, largest = 0;
+  for (let i = HERO_TREES.length; i < trees.count; i++) {
+    if (Math.hypot(trees.x[i], trees.z[i]) >= 450) continue;
+    smallest = Math.min(smallest, trees.width[i]); largest = Math.max(largest, trees.width[i]);
+  }
+  assert.ok(smallest < 0.65 && largest > 1.55, `valley tree widths run ${smallest} to ${largest}`);
 });
 
 test('no trees grow on steep rock or wet river banks except the window hero trees', () => {
-  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0 }))]).count, 187);
+  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0 }))]).count, 134);
   assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 0.5, cover: 0, wet: 0 }))]).count, HERO_TREES.length);
   assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0.3 }))]).count, HERO_TREES.length);
 });
@@ -106,13 +128,13 @@ test('dusk swaps in its own foliage and a still world never advances the wind', 
   const { scene, trees } = forestScene(true);
   trees.setTheme(WORLD_ATMOSPHERES.dusk);
   const color = key => trees.paint._colors3[key].toHexString().toLowerCase();
-  assert.equal(color('leafTop'), '#8fa04a');
-  assert.equal(color('leafBack'), '#e8a050');
-  assert.equal(color('leafUnder'), '#3a5642');
+  assert.equal(color('leafCrown'), '#b0a24c');
+  assert.equal(color('leafBack'), '#ffcf6a');
+  assert.equal(color('leafUnder'), WORLD_ATMOSPHERES.dusk.leafUnder);
   assert.equal(color('sunColor'), WORLD_ATMOSPHERES.dusk.sunColor);
   assert.equal(trees.paint._floats.sunStrength, WORLD_ATMOSPHERES.dusk.sunStrength);
-  trees.setTheme({ ...WORLD_ATMOSPHERES.rain });
-  assert.equal(color('leafTop'), '#92c840');
+  trees.setTheme({ ...WORLD_ATMOSPHERES.rain, leafCrown: '#123456' });
+  assert.equal(color('leafCrown'), '#123456');
   scene.render(); scene.render();
   assert.equal(trees.paint._floats.time, 0);
   scene.dispose();

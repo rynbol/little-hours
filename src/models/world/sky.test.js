@@ -7,6 +7,8 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { createWorldSky } from './sky.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 import { CLOUD_KINDS, cloudCards } from './clouds.js';
+import { AIR_UNIFORMS, applyAir } from './world-glsl.js';
+import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 
 const hue = hex => { const { r, g, b } = Color3.FromHexString(hex), max = Math.max(r, g, b), min = Math.min(r, g, b); return ((max === r ? (g - b) / (max - min) : max === g ? 2 + (b - r) / (max - min) : 4 + (r - g) / (max - min)) * 60 + 360) % 360; };
 const hsv = hex => { const { r, g, b } = Color3.FromHexString(hex), max = Math.max(r, g, b), min = Math.min(r, g, b); return { s: max ? (max - min) / max : 0, v: max }; };
@@ -38,6 +40,26 @@ test('far haze is blue-grey in day and dusk, so each ridge steps from green towa
   assert.ok(Color3.FromHexString(WORLD_ATMOSPHERES.dusk.fogFar).b < 0.55, 'dusk ridges stay a dark mass');
 });
 
+test('only dusk has a golden hour, so the day and rain skies keep their colours', () => {
+  assert.equal(WORLD_ATMOSPHERES.dusk.goldenHour, 1);
+  assert.equal(WORLD_ATMOSPHERES.dusk.sunGlow, '#fff1c3');
+  assert.equal(WORLD_ATMOSPHERES.day.goldenHour, 0);
+  assert.equal(WORLD_ATMOSPHERES.rain.goldenHour, 0);
+  assert.equal(Math.round(hue(WORLD_ATMOSPHERES.dusk.horizon)), 35);
+  assert.ok(hsv(WORLD_ATMOSPHERES.dusk.horizon).s > 0.4, 'the band near the sun is gold, not grey');
+});
+
+test('only dusk hazes the air gold toward the sun, so day and rain air is untouched', () => {
+  assert.deepEqual(Object.fromEntries(Object.entries(WORLD_ATMOSPHERES).map(([theme, air]) => [theme, air.sunHaze])), { day: 0, dusk: 1, rain: 0 });
+  assert.ok(AIR_UNIFORMS.includes('sunHaze'));
+  const scene = new Scene(new NullEngine()), paint = new ShaderMaterial('air', scene, { vertexSource: 'void main() {}', fragmentSource: 'void main() {}' }, { uniforms: [...AIR_UNIFORMS] });
+  applyAir(paint, WORLD_ATMOSPHERES.dusk);
+  assert.equal(paint._floats.sunHaze, 1);
+  applyAir(paint, WORLD_ATMOSPHERES.day);
+  assert.equal(paint._floats.sunHaze, 0);
+  scene.dispose();
+});
+
 test('the dusk sky above the window is a calm grey-green, not olive beige', () => {
   const high = WORLD_ATMOSPHERES.dusk.high;
   assert.equal(Math.round(hue(high)), 148);
@@ -60,13 +82,16 @@ test('the day and dusk suns sit low in the window and clear of every cloud at re
 test('the sky dome takes each theme\'s colours and sun', () => {
   const scene = new Scene(new NullEngine()), sky = createWorldSky(scene, new TransformNode('root', scene)), paint = sky.sky.material;
   sky.setTheme(WORLD_ATMOSPHERES.dusk);
-  assert.equal(paint._colors3.horizon.toHexString().toLowerCase(), '#fcbe74');
+  assert.equal(paint._colors3.horizon.toHexString().toLowerCase(), '#f0c07e');
+  assert.equal(paint._colors3.sunGlow.toHexString().toLowerCase(), '#fff1c3');
+  assert.equal(paint._floats.goldenHour, 1);
   assert.equal(paint._colors3.zenith.toHexString().toLowerCase(), '#7e8a8c');
   assert.equal(paint._floats.glowStrength, 0.9);
   assert.equal(paint._colors3.horizonAway.toHexString().toLowerCase(), '#a9a496');
   assert.equal(paint._vectors3.sun.y, WORLD_ATMOSPHERES.dusk.sun[1]);
   sky.setTheme(WORLD_ATMOSPHERES.rain);
   assert.equal(paint._colors3.horizon.toHexString().toLowerCase(), '#555c4c');
+  assert.equal(paint._floats.goldenHour, 0);
   assert.equal(sky.sky.infiniteDistance, true);
   scene.dispose();
 });

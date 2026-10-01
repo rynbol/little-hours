@@ -6,6 +6,7 @@ import { clockNow } from '../../core/test-pins.js';
 const VALLEY_AIR = (WORLD.valleyFloor + 4).toFixed(1);
 
 export const WORLD_GLSL = `
+uniform float sunHaze;
 float worldHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float worldNoise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3. - 2. * f);
   return mix(mix(worldHash(i), worldHash(i + vec2(1., 0.)), u.x), mix(worldHash(i + vec2(0., 1.)), worldHash(i + vec2(1., 1.)), u.x), u.y); }
@@ -19,15 +20,18 @@ vec3 worldAir(vec3 color, vec3 world, vec3 eye, vec3 sun, vec3 fogNear, vec3 fog
   float mist = exp(-to / 24.) * (1. - exp(-d * .0022)) * clamp(density * 1100., 0., .8);
   color = mix(color, mix(fogNear, fogSun, glare * .5), mist);
   color = mix(color, vec3(dot(color, vec3(.299, .587, .114))), far * .55);
-  return mix(color, mix(fogFar, fogSun, glare * .8), far);
+  color = mix(color, mix(fogFar, fogSun, glare * .8), far);
+  float toward = dot(dir, sun), close = smoothstep(.93, 1., toward);
+  vec3 haze = mix(fogFar, fogSun, mix(.6, .72, close)) * mix(.9, 1., close);
+  return mix(color, haze, sunHaze * smoothstep(.72, .96, toward) * (1. - exp(-d * .00035)) * .75);
 }`;
 
 export const AIR_COLORS = Object.freeze(['fogNear', 'fogFar', 'fogSun']);
-export const AIR_UNIFORMS = Object.freeze(['eye', 'sun', 'fogDensity', 'fogHeight', 'time', ...AIR_COLORS]);
+export const AIR_UNIFORMS = Object.freeze(['eye', 'sun', 'fogDensity', 'fogHeight', 'sunHaze', 'time', ...AIR_COLORS]);
 
 export function applyAir(paint, atmosphere) {
   paint.setVector3('sun', Vector3.FromArray(atmosphere.sun));
-  paint.setFloat('fogDensity', atmosphere.fogDensity); paint.setFloat('fogHeight', atmosphere.fogHeight);
+  paint.setFloat('fogDensity', atmosphere.fogDensity); paint.setFloat('fogHeight', atmosphere.fogHeight); paint.setFloat('sunHaze', atmosphere.sunHaze);
   for (const key of AIR_COLORS) paint.setColor3(key, Color3.FromHexString(atmosphere[key]));
 }
 
