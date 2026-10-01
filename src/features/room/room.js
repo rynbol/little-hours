@@ -1660,9 +1660,9 @@ export function createRoom(container, options = {}) {
   function seatPose() {
     const desk = placedObjects.get(layout.activeDeskId), head = desk?.metadata.avatarHead;
     if (!head) return null;
-    desk.computeWorldMatrix(true); head.computeWorldMatrix(true);
-    const forward = desk.getDirection(new Vector3(0, 0, -1));
-    return { eye: seatEye(head.getAbsolutePosition(), forward), forward, aspect: canvasAspect };
+    desk.computeWorldMatrix(true);
+    const forward = desk.getDirection(new Vector3(0, 0, -1)), restingHead = Vector3.TransformCoordinates(desk.metadata.avatarHeadRest, head.parent.computeWorldMatrix(true));
+    return { eye: seatEye(restingHead, forward), forward, aspect: canvasAspect };
   }
   const seatView = createFirstPersonView(scene, canvas, { roomCamera: camera, seat: seatPose, roomFrame: roomFraming, onLook: () => requestRender(), onChange(change) { syncCameraControl(); syncCompanionVisibility(); syncDetails(); syncSeatWorld(); refreshShadows(); options.onSeatChange?.(change); } });
   let cameraControl = false;

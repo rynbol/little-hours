@@ -1436,6 +1436,14 @@ try {
     assert.equal(diagnostics().seat.state, 'room', 'leaving before the chair view is ready cancels the sit');
     room.enterSeat(); await settle();
     assert.equal(diagnostics().seat.state, 'entering', 'a prepared chair view sits again without new work');
+    for (let i = 0; i < 600 && diagnostics().seat.state !== 'seated'; i++) advance();
+    const uprightEye = diagnostics().seat.camera.position.clone();
+    room.leaveSeat(); advance(2);
+    const head = diagnostics().scene.transformNodes.find(node => node.metadata?.itemId === diagnostics().layout.activeDeskId).metadata.avatarHead;
+    head.position.y -= 0.04; head.position.z -= 0.19;
+    room.enterSeat(); await settle();
+    for (let i = 0; i < 600 && diagnostics().seat.state !== 'seated'; i++) advance();
+    assert.ok(diagnostics().seat.camera.position.subtract(uprightEye).length() < 1e-3, 'the chair eye sits where the upright companion sits, wherever its typing lean is when the fly-in starts');
     room.leaveSeat(); advance(2);
     console.log('PASS seat on intent: the chair view is prepared when Focus asks to sit, the fly-in waits for it, and leaving first cancels the sit.');
   }

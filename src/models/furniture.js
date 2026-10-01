@@ -2037,7 +2037,7 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
     const body = parts.body.clone('grounded-trousers-and-shoes', avatar); body.setEnabled(true);
     const articulateUpper = createArticulatedUpperBody(avatar, parts.upper);
     const head = parts.head.clone('headphones', avatar); head.position.set(0, 1.80, -0.17); head.setEnabled(true);
-    result.metadata.avatarHead = head;
+    result.metadata.avatarHead = head; result.metadata.avatarHeadRest = head.position.clone();
     const writing = type === 'writing-desk';
     const hands = [-1, 1].map(side => {
       const template = writing && side === 1 ? parts.writingHand : parts.hand;
