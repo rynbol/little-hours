@@ -74,3 +74,17 @@ test('the Focus look fills the room air with amber haze from arm\'s length, as B
   assert.ok(amount >= 0.4 && amount <= 0.5 && near <= 0.5, `the haze veils the room at ${amount} from ${near} m without becoming fog`);
   engine.dispose();
 });
+
+test('from the chair, wood shows painted grain: thin, uneven dark lines a few centimetres apart that follow the board and stand upright on side faces', () => {
+  const { pitch, width, depth, streak, warp } = STORYBOOK.grain;
+  assert.ok(pitch >= 0.03 && pitch <= 0.06, `grain lines ${pitch} m apart`);
+  assert.ok(width <= 0.3 && depth >= 0.1 && depth <= 0.18, 'lines are thin and dark enough to read without turning into stripes');
+  assert.ok(streak > 0 && warp >= 2, 'lines waver and the board carries soft streaks');
+  const wood = STORYBOOK_FRAGMENT.slice(STORYBOOK_FRAGMENT.indexOf('vec3 storyWood'), STORYBOOK_FRAGMENT.indexOf('vec3 storySurface'));
+  assert.match(wood, /abs\(n\.x\) > 0\.7 \? p\.yxz : p/, 'a face turned sideways runs its grain upright');
+  assert.match(STORYBOOK_FRAGMENT, /if \(code > 8\.5\) return storyWood\(p, n\);/);
+  const engine = new NullEngine(), scene = new Scene(engine), state = { amount: 1 };
+  const code = new StorybookPlugin(new StandardMaterial('desk', scene), state).getCustomCode('fragment');
+  assert.ok(Object.values(code).some(text => text.includes('storySurface(vStorySurface,vPositionW,normalW)')), 'the surface pattern sees each face\'s normal');
+  engine.dispose();
+});
