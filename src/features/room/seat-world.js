@@ -3,6 +3,7 @@ import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
+import { ImageProcessingConfiguration } from '@babylonjs/core/Materials/imageProcessingConfiguration.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
@@ -666,7 +667,7 @@ export const moonRise = progress => 0.3 + progress * 0.3;
 
 export function createSeatWorld(scene, parent) {
   const root = new TransformNode('seat-world', scene); root.parent = parent; root.setEnabled(false);
-  const unlit = new StandardMaterial('seat-world-sky', scene); unlit.disableLighting = true; unlit.diffuseColor = Color3.Black(); unlit.emissiveColor = Color3.White(); unlit.specularColor = Color3.Black(); unlit.backFaceCulling = false;
+  const unlit = new StandardMaterial('seat-world-sky', scene); unlit.disableLighting = true; unlit.diffuseColor = Color3.Black(); unlit.emissiveColor = Color3.White(); unlit.specularColor = Color3.Black(); unlit.backFaceCulling = false; unlit.imageProcessingConfiguration = new ImageProcessingConfiguration();
   const lit = new StandardMaterial('seat-world-shell', scene); lit.diffuseColor = Color3.White(); lit.specularColor.set(0.03, 0.03, 0.03);
   const shapes = {};
   const make = (name, build, material = unlit, parentNode = root) => { const shape = createShape(); build(shape); shapes[name] = shape; return toMesh(shape, `seat-world-${name}`, scene, parentNode, material); };

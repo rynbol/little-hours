@@ -638,3 +638,15 @@ test('mist pools in the low valley in the middle distance, and the haze warms to
   assert.ok(warmth(a => off(a) < 0.15) > warmth(a => off(a) > 1) + 0.04, 'ranges toward the sun take warmer haze than ranges away from it');
   engine.dispose();
 });
+
+test('the painted sky, clouds and moon skip the room tone curve, so they match the land and stay brighter than it', () => {
+  const { engine, scene, world } = setup();
+  scene.imageProcessingConfiguration.toneMappingEnabled = true; scene.imageProcessingConfiguration.exposure = 1.08;
+  world.setEnabled(true);
+  for (const name of ['seat-world-sky', 'seat-world-clouds', 'seat-world-moon']) {
+    const material = world.meshes.find(mesh => mesh.name === name).material;
+    assert.equal(material.imageProcessingConfiguration.toneMappingEnabled, false, name);
+    assert.equal(material.imageProcessingConfiguration.exposure, 1, name);
+  }
+  engine.dispose();
+});
