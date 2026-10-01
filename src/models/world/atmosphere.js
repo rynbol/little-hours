@@ -3,7 +3,7 @@ const sunFrom = (heading, elevation) => Object.freeze([Math.cos(elevation) * Mat
 export const WORLD_ATMOSPHERES = Object.freeze({
   day: Object.freeze({
     sun: sunFrom(-0.02, 0.23), sunColor: '#fff4dc', sunStrength: 1,
-    zenith: '#8fb3c4', high: '#a5c2c8', horizon: '#cfdcd2', horizonAway: '#cfdcd2', glow: '#f4f2dc', glowStrength: 0.7, sunGlow: '#ffe2bc', sunGlowStrength: 0.6, goldenHour: 0,
+    zenith: '#8fb3c4', high: '#a5c2c8', skyBands: Object.freeze([0.05, 0.2, 0.28, 0.4]), glowSquash: 2.5, horizon: '#cfdcd2', horizonAway: '#cfdcd2', glow: '#f4f2dc', glowStrength: 0.7, sunGlow: '#ffe2bc', sunGlowStrength: 0.6, goldenHour: 0,
     skyAmbient: '#a9c4d6', groundAmbient: '#8a9a5c', shadowTint: '#6f86a8', shadowLift: 0.42,
     fogNear: '#bcd0cc', fogFar: '#7a9eae', fogSun: '#dfe8d0', fogDensity: 0.0005, fogHeight: 300, sunFocus: 10, sunScatter: 0, glareFloor: 0.2, glareHeight: 450,
     mist: '#bcd0cc', mistStrength: 0.42, ridgeLift: 0, ridgeFog: 0, ridgeLight: '#bcd0cc',
@@ -14,7 +14,7 @@ export const WORLD_ATMOSPHERES = Object.freeze({
   }),
   dusk: Object.freeze({
     sun: sunFrom(-0.2, 0.19), sunColor: '#ffd49c', sunStrength: 1,
-    zenith: '#7e8a8c', high: '#84918a', horizon: '#fcbe74', horizonAway: '#9aa4a8', glow: '#ffd890', glowStrength: 0.9, sunGlow: '#ffbe68', sunGlowStrength: 0.8, goldenHour: 1,
+    zenith: '#7e8a8c', high: '#84918a', skyBands: Object.freeze([0, 0.3, 0.3, 1]), glowSquash: 1, horizon: '#fcbe74', horizonAway: '#9aa4a8', glow: '#ffd890', glowStrength: 0.9, sunGlow: '#ffbe68', sunGlowStrength: 0.8, goldenHour: 1,
     skyAmbient: '#8c8a9c', groundAmbient: '#5f6248', shadowTint: '#5f6e80', shadowLift: 0.38,
     fogNear: '#91928c', fogFar: '#5f7284', fogSun: '#fcbe74', fogDensity: 0.00042, fogHeight: 220, sunFocus: 60, sunScatter: 0.9, glareFloor: 0, glareHeight: 110,
     mist: '#91928c', mistStrength: 0.45, ridgeLift: 0, ridgeFog: 0, ridgeLight: '#91928c',
@@ -25,11 +25,11 @@ export const WORLD_ATMOSPHERES = Object.freeze({
   }),
   rain: Object.freeze({
     sun: sunFrom(0.5, 0.6), sunColor: '#c8ccc0', sunStrength: 0.4,
-    zenith: '#3e443c', high: '#4f5649', horizon: '#555c4c', horizonAway: '#555c4c', glow: '#6a6e5e', glowStrength: 0.15, sunGlow: '#6a6e5e', sunGlowStrength: 0, goldenHour: 0,
+    zenith: '#3e443c', high: '#4f5649', skyBands: Object.freeze([0, 0.3, 0.3, 1]), glowSquash: 1, horizon: '#555c4c', horizonAway: '#555c4c', glow: '#6a6e5e', glowStrength: 0.15, sunGlow: '#6a6e5e', sunGlowStrength: 0, goldenHour: 0,
     skyAmbient: '#7a8272', groundAmbient: '#4e5642', shadowTint: '#5e665c', shadowLift: 0.7,
     fogNear: '#4e5547', fogFar: '#4c5446', fogSun: '#6a6e5e', fogDensity: 0.00105, fogHeight: 200, sunFocus: 10, sunScatter: 0, glareFloor: 0.2, glareHeight: 300,
     mist: '#5c6252', mistStrength: 0.6, ridgeLift: 0.65, ridgeFog: 0.3, ridgeLight: '#363d31',
-    cloudLit: '#4c5246', cloudShade: '#3e443a', cloudRim: '#6a6e5e', cloudCover: 0.95,
+    cloudLit: '#555b4d', cloudShade: '#3e443a', cloudRim: '#6a6e5e', cloudCover: 0.95,
     water: '#4a5448', waterShallow: '#32382e',
     leafTop: '#64804a', leafUnder: '#465a34', leafMid: '#3c4c36', leafHaze: '#3c4c36', leafBack: '#7a8458', leafCrown: '#62784a', needleTop: '#4a6040', needleUnder: '#33402f', bark: '#4a5038',
     grass: '#7f9a5a', grassLight: '#93a865', grassWarm: '#9ea05e', grassTip: '#94a274', grassFar: '#36442a', flowerWhite: '#c8ccc4', flowerYellow: '#c8bc78', flowerLilac: '#9c94b0', forestFloor: '#5a7445', rock: '#8a9088', rockDark: '#6c7470', dirt: '#8a8064', sand: '#a8a084', snow: '#e0e4e2', crestGlow: 0,

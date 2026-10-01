@@ -102,3 +102,11 @@ test('the sky dome takes each theme\'s colours and sun', () => {
   assert.equal(sky.sky.infiniteDistance, true);
   scene.dispose();
 });
+
+test('only the day sky reaches its zenith blue by the top of the window and holds the sun glow low, while dusk and rain keep their gradient', () => {
+  const scene = new Scene(new NullEngine()), sky = createWorldSky(scene, new TransformNode('root', scene)), paint = sky.sky.material, curve = () => [paint._vectors4.skyBands.asArray(), paint._floats.glowSquash];
+  sky.setTheme(WORLD_ATMOSPHERES.day);
+  assert.deepEqual(curve(), [[0.05, 0.2, 0.28, 0.4], 2.5]);
+  for (const theme of ['dusk', 'rain']) { sky.setTheme(WORLD_ATMOSPHERES[theme]); assert.deepEqual(curve(), [[0, 0.3, 0.3, 1], 1], theme); }
+  scene.dispose();
+});

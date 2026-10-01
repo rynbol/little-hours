@@ -2,22 +2,23 @@ import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder.js';
 import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
-import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { Vector3, Vector4 } from '@babylonjs/core/Maths/math.vector.js';
 
 export const SKY_COLORS = Object.freeze(['zenith', 'high', 'horizon', 'horizonAway', 'glow', 'sunGlow', 'fogFar', 'fogSun']);
-export const SKY_UNIFORMS = Object.freeze(['sun', 'glowStrength', 'sunGlowStrength', 'goldenHour', ...SKY_COLORS]);
+export const SKY_UNIFORMS = Object.freeze(['sun', 'skyBands', 'glowSquash', 'glowStrength', 'sunGlowStrength', 'goldenHour', ...SKY_COLORS]);
 
 export const SKY_GLSL = `
-uniform vec3 sun, zenith, high, horizon, horizonAway, glow, sunGlow, fogFar, fogSun; uniform float glowStrength, sunGlowStrength, goldenHour;
+uniform vec3 sun, zenith, high, horizon, horizonAway, glow, sunGlow, fogFar, fogSun; uniform vec4 skyBands; uniform float glowSquash, glowStrength, sunGlowStrength, goldenHour;
 vec3 worldSky(vec3 d) {
   float up = d.y, toward = max(dot(d, sun), 0.), lift = smoothstep(0., .62, up);
   float facing = dot(normalize(d.xz + vec2(1e-4)), normalize(sun.xz + vec2(1e-4))), sunward = facing * .5 + .5;
-  vec3 color = mix(mix(horizonAway, horizon, pow(sunward, 6.)), high, smoothstep(0., .3, lift));
-  color = mix(color, zenith, smoothstep(.3, 1., lift));
-  color *= 1. + pow(toward, 40.) * .3 * glowStrength;
+  vec3 color = mix(mix(horizonAway, horizon, pow(sunward, 6.)), high, smoothstep(skyBands.x, skyBands.y, lift));
+  color = mix(color, zenith, smoothstep(skyBands.z, skyBands.w, lift));
+  float aureole = max(dot(normalize(vec3(d.x, sun.y + (d.y - sun.y) * mix(1., glowSquash, step(sun.y, d.y)), d.z)), sun), 0.);
+  color *= 1. + pow(aureole, 40.) * .3 * glowStrength;
   float near = pow(toward, 12.), top = .24 + .12 * near, band = smoothstep(.5, .98, facing) * (1. - smoothstep(top * .3, top, up));
   color = mix(color, mix(horizon, glow, pow(toward, 48.) * .6), band * goldenHour);
-  color = mix(color, sunGlow, pow(toward, 90. + 110. * goldenHour) * sunGlowStrength);
+  color = mix(color, sunGlow, pow(aureole, 90. + 110. * goldenHour) * sunGlowStrength);
   color = mix(color, glow, clamp(pow(toward, 300.) * .6 * glowStrength, 0., 1.));
   vec3 air = mix(fogFar, fogSun, pow(toward, 8.) * .9);
   return mix(air, color, smoothstep(-.025, .09, up));
@@ -40,7 +41,7 @@ void main() {
 }`;
 
 export function applySkyTheme(paint, atmosphere) {
-  paint.setVector3('sun', Vector3.FromArray(atmosphere.sun));
+  paint.setVector3('sun', Vector3.FromArray(atmosphere.sun)); paint.setVector4('skyBands', Vector4.FromArray(atmosphere.skyBands)); paint.setFloat('glowSquash', atmosphere.glowSquash);
   paint.setFloat('glowStrength', atmosphere.glowStrength); paint.setFloat('sunGlowStrength', atmosphere.sunGlowStrength); paint.setFloat('goldenHour', atmosphere.goldenHour);
   for (const key of SKY_COLORS) paint.setColor3(key, Color3.FromHexString(atmosphere[key]));
 }

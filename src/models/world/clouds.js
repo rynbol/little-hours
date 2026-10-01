@@ -17,7 +17,7 @@ export const HERO_BANKS = Object.freeze([
   Object.freeze({ kind: 'cumulus', bearing: -0.68, distance: 3600, base: 300, width: 2600, tall: 0.1, stretch: 3.5, spin: 0, seed: 53 }),
   Object.freeze({ kind: 'cumulus', bearing: -0.95, distance: 3600, base: 900, width: 1100, tall: 0.16, stretch: 1.8, spin: 0.0003, seed: 83 }),
   Object.freeze({ kind: 'cumulus', bearing: -0.25, distance: 3800, base: 880, width: 1400, tall: 0.16, stretch: 1.8, spin: 0.0003, seed: 71 }),
-  Object.freeze({ kind: 'cumulus', bearing: 0.3, distance: 3000, base: 960, width: 1500, tall: 0.19, spin: 0.0003, seed: 37 }),
+  Object.freeze({ kind: 'cumulus', bearing: 0.3, distance: 2400, base: 960, width: 1200, tall: 0.21, spin: 0.0003, seed: 37 }),
   Object.freeze({ kind: 'wisp', bearing: -0.18, distance: 4400, base: 1260, width: 1700, tall: 0.07, spin: 0.0003, seed: 19 }),
   Object.freeze({ kind: 'wisp', bearing: 0.12, distance: 4200, base: 1330, width: 2200, tall: 0.06, spin: 0.0003, seed: 43 }),
   Object.freeze({ kind: 'cumulus', bearing: 0.271, distance: 4608, base: 796, width: 888, tall: 0.342, spin: 0.0011, seed: 24.96 }),
@@ -168,7 +168,7 @@ void main() {
   float n = worldNoise(q * 2.2) * .625 + worldNoise(q * 5.1 + 3.1) * .375;
   vec3 color;
   if (kind < .5) {
-    float base = mix(-.38, -.66, banked) + .2 * x * x, frayed = n * .7 + worldNoise(q * 11.3 - vec2(time * .02, 0.)) * .3, feather = f + (frayed - .5) * .5 * (1. - smoothstep(.15, .6, f)) + (cloudCover - .55) * .3;
+    float wet = smoothstep(.6, .9, cloudCover) * banked, base = mix(-.38, -.66, banked) + .2 * x * x, frayed = n * .7 + worldNoise(q * 11.3 - vec2(time * .02, 0.)) * .3, feather = f + (frayed - .5) * .5 * (1. - smoothstep(.15, .6, f)) + (cloudCover - .55) * .3;
     float fade = smoothstep(-.15, .3, p.y - base + (n - .5) * .9) * (1. - smoothstep(.85, 1., abs(x)));
     a = smoothstep(.08, .34, feather) * fade * .97;
     float rise = (p.y + .38 + x * sunSide * .1 + (n - .5) * .08) / (top + .38), height = rise / .85, lit = 1. - min((height + sqrt(height * height + .01)) * .5, 1.);
@@ -176,7 +176,7 @@ void main() {
     float grade = (.1 + .9 * (1. - lit * lit)) * smoothstep(-.12, .12, rise) * (1. - shaded);
     color = mix(cloudShade, cloudLit, grade) + cloudRim * forward * (.05 + .12 * sunScatter);
     color = mix(color, cloudRim, smoothstep(0., 1., facing * 1.2 + forward * .4) * smoothstep(.05, .5, rise) * sunStrength * .45);
-    float underside = smoothstep(1.5, 3., vStretch) * (1. - smoothstep(0., .75, rise));
+    float underside = max(smoothstep(1.5, 3., vStretch), wet) * (1. - smoothstep(0., .75, rise));
     color = mix(color, fogNear, underside * .6); a *= 1. - underside * .45;
   } else if (kind < 1.5) {
     float streak = worldNoise(vec2(p.x * .7 + seed, p.y * 1.8 + p.x * .35 + time * .004)) * .65 + worldNoise(vec2(p.x * 1.6 - seed, p.y * 3.6)) * .35;

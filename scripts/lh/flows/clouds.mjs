@@ -58,6 +58,67 @@ const MEASURE = `(() => {
   return { spread: Math.max(...widths) / Math.min(...widths), clouds: measured };
 })()`;
 
+const BANKS = `(() => {
+  const { engine, scene, camera } = window.__world, gl = engine._gl, clouds = scene.getMeshByName('world-clouds'), keepTarget = camera.getTarget().clone();
+  const at = clouds.getVerticesData('position'), size = clouds.getVerticesData('color'), kind = clouds.getVerticesData('uv2'), everyCard = [...clouds.getIndices()], eye = camera.position;
+  const width = engine.getRenderWidth(), height = engine.getRenderHeight();
+  const read = () => { engine.beginFrame(); scene.render(); engine.endFrame(); const pixels = new Uint8Array(width * height * 4); gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels); return pixels; };
+  const others = scene.meshes.filter(mesh => mesh !== clouds && mesh.isEnabled());
+  const alone = shade => { const keep = scene.clearColor.clone(); others.forEach(mesh => mesh.setEnabled(false)); scene.clearColor.set(shade, shade, shade, 1); const pixels = read(); scene.clearColor.copyFrom(keep); others.forEach(mesh => mesh.setEnabled(true)); return pixels; };
+  const quantile = (list, q) => [...list].sort((a, b) => a - b)[Math.min(list.length - 1, Math.floor(list.length * q))];
+  const banks = [];
+  for (let v = 0; v < at.length / 3; v += 4) {
+    if (kind[v * 2 + 1] !== 0 || size[v * 4 + 3] <= 1) continue;
+    const x = at[v * 3] - eye.x, z = at[v * 3 + 2] - eye.z;
+    if (z > 0 || Math.abs(Math.atan2(x, -z)) > 1.1) continue;
+    camera.setTarget(new eye.constructor(at[v * 3], at[v * 3 + 1], at[v * 3 + 2]));
+    clouds.setIndices([0, 1, 2, 0, 2, 3].map(k => v + k));
+    clouds.setEnabled(false); const clear = read(); clouds.setEnabled(true);
+    const black = alone(0), white = alone(1), alpha = new Float32Array(width * height), covered = [];
+    for (let p = 0; p < width * height; p++) { const i = p * 4; alpha[p] = 1 - (white[i] - black[i] + white[i + 1] - black[i + 1] + white[i + 2] - black[i + 2]) / 765; if (alpha[p] > 0.1) covered.push(p); }
+    if (covered.length < 400) continue;
+    const row = p => Math.floor(p / width), column = p => p % width, lowest = new Map(), highest = new Map();
+    for (const p of covered) { lowest.set(column(p), Math.min(lowest.get(column(p)) ?? Infinity, row(p))); highest.set(column(p), Math.max(highest.get(column(p)) ?? -Infinity, row(p))); }
+    const floor = quantile([...lowest.values()], 0.05), ceiling = quantile([...highest.values()], 0.95), tall = Math.max(ceiling - floor, 1);
+    const paint = (p, c) => black[p * 4 + c] / 255 / Math.max(alpha[p], 1e-3), luma = p => .2126 * paint(p, 0) + .7152 * paint(p, 1) + .0722 * paint(p, 2);
+    const sky = p => { const i = p * 4; return (.2126 * clear[i] + .7152 * clear[i + 1] + .0722 * clear[i + 2]) / 255; };
+    const solid = covered.filter(p => alpha[p] > 0.25);
+    const under = solid.filter(p => (row(p) - floor) / tall < 0.25), seen = p => luma(p) * alpha[p] + sky(p) * (1 - alpha[p]);
+    banks.push({ stretch: Number(size[v * 4 + 3].toFixed(2)), underStep: under.length ? Number((under.reduce((sum, p) => sum + seen(p) - sky(p), 0) / under.length).toFixed(3)) : null });
+  }
+  clouds.setIndices(everyCard); camera.setTarget(keepTarget);
+  return banks;
+})()`;
+
+const SKY = `(() => {
+  const { engine, scene, camera } = window.__world, gl = engine._gl, sky = scene.getMeshByName('world-sky'), sun = sky.material._vectors3.sun, keepTarget = camera.getTarget().clone(), eye = camera.position;
+  const width = engine.getRenderWidth(), height = engine.getRenderHeight(), others = scene.meshes.filter(mesh => mesh !== sky && mesh.isEnabled());
+  const heading = Math.atan2(sun.x, -sun.z);
+  const look = (turn, up) => {
+    camera.setTarget(new eye.constructor(eye.x + Math.cos(up) * Math.sin(heading + turn), eye.y + Math.sin(up), eye.z - Math.cos(up) * Math.cos(heading + turn)));
+    engine.beginFrame(); scene.render(); engine.endFrame();
+    const pixel = new Uint8Array(4); gl.readPixels(width >> 1, height >> 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); return '#' + [...pixel.slice(0, 3)].map(c => c.toString(16).padStart(2, '0')).join('');
+  };
+  others.forEach(mesh => mesh.setEnabled(false));
+  const result = { aboveSun: look(0, 0.37), awayTop: look(-0.5, 0.37), awayMid: look(0.5, 0.2), horizon: look(0.5, 0.1), besideSun: look(0.06, Math.asin(sun.y)) };
+  others.forEach(mesh => mesh.setEnabled(true)); camera.setTarget(keepTarget);
+  return result;
+})()`;
+
+const SLIVERS = `(() => {
+  const d = window.__littleHours.room.diagnostics(), engine = d.engine, outdoor = d.seat.world.outdoorScene, clouds = outdoor.getMeshByName('world-clouds'), view = outdoor.activeCamera.getTransformationMatrix().m, place = clouds.getWorldMatrix().m;
+  const at = clouds.getVerticesData('position'), size = clouds.getVerticesData('color'), kind = clouds.getVerticesData('uv2');
+  const screen = (x, y, z) => { const w = [0, 1, 2].map(k => place[k] * x + place[4 + k] * y + place[8 + k] * z + place[12 + k]), clip = [0, 1, 3].map(k => view[k] * w[0] + view[4 + k] * w[1] + view[8 + k] * w[2] + view[12 + k]); return clip[2] > 0 ? [clip[0] / clip[2], clip[1] / clip[2]] : null; };
+  const cut = [];
+  for (let v = 0; v < at.length / 3; v += 4) {
+    if (kind[v * 2 + 1] !== 0) continue;
+    const top = screen(at[v * 3], at[v * 3 + 1] + size[v * 4 + 1] * 0.8, at[v * 3 + 2]), bottom = screen(at[v * 3], at[v * 3 + 1] - size[v * 4 + 1] * 0.62, at[v * 3 + 2]);
+    if (!top || !bottom || Math.abs(top[0]) > 1 || top[1] <= 1 || bottom[1] >= 1) continue;
+    cut.push({ seed: Number(kind[v * 2].toFixed(2)), shown: Number(((1 - bottom[1]) / 2).toFixed(3)) });
+  }
+  return cut;
+})()`;
+
 const RIM = Math.cos(25 * Math.PI / 180), UNDERSIDE = (0.2126 * 0x90 + 0.7152 * 0xaf + 0.0722 * 0xc1) / 255;
 
 export default {
@@ -70,11 +131,17 @@ export default {
         await browser.navigate(`${t.url}/checks/world.html?view=window&theme=${theme}`);
         for (let i = 0; i < 2400 * slow && !await browser.js('Boolean(window.__world?.ready())').catch(() => false); i++) await sleep(50);
         await sleep(500 * slow);
-        const { spread, clouds } = await browser.js(MEASURE);
+        const { spread, clouds } = await browser.js(MEASURE), banks = await browser.js(BANKS);
+        if (theme === 'rain') check('rain: no flat bank shows as a dark slab, its underside never more than 0.02 darker than the sky behind it', banks.length >= 4 && banks.every(({ underStep }) => underStep > -0.02), banks.map(({ stretch, underStep }) => [stretch, underStep]));
         await browser.shot(join(t.out, `clouds-${theme}.jpg`));
         const near = clouds.filter(cloud => cloud.toward > RIM);
+        if (theme === 'day') {
+          const sky = await browser.js(SKY), rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255), luma = hex => { const [r, g, b] = rgb(hex); return .2126 * r + .7152 * g + .0722 * b; }, near = (hex, target) => Math.max(...rgb(hex).map((c, i) => Math.abs(c - rgb(target)[i]))) < 0.04;
+          check('day: the window top is the zenith blue near #8fb3c4 even right above the sun, over a sky that pales to #a5c2c8 halfway down', near(sky.aboveSun, '#8fb3c4') && near(sky.awayTop, '#8fb3c4') && near(sky.awayMid, '#a5c2c8'), sky);
+          check('day: the horizon stays pale and the sun keeps its glow', luma(sky.horizon) > luma(sky.awayTop) + 0.1 && luma(sky.besideSun) > 0.85, sky);
+        }
         if (theme === 'rain') {
-          check('rain: cumulus near the veiled rain sun carry no bright rim, their fringes no brighter than their tops', near.length > 0 && near.every(({ top, fringe }) => fringe.lit < top.lit + 0.01), near.map(({ toward, top, fringe }) => [toward, fringe.hex, top.hex]));
+          check('rain: no cumulus in front of the window carries a bright rim under the veiled sun, every fringe no brighter than its top', clouds.length >= 3 && clouds.every(({ top, fringe }) => fringe.lit < top.lit + 0.01), clouds.map(({ toward, sunRight, top, fringe }) => [toward, sunRight, fringe.hex, top.hex]));
           check('no page errors (world rain)', browser.errors.length === 0, browser.errors.join(' | ').slice(0, 400));
           continue;
         }
@@ -93,5 +160,18 @@ export default {
         check(`no page errors (world ${theme})`, browser.errors.length === 0, browser.errors.join(' | ').slice(0, 400));
       } finally { await browser.close(); }
     }
+    const app = await t.open({ seed: 'three-rooms', theme: 'day', width: 960, height: 640, reducedMotion: true });
+    await app.waitFor(`window.__littleHours.room.diagnostics().seat.world.outdoor !== false`, { what: 'the outdoor world to be built', timeout: 30000 });
+    await app.clickSel('#focus-mode-enter');
+    await app.waitFor(`window.__littleHours.room.diagnostics().seat.state === 'seated'`, { what: 'the view to settle in the chair', timeout: 30000 });
+    const box = await app.box('#room-canvas'), slivers = [];
+    for (const turn of [0, -30, 30, 35]) {
+      const step = (turn - (slivers.at(-1)?.turn ?? 0)) * Math.PI / 180 / 0.0042;
+      if (step) await app.drag({ x: box.x - step / 2, y: box.y }, { x: box.x + step / 2, y: box.y });
+      await app.settle();
+      slivers.push({ turn, cut: await app.js(SLIVERS) });
+    }
+    check('day, from the chair: no cumulus is cut by the top of the view down to a grey sliver of underside, each one either clears the top or shows at least a tenth of the view', slivers.every(({ cut }) => cut.every(({ shown }) => shown >= 0.1)), slivers);
+    await t.close(app);
   },
 };
