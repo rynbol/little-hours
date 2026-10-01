@@ -7,10 +7,13 @@ export const STORYBOOK = Object.freeze({
   lift: 1.0,
   shadow: [0.94, 0.92, 0.96],
   rim: [1.0, 0.93, 0.8],
-  haze: Object.freeze({ color: [0.62, 0.52, 0.34], amount: 0.42, near: 0.5, far: 4.0 }),
+  haze: Object.freeze({ color: [0.52, 0.45, 0.36], amount: 0.42, near: 0.5, far: 4.0 }),
+  falloff: Object.freeze({ color: [0.78, 0.8, 0.86], near: 1.5, far: 5.0 }),
+  grain: Object.freeze({ pitch: 0.045, width: 0.22, depth: 0.13, streak: 0.1, warp: 2.6 }),
 });
 
 const glsl = values => `vec3(${values.map(value => value.toFixed(3)).join(',')})`;
+const { grain } = STORYBOOK;
 
 export const STORYBOOK_FRAGMENT = `
 float storyHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -19,9 +22,16 @@ float storyNoise(vec3 p) {
   return mix(mix(mix(storyHash(i), storyHash(i + vec3(1,0,0)), f.x), mix(storyHash(i + vec3(0,1,0)), storyHash(i + vec3(1,1,0)), f.x), f.y),
              mix(mix(storyHash(i + vec3(0,0,1)), storyHash(i + vec3(1,0,1)), f.x), mix(storyHash(i + vec3(0,1,1)), storyHash(i + vec3(1,1,1)), f.x), f.y), f.z);
 }
-vec3 storySurface(float code, vec3 p) {
+vec3 storyWood(vec3 p, vec3 n) {
+  vec3 q = abs(n.x) > 0.7 ? p.yxz : p;
+  float ring = fract((q.y + q.z) / ${grain.pitch.toFixed(3)} + ${grain.warp.toFixed(3)} * storyNoise(vec3(q.x * 1.1, q.y * 7.0, q.z * 7.0)));
+  float line = smoothstep(${(1 - grain.width).toFixed(3)}, 1.0, 1.0 - abs(ring * 2.0 - 1.0)) * (0.35 + storyNoise(vec3(q.x * 0.7, (q.y + q.z) * 31.0, 0.5)));
+  float streak = storyNoise(vec3(q.x * 1.5, q.y * 16.0, q.z * 16.0));
+  return vec3(1.0 + ${grain.streak.toFixed(3)} * (streak - 0.5)) - ${grain.depth.toFixed(3)} * line * vec3(0.9, 1.0, 1.08);
+}
+vec3 storySurface(float code, vec3 p, vec3 n) {
   if (code > 9.5) return vec3(1.0);
-  if (code > 8.5) return vec3(0.94 + 0.1 * storyNoise(vec3(p.x * 1.5, p.y * 8.0, p.z * 8.0)));
+  if (code > 8.5) return storyWood(p, n);
   if (code > 7.5) return vec3(0.97 + 0.05 * storyNoise(p * 18.0));
   if (code > 6.5) return vec3(0.98 + 0.04 * storyNoise(vec3(p.x * 4.0, p.y * 40.0, p.z * 4.0)));
   if (code > 5.5) return vec3(0.99 + 0.02 * storyNoise(p * 30.0));
@@ -43,7 +53,7 @@ vec3 storyLight(vec3 light, vec3 n, vec3 v, vec3 p) {
 
 const LIGHT_HOOK = /vec3 finalDiffuse=/g;
 const OUTDOOR_PREFIX = 'seat-world';
-const { haze } = STORYBOOK;
+const { haze, falloff } = STORYBOOK;
 export const SURFACE_KIND = 'storySurface';
 
 export class StorybookPlugin extends MaterialPluginBase {
@@ -64,8 +74,8 @@ export class StorybookPlugin extends MaterialPluginBase {
     };
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: `#ifdef STORYSURFACE\nvarying float vStorySurface;\n#endif\n${STORYBOOK_FRAGMENT}`,
-      [`!${LIGHT_HOOK.source}`]: '\n#ifdef LIGHT0\ndiffuseBase=storyLight(diffuseBase,normalW,viewDirectionW,vPositionW);\n#endif\n#ifdef STORYSURFACE\nbaseColor.rgb*=mix(vec3(1.0),storySurface(vStorySurface,vPositionW),storyLook);\n#endif\nvec3 finalDiffuse=',
-      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `#ifdef STORYHAZE\ncolor.rgb=mix(color.rgb,${glsl(haze.color)},storyLook*${haze.amount.toFixed(3)}*smoothstep(${haze.near.toFixed(3)},${haze.far.toFixed(3)},length(vEyePosition.xyz-vPositionW)));\n#endif`,
+      [`!${LIGHT_HOOK.source}`]: '\n#ifdef LIGHT0\ndiffuseBase=storyLight(diffuseBase,normalW,viewDirectionW,vPositionW);\n#endif\n#ifdef STORYSURFACE\nbaseColor.rgb*=mix(vec3(1.0),storySurface(vStorySurface,vPositionW,normalW),storyLook);\n#endif\nvec3 finalDiffuse=',
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `#ifdef STORYHAZE\nfloat storyDistance=length(vEyePosition.xyz-vPositionW);\ncolor.rgb*=mix(vec3(1.0),${glsl(falloff.color)},storyLook*smoothstep(${falloff.near.toFixed(3)},${falloff.far.toFixed(3)},storyDistance));\ncolor.rgb=mix(color.rgb,${glsl(haze.color)},storyLook*${haze.amount.toFixed(3)}*smoothstep(${haze.near.toFixed(3)},${haze.far.toFixed(3)},storyDistance));\n#endif`,
     };
   }
 }

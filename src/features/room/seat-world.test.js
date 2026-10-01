@@ -4,7 +4,7 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { heightAt } from '../../core/world-terrain.js';
-import { createSeatWorld, valleyMist, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VOLCANO_AT, TOWER_AT, CASTLE_AT, LANDMARK_SCALE, valleyFloor, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, VOLCANO, SEAT_DRAPE } from './seat-world.js';
+import { createSeatWorld, valleyMist, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VOLCANO_AT, TOWER_AT, CASTLE_AT, LANDMARK_SCALE, valleyFloor, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, VOLCANO, SEAT_DRAPE, BUTTERFLY_WING } from './seat-world.js';
 
 const PEAK = VOLCANO.base + VOLCANO.height, [VX, VZ] = VOLCANO_AT, fromVolcano = (x, z) => Math.hypot(x - VX, z - VZ);
 
@@ -306,6 +306,57 @@ test('butterflies flutter over the meadow by day, beating their wings, and hold 
   assert.deepEqual(flyers(), held);
   world.setTheme('dusk'); world.animate(0.1, false);
   assert.ok(flyers().every(({ wing, depth }) => Math.abs(wing - depth) < 1e-6), 'no flapping wings at dusk, only round spirits');
+  engine.dispose();
+});
+
+test('dusk spirits are soft round motes turned toward the chair, and day butterflies flap two lobed wings, all in one blended draw', () => {
+  const { engine, world } = setup();
+  world.setTheme('dusk'); world.setProgress(1); world.setEnabled(true);
+  const spirits = world.meshes.find(mesh => mesh.name === 'seat-world-spirits'), { shape } = spirits.metadata;
+  assert.equal(world.meshes.filter(mesh => mesh.name === 'seat-world-spirits').length, 1);
+  assert.equal(spirits.thinInstanceCount, 34);
+  assert.ok(spirits.hasVertexAlpha && spirits.material.disableDepthWrite && spirits.material.needAlphaBlendingForMesh(spirits), 'motes blend softly instead of cutting hard edges');
+  const points = () => { const colors = spirits.getVerticesData('color'); return shape.roles.map((_, i) => ({ x: shape.positions[i * 3], y: shape.positions[i * 3 + 1], z: shape.positions[i * 3 + 2], alpha: colors[i * 4 + 3], wing: shape.wings[i] })); };
+  const radius = ({ x, y }) => Math.hypot(x, y);
+  const mote = points().filter(point => !point.wing), rim = Math.max(...mote.map(radius));
+  assert.ok(points().every(({ wing, alpha }) => !wing || alpha === 0), 'no wings after dark');
+  assert.ok(mote.every(({ z }) => z === 0), 'the mote is one flat disc');
+  assert.equal(mote.find(point => radius(point) === 0).alpha, 1, 'a bright centre');
+  const edge = mote.filter(point => Math.abs(radius(point) - rim) < 1e-6);
+  assert.ok(edge.length >= 12 && edge.every(({ alpha }) => alpha === 0), 'a round rim of at least 12 points where the glow falls off to nothing');
+  const halo = mote.filter(point => radius(point) > 0 && radius(point) < rim - 1e-6);
+  assert.ok(halo.length >= 12 && halo.every(({ alpha }) => alpha > 0.2 && alpha < 0.7), 'a halo between the core and the rim');
+  world.animate(5, false);
+  const matrices = spirits._thinInstanceDataStorage.matrixData;
+  let facing = 0;
+  for (let i = 6; i < 34; i++) {
+    const m = matrices.slice(i * 16, i * 16 + 16), size = Math.hypot(m[8], m[9], m[10]), far = Math.hypot(m[12], m[13], m[14]);
+    if (size < 0.05 || m[13] < -100) continue;
+    assert.ok(Math.abs((m[8] * m[12] + m[9] * m[13] + m[10] * m[14]) / size / far) > 0.999, `spirit ${i} turns its disc to the chair`);
+    facing++;
+  }
+  assert.ok(facing > 20);
+  world.setTheme('day');
+  assert.ok(points().every(({ wing, alpha }) => wing ? alpha > 0.9 : alpha === 0), 'only solid wings by day');
+  const wings = points().filter(({ wing }) => wing);
+  for (const side of [-1, 1]) {
+    const wing = wings.filter(({ x }) => x * side > 1e-6);
+    assert.ok(wing.every(({ x, y }) => Math.abs(Math.abs(x) - y) < 1e-6), 'each wing hinges on the body and lifts as one surface');
+    const reach = wing.map(({ x, z }) => [Math.atan2(Math.abs(x), z), Math.hypot(x, z)]).sort((a, b) => a[0] - b[0]).map(([, r]) => r);
+    const peaks = reach.filter((r, k) => k > 0 && k < reach.length - 1 && r > reach[k - 1] && r > reach[k + 1]);
+    assert.equal(peaks.length, 2, 'a forewing and a hindwing lobe');
+    assert.ok(peaks[0] > peaks[1], 'the forewing is the larger lobe');
+  }
+  assert.ok(wings.filter(({ x }) => x < -1e-6).length === wings.filter(({ x }) => x > 1e-6).length, 'two matching wings');
+  const flap = () => { const m = spirits._thinInstanceDataStorage.matrixData; return Array.from({ length: 6 }, (_, i) => [Math.hypot(m[i * 16], m[i * 16 + 1], m[i * 16 + 2]), Math.hypot(m[i * 16 + 4], m[i * 16 + 5], m[i * 16 + 6])]); };
+  const angles = [];
+  for (let k = 0; k < 8; k++) {
+    world.animate(0.03, false);
+    for (const [span, lift] of flap()) { assert.ok(Math.abs(Math.hypot(span, lift) - BUTTERFLY_WING) < 1e-6, 'the wings swing about the hinge instead of stretching'); angles.push(Math.atan2(lift, span)); }
+  }
+  assert.ok(Math.max(...angles) - Math.min(...angles) > 0.8, 'the wings sweep well up and back down');
+  world.animate(1, true);
+  assert.ok(flap().every(([span, lift]) => lift < span * 0.2), 'reduced motion rests the wings open and flat');
   engine.dispose();
 });
 
