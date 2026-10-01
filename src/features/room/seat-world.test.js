@@ -327,3 +327,20 @@ test('the valley fades into haze with distance, so the tower and the mid-field w
   assert.ok(far > middle && far < 1, 'haze keeps building toward the ranges');
   engine.dispose();
 });
+
+test('the watchtower glows with glyph lines up every tier and splays its crown claws outward', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
+  const runes = [], stone = [];
+  for (let i = 0; i < shape.roles.length; i++) {
+    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2], reach = Math.hypot(x - 13, z + 56);
+    if (reach > 5) continue;
+    if (shape.roles[i] === 'rune') runes.push(y); else if (shape.roles[i] === 'ruin') stone.push({ y, reach });
+  }
+  const tiers = new Set(runes.map(y => Math.floor(y / 3)));
+  assert.ok(tiers.size >= 5, `glyphs cover ${tiers.size} bands of the tower`);
+  const top = Math.max(...stone.map(each => each.y)), crown = stone.filter(each => each.y > top - 0.1);
+  assert.ok(crown.length >= 4 && crown.every(each => each.reach > 2.4), 'claw tips lean out past the crown platform');
+  engine.dispose();
+});

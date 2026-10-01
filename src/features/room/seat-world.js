@@ -244,12 +244,23 @@ function buildVolcano(shape) {
 function buildWatchtower(shape) {
   const [tx, tz] = TOWER_AT, g = terrainHeight(tx, tz) - 0.3;
   let y = g;
+  shape.blob(tx, g, tz, 4.4, 1.7, 4.4, 'rock', 'moss', 0.7, 3, 10);
   for (const [w, h, twist] of [[3.4, 3, 0], [2.6, 5, 0.25], [2.1, 4.5, 0.5], [1.7, 3.5, 0.8]]) {
-    shape.box(tx, y + h / 2, tz, w, h, w, twist, 'ruin', 0.95); shape.box(tx, y + h, tz, w + 0.3, 0.25, w + 0.3, twist, 'moss');
+    shape.box(tx, y + h / 2, tz, w, h, w, twist, 'ruin', 0.8); shape.box(tx, y + h, tz, w + 0.3, 0.25, w + 0.3, twist, 'moss');
+    for (const [u, v] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+      const lx = u * (w / 2 + 0.02), lz = v * (w / 2 + 0.02), fx = tx + lx * Math.cos(twist) + lz * Math.sin(twist), fz = tz - lx * Math.sin(twist) + lz * Math.cos(twist), across = (size, thin) => v ? [size, thin] : [thin, size];
+      const [sw, sd] = across(0.14, 0.06), [bw, bd] = across(w * 0.6, 0.06);
+      shape.box(fx, y + h * 0.5, fz, sw, h * 0.7, sd, twist, 'rune', 0.9);
+      shape.box(fx, y + h * 0.3, fz, bw, 0.1, bd, twist, 'rune', 0.8);
+    }
     y += h;
   }
   shape.box(tx, y + 0.3, tz, 3.2, 0.5, 3.2, 0.8, 'ruin', 1.05);
-  for (const [dx, dz] of [[-1.3, -1.3], [1.3, -1.3], [1.3, 1.3], [-1.3, 1.3]]) shape.box(tx + dx, y + 1.4, tz + dz, 0.3, 1.8, 0.3, 0, 'ruin', 0.9);
+  for (const [dx, dz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    const bx = tx + dx * 1.15, bz = tz + dz * 1.15, tip = shape.vertex(tx + dx * 1.9, y + 3, tz + dz * 1.9, 'ruin', 1);
+    const foot = [0, 1, 2].map(k => { const a = k / 3 * Math.PI * 2; return shape.vertex(bx + Math.cos(a) * 0.25, y + 0.5, bz + Math.sin(a) * 0.25, 'ruin', 0.75 + k * 0.1); });
+    for (let k = 0; k < 3; k++) shape.tri(tip, foot[k], foot[(k + 1) % 3]);
+  }
   const cy = y + 2.1, c = [shape.vertex(tx, cy + 1.6, tz, 'rune', 1.2), shape.vertex(tx, cy - 1.2, tz, 'rune', 0.8)];
   const ring = [[0.8, 0], [0, 0.8], [-0.8, 0], [0, -0.8]].map(([dx, dz], k) => shape.vertex(tx + dx, cy, tz + dz, 'rune', k % 2 ? 1 : 0.9));
   for (let k = 0; k < 4; k++) { shape.tri(c[0], ring[k], ring[(k + 1) % 4]); shape.tri(c[1], ring[(k + 1) % 4], ring[k]); }
