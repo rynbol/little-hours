@@ -25,7 +25,7 @@ const conifers = trees => trees.kind.reduce((sum, kind) => sum + kind, 0);
 
 test('forests fill canopy ground while meadows get only a few lone broadleaf trees', () => {
   const trees = plantTrees(halfForest());
-  assert.equal(trees.count, 1180);
+  assert.equal(trees.count, 1159);
   let meadow = 0, meadowConifers = 0;
   for (let i = 0; i < trees.count; i++) {
     const d = Math.hypot(trees.x[i], trees.z[i]);
@@ -34,7 +34,7 @@ test('forests fill canopy ground while meadows get only a few lone broadleaf tre
     assert.ok(Math.abs(trees.x[i]) < 600 && Math.abs(trees.z[i]) < 600, `tree ${i} is off the terrain`);
     if (trees.x[i] < -20) { meadow++; meadowConifers += trees.kind[i]; }
   }
-  assert.equal(meadow, 68);
+  assert.equal(meadow, 53);
   assert.equal(meadowConifers, 0);
   assert.ok(Math.abs(trees.y[0] - (10 - 0.5 * trees.width[0])) < 1e-5);
 });
@@ -53,8 +53,33 @@ test('far hills hold a few wide grove clumps instead of a carpet of single trees
     far++;
     if (trees.width[i] / trees.height[i] > 1.5) clumped++;
   }
-  assert.equal(far, 2253);
+  assert.equal(far, 2892);
   assert.ok(clumped / far > 0.95, `${clumped} of ${far} far trees are clumps`);
+});
+
+test('past the valley an open meadow holds no lone trees dotted across it', () => {
+  const trees = plantTrees([flatRing(3400, 100, () => ({ y: -40, up: 1, cover: 0, wet: 0 }))]);
+  const dotted = Array.from(trees.x).filter((x, i) => i >= HERO_TREES.length && Math.hypot(x, trees.z[i]) >= 450).length;
+  assert.equal(dotted, 0);
+});
+
+test('far hills gather their groves into clumps of mixed heights instead of an even spread of matching tops', () => {
+  const trees = plantTrees([flatRing(3400, 100, () => ({ y: -40, up: 1, cover: 1, wet: 0 }))]);
+  const all = Array.from({ length: trees.count - HERO_TREES.length }, (_, k) => k + HERO_TREES.length);
+  const ring = (from, to) => {
+    const inside = all.filter(i => trees.z[i] < 0 && Math.hypot(trees.x[i], trees.z[i]) > from && Math.hypot(trees.x[i], trees.z[i]) < to);
+    const nearest = inside.map(i => all.reduce((best, j) => j === i ? best : Math.min(best, Math.hypot(trees.x[i] - trees.x[j], trees.z[i] - trees.z[j])), Infinity));
+    const spread = 0.5 / Math.sqrt(inside.length / (Math.PI * (to * to - from * from) / 2)), heights = inside.map(i => trees.height[i]), mean = heights.reduce((a, b) => a + b, 0) / heights.length;
+    return {
+      clumping: Number((nearest.reduce((a, b) => a + b, 0) / nearest.length / spread).toFixed(2)),
+      heights: Number((Math.sqrt(heights.reduce((a, b) => a + (b - mean) ** 2, 0) / heights.length) / mean).toFixed(2)),
+    };
+  };
+  for (const [from, to] of [[600, 1200], [1500, 3200]]) {
+    const { clumping, heights } = ring(from, to);
+    assert.ok(clumping < 0.78, `groves ${from}-${to} m have nearest-neighbour ratio ${clumping}, an even spread`);
+    assert.ok(heights > 0.24, `grove heights ${from}-${to} m vary only ${heights}, so their tops line up`);
+  }
 });
 
 test('valley canopy sizes range from about 0.6 to 1.6 so groves are not one stamped carpet', () => {
@@ -68,7 +93,7 @@ test('valley canopy sizes range from about 0.6 to 1.6 so groves are not one stam
 });
 
 test('no trees grow on steep rock or wet river banks except the window hero trees', () => {
-  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0 }))]).count, 135);
+  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0 }))]).count, 109);
   assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 0.5, cover: 0, wet: 0 }))]).count, HERO_TREES.length);
   assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0.3 }))]).count, HERO_TREES.length);
 });
@@ -184,11 +209,22 @@ test('a far grove pixel pays for clump noise only inside a clump reach, and for 
   scene.dispose();
 });
 
+test('far broadleaf cards mirror and resize their lobes per tree so neighbouring groves are not stamped clones', () => {
+  const { scene, trees } = forestScene(true);
+  scene.render();
+  const fragment = trees.paint.getEffect()._fragmentSourceCode, lobes = fragment.match(/clump\((?!vec2 c)[^;]*\);/g);
+  assert.equal(lobes.length, 13);
+  assert.ok(lobes.every(lobe => /^clump\(m, vec2\([^)]*\), [\d.]+ \* \([^)]*fract\(seed \* [\d.]+\)\), seed, best\);$/.test(lobe)), lobes.join('\n'));
+  assert.match(fragment, /vec2 m = vec2\(c\.x \* flip, c\.y\)/);
+  scene.dispose();
+});
+
 test('dusk swaps in its own foliage and a still world never advances the wind', () => {
   const { scene, trees } = forestScene(true);
   trees.setTheme(WORLD_ATMOSPHERES.dusk);
   const color = key => trees.paint._colors3[key].toHexString().toLowerCase();
-  assert.equal(color('leafCrown'), '#98ac4c');
+  assert.equal(color('leafCrown'), '#84a450');
+  assert.equal(trees.paint._floats.goldenHour, 1);
   assert.equal(color('leafBack'), '#f4d27a');
   assert.equal(color('leafUnder'), WORLD_ATMOSPHERES.dusk.leafUnder);
   assert.equal(color('sunColor'), WORLD_ATMOSPHERES.dusk.sunColor);

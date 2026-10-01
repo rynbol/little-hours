@@ -20,7 +20,7 @@ export const WORLD_ATMOSPHERES = Object.freeze({
     mist: '#91928c', mistStrength: 0.45, ridgeLift: 0, ridgeFog: 0, ridgeLight: '#91928c',
     cloudLit: '#ffe2b0', cloudShade: '#8c8a96', cloudRim: '#ffd9a0', cloudCover: 0.5,
     water: '#56707a', waterShallow: '#3a3e38',
-    leafTop: '#a8bc4a', leafUnder: '#3a5c48', leafBack: '#f4d27a', leafCrown: '#98ac4c', needleTop: '#5e8040', needleUnder: '#2a4442', bark: '#544c3c',
+    leafTop: '#a8bc4a', leafUnder: '#3a5c48', leafBack: '#f4d27a', leafCrown: '#84a450', needleTop: '#5e8040', needleUnder: '#2a4442', bark: '#544c3c',
     grass: '#6e9450', grassLight: '#a0b468', grassWarm: '#b4b060', grassTip: '#fae6b0', grassFar: '#c0c050', flowerWhite: '#f2e2cc', flowerYellow: '#f0d488', flowerLilac: '#b49ccc', forestFloor: '#56683c', rock: '#8c949a', rockDark: '#5f6874', dirt: '#9a8c6a', sand: '#c8b88e', snow: '#ffe2cc', crestGlow: 0.9,
   }),
   rain: Object.freeze({

@@ -60,7 +60,9 @@ test('world grass follows the camera in steps, takes the theme and stays still w
   assert.deepEqual(grass.origin, [-78, -88]);
   const paint = grass.mesh.material;
   assert.equal(paint._floats.gusts, 0);
+  assert.equal(paint._floats.goldenHour, 0);
   grass.setTheme(WORLD_ATMOSPHERES.dusk);
+  assert.equal(paint._floats.goldenHour, 1);
   for (const key of ['grassLight', 'flowerWhite', 'flowerYellow', 'flowerLilac']) assert.equal(paint._colors3[key].toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk[key], key);
   assert.equal(grass.rocks.material._colors3.rock.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.rock);
   camera.position.set(60, 2, -60);

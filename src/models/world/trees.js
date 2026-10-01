@@ -12,8 +12,8 @@ import { RIDGE_LIFT_GLSL, RIDGE_UNIFORMS, applyRidges } from './terrain-paint.js
 
 export const TREE_BANDS = Object.freeze([
   Object.freeze({ from: 25, to: 450, spacing: 8, size: 1, clump: 1, spread: 1, lone: 1, behind: 450, gather: 1, fray: 0 }),
-  Object.freeze({ from: 450, to: 1300, spacing: 34, size: 1.7, clump: 3.2, spread: 1.7, lone: 0.3, behind: 200, gather: 0, fray: 1 }),
-  Object.freeze({ from: 1300, to: 3400, spacing: 60, size: 2.6, clump: 5, spread: 1.8, lone: 0.25, behind: 200, gather: 0, fray: 1 }),
+  Object.freeze({ from: 450, to: 1300, spacing: 34, size: 1.7, clump: 2.9, spread: 1.7, lone: 0, behind: 200, gather: 0.7, fray: 1 }),
+  Object.freeze({ from: 1300, to: 3400, spacing: 46, size: 2.6, clump: 3.6, spread: 1.8, lone: 0, behind: 200, gather: 0.7, fray: 0 }),
 ]);
 export const WINDOW_EYE = Object.freeze({ x: -2, y: 2.24, z: -2.4 });
 export const VISTA = Object.freeze({ reach: 320, clearing: 170, bearing: -0.3, halfAngle: 1.25, dip: 0.022 });
@@ -83,7 +83,7 @@ export function plantTrees(rings) {
   }
   const neighbour = groundOf(rings), coverAt = (x, z) => neighbour(x, z)?.cover ?? 0, heightToward = (x, z, fallback) => neighbour(x, z)?.y ?? fallback;
   TREE_BANDS.forEach(({ from, to, spacing, size, clump, spread, lone: loneShare, behind, gather, fray }, band) => {
-    const cells = Math.ceil(to / spacing), lone = loneShare * spacing * spacing / LONE_TREE_AREA, salt = band * 8, scatter = 1 + 0.7 * gather;
+    const cells = Math.ceil(to / spacing), lone = loneShare * spacing * spacing / LONE_TREE_AREA, salt = band * 8, scatter = 1 + 0.7 * gather, thicketSize = spacing / TREE_BANDS[0].spacing;
     for (let gx = -cells; gx < cells; gx++) for (let gz = -cells; gz < Math.ceil(behind / spacing); gz++) {
       const px = (gx + 0.5 + (hash(gx, gz, salt + 1) - 0.5) * scatter) * spacing, pz = (gz + 0.5 + (hash(gx, gz, salt + 2) - 0.5) * scatter) * spacing, d = Math.hypot(px, pz);
       if (d < from || d >= to || pz > behind || riverDistance(px, pz) < RIVER_CLEARANCE) continue;
@@ -96,7 +96,7 @@ export function plantTrees(rings) {
       const crest = fray && open && up > 0.85 ? smooth(8, 22, at.y - heightToward(px * (1 - FRAY_REACH / d), pz * (1 - FRAY_REACH / d), at.y)) : 0;
       const frayed = fray * Math.max(smooth(0.3, 0.8, edge) * smooth(0.55, 0.75, up) * 0.8, crest) * smooth(-0.3, 0.3, noise2(px / 70, pz / 70, 96));
       const meadow = Math.max(lone * smooth(0.9, 0.96, up), frayed) * open;
-      const thicket = smooth(-0.25, 0.4, noise2(px / 30, pz / 30, 94) + 0.45 * noise2(px / 12, pz / 12, 95)), gathered = 1 - gather + gather * thicket;
+      const thicket = smooth(-0.25, 0.4, noise2(px / (30 * thicketSize), pz / (30 * thicketSize), 94) + 0.45 * noise2(px / (12 * thicketSize), pz / (12 * thicketSize), 95)), gathered = 1 - gather + gather * thicket;
       const forest = smooth(0.04, 0.3, at.cover) * grove * 1.3 * gathered * (1 + gather), roll = hash(gx, gz, salt + 3);
       if (roll >= forest && roll >= meadow) continue;
       const alone = roll >= forest, stand = smooth(-0.05, 0.35, noise2(px / 90, pz / 90, 93)), conifer = !alone && hash(gx, gz, salt + 4) < (0.85 * smooth(25, 120, at.y) + 0.5 * smooth(0.95, 0.85, at.up)) * stand;
@@ -239,7 +239,7 @@ const TREE_FRAGMENT = `precision highp float;
 varying vec3 vWorld, vNormal, vRight; varying vec4 vPart; varying vec2 vUv; varying float vSeed, vSpread;
 uniform vec3 eye, sun, sunColor, skyAmbient, groundAmbient, shadowTint, fogNear, fogFar, fogSun;
 uniform vec3 leafTop, leafUnder, leafBack, leafCrown, needleTop, needleUnder, bark;
-uniform float sunStrength, shadowLift, fogDensity, fogHeight, time;
+uniform float sunStrength, shadowLift, fogDensity, fogHeight, time, goldenHour;
 ${WORLD_GLSL}
 ${RIDGE_LIFT_GLSL}
 vec3 treeAir(vec3 color) { return liftRidges(worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), vWorld.y, distance(eye, vWorld)); }
@@ -264,17 +264,19 @@ void clump(vec2 c, vec2 centre, float radius, float seed, inout vec4 best) {
 }
 vec3 foliage(vec3 n, vec3 v, float ao, float needle, float tint, float leaf) {
   vec3 ambient = mix(groundAmbient, skyAmbient, n.y * .5 + .5), shade = shadowTint * shadowLift + ambient * .35, lit = sunColor * sunStrength;
-  float wrap = clamp((dot(n, sun) + .45) / 1.45, 0., 1.), light = wrap * mix(.4, 1., ao);
+  float soft = .45 - .3 * goldenHour, wrap = clamp((dot(n, sun) + soft) / (1. + soft), 0., 1.), light = wrap * mix(.4, 1., ao);
   vec3 top = mix(leafTop, needleTop, needle), under = mix(leafUnder, needleUnder, needle);
   top = mix(top, top * vec3(1.12, 1.06, .78), tint * (1. - needle) * .6);
   top = mix(top, top * vec3(.8, .92, 1.04), smoothstep(.5, 1., fract(tint * 7.31)) * (1. - needle) * .8);
+  top = mix(top, leafBack, goldenHour * light * sqrt(light) * (1. - needle * .5) * .75);
   vec3 color = mix(under * (shade * 1.5 + .32), top * lit, light) * mix(.84, 1., clamp(n.y * .5 + .5, 0., 1.)) * mix(.78, 1., ao) * leaf;
   vec3 crown = mix(leafCrown, top * lit, needle * .5) * (top / max(mix(leafTop, needleTop, needle), vec3(.01)));
-  color = mix(color, crown * leaf, smoothstep(.12, .75, n.y) * mix(.5, 1., ao) * (1. - light * .6) * .9);
+  color = mix(color, crown * leaf, smoothstep(.12, .75, n.y) * mix(.5, 1., ao) * (1. - light * (.6 + .3 * goldenHour)) * .9);
   float edge = pow(1. - abs(dot(v, n)), 3.);
   float through = pow(clamp(dot(-v, sun), 0., 1.), 4.) * (.3 + .7 * edge) * (1. - wrap * .5) * .6 * mix(.5, 1., ao);
   float rim = pow(1. - abs(dot(v, n)), 1.6) * smoothstep(.4, .9, dot(n, normalize(sun + vec3(0., 1., 0.)))) * .8;
-  return mix(color, leafBack * lit * leaf, rim) + leafBack * sunStrength * through * leaf;
+  color = mix(color, leafBack * lit * leaf, rim) + leafBack * sunStrength * through * leaf;
+  return mix(color, leafBack * lit * leaf, goldenHour * clamp(through * edge * 3., 0., .7));
 }
 void main() {
   float part = vPart.b, needle = step(.37, part) * (1. - step(.62, part)) + step(.87, part);
@@ -286,7 +288,7 @@ void main() {
     color = bark * mix(shade * 1.25, lit, clamp(dot(n, sun) * .5 + .5, 0., 1.) * vPart.r) * (.7 + .3 * vPart.r);
   } else if (part > .62) {
     vec2 c = vUv; float seed = vSeed * 7.31;
-    vec3 facing = normalize(vNormal), n; float ao, h;
+    vec3 facing = normalize(vNormal), n; float ao, h, underside = 1.;
     if (needle > .5) {
       float t = clamp((c.y - 1.8) / 12.4, 0., 1.), tier = fract(-t * 6.5 + seed), w = 3.5 * pow(1. - t, .95) * (.74 + .26 * tier) * (.92 + .16 * worldNoise(c * 2.3 + seed * 11.));
       float nx = c.x / max(w, .05); h = 1. - nx * nx;
@@ -295,15 +297,16 @@ void main() {
       ao = clamp(.3 + .45 * sqrt(1. - h) + .25 * t + .2 * (1. - tier), 0., 1.);
     } else {
       vec4 best = vec4(-1.);
+      float flip = fract(seed * .53) < .5 ? -1. : 1.; vec2 m = vec2(c.x * flip, c.y);
       if (vSpread > 1.2) {
-        clump(c, vec2(-3.4, 6.), 2.1, seed, best); clump(c, vec2(-.9, 7.4), 2.6, seed, best); clump(c, vec2(2.1, 6.6), 2.4, seed, best); clump(c, vec2(3.9, 4.9), 1.5, seed, best);
-        clump(c, vec2(-2.5, 3.), 2.6, seed, best); clump(c, vec2(1., 3.2), 2.9, seed, best); clump(c, vec2(3.6, 2.6), 1.8, seed, best);
+        clump(m, vec2(-3.4, 6.), 2.1 * (.75 + .5 * fract(seed * 1.7)), seed, best); clump(m, vec2(-.9, 7.4), 2.6 * (.75 + .5 * fract(seed * 2.3)), seed, best); clump(m, vec2(2.1, 6.6), 2.4 * (.75 + .5 * fract(seed * 3.1)), seed, best); clump(m, vec2(3.9, 4.9), 1.5 * (.6 + .8 * fract(seed * 4.3)), seed, best);
+        clump(m, vec2(-2.5, 3.), 2.6 * (.8 + .4 * fract(seed * 5.9)), seed, best); clump(m, vec2(1., 3.2), 2.9 * (.8 + .4 * fract(seed * 6.7)), seed, best); clump(m, vec2(3.6, 2.6), 1.8 * (.7 + .6 * fract(seed * 7.9)), seed, best);
         if (best.x < 0.) discard;
       } else {
-        clump(c, vec2(0., 7.9), 2.7, seed, best); clump(c, vec2(-2.9, 6.3), 2.2, seed, best); clump(c, vec2(2.8, 6.5), 2.2, seed, best);
-        clump(c, vec2(-1.4, 5.5), 2.3, seed, best); clump(c, vec2(1.5, 5.7), 2.3, seed, best); clump(c, vec2(.4, 9.3), 1.7, seed, best);
+        clump(m, vec2(0., 7.9), 2.7 * (.8 + .4 * fract(seed * 1.7)), seed, best); clump(m, vec2(-2.9, 6.3), 2.2 * (.7 + .6 * fract(seed * 2.3)), seed, best); clump(m, vec2(2.8, 6.5), 2.2 * (.7 + .6 * fract(seed * 3.1)), seed, best);
+        clump(m, vec2(-1.4, 5.5), 2.3 * (.75 + .5 * fract(seed * 4.3)), seed, best); clump(m, vec2(1.5, 5.7), 2.3 * (.75 + .5 * fract(seed * 5.9)), seed, best); clump(m, vec2(.4, 9.3), 1.7 * (.5 + fract(seed * 6.7)), seed, best);
       }
-      h = best.x;
+      h = best.x; best.y *= flip; underside = smoothstep(0., 2.6, c.y - (vSpread > 1.2 ? .6 : 3.2) + best.z * 1.2);
       if (h < 0.) { if (abs(c.x) < .42 - c.y * .03 && c.y < 4.6) { color = bark * mix(shade * 1.25, lit, .25); gl_FragColor = vec4(treeAir(color), 1.); return; } discard; }
       vec2 dc = (c - vec2(0., 6.6)) / 5.2;
       vec3 local = normalize(normalize(vec3(dc, sqrt(max(1. - dot(dc, dc), .05)))) * .55 + normalize(vec3(best.yz, sqrt(h))) * .45);
@@ -315,8 +318,10 @@ void main() {
     color = foliage(n, v, ao, needle, vSeed, mottle);
     float back = pow(clamp(dot(-v, sun), 0., 1.), 2.), band = smoothstep(40., 180., dist) * (1. - smoothstep(900., 1600., dist));
     color = mix(color, leafBack * lit, back * band * .7 * (1. - sqrt(max(h, 0.))) * clamp(n.y + .4, 0., 1.));
+    color *= mix(.6, 1., underside);
     vec3 field = mix(mix(leafUnder, needleUnder, needle) * (shade * 1.35 + .25), mix(leafCrown, needleTop * lit, needle), .32);
     color = mix(color, field, smoothstep(300., 1500., dist) * .8);
+    color = mix(color, leafBack * lit, goldenHour * back * smoothstep(.2, .9, n.y) * (1. - sqrt(max(h, 0.))) * .9);
   } else {
     vec2 q = vUv * 2. - 1.; float body = 1. - dot(q, q), seed = vPart.a, leaf;
     if (needle > .5) {
@@ -342,7 +347,7 @@ export function createWorldTrees(scene, { root, still, rings }) {
   const planted = plantTrees(rings);
   const paint = new ShaderMaterial('world-trees-paint', scene, { vertexSource: TREE_VERTEX, fragmentSource: TREE_FRAGMENT }, {
     attributes: ['position', 'normal', 'color', 'uv'],
-    uniforms: ['world', 'viewProjection', ...AIR_UNIFORMS, ...RIDGE_UNIFORMS, 'sunStrength', 'shadowLift', ...LIGHT_COLORS, ...FOLIAGE_COLORS],
+    uniforms: ['world', 'viewProjection', ...AIR_UNIFORMS, ...RIDGE_UNIFORMS, 'sunStrength', 'shadowLift', 'goldenHour', ...LIGHT_COLORS, ...FOLIAGE_COLORS],
   });
   paint.backFaceCulling = false;
   followEye(scene, paint, still);
@@ -388,7 +393,7 @@ export function createWorldTrees(scene, { root, still, rings }) {
     setTheme(atmosphere) {
       applyAir(paint, atmosphere); applyRidges(paint, atmosphere);
       for (const key of [...FOLIAGE_COLORS, ...LIGHT_COLORS]) paint.setColor3(key, Color3.FromHexString(atmosphere[key]));
-      paint.setFloat('sunStrength', atmosphere.sunStrength); paint.setFloat('shadowLift', atmosphere.shadowLift);
+      paint.setFloat('sunStrength', atmosphere.sunStrength); paint.setFloat('shadowLift', atmosphere.shadowLift); paint.setFloat('goldenHour', atmosphere.goldenHour);
     },
   };
 }
