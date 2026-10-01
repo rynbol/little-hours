@@ -342,15 +342,29 @@ export function createRoom(container, options = {}) {
   const lanternBulbs = [[-5.33, 4.32, 2.86], [1.64, 4.35, -4.05], [4.40, 4.54, -4.08]];
   for (const [x, y, z] of lanternBulbs) lantern(x, y, z);
   const lanternGlow = createLanternGlow(scene, lanternBulbs.map(([x, y, z]) => [x, y + 0.16, z]));
+  const turned = (profile, position, mat, segments = 20) => finish(MeshBuilder.CreateLathe(`turned-${meshId++}`, { shape: profile.map(([r, y]) => new Vector3(r, y, 0)), tessellation: segments }, scene), mat, position, decor.lights);
+  const SILL_DISH = [[0, 0], [0.112, 0], [0.124, 0.006], [0.13, 0.02], [0.124, 0.03], [0.112, 0.022], [0.08, 0.015], [0, 0.015]];
+  const FLAME = [[0, 0], [0.013, 0.006], [0.022, 0.022], [0.021, 0.04], [0.013, 0.062], [0.005, 0.08], [0, 0.09]];
   for (let i = 0; i < 5; i++) {
-    const x = i < 3 ? -4.21 + i * 0.19 : -1.35 + (i - 3) * 0.24, h = 0.20 + (i % 3) * 0.11;
-    const wax = material('#e6cc96'), top = 1.565 + h;
-    cylinder(0.12, 0.1, 0.03, [x, 1.555, -4.05], palette.brass, decor.lights);
-    cylinder(0.062, 0.075, h, [x, 1.565 + h / 2, -4.05], wax, decor.lights);
-    for (const [angle, length] of [[0.6 + i, 0.07 + (i % 2) * 0.05], [2.9 + i * 1.3, 0.05]]) cylinder(0.014, 0.018, length, [x + Math.cos(angle) * 0.058, top - length / 2, -4.05 + Math.sin(angle) * 0.058], wax, decor.lights, 6);
-    cylinder(0.006, 0.006, 0.035, [x, top + 0.015, -4.05], palette.dark, decor.lights, 6);
-    sphere([0.026, 0.034, 0.026], [x, top + 0.045, -4.05], candleFlame, decor.lights);
-    cylinder(0, 0.021, 0.07, [x, top + 0.09, -4.05], candleTip, decor.lights, 10);
+    const x = i < 3 ? -4.21 + i * 0.19 : -1.35 + (i - 3) * 0.24, h = 0.20 + (i % 3) * 0.11, z = -4.05, floor = 1.555;
+    const wax = material('#e6cc96'), top = floor + h, radius = 0.07;
+    turned(SILL_DISH, [x, 1.54, z], palette.brass, 24);
+    if (i === 0 || i === 4) {
+      const ring = finish(MeshBuilder.CreateTorus(`handle-${meshId++}`, { diameter: 0.05, thickness: 0.011, tessellation: 14 }, scene), palette.brass, [x + (i ? 0.142 : -0.142), 1.556, z], decor.lights);
+      ring.rotation.x = Math.PI / 2;
+    }
+    turned([[0, 0], [radius + 0.004, 0], [radius + 0.005, 0.012], [radius, h * 0.55], [radius - 0.003, h - 0.01], [radius - 0.001, h - 0.002], [radius - 0.008, h + 0.004], [radius - 0.022, h - 0.006], [0.03, h - 0.013], [0, h - 0.015]], [x, floor, z], wax, 18);
+    for (let k = 0; k < 3 + (i % 2); k++) {
+      const angle = 0.5 + i * 1.7 + k * 1.9, reaches = k === 0 && i !== 1, length = reaches ? h - 0.014 : 0.04 + ((i + k) % 3) * 0.035, side = r => [x + Math.cos(angle) * r, z + Math.sin(angle) * r];
+      const path = [0, 0.4, 0.75, 1].map((t, step) => { const [px, pz] = side(radius - 0.004 + t * 0.002 + (step % 2) * 0.002); return [px, top - 0.003 - t * length, pz]; });
+      tube(path, 0.011 + (k % 2) * 0.003, wax, decor.lights);
+      const [bx, bz] = side(radius + 0.001), bead = sphere([0.009, 0.017, 0.016], [bx, top - 0.003 - length, bz], wax, decor.lights);
+      bead.rotation.y = -angle;
+      if (reaches) { const [px, pz] = side(radius + 0.024); sphere([0.03, 0.006, 0.022], [px, floor + 0.001, pz], wax, decor.lights); }
+    }
+    tube([[x, top - 0.016, z], [x, top + 0.01, z], [x + 0.005, top + 0.024, z + 0.002]], 0.0042, palette.dark, decor.lights);
+    turned(FLAME, [x + 0.003, top + 0.014, z], candleFlame, 14);
+    cylinder(0, 0.009, 0.026, [x + 0.003, top + 0.094, z], candleTip, decor.lights, 10);
   }
 
   // Merge architecture per material once. Furniture factories similarly batch

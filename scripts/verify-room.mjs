@@ -646,6 +646,13 @@ try {
       const flameAt = x => scene.pickWithRay(new Ray(new Vector3(x, 3, -4.05), new Vector3(0, -1, 0), 3), mesh => mesh.isEnabled() && mesh.isDescendantOf(lights) && mesh.material.name.includes('flame')).pickedMesh?.material.emissiveColor;
       for (const x of [-4.21, -1.11]) { const tip = flameAt(x); assert.ok(tip && tip.g / tip.r < 0.7, 'each sill candle flame burns orange at the tip'); }
       for (const x of [-4.21, -4.02, -3.83, -1.35, -1.11]) assert.deepEqual([downAt(x, -4.05), downAt(x + 0.095, -4.05)], ['paint-#4d5148:{}', 'paint-#bf9762:{"metalness":0.45}'], 'each sill candle has a wick and stands in a brass dish');
+      const sillX = [-4.21, -4.02, -3.83, -1.35, -1.11], points = name => lights.getChildMeshes().filter(mesh => mesh.material.name === name).flatMap(mesh => { mesh.computeWorldMatrix(true); const p = mesh.getVerticesData('position'), out = []; for (let i = 0; i < p.length; i += 3) out.push(Vector3.TransformCoordinates(new Vector3(p[i], p[i + 1], p[i + 2]), mesh.getWorldMatrix())); return out; });
+      const flamePoints = points('paint-#ffdda3:{"emissive":"#ffd392","emissiveIntensity":1.25,"flame":true}'), waxPoints = points('paint-#e6cc96:{}');
+      for (const x of sillX) {
+        const own = flamePoints.filter(p => Math.abs(p.x - x) < 0.05), height = Math.max(...own.map(p => p.y)) - Math.min(...own.map(p => p.y)), width = Math.max(...own.map(p => p.x)) - Math.min(...own.map(p => p.x));
+        assert.ok(height > 0.085 && height / width > 1.8, `the sill candle flame at ${x} is a tall teardrop`);
+      }
+      assert.ok(sillX.filter(x => waxPoints.some(p => p.y < 1.562 && Math.hypot(p.x - x, p.z + 4.05) > 0.085 && Math.hypot(p.x - x, p.z + 4.05) < 0.13)).length >= 4, 'wax runs down the sill candles and pools in their dishes');
     }
     if (style !== 'retreat') {
       assert.ok(shell.getChildMeshes().length <= 6, 'architecture is batched into at most six meshes');
