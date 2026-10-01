@@ -6,7 +6,7 @@ from bookcase import spine_book
 
 WOOD, DARK, CANDLE, FLAME, TERRACOTTA = '#aa7954', '#73533d', '#ead6aa', '#ffd186', '#bd8469'
 LEAF, LIGHT_LEAF, DARK_LEAF, BRASS = '#809362', '#95a576', '#617853', '#bf9762'
-BOOKS = ['#788e84', '#bb8066', '#d5b77c', '#a4ac8e', '#829da3', '#c7a696']
+BOOKS = ['#6b7a5c', '#9c5f46', '#b89358', '#857a58', '#5f7270', '#a07c62']
 Y = 0.18
 EYE = (0.25, 0.2, 1.0)
 

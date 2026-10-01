@@ -24,11 +24,13 @@ export function floorBoards({ left, right, back, front }, tones) {
   return boards;
 }
 
+export const GRAIN = Object.freeze({ lines: 18, alpha: [0.025, 0.045], width: [2.5, 5], knots: 1 });
+
 export function woodGrain(context, width, height) {
   context.fillStyle = '#f6efe6'; context.fillRect(0, 0, width, height);
-  for (let line = 0; line < 46; line++) {
-    const x0 = hash(line, 7) * width, sway = 3 + hash(line, 9) * 9, wave = 1.5 + hash(line, 11) * 3;
-    context.strokeStyle = `rgba(92, 56, 32, ${0.05 + hash(line, 13) * 0.1})`; context.lineWidth = 0.6 + hash(line, 15) * 1.8;
+  for (let line = 0; line < GRAIN.lines; line++) {
+    const x0 = hash(line, 7) * width, sway = 3 + hash(line, 9) * 9, wave = 1 + hash(line, 11) * 1.5;
+    context.strokeStyle = `rgba(92, 56, 32, ${GRAIN.alpha[0] + hash(line, 13) * (GRAIN.alpha[1] - GRAIN.alpha[0])})`; context.lineWidth = GRAIN.width[0] + hash(line, 15) * (GRAIN.width[1] - GRAIN.width[0]);
     context.beginPath();
     for (let y = 0; y <= height; y += 8) {
       const x = x0 + Math.sin(y / height * Math.PI * 2 * wave + line) * sway;
@@ -36,11 +38,11 @@ export function woodGrain(context, width, height) {
     }
     context.stroke();
   }
-  for (let knot = 0; knot < 3; knot++) {
+  for (let knot = 0; knot < GRAIN.knots; knot++) {
     const x = hash(knot, 17) * width, y = hash(knot, 19) * height;
-    for (let ring = 0; ring < 4; ring++) {
-      context.strokeStyle = `rgba(84, 50, 28, ${0.16 - ring * 0.03})`; context.lineWidth = 1.2;
-      context.beginPath(); context.ellipse(x, y, 3 + ring * 3, 9 + ring * 7, 0, 0, Math.PI * 2); context.stroke();
+    for (let ring = 0; ring < 3; ring++) {
+      context.strokeStyle = `rgba(84, 50, 28, ${0.07 - ring * 0.02})`; context.lineWidth = 2;
+      context.beginPath(); context.ellipse(x, y, 4 + ring * 4, 12 + ring * 9, 0, 0, Math.PI * 2); context.stroke();
     }
   }
 }

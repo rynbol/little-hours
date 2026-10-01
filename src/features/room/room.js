@@ -21,7 +21,7 @@ import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstr
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 import '@babylonjs/core/Culling/ray.js';
 import '@babylonjs/core/Rendering/outlineRenderer.js';
-import { createFurniture, createRoundedBox, createContactShadow, createMobileCompanion, disposeAvatarTemplates, disposeFurnitureAssets, WINDOW_VIEW_DEPTH, PET_BED_SURFACE } from '../../models/furniture.js';
+import { createFurniture, createRoundedBox, createContactShadow, createMobileCompanion, disposeAvatarTemplates, disposeFurnitureAssets, WINDOW_VIEW_DEPTH, PET_BED_SURFACE, LAPTOP } from '../../models/furniture.js';
 import { celebrationWeight } from '../../core/delight.js';
 import { AVATAR_DEFAULT, avatarAppearanceKey, normalizeAvatarAppearance } from '../../core/avatar.js';
 import { createPetModel, createPetBelongings } from '../pet/index.js';
@@ -29,7 +29,7 @@ import { createPetRoutine, insideBed, PETS, PET_REACTION } from '../pet/index.js
 import { createCompanionRoutine } from '../companion/index.js';
 import { interactionFor, INTERACTION_NOTICES } from '../../core/item-interactions.js';
 import { createArchitecture, styleFurniture, buildWallMesh, furnitureRepaint } from '../../models/architecture.js';
-import { hasDetail, isDetailLoaded, loadDetails, createDetail, disposeDetails } from '../../models/detail.js';
+import { hasDetail, isDetailLoaded, loadDetails, createDetail, disposeDetails, shadeGlow } from '../../models/detail.js';
 import { getFurniture } from '../../core/catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, footprintBounds, MAX_ITEMS, pieceCount, petBed, roomDesign, rugStack, rugTouches, groundAt, standHeight, FLOOR_Y, RUG_STEP, FLAT_RUG } from '../../core/layout.js';
 import { roomDisplayName } from '../../core/house.js';
@@ -44,9 +44,11 @@ import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
-import { ROOM_LIGHTS, seatedDim, deskLamp } from './room-lighting.js';
+import { ROOM_LIGHTS, seatedDim, deskLamp, gradeFocus, roomBloom, bloomEmission, lampPool } from './room-lighting.js';
+import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
 import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
-import { createLanternGlow } from './room-lantern-glow.js';
+import { createLanternGlow, createGlowDecal, deskPoolShape, DESK_POOL } from './room-lantern-glow.js';
+import { moulding, sillNosing } from './window-trim.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
 import { createStorybook } from '../../models/storybook.js';
 import { createSeatWorld } from './seat-world.js';
@@ -71,6 +73,8 @@ export function createRoom(container, options = {}) {
   scene.imageProcessingConfiguration.toneMappingEnabled = true;
   scene.imageProcessingConfiguration.toneMappingType = 1;
   scene.imageProcessingConfiguration.exposure = 1.08;
+  scene.imageProcessingConfiguration.colorCurves = gradeFocus(new ColorCurves(), 0);
+  scene.imageProcessingConfiguration.colorCurvesEnabled = true;
   const painterly = createPainterly(scene, 'room-dusk');
   const storybook = createStorybook(scene);
   const targetHome = new Vector3(0, 2.15, 0), alphaHome = Math.atan2(12.4, 10.5), betaHome = 1.071;
@@ -197,7 +201,7 @@ export function createRoom(container, options = {}) {
     for (const mesh of mobileCompanion.root.getChildMeshes()) mesh.layerMask |= portraitMask;
     mobileCompanion.contact.layerMask |= portraitMask;
   }
-  const bloom = new GlowLayer('candlelight-bloom', scene, { mainTextureFixedSize: 512, blurKernelSize: 24 }); bloom.intensity = 0.34;
+  const bloom = new GlowLayer('candlelight-bloom', scene, { mainTextureFixedSize: 512, blurKernelSize: 48 }); bloom.intensity = 0.34; bloom.customEmissiveColorSelector = (mesh, subMesh, material, result) => bloomEmission(material, storybook.amount, result);
   const glowingMeshes = new Set();
 
   // A generous timber retreat: deep floorboards, paneled walls and exposed beams.
@@ -301,8 +305,15 @@ export function createRoom(container, options = {}) {
   const archPoints = []; for (let i = 0; i <= 32; i++) { const angle = i / 32 * Math.PI; archPoints.push([archCenter + Math.cos(angle) * archRadius, archSpring + Math.sin(angle) * archRadius, -4.43]); }
   tube(archPoints, 0.13, windowDark); tube(archPoints.map(([x, y, z]) => [x, y, z + 0.06]), 0.065, windowFrame);
   box([4.62, 0.18, 0.68], [archCenter, 1.45, -4.25], palette.wood, 0.045);
-  box([0.065, 3.7, 0.15], [archCenter, 3.30, -4.31], glazing, 0.008);
-  box([4.12, 0.07, 0.15], [archCenter, archSpring, -4.31], glazing, 0.008);
+  const sillTones = { lit: palette.edge, shadow: palette.darkWood, grain: palette.darkWood };
+  for (const part of sillNosing(4.62, { height: 0.18, depth: 0.68 })) {
+    if (part.rod) rod(...part.rod.map(([x, y, z]) => [archCenter + x, 1.45 + y, -4.25 + z]), part.radius, sillTones[part.tone]);
+    else box(part.size, [archCenter + part.at[0], 1.45 + part.at[1], -4.25 + part.at[2]], sillTones[part.tone]);
+  }
+  const trimTones = { core: glazing, face: windowDark, lit: windowFrame, grain: glazing };
+  for (const [length, axis, y] of [[3.7, 'y', 3.30], [4.12, 'x', archSpring]]) {
+    for (const part of moulding(length, axis)) box(part.size, [archCenter + part.at[0], y + part.at[1], -4.31 + part.at[2]], trimTones[part.tone], part.bevel);
+  }
   [-1, 1].forEach(side => rod([archCenter, archSpring, -4.31], [archCenter + side * 1.47, archSpring + 1.47, -4.31], 0.026, glazing));
   // Heavy linen curtains are swept to each side with golden tiebacks.
   const curtain = material('#a88380'), curtainShade = material('#8c686d');
@@ -374,6 +385,8 @@ export function createRoom(container, options = {}) {
   const lanternBulbs = [[-5.33, 4.32, 2.86], [1.64, 4.35, -4.05], [4.40, 4.54, -4.08]];
   for (const [x, y, z] of lanternBulbs) lantern(x, y, z);
   const lanternGlow = createLanternGlow(scene, lanternBulbs.map(([x, y, z]) => [x, y + 0.16, z]));
+  const deskPool = createGlowDecal(scene, 'desk-lamp-pool', deskPoolShape(1.5), true); deskPool.setLight(DESK_POOL.tint, 0);
+  let deskPoolOwner = null, deskPoolFlag = -1;
   const turned = (profile, position, mat, segments = 20) => finish(MeshBuilder.CreateLathe(`turned-${meshId++}`, { shape: profile.map(([r, y]) => new Vector3(r, y, 0)), tessellation: segments }, scene), mat, position, decor.lights);
   const SILL_DISH = [[0, 0], [0.112, 0], [0.124, 0.006], [0.13, 0.02], [0.124, 0.03], [0.112, 0.022], [0.08, 0.015], [0, 0.015]];
   const FLAME = [[0, 0], [0.013, 0.006], [0.022, 0.022], [0.021, 0.04], [0.013, 0.062], [0.005, 0.08], [0, 0.09]];
@@ -943,9 +956,12 @@ export function createRoom(container, options = {}) {
     if (fireplace) { const offset = Vector3.TransformCoordinates(new Vector3(0, 1.0, 0.70), Matrix.RotationY(fireplace.rotation * Math.PI / 2)); hearthGlow.position.set(fireplace.x + offset.x, offset.y, fireplace.z + offset.z); }
   }
   function aimDeskLamp(blend = 0) {
-    const desk = layout.items.find(item => item.id === layout.activeDeskId); if (!desk) return;
+    const desk = layout.items.find(item => item.id === layout.activeDeskId); if (!desk) { deskPool.setStrength(0); return; }
     const lamp = deskLamp(theme, blend), offset = Vector3.TransformCoordinates(Vector3.FromArray(lamp.offset), Matrix.RotationY(desk.rotation * Math.PI / 2));
     windowGlow.position.set(desk.x + offset.x, offset.y, desk.z + offset.z); windowGlow.intensity = lamp.intensity; windowGlow.range = lamp.range;
+    const object = placedObjects.get(desk.id), world = object?.computeWorldMatrix();
+    if (world && (object !== deskPoolOwner || world.updateFlag !== deskPoolFlag)) { deskPoolOwner = object; deskPoolFlag = world.updateFlag; deskPool.place(deskPoolShape(getFurniture(desk.type).footprint[0] / 2 - 0.02), world); }
+    deskPool.setStrength(world && !desk.off && !avatarCameraEditing ? lampPool(theme, blend) : 0);
   }
   // A switched-off lamp keeps its shade with an unlit twin of its glowing
   // paint. Candles and fires lose their flames.
@@ -1222,7 +1238,7 @@ export function createRoom(container, options = {}) {
   function setTheme(name) {
     if (savedAvatarEffects) restoreAvatarEffects();
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
-    const daylight = theme === 'day', night = theme === 'dusk';
+    const night = theme === 'dusk';
     companionRoutine?.setContext({ night });
     paintSky(theme); seatWorld.setTheme(theme); windowWorld?.setTheme(theme); architecture?.setTheme(theme); roof?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
     if (!night) { shootingStar.setEnabled(false); streakMaterial.alpha = 0; }
@@ -1231,9 +1247,10 @@ export function createRoom(container, options = {}) {
     sun.position.set(...light.position); sun.direction.set(...light.direction).normalize();
     hemisphere.diffuse = color(light.sky); hemisphere.groundColor = color(light.ground); hemisphere.intensity = light.ambient;
     painterly.setTheme(`room-${theme}`); aimSunbeam();
+    for (const object of placedObjects.values()) if (object.metadata.detail) dimScreen(object.metadata.detail);
     aimDeskLamp();
     applyBulbs(); applyAccents();
-    bloom.intensity = daylight ? 0.18 : night ? 0.40 : 0.26;
+    bloom.intensity = roomBloom(theme, seatView.blend);
     shadow.darkness = light.darkness;
     if (avatarCameraEditing) {
       savedAvatarEffects = [fireflies, skyStars, moths, shootingStar, rain, windowGlow, hearthGlow].map(effect => [effect, effect.isEnabled()]);
@@ -1661,11 +1678,12 @@ export function createRoom(container, options = {}) {
     skyStars.setEnabled(theme === 'dusk' && !inside);
     for (const mesh of scene.meshes) if (mesh.material && (mesh.material === retreatView || mesh.material === architecture?.viewMaterial)) mesh.isVisible = !inside;
   }
+  function dimScreen(detail) { shadeGlow(detail, Object.fromEntries(LAPTOP.page.map(hex => [hex, ROOM_LIGHTS[theme].screen]))); }
   function syncDetails() {
     for (const object of placedObjects.values()) {
       const type = object.metadata.furnitureType; if (!hasDetail(type)) continue;
       let detail = object.metadata.detail;
-      if (!detail) { detail = createDetail(type, scene, furnitureRepaint(architectureStyle, tintPaint(type, object.metadata.tint))); if (!detail) continue; detail.parent = object; object.metadata.detail = detail; }
+      if (!detail) { detail = createDetail(type, scene, furnitureRepaint(architectureStyle, tintPaint(type, object.metadata.tint))); if (!detail) continue; detail.parent = object; object.metadata.detail = detail; dimScreen(detail); }
       detail.setEnabled(seatView.inside); object.metadata.body.setEnabled(!seatView.inside);
     }
   }
@@ -1876,6 +1894,7 @@ export function createRoom(container, options = {}) {
     companionTime = now;
     animateAvatarCamera(companionDelta);
     if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
+    if (storybook.amount !== seatView.blend) { gradeFocus(scene.imageProcessingConfiguration.colorCurves, seatView.blend); bloom.intensity = roomBloom(theme, seatView.blend); }
     storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = ROOM_LIGHTS[theme].sun * seatedDim(theme, seatView.blend); aimDeskLamp(seatView.blend); rain.alpha = windowRainAlpha * (1 - seatView.blend);
     sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend);
     seatWorld.animate(companionDelta, reducedMotion);

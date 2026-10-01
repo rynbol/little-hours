@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
-import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, DETAIL_SOURCES } from './detail.js';
+import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, shadeGlow, DETAIL_SOURCES } from './detail.js';
 import { SURFACE_KIND } from './storybook.js';
 import { getFurniture } from '../core/catalog.js';
 import { createFurniture, LAPTOP } from './furniture.js';
@@ -84,6 +85,23 @@ test('the study laptop is a walnut case with brass fittings and a sepia screen, 
   disposeDetails(scene); engine.dispose();
 });
 
+test('turning the laptop page down dims only its glowing parts, leaves the lamp shade and the mug lit, and never compounds', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const detail = createDetail('study-desk', scene), untouched = createDetail('study-desk', scene), layer = (node, name) => node.getChildMeshes().find(mesh => mesh.material.name === name);
+  const glow = layer(detail, 'detail-glow'), { slots, palette } = glow.metadata, lit = Float32Array.from(glow.getVerticesData('color')), paint = Float32Array.from(layer(detail, 'detail-paint').getVerticesData('color'));
+  const page = Object.fromEntries(LAPTOP.page.map(hex => [hex, 0.6]));
+  shadeGlow(detail, page); shadeGlow(detail, page);
+  const colors = glow.getVerticesData('color'), at = hex => slots.findIndex(slot => slot === palette.indexOf(hex));
+  for (const hex of LAPTOP.page) { const i = at(hex); assert.ok(Math.abs(colors[i * 4 + 1] - lit[i * 4 + 1] * 0.6) < 1e-4, `${hex} is turned down once`); }
+  const shade = at('#ffd08a'); assert.equal(colors[shade * 4 + 1], lit[shade * 4 + 1], 'the lamp shade keeps its glow');
+  assert.deepEqual(Array.from(layer(detail, 'detail-paint').getVerticesData('color')), Array.from(paint), 'the painted parts, the mug rim among them, are untouched');
+  assert.deepEqual(Array.from(layer(untouched, 'detail-glow').getVerticesData('color')), Array.from(lit), 'another desk keeps its own bright page');
+  shadeGlow(detail, Object.fromEntries(LAPTOP.page.map(hex => [hex, 1])));
+  assert.deepEqual(Array.from(glow.getVerticesData('color')), Array.from(lit), 'turning it back up restores the page');
+  disposeDetails(scene); engine.dispose();
+});
+
 test('the desk lamp shade glows evenly from within instead of being lit across its pleats', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
@@ -111,7 +129,7 @@ test('the desk succulent is a blush-tipped rosette in a glazed pot', async () =>
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
   const { palette } = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint').metadata;
-  assert.ok(['#7f9fa3', '#efe2c4', '#8fb07c', '#c9dea8', '#d8958a'].every(hex => palette.includes(hex)), 'glazed pot with a cream band, graded rosette leaves and blushed tips');
+  assert.ok(['#667c78', '#efe2c4', '#8fb07c', '#c9dea8', '#d8958a'].every(hex => palette.includes(hex)), 'glazed pot with a cream band, graded rosette leaves and blushed tips');
   disposeDetails(scene); engine.dispose();
 });
 
@@ -129,6 +147,22 @@ test('the moon tree charms hang on strings that rise into the canopy or loop ove
   }
   assert.ok(strands > 20, `${strands} string vertices`);
   tops.forEach(top => assert.ok(top > 2.38, `a string reaches ${top}`));
+  disposeDetails(scene); engine.dispose();
+});
+
+test('baked contact shade keeps most of each colour, so crevices stay warm instead of crushing to black', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine), types = ['bookcase', 'study-desk', 'lounge-chair', 'fireplace'];
+  await loadDetails(types);
+  for (const type of types) {
+    const kept = [];
+    for (const mesh of createDetail(type, scene).getChildMeshes().filter(mesh => mesh.material.name !== 'detail-glow')) {
+      const colors = mesh.getVerticesData('color'), { slots, palette } = mesh.metadata;
+      const brightest = palette.map(hex => Math.max(...[1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16) / 255)));
+      slots.forEach((slot, v) => kept.push(Math.max(colors[v * 4], colors[v * 4 + 1], colors[v * 4 + 2]) / brightest[slot]));
+    }
+    kept.sort((a, b) => a - b);
+    assert.ok(kept[Math.floor(kept.length * 0.02)] > 0.5, `${type} crevices keep ${kept[Math.floor(kept.length * 0.02)].toFixed(2)} of their colour`);
+  }
   disposeDetails(scene); engine.dispose();
 });
 
@@ -165,10 +199,34 @@ test('the desk lamp shade shows its pleat folds, a rust trim at both rims, a gil
   const at = (layer, hex) => { const { slots, palette } = layers[layer].metadata, slot = palette.indexOf(hex), p = layers[layer].getVerticesData('position'), out = []; slots.forEach((s, v) => { if (s === slot) out.push([p[v * 3], p[v * 3 + 1], p[v * 3 + 2]]); }); return out; };
   const nearShade = ([x, , z]) => Math.hypot(x - 0.96, z + 0.69) < 0.27;
   assert.ok(at('detail-glow', '#eeb26a').filter(nearShade).length > 200, 'darker fold lines run down the glowing shade');
-  const trim = at('detail-paint', '#9a5a3c').filter(nearShade).map(([, y]) => y);
+  const trim = at('detail-paint', '#8e6048').filter(nearShade).map(([, y]) => y);
   assert.ok(trim.some(y => y < 1.8) && trim.some(y => y > 1.98), 'a rust trim binds the bottom and top rims');
-  const beads = at('detail-metal', '#d9b36e').filter(([x, y, z]) => Math.abs(Math.hypot(x - 0.96, z + 0.69) - 0.256) < 0.012 && Math.abs(y - 1.76) < 0.015);
+  const beads = at('detail-metal', '#cdb07e').filter(([x, y, z]) => Math.abs(Math.hypot(x - 0.96, z + 0.69) - 0.256) < 0.012 && Math.abs(y - 1.76) < 0.015);
   assert.ok(beads.length > 24 * 6, `${beads.length} fringe bead vertices`);
-  assert.ok(at('detail-metal', '#bf9762').some(([x, y, z]) => Math.hypot(x - 0.96, z + 0.69) < 0.03 && y > 2.05), 'a brass finial crowns the shade');
+  assert.ok(at('detail-metal', '#b99a6e').some(([x, y, z]) => Math.hypot(x - 0.96, z + 0.69) < 0.03 && y > 2.05), 'a brass finial crowns the shade');
+  disposeDetails(scene); engine.dispose();
+});
+
+test('the desk close-ups are lifted earth tones, with no saturated primaries or blue cloth', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const lit = createDetail('study-desk', scene).getChildMeshes().filter(mesh => mesh.material.name !== 'detail-glow');
+  const used = new Set(lit.flatMap(mesh => [...mesh.metadata.slots].map(slot => mesh.metadata.palette[slot].toLowerCase())));
+  const loud = [...used].filter(hex => {
+    const color = Color3.FromHexString(hex), [h, s, v] = color.toHSV().asArray(), chroma = Math.max(color.r, color.g, color.b) - Math.min(color.r, color.g, color.b);
+    return v > 0.3 && (chroma > 0.36 || s > 0.56 || (h > 180 && h < 260 && s > 0.15));
+  });
+  assert.deepEqual(loud, [], 'desk close-ups that shout from the chair');
+  disposeDetails(scene); engine.dispose();
+});
+
+test('shelf books are earthy leather and cloth tones, with no pale pastel blues or greens', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine), types = ['bookcase', 'wall-shelf'];
+  await loadDetails(types);
+  for (const type of types) {
+    const { palette } = createDetail(type, scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint').metadata;
+    const pastel = palette.filter(hex => { const [h, s, v] = Color3.FromHexString(hex).toHSV().asArray(); return h > 120 && h < 260 && s > 0.08 && v > 0.5; });
+    assert.deepEqual(pastel, [], `${type} has pale cool spines`);
+  }
   disposeDetails(scene); engine.dispose();
 });

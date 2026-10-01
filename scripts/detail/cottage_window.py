@@ -5,7 +5,7 @@ from kit import Frame, at, cylinder, lathe, rbox, rod, sphere, torus, tube
 
 WOOD, EDGE, DARK, TERRACOTTA, LEAF, DARK_LEAF = '#aa7954', '#bc9169', '#73533d', '#bd8469', '#809362', '#617853'
 BRASS, CURTAIN, TRIM, PAPER = '#bf9762', '#efdfc4', '#d39a86', '#f2ead5'
-BOOKS = ['#788e84', '#bb8066']
+BOOKS = ['#6b7a5c', '#9c5f46']
 EYE = (0.3, 0.25, 1.0)
 AO = 0.55
 

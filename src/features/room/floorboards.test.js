@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { floorBoards } from './floorboards.js';
+import { floorBoards, woodGrain } from './floorboards.js';
 
 const bounds = { left: -5.97, right: 5.97, back: -4.55, front: 4.55 };
 const tones = ['a', 'b', 'c', 'd', 'e', 'f'];
@@ -25,4 +25,14 @@ test('floorboards tile the floor edge to edge without overlapping', () => {
   }
   const used = new Set(boards.map(board => board.tone));
   assert.equal(used.size, tones.length, 'every floor tone appears');
+});
+
+test('the floor grain is a few broad, faint streaks, not fine dark lines that read as plastic', () => {
+  const strokes = [];
+  let style = '', width = 0;
+  const context = { set fillStyle(v) {}, set strokeStyle(v) { style = v; }, set lineWidth(v) { width = v; }, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, ellipse() {}, stroke() { strokes.push({ alpha: Number(style.match(/([\d.]+)\)$/)[1]), width }); } };
+  woodGrain(context, 256, 1024);
+  assert.ok(strokes.length <= 24, `${strokes.length} grain strokes`);
+  assert.ok(strokes.every(({ alpha }) => alpha <= 0.07), 'every streak is faint');
+  assert.ok(strokes.every(({ width }) => width >= 2), 'every streak is broad');
 });

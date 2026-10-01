@@ -131,6 +131,18 @@ function repaintDetail(mesh, repaint) {
   mesh.makeGeometryUnique(); mesh.setVerticesData('color', colors);
 }
 
+const litColors = new WeakMap();
+export function shadeGlow(detail, factors) {
+  for (const mesh of detail.getChildMeshes()) {
+    const { slots, palette } = mesh.metadata ?? {};
+    if (mesh.material?.name !== 'detail-glow' || !palette.some(hex => hex in factors)) continue;
+    if (!litColors.has(mesh)) { if (mesh.geometry.meshes.length > 1) mesh.makeGeometryUnique(); litColors.set(mesh, Float32Array.from(mesh.getVerticesData('color'))); }
+    const lit = litColors.get(mesh), colors = Float32Array.from(lit), scale = palette.map(hex => factors[hex] ?? 1);
+    for (let i = 0; i < slots.length; i++) for (let channel = 0; channel < 3; channel++) colors[i * 4 + channel] = lit[i * 4 + channel] * scale[slots[i]];
+    mesh.updateVerticesData('color', colors);
+  }
+}
+
 export function disposeDetails(scene) {
   const cache = templatesByScene.get(scene); if (!cache) return;
   for (const node of cache.nodes.values()) node.dispose(false, false);

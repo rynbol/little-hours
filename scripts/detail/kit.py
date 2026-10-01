@@ -289,7 +289,7 @@ def _pack(objects):
     return shape, len(seen), len(indices) // 3
 
 
-def export(name, objects, ao=0.7):
+def export(name, objects, ao=0.4):
     objects = [o for o in objects if o is not None]
     palette = {}
     _paint(objects, palette)

@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatedDim, deskLamp, LAMP_AT } from './room-lighting.js';
+import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
+import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
+import { ROOM_LIGHTS, seatedDim, deskLamp, LAMP_AT, gradeFocus, roomBloom, bloomEmission } from './room-lighting.js';
 
 test('seated at dusk or in rain, the room ambient and key light dim so the lamp and candles lead', () => {
   assert.equal(seatedDim('day', 1), 1);
@@ -20,4 +22,42 @@ test('seated, the desk lamp tucks under its shade and throws a tight warm pool a
   }
   assert.ok(deskLamp('day', 1).intensity < 0.5, 'the day lamp stays a gentle accent');
   assert.equal(deskLamp('dusk', 0).range, 3.4, 'the dollhouse keeps its lamplight');
+});
+
+function curveAt(curves, luma) {
+  const uniforms = {};
+  ColorCurves.Bind(curves, { setFloat4: (name, ...value) => { uniforms[name] = value; } });
+  const lift = Math.min(1, Math.max(0, luma * 3 - 1.5)), drop = Math.min(1, Math.max(0, 1.5 - luma * 3));
+  return uniforms.vCameraColorCurveNeutral.map((neutral, i) => neutral + lift * uniforms.vCameraColorCurvePositive[i] - drop * uniforms.vCameraColorCurveNegative[i]);
+}
+
+test('the Focus grade lifts shade, softens highlights and warms toward gold, and is neutral in the dollhouse', () => {
+  const room = gradeFocus(new ColorCurves(), 0);
+  for (const luma of [0.1, 0.5, 0.9]) assert.deepEqual(curveAt(room, luma).map(v => +v.toFixed(6)), [1, 1, 1, 1]);
+  const seated = gradeFocus(new ColorCurves(), 1);
+  const [shadeR, shadeG, shadeB] = curveAt(seated, 0.1), [lightR] = curveAt(seated, 0.9), [, , , midSaturation] = curveAt(seated, 0.5);
+  assert.ok(shadeR > 1.12, `shade lifts ${shadeR}`);
+  assert.ok(lightR < 0.95, `highlights ease to ${lightR}`);
+  assert.ok(shadeB < shadeG && shadeG > shadeR * 0.97, `tint ${shadeR} ${shadeG} ${shadeB} leans gold, not red`);
+  assert.ok(midSaturation > 1.1, `midtones saturate ${midSaturation}`);
+});
+
+test('seated, candle and lamp bloom roughly doubles so flames carry soft halos, strongest after dark', () => {
+  for (const theme of ['day', 'dusk', 'rain']) assert.ok(roomBloom(theme, 1) >= roomBloom(theme, 0) * 1.6, `${theme} bloom ${roomBloom(theme, 0)} → ${roomBloom(theme, 1)}`);
+  assert.equal(roomBloom('dusk', 0), 0.4);
+  assert.ok(roomBloom('dusk', 1) > roomBloom('rain', 1) && roomBloom('rain', 1) > roomBloom('day', 1));
+  assert.ok(roomBloom('dusk', 1) <= 1.4, 'halos stay soft, not a wash');
+});
+
+test('seated, glowing paint like the laptop screen blooms faintly so it keeps its page, while flames keep full halos', () => {
+  const paint = { name: 'detail-glow', emissiveColor: new Color3(0.66, 0.64, 0.58), alpha: 1 }, flame = { name: 'candle-flame', emissiveColor: new Color3(1, 0.8, 0.5), alpha: 1 };
+  assert.deepEqual(bloomEmission(paint, 0, new Color4()).asArray(), [0.66, 0.64, 0.58, 1]);
+  const seated = bloomEmission(paint, 1, new Color4());
+  assert.ok(seated.r * roomBloom('dusk', 1) < 0.3, `screen glow ${seated.r * roomBloom('dusk', 1)} at dusk would wash the page out`);
+  assert.deepEqual(bloomEmission(flame, 1, new Color4()).asArray(), [1, 0.8, 0.5, 1]);
+});
+
+test('the laptop page is turned down after dark and in rain, so it never outshines the lamp', () => {
+  assert.equal(ROOM_LIGHTS.day.screen, 1);
+  assert.ok(ROOM_LIGHTS.dusk.screen <= 0.65 && ROOM_LIGHTS.dusk.screen < ROOM_LIGHTS.rain.screen && ROOM_LIGHTS.rain.screen < 1);
 });
