@@ -7,14 +7,20 @@ import { TargetCamera } from '@babylonjs/core/Cameras/targetCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { createWindowWorld, WINDOW_WORLD_DEPTH } from './window-world.js';
 
+function uploadingEngine() {
+  const engine = new NullEngine(), createRawTexture = engine.createRawTexture.bind(engine);
+  engine.createRawTexture = (...args) => Object.assign(createRawTexture(...args), { isReady: true });
+  return engine;
+}
 const near = (actual, expected) => assert.ok(Vector3.Distance(actual, expected) < 1e-4, `${actual} vs ${expected}`);
 
-test('the window world draws nothing until built, then sees the outdoors from where the seat camera sits in the room', async () => {
-  const engine = new NullEngine(), room = new Scene(engine), anchor = new TransformNode('seat-world', room);
+test('the window world draws nothing until built, then sees the outdoors from where the seat camera sits in the room', { timeout: 30000 }, async t => {
+  const engine = uploadingEngine(), room = new Scene(engine), anchor = new TransformNode('seat-world', room);
   anchor.position.set(10, 1, 5); anchor.rotation.y = Math.PI / 2; anchor.computeWorldMatrix(true);
   const seat = new TargetCamera('seat', Vector3.TransformCoordinates(new Vector3(-2, 2.24, -2.4), anchor.getWorldMatrix()), room);
   seat.setTarget(Vector3.TransformCoordinates(new Vector3(-2, 2.24, -12.4), anchor.getWorldMatrix())); seat.fov = 1.4; seat.computeWorldMatrix(true);
   const windowWorld = createWindowWorld(engine, anchor, { workers: false });
+  t.after(() => windowWorld.scene.isDisposed || windowWorld.dispose());
   assert.equal(windowWorld.render(seat), false);
   assert.equal(engine.scenes.includes(windowWorld.scene), false);
   await windowWorld.prepare({ theme: 'dusk' });
