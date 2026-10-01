@@ -5,7 +5,7 @@ import { Scene } from '@babylonjs/core/scene.js';
 import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, DETAIL_SOURCES } from './detail.js';
 import { SURFACE_KIND } from './storybook.js';
 import { getFurniture } from '../core/catalog.js';
-import { createFurniture } from './furniture.js';
+import { createFurniture, LAPTOP } from './furniture.js';
 
 const bounds = node => { const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity]; for (const mesh of node.getChildMeshes()) { mesh.computeWorldMatrix(true); const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox; minimumWorld.asArray().forEach((v, i) => { low[i] = Math.min(low[i], v); }); maximumWorld.asArray().forEach((v, i) => { high[i] = Math.max(high[i], v); }); } return [...low, ...high]; };
 const extent = mesh => { mesh.computeWorldMatrix(true); const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox; return { min: minimumWorld.asArray(), max: maximumWorld.asArray() }; };
@@ -65,19 +65,20 @@ test('every detailed model keeps the size and place of the dollhouse piece it st
   disposeDetails(scene); engine.dispose();
 });
 
-test('the study laptop is warm champagne with a sepia screen, in both the detailed and the dollhouse desk', async () => {
+test('the study laptop is a walnut case with brass fittings and a sepia screen, in both the detailed and the dollhouse desk', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
-  const warm = hex => { const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)); return r > g && g > b; };
-  const { palette } = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-metal').metadata;
-  assert.ok(palette.includes('#b3a189') && warm('#b3a189') && !palette.includes('#777f72'), 'detailed laptop shell');
-  const glow = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-glow');
+  const meshes = createDetail('study-desk', scene).getChildMeshes(), palette = name => meshes.find(mesh => mesh.material.name === name).metadata.palette;
+  assert.ok(palette('detail-paint').includes(LAPTOP.walnut) && palette('detail-paint').includes(LAPTOP.leather), 'detailed laptop case is walnut with a leather trackpad');
+  assert.ok(palette('detail-metal').includes(LAPTOP.brass) && !palette('detail-metal').includes('#b3a189'), 'detailed laptop fittings are brass');
+  const glow = meshes.find(mesh => mesh.material.name === 'detail-glow');
   const colors = glow.getVerticesData('color'), tints = new Set();
   for (let i = 0; i < colors.length; i += 4) tints.add(colors[i] >= colors[i + 2] ? 'warm' : 'cool');
   assert.deepEqual([...tints], ['warm'], 'every lit part of the desk glows warm');
-  const near = (colors, i) => Math.abs(colors[i] - 0xb3 / 255) + Math.abs(colors[i + 1] - 0xa1 / 255) + Math.abs(colors[i + 2] - 0x89 / 255) < 0.02;
-  const shell = createFurniture('study-desk', scene).getChildMeshes().some(mesh => { const colors = mesh.getVerticesData('color'); if (colors) { for (let i = 0; i < colors.length; i += 4) if (near(colors, i)) return true; } const paint = mesh.material?.diffuseColor; return paint && near([paint.r, paint.g, paint.b], 0); });
-  assert.ok(shell, 'the dollhouse laptop shares the champagne shell');
+  const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const has = hex => { const target = rgb(hex), near = (c, i) => Math.abs(c[i] - target[0]) + Math.abs(c[i + 1] - target[1]) + Math.abs(c[i + 2] - target[2]) < 0.02;
+    return createFurniture('study-desk', scene).getChildMeshes().some(mesh => { const colors = mesh.getVerticesData('color'); if (colors) { for (let i = 0; i < colors.length; i += 4) if (near(colors, i)) return true; } const paint = mesh.material?.diffuseColor; return paint && near([paint.r, paint.g, paint.b], 0); }); };
+  assert.ok(has(LAPTOP.walnut) && has(LAPTOP.brass), 'the dollhouse laptop shares the walnut case and brass hinge');
   disposeDetails(scene); engine.dispose();
 });
 

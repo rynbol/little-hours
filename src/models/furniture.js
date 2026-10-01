@@ -235,14 +235,16 @@ function deskLamp(parent, x, y, z) {
   cylinder(lamp, 0.10, 0.24, 0.21, [-0.14, 0.63, 0], '#c99858');
   cylinder(lamp, 0.205, 0.205, 0.013, [-0.14, 0.52, 0], '#f4dba1', { emissive: '#ffbd61', emissiveIntensity: 0.38 });
 }
+export const LAPTOP = Object.freeze({ walnut: '#9c6542', brass: '#c9a063', leather: '#7a5640' });
 function laptop(parent) {
   const laptopGroup = group(parent, [0, 1.29, -0.43]);
-  box(laptopGroup, [0.97, 0.045, 0.62], [0, 0, 0], '#b3a189', 0.025);
-  box(laptopGroup, [0.68, 0.008, 0.23], [0, 0.028, -0.06], '#4a3f36', 0.012);
-  box(laptopGroup, [0.25, 0.007, 0.12], [0, 0.028, 0.19], '#c7b89e', 0.012);
+  box(laptopGroup, [0.97, 0.045, 0.62], [0, 0, 0], LAPTOP.walnut, 0.03);
+  box(laptopGroup, [0.68, 0.008, 0.23], [0, 0.028, -0.06], '#3d2b22', 0.012);
+  box(laptopGroup, [0.25, 0.007, 0.12], [0, 0.028, 0.19], LAPTOP.leather, 0.012);
+  rod(laptopGroup, [-0.42, 0.03, -0.29], [0.42, 0.03, -0.29], 0.016, LAPTOP.brass, { metalness: 0.45 });
   const screen = group(laptopGroup, [0, 0.027, -0.26]); screen.rotation.x = -0.28;
-  box(screen, [0.97, 0.62, 0.045], [0, 0.3, 0], '#b3a189', 0.026);
-  box(screen, [0.86, 0.51, 0.009], [0, 0.3, 0.028], '#efe2c4', 0.005);
+  box(screen, [0.97, 0.62, 0.045], [0, 0.3, 0], LAPTOP.walnut, 0.03);
+  box(screen, [0.92, 0.575, 0.009], [0, 0.305, 0.028], '#efe2c4', 0.005);
   box(screen, [0.20, 0.45, 0.009], [-0.29, 0.3, 0.034], '#e3cfa8', 0.004);
   box(screen, [0.52, 0.41, 0.01], [0.12, 0.3, 0.04], '#fbf3df', 0.009);
   box(screen, [0.28, 0.017, 0.008], [0.05, 0.445, 0.049], '#a97b52', 0.001);
@@ -549,9 +551,10 @@ function moonTree(parent, canopyOnly = false) {
       const end = [Math.cos(angle) * reach, height + 0.24, Math.sin(angle) * reach];
       if (!canopyOnly) rod(parent, [0, height - 0.05, 0], end, 0.020, '#816746');
       else {
-        const size = tier === 3 ? 0.85 : 1, seed = tier * 3 + branch, offset = angle + 0.55;
+        const seed = tier * 3 + branch, offset = angle + 0.55, vary = k => { const v = Math.sin(k * 12.9898) * 43758.5453; return v - Math.floor(v); };
+        const size = (tier === 3 ? 0.85 : 1) * (0.86 + vary(seed) * 0.22), small = 0.75 + vary(seed + 12) * 0.5;
         leafClump(parent, [end[0] * 0.9, end[1] + 0.06, end[2] * 0.9], [0.3 * size, 0.23 * size, 0.3 * size], seed);
-        if (tier < 3) leafClump(parent, [Math.cos(offset) * reach * 0.72, end[1] + 0.14, Math.sin(offset) * reach * 0.72], [0.22, 0.18, 0.22], seed + 12);
+        if (tier < 3) leafClump(parent, [Math.cos(offset) * reach * 0.72, end[1] + 0.14, Math.sin(offset) * reach * 0.72], [0.22 * small, 0.18 * small, 0.22 * small], seed + 12);
       }
     }
   }
