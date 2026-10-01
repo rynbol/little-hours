@@ -223,6 +223,10 @@ try {
   const streaks = rainMesh.getVerticesData('position'), lengths = [];
   for (let i = 0; i < streaks.length; i += 6) lengths.push(streaks[i + 4] - streaks[i + 1]);
   assert.ok(lengths.length >= 60 && Math.max(...lengths) < 0.13 && rainMesh.alpha < 0.4, 'rain falls as many short, faint streaks, not long scratches');
+  const heads = () => { const at = rainMesh.getVerticesData('position'), list = []; for (let i = 0; i < at.length; i += 6) list.push([at[i], at[i + 1]]); return list; };
+  const first = heads(); advance(40); const later = heads(), close = (a, b, i, j) => Math.abs(a[i][0] - a[j][0]) < 0.07 && Math.abs(a[i][1] - a[j][1]) < 0.25;
+  let pairs = 0; for (let i = 0; i < first.length; i++) for (let j = i + 1; j < first.length; j++) if (close(first, first, i, j) && close(later, later, i, j)) pairs++;
+  assert.ok(pairs <= 2 && Math.max(...lengths) - Math.min(...lengths) > 0.03, `rain falls unevenly, not in matched pairs (${pairs} pairs)`);
   room.setTheme('dusk'); advance(2);
   assert.equal(stars.isEnabled(), true); assert.equal(shootingStar.isEnabled(), true); assert.equal(rainMesh.isEnabled(), false);
   const deskLamp = scene.getLightByName('window-lamplight');
