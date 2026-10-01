@@ -238,9 +238,9 @@ function deskLamp(parent, x, y, z) {
 }
 export const LAPTOP = Object.freeze({ walnut: '#6e5444', brass: '#c2a274', leather: '#776050', page: Object.freeze(['#efe2c4', '#e3cfa8', '#fbf3df', '#a97b52', '#cdb48c']) });
 function laptop(parent) {
-  const laptopGroup = group(parent, [0, 1.29, -0.43]);
-  box(laptopGroup, [0.97, 0.045, 0.62], [0, 0, 0], LAPTOP.walnut, 0.03);
-  box(laptopGroup, [0.68, 0.008, 0.23], [0, 0.028, -0.06], '#3d2b22', 0.012);
+  const laptopGroup = group(parent, [0, 1.30, -0.40]); laptopGroup.scaling.setAll(0.65);
+  box(laptopGroup, [0.97, 0.101, 0.62], [0, -0.0265, 0], LAPTOP.walnut, 0.03);
+  box(laptopGroup, [0.82, 0.008, 0.29], [0, 0.028, -0.115], '#3d2b22', 0.012);
   box(laptopGroup, [0.25, 0.007, 0.12], [0, 0.028, 0.19], LAPTOP.leather, 0.012);
   rod(laptopGroup, [-0.42, 0.03, -0.29], [0.42, 0.03, -0.29], 0.016, LAPTOP.brass, { metalness: 0.45 });
   const screen = group(laptopGroup, [0, 0.027, -0.26]); screen.rotation.x = -0.28;

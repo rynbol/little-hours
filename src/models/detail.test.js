@@ -86,6 +86,32 @@ test('the study laptop is a walnut case with brass fittings and a sepia screen, 
   disposeDetails(scene); engine.dispose();
 });
 
+test('the laptop is small enough to leave the meadow in view, rests on the desk, and takes the typing hands on its keys, in both the detailed and the dollhouse desk', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const piece = createFurniture('study-desk', scene), detail = createDetail('study-desk', scene); detail.parent = piece;
+  const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const span = (meshes, keep) => { const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity]; for (const mesh of meshes) { const at = mesh.getVerticesData('position'), world = mesh.computeWorldMatrix(true).m; for (let v = 0; v < at.length / 3; v++) { if (!keep(mesh, v)) continue; for (let k = 0; k < 3; k++) { const value = at[v * 3] * world[k] + at[v * 3 + 1] * world[4 + k] + at[v * 3 + 2] * world[8 + k] + world[12 + k]; low[k] = Math.min(low[k], value); high[k] = Math.max(high[k], value); } } } return { low, high }; };
+  const slot = hex => (mesh, v) => mesh.metadata.palette[mesh.metadata.slots[v]] === hex;
+  const tinted = hex => { const target = rgb(hex); return (mesh, v) => { const colors = mesh.getVerticesData('color'), c = colors ? [colors[v * 4], colors[v * 4 + 1], colors[v * 4 + 2]] : [mesh.material.diffuseColor.r, mesh.material.diffuseColor.g, mesh.material.diffuseColor.b]; return c.every((value, i) => Math.abs(value - target[i]) < 0.007); }; };
+  const layer = name => detail.getChildMeshes().filter(mesh => mesh.material.name === name), body = piece.metadata.body.getChildMeshes();
+  const deskTop = span(layer('detail-paint'), (mesh, v) => slot('#aa7954')(mesh, v) && Math.abs(mesh.getVerticesData('position')[v * 3]) < 0.3).high[1];
+  const laptops = { detailed: { page: span(layer('detail-glow-page'), () => true), keys: span(layer('detail-paint'), slot('#f4ecd8')), case: span(layer('detail-paint'), slot(LAPTOP.walnut)) },
+    dollhouse: { page: span(body, tinted('#efe2c4')), keys: span(body, tinted('#3d2b22')), case: span(body, tinted(LAPTOP.walnut)) } };
+  const hands = piece.metadata.avatar.getChildren().filter(node => node.name === 'typing-hand').map(hand => span(hand.getChildMeshes(), () => true));
+  for (const [name, { page, keys, case: shell }] of Object.entries(laptops)) {
+    const wide = page.high[0] - page.low[0], tall = page.high[1] - page.low[1];
+    assert.ok(wide <= 0.62 && tall <= 0.38, `the ${name} page is ${wide.toFixed(2)} by ${tall.toFixed(2)}`);
+    assert.ok(Math.abs(shell.low[1] - deskTop) < 0.004, `the ${name} laptop rests on the desk, ${(shell.low[1] - deskTop).toFixed(3)} off it`);
+    for (const hand of hands) {
+      const middle = (hand.low[0] + hand.high[0]) / 2, fingers = Math.min(hand.high[2], keys.high[2]) - Math.max(hand.low[2], keys.low[2]), gap = hand.low[1] - keys.high[1];
+      assert.ok(Math.abs(middle) < keys.high[0] - 0.03 && fingers > 0.1 && gap >= 0 && gap < 0.01, `a ${name} typing hand lands on the keys: ${middle.toFixed(2)} across, ${fingers.toFixed(2)} over them, ${gap.toFixed(3)} above`);
+    }
+  }
+  assert.ok(Math.abs(laptops.detailed.page.high[0] - laptops.dollhouse.page.high[0]) < 0.02 && Math.abs(laptops.detailed.page.high[1] - laptops.dollhouse.page.high[1]) < 0.02, 'the close-up and the dollhouse laptop are the same size');
+  disposeDetails(scene); engine.dispose();
+});
+
 test('turning the laptop page down dims what the page draws and what it blooms, leaves the lamp shade lit, and never compounds', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
@@ -219,18 +245,18 @@ test('the bookcase spines vary in style, with raised ribs and title bands in dar
   disposeDetails(scene); engine.dispose();
 });
 
-test('the laptop keyboard staggers its rows around modifier keys and a wide centred spacebar, keeping its footprint', async () => {
+test('the laptop keyboard staggers its rows around modifier keys and a wide centred spacebar, keeping its layout at the laptop scale', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
   const paint = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint');
   const positions = paint.getVerticesData('position'), { slots, palette } = paint.metadata, top = palette.indexOf('#f4ecd8'), seat = palette.indexOf('#22170f');
   const tops = [], shadows = [];
   slots.forEach((slot, v) => { if (slot === top) tops.push([positions[v * 3], positions[v * 3 + 2]]); if (slot === seat) shadows.push(positions[v * 3]); });
-  const row = z => tops.filter(([, pz]) => Math.abs(pz - (-0.43 + z)) < 0.018).map(([x]) => x);
+  const key = 0.65 * 1.2, row = z => tops.filter(([, pz]) => Math.abs(pz - (-0.4195 + key * z)) < 0.018 * key).map(([x]) => x / key);
   const bottom = row(-0.17 + 4 * 0.048), home = row(-0.17 + 2 * 0.048), numbers = row(-0.17);
   assert.ok(bottom.length && !bottom.some(x => Math.abs(x) < 0.14) && bottom.some(x => x < -0.145) && bottom.some(x => x > 0.145), 'one spacebar spans the middle of the bottom row');
   assert.ok(Math.max(...home.map(x => Math.min(...numbers.map(n => Math.abs(n - x))))) > 0.006, 'the home row is staggered against the number row');
-  assert.ok(shadows.length > 100 && Math.min(...shadows) > -0.335 && Math.max(...shadows) < 0.335 && Math.max(...tops.map(([x]) => Math.abs(x))) < 0.33, 'the keys sit in shaded seats inside the original keyboard width');
+  assert.ok(shadows.length > 100 && Math.min(...shadows) > -0.335 * key && Math.max(...shadows) < 0.335 * key && Math.max(...tops.map(([x]) => Math.abs(x))) < 0.33 * key, 'the keys sit in shaded seats inside the keyboard width');
   disposeDetails(scene); engine.dispose();
 });
 

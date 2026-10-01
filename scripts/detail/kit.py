@@ -34,9 +34,9 @@ def place(obj, position, rotation=(0, 0, 0), parent=None):
 
 
 class Frame:
-    def __init__(self, position=(0, 0, 0), rotation=(0, 0, 0), parent=None):
+    def __init__(self, position=(0, 0, 0), rotation=(0, 0, 0), parent=None, scale=1):
         base = parent.matrix if parent else Matrix.Identity(4)
-        self.matrix = base @ Matrix.Translation(at(*position)) @ babylon_rotation(*rotation).to_4x4()
+        self.matrix = base @ Matrix.Translation(at(*position)) @ babylon_rotation(*rotation).to_4x4() @ Matrix.Scale(scale, 4)
 
 
 def _finish(obj, colour, surface, layer, frame, position, rotation, shade=None):
