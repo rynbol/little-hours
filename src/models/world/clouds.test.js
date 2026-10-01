@@ -62,14 +62,16 @@ test('no cloud is placed over the day or dusk sun, whatever the land beneath it'
   assert.ok(cloudCards().filter(card => card.kind !== CLOUD_KINDS.mist).every(card => clearsSuns(card)));
 });
 
-test('day cumulus have warm white tops over blue-grey bases, and dusk bases stay cool grey under amber-lit tops', () => {
-  const rgb = hex => Color3.FromHexString(hex), value = ({ r, g, b }) => Math.max(r, g, b);
+test('cloud tops are warm white below the clip line over blue-grey day bases, and the sun-side warmth never clips either', () => {
+  const rgb = hex => Color3.FromHexString(hex), value = ({ r, g, b }) => Math.max(r, g, b), luma = ({ r, g, b }) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
   const day = WORLD_ATMOSPHERES.day, dusk = WORLD_ATMOSPHERES.dusk;
-  const top = rgb(day.cloudLit), base = rgb(day.cloudShade), under = rgb(dusk.cloudShade), amber = rgb(dusk.cloudLit);
-  assert.ok(value(top) > 0.98 && top.r >= top.g && top.g > top.b, 'day tops are warm white');
-  assert.ok(base.b > base.g && base.g > base.r && value(top) - value(base) > 0.2, 'day bases are a darker blue-grey');
+  const top = rgb(day.cloudLit), base = rgb(day.cloudShade), under = rgb(dusk.cloudShade), amber = rgb(dusk.cloudLit), warm = rgb(dusk.cloudRim);
+  assert.ok(luma(top) > 0.9 && luma(top) < 0.97 && top.r >= top.g && top.g > top.b, `day tops are warm white at luma ${luma(top).toFixed(3)}`);
+  assert.ok(base.b > base.g && base.g > base.r && value(top) - value(base) > 0.15, 'day bases are a darker blue-grey');
   assert.ok(under.b >= under.r && under.b >= under.g && value(under) < 0.62, 'dusk bases are a cool, darker grey');
   assert.ok(amber.r - amber.b > 0.25 && value(amber) - value(under) > 0.35, 'dusk tops are warm and far brighter than the bases');
+  assert.ok(warm.r - warm.b > amber.r - amber.b, 'the dusk sun side is warmer than the dusk tops');
+  for (const theme of ['day', 'dusk', 'rain']) assert.ok(luma(rgb(WORLD_ATMOSPHERES[theme].cloudRim)) < 0.98, `${theme} sun-side warmth stays below the clip line`);
 });
 
 test('every cloud, wisp and mist bank is one draw that takes the theme and drifts unless still', async () => {

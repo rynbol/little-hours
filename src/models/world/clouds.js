@@ -101,15 +101,15 @@ uniform vec3 eye, fogNear, cloudLit, cloudShade, cloudRim;
 uniform float time, fogDensity, fogHeight, cloudCover, sunStrength;
 ${WORLD_GLSL}
 ${SKY_GLSL}
-vec2 cloudField(vec2 p, vec2 lit, float seed, float aspect) {
-  vec2 core = vec2(p.x / (aspect * .82), (p.y + .32) / .3), litCore = vec2((p.x + lit.x) / (aspect * .82), (p.y + lit.y + .32) / .3);
-  vec2 f = max(vec2(1. - dot(core, core), 1. - dot(litCore, litCore)), 0.); f *= f * .9;
+float cloudField(vec2 p, float seed, float aspect) {
+  vec2 core = vec2(p.x / (aspect * .82), (p.y + .32) / .3);
+  float f = max(1. - dot(core, core), 0.); f *= f * .9;
   for (int i = 0; i < 9; i++) {
     float fi = float(i) * 4., r = .2 + worldHash(vec2(seed, fi + 1.)) * .3;
     float u = (worldHash(vec2(seed, fi + 2.)) - .5) * 2. * max(aspect - 1.15 * r - .25, 0.), edge = abs(u) / aspect;
     r *= 1.1 - .55 * edge;
-    vec2 at = vec2(u, -.34 + r * .6 + worldHash(vec2(seed, fi + 3.)) * .3 * (1. - edge)), shape = vec2(r * 1.15, r), d = (p - at) / shape, dLit = (p + lit - at) / shape;
-    vec2 blob = max(vec2(1. - dot(d, d), 1. - dot(dLit, dLit)), 0.); f += blob * blob;
+    vec2 at = vec2(u, -.34 + r * .6 + worldHash(vec2(seed, fi + 3.)) * .3 * (1. - edge)), d = (p - at) / vec2(r * 1.15, r);
+    float blob = max(1. - dot(d, d), 0.); f += blob * blob;
   }
   return f;
 }
@@ -117,26 +117,19 @@ void main() {
   vec2 p = vUv; float seed = vSeed.x, kind = vSeed.y, a;
   float x = p.x / vAspect, lean = worldHash(vec2(seed, 31.)) * .7 - .15;
   vec2 s = vec2(p.x - lean * (p.y + .1) * .45, p.y);
-  float sunSide = dot(sun, normalize(vec3(-(vWorld.z - eye.z), 0., vWorld.x - eye.x)));
-  vec2 field = kind < .5 ? cloudField(s, vec2(sunSide * .08, .15), seed, vAspect) : vec2(1.);
-  if (field.x < .04) discard;
-  float f = field.x, toward = pow(max(dot(normalize(vWorld - eye), sun), 0.), 6.);
+  float f = kind < .5 ? cloudField(s, seed, vAspect) : 1.;
+  if (f < .02) discard;
+  float sunSide = dot(sun, normalize(vec3(-(vWorld.z - eye.z), 0., vWorld.x - eye.x))), toward = pow(max(dot(normalize(vWorld - eye), sun), 0.), 6.);
   vec2 q = p + fract(seed * .618) * 13. + vec2(time * .012, 0.);
-  float n = worldNoise(q * 2.2) * .5 + worldNoise(q * 5.1 + 3.1) * .3 + worldNoise(q * 11.3 - vec2(time * .02, 0.)) * .2;
-  vec3 color, glow = vec3(0.);
+  float n = worldNoise(q * 2.2) * .625 + worldNoise(q * 5.1 + 3.1) * .375;
+  vec3 color;
   if (kind < .5) {
-    float base = -.38 + .2 * x * x + (worldNoise(vec2(p.x * .9, seed * 7.)) - .5) * .2;
-    vec2 tq = vec2(p.x * 1.4 + time * .01, p.y * 3.4) + seed * 3.;
-    float tatter = worldNoise(tq) * .55 + worldNoise(tq * vec2(3.1, 2.2) - 5.7) * .45;
-    float rise = p.y - base, edge = mix(f * (.2 + 1.6 * clamp(n * 2.6 - .8, 0., 1.)), f, smoothstep(.5, 1.2, f)) + (cloudCover - .55) * .3;
-    float fade = smoothstep(-.05, .3, rise + (tatter - .5) * 1.1) * (1. - smoothstep(.9, 1., abs(x)));
-    a = smoothstep(.16, .5, edge) * fade * .97;
-    float shadow = smoothstep(0., 1.6, field.y + (n - .5) * .4);
-    float lit = clamp(smoothstep(-.65, .5, p.y) * .85 + (1. - shadow) * .3 + (n - .5) * .15 - .02, 0., 1.);
-    color = mix(cloudShade, cloudLit, lit);
-    float near = smoothstep(.83, .95, dot(normalize(vWorld - eye), sun)) * smoothstep(.5, 1., sunStrength), thin = (1. - smoothstep(.16, .7, min(edge, f))) * smoothstep(-.5, .2, p.y);
-    color = mix(color, cloudRim, clamp(near * (thin + .35 * smoothstep(-.3, .6, p.y)), 0., 1.));
-    glow = cloudRim * near * thin * smoothstep(.04, .3, edge) * fade * .4;
+    float base = -.38 + .2 * x * x, frayed = n * .7 + worldNoise(q * 11.3 - vec2(time * .02, 0.)) * .3, feather = f + (frayed - .5) * .5 * (1. - smoothstep(.15, .6, f)) + (cloudCover - .55) * .3;
+    float fade = smoothstep(-.15, .3, p.y - base + (n - .5) * .9) * (1. - smoothstep(.85, 1., abs(x)));
+    a = smoothstep(.08, .34, feather) * fade * .97;
+    float grade = smoothstep(0., .62, p.y - base + x * sunSide * .3 + (n - .5) * .1);
+    color = mix(cloudShade, cloudLit, mix(grade, 1., toward * .3));
+    color = mix(color, cloudRim, clamp(x * sunSide * 1.6 + toward * .8, 0., 1.) * smoothstep(-.4, .3, p.y) * sunStrength * .45);
   } else if (kind < 1.5) {
     float streak = worldNoise(vec2(p.x * .7 + seed, p.y * 1.8 + p.x * .35 + time * .004)) * .65 + worldNoise(vec2(p.x * 1.6 - seed, p.y * 3.6)) * .35;
     a = smoothstep(.42, .9, streak + (cloudCover - .55) * .3) * (1. - smoothstep(.3, 1., abs(p.x) / vAspect)) * (1. - smoothstep(0., 1., abs(p.y))) * .55;
@@ -147,9 +140,9 @@ void main() {
     color = mix(fogNear, fogSun, toward * .6) * (.92 + .16 * smoothstep(-.5, .8, p.y));
   }
   vec3 ray = vWorld - eye;
-  color = kind > 1.5 ? worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight) : mix(color, worldSky(normalize(ray)), (1. - exp(-length(ray) * fogDensity * .3)) * (kind < .5 ? .35 : .5));
+  color = kind > 1.5 ? worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight) : mix(color, worldSky(normalize(ray)), (1. - exp(-length(ray) * fogDensity * .3)) * (kind < .5 ? .25 : .5));
   a *= vClear;
-  gl_FragColor = vec4(color * a + glow * vClear, a);
+  gl_FragColor = vec4(color * a, a);
 }`;
 
 export function createWorldClouds(scene, { root, still }) {
