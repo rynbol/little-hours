@@ -297,10 +297,33 @@ export function createRoom(container, options = {}) {
   [-1, 1].forEach(side => rod([archCenter, archSpring, -4.31], [archCenter + side * 1.47, archSpring + 1.47, -4.31], 0.026, glazing));
   // Heavy linen curtains are swept to each side with golden tiebacks.
   const curtain = material('#a88380'), curtainShade = material('#8c686d');
-  for (const side of [-1, 1]) for (let fold = 0; fold < 4; fold++) {
-    const x = archCenter + side * (2.25 + fold * 0.12), z = -4.06 + (fold % 2) * 0.04;
-    const drape = cylinder(0.13, 0.18, 3.85, [x, 3.38, z], fold % 2 ? curtainShade : curtain); drape.scaling.z = 0.65;
-    const tie = cylinder(0.18, 0.18, 0.12, [x, 2.38, z], palette.brass); tie.scaling.z = 0.65;
+  const DRAPE = { bottom: 1.46, top: 5.32, tie: 2.38, wall: -4.13, front: -4.06, folds: 3, across: 28, rows: 36, valleys: [[-1, -0.82], [-0.5, -0.17], [0.17, 0.5], [0.82, 1]] };
+  function drapeSection(side, y, swell = 0, from = -1, to = 1) {
+    const smooth = t => t * t * (3 - 2 * t), above = Math.max(0, Math.min(1, (y - DRAPE.tie) / (DRAPE.top - DRAPE.tie))), below = Math.max(0, Math.min(1, (DRAPE.tie - y) / (DRAPE.tie - DRAPE.bottom)));
+    const gather = Math.exp(-(((y - DRAPE.tie) / 0.5) ** 2)), pouf = y > DRAPE.tie ? Math.sin(Math.min(1, (y - DRAPE.tie) / 0.42) * Math.PI) : 0;
+    const half = 0.12 + (y >= DRAPE.tie ? 0.16 * smooth(above) ** 0.7 : 0.16 * Math.sqrt(below)) + 0.05 * pouf;
+    const depth = 0.025 + 0.04 * (half - 0.12) / 0.16, center = archCenter + side * (2.36 + 0.07 * gather), points = [], steps = Math.max(2, Math.round(DRAPE.across * (to - from) / 2));
+    for (let i = 0; i <= steps; i++) {
+      const u = from + (to - from) * i / steps, ridge = 0.5 + 0.5 * Math.cos(u * Math.PI * DRAPE.folds);
+      points.push(new Vector3(center + u * half, y, DRAPE.front + depth * ridge + 0.035 * (1 - u * u) + 0.045 * pouf + swell));
+    }
+    if (from === -1 && to === 1) for (let i = steps; i >= 0; i -= 4) points.push(new Vector3(center + (i / steps * 2 - 1) * half, y, DRAPE.wall));
+    return points;
+  }
+  function drapeRibbon(side, from, to, rows, mat, swell = 0, across = [-1, 1]) {
+    const sections = Array.from({ length: rows + 1 }, (_, row) => drapeSection(side, from + (to - from) * row / rows, swell, ...across));
+    return finish(MeshBuilder.CreateRibbon(`drape-${meshId++}`, { pathArray: sections, closePath: across[0] === -1 && across[1] === 1 }, scene), mat, [0, 0, 0]);
+  }
+  for (const side of [-1, 1]) {
+    drapeRibbon(side, DRAPE.bottom + 0.06, DRAPE.top, DRAPE.rows, curtain);
+    for (const valley of DRAPE.valleys) drapeRibbon(side, DRAPE.bottom + 0.06, DRAPE.top, DRAPE.rows, curtainShade, 0.003, valley);
+    drapeRibbon(side, DRAPE.bottom, DRAPE.bottom + 0.075, 2, curtainShade, 0.008);
+    const band = drapeSection(side, DRAPE.tie, 0.014);
+    tube(band.slice(0, DRAPE.across + 1).map(point => [point.x, point.y, point.z]), 0.015, palette.brass);
+    const knot = band[Math.round(DRAPE.across * (side < 0 ? 0.75 : 0.25))];
+    sphere([0.036, 0.036, 0.032], [knot.x, knot.y, knot.z + 0.012], palette.brass);
+    sphere([0.022, 0.026, 0.022], [knot.x, knot.y - 0.055, knot.z + 0.016], palette.brass);
+    cylinder(0.014, 0.036, 0.24, [knot.x, knot.y - 0.19, knot.z + 0.016], palette.brass, classicArchitecture, 12);
   }
   rod([-5.34, 5.38, -4.04], [-0.07, 5.38, -4.04], 0.038, palette.brass);
   [-5.42, 0.01].forEach(x => sphere([0.10, 0.10, 0.10], [x, 5.38, -4.04], palette.brass));

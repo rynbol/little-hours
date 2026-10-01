@@ -653,6 +653,13 @@ try {
         assert.ok(height > 0.085 && height / width > 1.8, `the sill candle flame at ${x} is a tall teardrop`);
       }
       assert.ok(sillX.filter(x => waxPoints.some(p => p.y < 1.562 && Math.hypot(p.x - x, p.z + 4.05) > 0.085 && Math.hypot(p.x - x, p.z + 4.05) < 0.13)).length >= 4, 'wax runs down the sill candles and pools in their dishes');
+      const drape = name => shell.getChildMeshes().filter(mesh => mesh.material?.name === name).flatMap(mesh => { mesh.computeWorldMatrix(true); const p = mesh.getVerticesData('position'), out = []; for (let i = 0; i < p.length; i += 3) out.push(Vector3.TransformCoordinates(new Vector3(p[i], p[i + 1], p[i + 2]), mesh.getWorldMatrix())); return out; });
+      const cloth = drape('paint-#a88380:{}'), shade = drape('paint-#8c686d:{}');
+      for (const side of [-1, 1]) {
+        const span = (low, high) => { const xs = cloth.filter(p => (p.x - -2.7) * side > 1.5 && p.y > low && p.y < high).map(p => p.x); return Math.max(...xs) - Math.min(...xs); };
+        assert.ok(span(2.34, 2.42) < span(4.6, 5.0) * 0.6, `the ${side < 0 ? 'left' : 'right'} curtain gathers at its brass tie-back and falls fuller above and below`);
+        assert.ok(shade.filter(p => (p.x - -2.7) * side > 1.5 && p.y > 3 && p.y < 4).length > 120, `the ${side < 0 ? 'left' : 'right'} curtain folds are shaded in their valleys`);
+      }
     }
     if (style !== 'retreat') {
       assert.ok(shell.getChildMeshes().length <= 6, 'architecture is batched into at most six meshes');

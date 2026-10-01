@@ -92,7 +92,7 @@ export function installTestHook(app) {
       const box = mesh.getBoundingInfo().boundingBox;
       min.minimizeInPlace(box.minimumWorld); max.maximizeInPlace(box.maximumWorld);
     }
-    return scan(scene, min, max, (x, y) => { const picked = scene.pick(x, y)?.pickedMesh; return Boolean(picked && match(picked)); });
+    return scan(scene, min, max, (x, y) => { const throughLeaves = mesh => mesh.isPickable && mesh.isEnabled() && mesh.isVisible && mesh.metadata?.effect !== 'leaf-sway', picked = scene.pick(x, y, throughLeaves)?.pickedMesh; return Boolean(picked && match(picked)); });
   }
 
   function scan(scene, min, max, isHit) {
