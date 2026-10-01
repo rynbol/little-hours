@@ -49,6 +49,7 @@ import { createPainterly } from '../../models/painterly.js';
 import { ROOM_LIGHTS, seatedDim, windowSun, deskLamp, gradeFocus, roomBloom, bloomEmission, lampPool } from './room-lighting.js';
 import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
 import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
+import { createWindowSpill } from './room-window-spill.js';
 import { createLanternGlow, createGlowDecal, deskPoolShape, DESK_POOL } from './room-lantern-glow.js';
 import { moulding, sillNosing } from './window-trim.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
@@ -181,7 +182,7 @@ export function createRoom(container, options = {}) {
   // filtered samples from shadowing the floor itself. Hardware PCF gives
   // smooth edges instead of Poisson grain; Babylon falls back to Poisson
   // sampling on WebGL1.
-  const sunbeam = createSunbeam(scene);
+  const sunbeam = createSunbeam(scene), sideWallSpill = createWindowSpill(scene, classicArchitecture);
   const shadow = new ShadowGenerator(2048, sun); shadow.usePercentageCloserFiltering = true; shadow.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
   shadow.bias = 0.002; shadow.normalBias = 0.02; shadow.darkness = 0.24;
   shadow.getShadowMap().refreshRate = 0;
@@ -1252,7 +1253,7 @@ export function createRoom(container, options = {}) {
     storybook.haze = light.haze;
     painterly.setTheme(`room-${theme}`); aimSunbeam();
     dimPage(scene, light.screen);
-    spillWindow(scene, light.spill);
+    spillWindow(scene, light.spill); sideWallSpill.setLight(light.wallSpill);
     aimDeskLamp();
     applyBulbs(); applyAccents();
     bloom.intensity = roomBloom(theme, seatView.blend);
@@ -1909,7 +1910,7 @@ export function createRoom(container, options = {}) {
     if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
     if (storybook.amount !== seatView.blend) { gradeFocus(scene.imageProcessingConfiguration.colorCurves, seatView.blend); bloom.intensity = roomBloom(theme, seatView.blend); }
     storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = windowSun(theme, seatView.blend, sun.diffuse); aimDeskLamp(seatView.blend); rain.alpha = windowRainAlpha * (1 - seatView.blend); rain.isVisible = rain.alpha > 0.005;
-    sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend);
+    sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend); sideWallSpill.show(seatView.blend);
     seatWorld.animate(companionDelta, reducedMotion);
     passages?.animate(companionDelta, houseHover, reducedMotion, lockedDoor, openingDoor);
     const celebrating = celebrationAge < 3.2;

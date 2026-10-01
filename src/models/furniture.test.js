@@ -131,3 +131,32 @@ test('the moon tree canopy dims and softens in the dusk and rain light but stays
     assert.deepEqual(Array.from(canopy.getVerticesData('color')), day, 'the day canopy is exactly its own colours');
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
+
+test('a moon tree in the back-left corner is lit on the side that faces the window and shaded on the side that faces the wall', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const tree = createFurniture('moon-tree', scene), canopy = tree.getChildMeshes(false).find(mesh => mesh.name === 'swaying-leaf-canopy');
+    const colors = canopy.getVerticesData('color'), normals = canopy.getVerticesData('normal'), toWindow = [0.77, 0.34, -0.53], lit = [], shade = [];
+    for (let v = 0; v < normals.length / 3; v++) {
+      const facing = normals[v * 3] * toWindow[0] + normals[v * 3 + 1] * toWindow[1] + normals[v * 3 + 2] * toWindow[2];
+      const luma = 0.2126 * colors[v * 4] + 0.7152 * colors[v * 4 + 1] + 0.0722 * colors[v * 4 + 2];
+      if (facing > 0.5) lit.push(luma); else if (facing < -0.5) shade.push(luma);
+    }
+    const median = values => values.sort((a, b) => a - b)[values.length >> 1];
+    assert.ok(median(lit) > median(shade) * 1.6, `the window side is ${(median(lit) / median(shade)).toFixed(2)}x the wall side`);
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('the moon tree pads shrink from broad low pads to small crown pads, and not every pad has a twin', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), pads = [], addMesh = scene.addMesh.bind(scene);
+  scene.addMesh = (mesh, recursive) => {
+    if (mesh.name === 'moonleaf-clump') mesh.onDisposeObservable.add(() => { const { extendSize, center } = mesh.getBoundingInfo().boundingBox; pads.push({ width: extendSize.x, y: center.y }); });
+    return addMesh(mesh, recursive);
+  };
+  try {
+    createFurniture('moon-tree', scene);
+    const sorted = [...pads].sort((a, b) => a.y - b.y), third = Math.floor(sorted.length / 3), mean = list => list.reduce((sum, pad) => sum + pad.width, 0) / list.length;
+    assert.ok(pads.length < 26, `${pads.length} pads, so some branches end in one pad`);
+    assert.ok(mean(sorted.slice(0, third)) > mean(sorted.slice(-third)) * 1.4, `low pads ${mean(sorted.slice(0, third)).toFixed(3)} against crown pads ${mean(sorted.slice(-third)).toFixed(3)}`);
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
