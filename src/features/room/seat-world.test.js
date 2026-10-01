@@ -381,3 +381,18 @@ test('the meadow ruins stay low and broad, a broken arch among stumps rather tha
   assert.ok(lintels.length >= 3, `${lintels.length} arch lintels`);
   engine.dispose();
 });
+
+test('the volcano foot melts into the valley haze while its upper slopes stay crisp', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata, foot = [], slope = [], plain = [];
+  for (let i = 0; i < shape.roles.length; i++) {
+    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2], reach = Math.hypot(x + 82, z + 96);
+    if (shape.roles[i] === 'rock' && reach < 40) (y < 11 ? foot : y > 22 ? slope : []).push(shape.fogs[i]);
+    else if (shape.roles[i] !== 'rock' && reach > 36 && reach < 48 && y < 20) plain.push(shape.fogs[i]);
+  }
+  const mean = list => list.reduce((sum, each) => sum + each, 0) / list.length;
+  assert.ok(mean(foot) > mean(plain) * 0.85, `foot haze ${mean(foot).toFixed(2)} against the plain ${mean(plain).toFixed(2)}`);
+  assert.ok(mean(slope) < mean(foot) * 0.7, `slope haze ${mean(slope).toFixed(2)} against the foot ${mean(foot).toFixed(2)}`);
+  engine.dispose();
+});
