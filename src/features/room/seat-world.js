@@ -25,7 +25,7 @@ export const VISTA_THEMES = Object.freeze({
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffeccc', cloudShade: '#bdb8dc', cloudFog: 0.42,
     castle: '#687088', castleRoof: '#3a5a74', rock: '#5c3e38', ember: '#e2683c', emberFog: 0.75, smoke: '#8c827e', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
-    light: 0, night: null,
+    aerial: 1.12, light: 0, night: null,
   },
   rain: {
     zenith: '#3f4a5e', high: '#5c6878', horizon: '#9aa2a8', glow: '#b8b4ae', haze: '#7a8590', below: '#4c5864',
@@ -240,7 +240,7 @@ function buildVolcano(shape) {
       const y = base + height * t ** 1.35 + Math.sin(a * 5 + 1) * 1.3 * t ** 4;
       const lava = t > 0.85 || (t > 0.3 && streaks.includes(s));
       const id = shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', lava ? 1.1 + 0.3 * t : (0.6 + 0.3 * Math.max(0, Math.cos(a - 2.1)) + rib * 0.22 + (k % 2) * 0.03) * (1 - 0.45 * t ** 1.5));
-      shape.fogs[id] *= 1 - 0.42 * Math.min(1, t * 2.4);
+      shape.fogs[id] *= 1 - 0.2 * Math.min(1, t * 2.4);
     }
   }
   for (let k = 0; k < rings; k++) for (let s = 0; s < segments; s++) {
@@ -580,8 +580,8 @@ export function vistaColor(palette, shape, i, out, glow) {
     const value = Array.isArray(palette[key]) ? palette[key][index] : palette[role] ?? SHELL_ROLES[role] ?? palette.stone;
     color = hex(value).scale(shade);
   }
-  const fog = role === 'ember' ? shape.fogs[i] * (palette.emberFog ?? 0.45) : ['lamp', 'spirit', 'window', 'windowWarm', 'glint', 'star', 'moon', 'rune'].includes(role) ? shape.fogs[i] * 0.45 : role.startsWith('cloud') ? shape.fogs[i] * palette.cloudFog : shape.fogs[i];
-  Color3.LerpToRef(color, hex(palette.haze), fog * 0.82, out);
+  const fog = role === 'ember' ? shape.fogs[i] * (palette.emberFog ?? 0.45) : ['lamp', 'spirit', 'window', 'windowWarm', 'glint', 'star', 'moon', 'rune'].includes(role) ? shape.fogs[i] * 0.45 : role.startsWith('cloud') ? shape.fogs[i] * palette.cloudFog : shape.fogs[i] * (palette.aerial ?? 1);
+  Color3.LerpToRef(color, hex(palette.haze), Math.min(1, fog * 0.82), out);
   return out;
 }
 

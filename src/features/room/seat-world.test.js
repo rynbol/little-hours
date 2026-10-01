@@ -384,7 +384,7 @@ test('the meadow ruins stay low and broad, a broken arch among stumps rather tha
   engine.dispose();
 });
 
-test('the volcano foot melts into the valley haze while its upper slopes stay crisp', () => {
+test('the volcano foot melts into the valley haze while its upper slopes keep a little more shape', () => {
   const { engine, world } = setup();
   world.setEnabled(true);
   const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata, foot = [], slope = [], plain = [];
@@ -395,7 +395,7 @@ test('the volcano foot melts into the valley haze while its upper slopes stay cr
   }
   const mean = list => list.reduce((sum, each) => sum + each, 0) / list.length;
   assert.ok(mean(foot) > mean(plain) * 0.85, `foot haze ${mean(foot).toFixed(2)} against the plain ${mean(plain).toFixed(2)}`);
-  assert.ok(mean(slope) < mean(foot) * 0.7, `slope haze ${mean(slope).toFixed(2)} against the foot ${mean(foot).toFixed(2)}`);
+  assert.ok(mean(slope) < mean(foot) * 0.85, `slope haze ${mean(slope).toFixed(2)} against the foot ${mean(foot).toFixed(2)}`);
   engine.dispose();
 });
 
@@ -500,6 +500,17 @@ test('rain clouds melt into the overcast haze instead of floating as hard dark l
   let gap = 0;
   shape.roles.forEach((_, i) => { gap += Math.max(...sky.map((v, c) => Math.abs(colors[i * 4 + c] - v))) / shape.roles.length; });
   assert.ok(gap < 0.065, `rain clouds sit ${gap.toFixed(3)} from the haze`);
+  engine.dispose();
+});
+
+test('by day the far volcano recedes into blue air instead of standing out in saturated rock', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true); world.setTheme('day');
+  const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-land'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color');
+  const haze = [1, 3, 5].map(k => parseInt(VISTA_THEMES.day.haze.slice(k, k + 2), 16) / 255), gaps = [];
+  shape.roles.forEach((role, i) => { if (role === 'rock' && Math.hypot(shape.positions[i * 3] + 82, shape.positions[i * 3 + 2] + 96) < 40) gaps.push(Math.hypot(...haze.map((c, k) => colors[i * 4 + k] - c))); });
+  const gap = gaps.reduce((sum, each) => sum + each, 0) / gaps.length;
+  assert.ok(gap < 0.45, `volcano rock sits ${gap.toFixed(3)} from the day haze`);
   engine.dispose();
 });
 
