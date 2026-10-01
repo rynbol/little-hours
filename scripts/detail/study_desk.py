@@ -8,6 +8,8 @@ WOOD, EDGE, DARK, BRASS, SAGE, PAPER = '#aa7954', '#bc9169', '#73533d', '#bf9762
 BOOKS = ['#788e84', '#bb8066', '#5f7a8c']
 WALNUT, LEATHER, LAPTOP_BRASS, GILT, RIBBON, INK = '#7f4c33', '#7a5640', '#c9a063', '#d9b36e', '#a8463e', '#3f4a5e'
 EYE = (0.25, 0.9, 1.0)
+KEY_TOP, KEY_SKIRT, KEY_SHADOW = '#f4ecd8', '#d8caa9', '#22170f'
+KEY_ROWS = ([1] * 11 + [2], [1.5] + [1] * 10 + [1.5], [1.75] + [1] * 9 + [2.25], [2.25] + [1] * 8 + [2.75], [1, 1, 1.25, 6.5, 1.25, 1, 1])
 
 
 def turned_leg(x, z, top, colour):
@@ -79,12 +81,17 @@ def laptop():
     parts.append(rod((-0.4, 0.024, -0.3), (0.4, 0.024, -0.3), 0.017, LAPTOP_BRASS, sides=16, surface='metal', layer='metal', frame=f))
     for x in (-0.41, 0.41):
         parts.append(rod((x - 0.012, 0.024, -0.3), (x + 0.012, 0.024, -0.3), 0.02, LAPTOP_BRASS, sides=16, surface='metal', layer='metal', frame=f))
-    for row in range(5):
-        keys = 13 if row < 4 else 9
-        for k in range(keys):
-            w = 0.044 if row < 4 else (0.2 if k == 4 else 0.044)
-            x = -0.3 + k * 0.05 if row < 4 else [-0.3, -0.25, -0.2, -0.15, 0.0, 0.15, 0.2, 0.25, 0.3][k]
-            parts.append(rbox([w, 0.011, 0.038], (x, 0.026, -0.17 + row * 0.048), '#efe6cf' if (row, k) != (2, 6) else '#d9b07a', bevel=0.007, segments=2, frame=f))
+    pitch, gap = 0.05, 0.006
+    for row, widths in enumerate(KEY_ROWS):
+        x, z = -pitch * 6.5, -0.17 + row * 0.048
+        for k, units in enumerate(widths):
+            w = units * pitch - gap
+            centre = x + units * pitch / 2
+            accent = (row, k) == (2, 6)
+            parts.append(rbox([w + 0.006, 0.002, 0.044], (centre, 0.0245, z), KEY_SHADOW, bevel=0.002, frame=f))
+            parts.append(rbox([w, 0.009, 0.038], (centre, 0.025, z), '#c9a46c' if accent else KEY_SKIRT, bevel=0.005, segments=2, frame=f))
+            parts.append(rbox([w - 0.009, 0.004, 0.028], (centre, 0.0305, z - 0.002), '#e0bb82' if accent else KEY_TOP, bevel=0.003, segments=2, frame=f))
+            x += units * pitch
     lid = Frame((0, 0.022, -0.29), (-0.28, 0, 0), f)
     parts.append(rbox([0.97, 0.62, 0.03], (0, 0.31, 0), WALNUT, bevel=0.03, surface='wood', frame=lid, dice=0.06))
     parts.append(rbox([0.93, 0.584, 0.006], (0, 0.314, 0.016), '#2b2420', bevel=0.004, frame=lid))
