@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Little Hours outdoor world</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#9fc0d4}canvas{position:fixed;inset:0;width:100%;height:100%;outline:none}#hud{position:fixed;left:12px;bottom:10px;font:12px/1.4 ui-monospace,monospace;color:#fff;text-shadow:0 1px 2px #0008;pointer-events:none}</style></head>
+<body><canvas id="stage" tabindex="0"></canvas><div id="hud"></div><script type="module">
+if (!import.meta.env.DEV) throw new Error('Development check only');
+import { Engine } from '@babylonjs/core/Engines/engine.js';
+import { Scene } from '@babylonjs/core/scene.js';
+import { UniversalCamera } from '@babylonjs/core/Cameras/universalCamera.js';
+import { Color4 } from '@babylonjs/core/Maths/math.color.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { createOutdoorWorld } from '../src/models/world/world.js';
+import { heightAt } from '../src/core/world-terrain.js';
+const VIEWS = {
+  window: { at: [0, 2.24, -2.4], yaw: 0, pitch: -0.12 },
+  meadow: { at: [-60, 0, -140], yaw: 0.3, pitch: -0.05, ground: 1.7 },
+  river: { at: [120, 0, -420], yaw: -0.6, pitch: -0.08, ground: 1.7 },
+  overlook: { at: [0, 60, 40], yaw: 0, pitch: -0.18 },
+  forest: { at: [40, 0, -700], yaw: 0.9, pitch: 0, ground: 1.7 },
+  grass: { at: [-30, 0, -90], yaw: 0.2, pitch: -0.25, ground: 1.2 },
+  dusk: { at: [0, 2.24, -2.4], yaw: -0.4, pitch: -0.05 },
+};
+const params = new URLSearchParams(location.search), theme = params.get('theme') || 'day';
+const custom = params.get('at') && { at: params.get('at').split(',').map(Number), yaw: Number(params.get('yaw') || 0), pitch: Number(params.get('pitch') || 0), ground: Number(params.get('at').split(',')[1]) };
+const view = custom || VIEWS[params.get('view')] || VIEWS.window;
+const canvas = document.getElementById('stage'), engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: false });
+engine.setHardwareScalingLevel(1 / Math.min(2, devicePixelRatio));
+const scene = new Scene(engine); scene.clearColor = new Color4(0.6, 0.75, 0.83, 1); scene.skipPointerMovePicking = true;
+const [x, y, z] = view.at, start = new Vector3(x, view.ground ? heightAt(x, z) + view.ground : y, z);
+const camera = new UniversalCamera('explorer', start, scene);
+camera.fov = 1.22; camera.minZ = 0.1; camera.maxZ = 16000; camera.rotation.set(-view.pitch, view.yaw + Math.PI, 0);
+camera.speed = Number(params.get('speed') || 1.5); camera.angularSensibility = 2400; camera.keysUp = [87]; camera.keysDown = [83]; camera.keysLeft = [65]; camera.keysRight = [68]; camera.keysUpward = [69]; camera.keysDownward = [81];
+camera.attachControl(canvas, true);
+const built = performance.now(), world = createOutdoorWorld(scene, { theme, still: matchMedia('(prefers-reduced-motion: reduce)').matches }), buildMs = Math.round(performance.now() - built);
+const hud = document.getElementById('hud');
+let frames = 0;
+engine.runRenderLoop(() => { scene.render(); if (++frames % 30 === 0) hud.textContent = `${theme} · ${engine.getFps().toFixed(0)} fps · ${scene.getActiveMeshes().length} meshes · ${camera.position.x.toFixed(0)}, ${camera.position.y.toFixed(0)}, ${camera.position.z.toFixed(0)}`; });
+addEventListener('resize', () => engine.resize());
+window.__world = { engine, scene, camera, world, buildMs, views: Object.keys(VIEWS), ready: () => scene.isReady() && frames > 5 };
+</script></body></html>

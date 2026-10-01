@@ -15,16 +15,16 @@ export const VISTA_THEMES = Object.freeze({
     far: '#5f7080', mid: '#5c6670', valley: '#6c8048', field: '#7a8a58', cliff: '#6a6670', grass: '#768a46', meadow: '#909c4a', meadowWarm: '#c8964c', petal: '#b0a088',
     trunk: '#46423a', leaf: '#3e5238', leafLight: '#7a8e52', walls: ['#d8b890', '#c8a088', '#b0a8a0', '#e0c49a'], roofs: ['#6a3f3a', '#4a3a3a', '#7a4a3a', '#3f4a5a'],
     stone: '#7a7672', water: '#6a7a88', glint: '#ffe0b0', window: '#ffc978', windowWarm: '#ffa860', windowDark: '#3a3c40', lamp: '#ffdca0',
-    star: '#fff4d8', moon: '#ffe6b4', cloud: '#ffe2b0', cloudShade: '#8c8a96', cloudFog: 0.32,
+    star: '#fff4d8', moon: '#ffe6b4', cloud: '#ffe2b0', cloudShade: '#8c8a96', cloudFog: 0.14,
     castle: '#5c6070', castleRoof: '#363c4a', rock: '#4e4446', ember: '#ff6a3a', emberFog: 0.6, smoke: '#6c6660', ruin: '#7a7670', moss: '#5a6440', rune: '#ffb060', bird: '#2a2a2c', spirit: '#d8ffb8', snow: '#f0d8c0',
     light: 0.35, night: { zenith: '#141c2a', high: '#26323c', horizon: '#7a6450', glow: '#c89a70', haze: '#3c4650', hazeSun: '#6a5a4c', mist: '#3a424a', cloud: '#4c5258', cloudShade: '#2a3038' },
   },
   day: {
     zenith: '#8fb3c4', high: '#a5c2c8', horizon: '#cfdcd2', glow: '#f4f2dc', glowStrength: 0.6, haze: '#a8c2c6', hazeSun: '#dfe8d0', mist: '#c8dcc4', mistStrength: 0.38, below: '#a0b8b0',
     far: '#6a8e9c', mid: '#6a8a84', valley: '#80b050', field: '#94b862', cliff: '#7c8f96', grass: '#7eb24d', meadow: '#8cbf57', meadowWarm: '#c8cf5a', petal: '#fffaf0',
-    trunk: '#5c6440', leaf: '#3c6230', leafLight: '#6a9c3c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
+    trunk: '#5c6440', leaf: '#4a7436', leafLight: '#86b448', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a698', water: '#6aa8c4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
-    star: '#a5c2c8', moon: '#fffbea', cloud: '#f6f2e0', cloudShade: '#b2c6ce', cloudFog: 0.32,
+    star: '#a5c2c8', moon: '#fffbea', cloud: '#f6f2e0', cloudShade: '#b2c6ce', cloudFog: 0.16,
     castle: '#7a8090', castleRoof: '#4a6274', rock: '#6a5e5c', ember: '#d8703c', emberFog: 0.95, smoke: '#8c8680', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
     aerial: 1.12, light: 0, night: null,
   },
@@ -54,9 +54,10 @@ const SUN_RAYS = [[-44, 72, 10, 80], [-20, 84, 7, 90], [2, 66, 11, 75], [22, 92,
 const SPIRITS = 34, SPIRIT_SECONDS = 40, SHOOTING_SECONDS = 23;
 const ahead = (across, distance) => [across, -distance];
 const bearing = (x, z) => Math.atan2(x, -z);
-export const CASTLE_AT = Object.freeze(ahead(-22, 100));
-const VOLCANO_AT = ahead(-82, 96), TOWER_AT = ahead(13, 56);
-export const VOLCANO = Object.freeze({ base: 2, height: 34 });
+export const CASTLE_AT = Object.freeze(ahead(-16, 124));
+export const VOLCANO_AT = Object.freeze(ahead(-94, 118)), TOWER_AT = Object.freeze(ahead(18, 72));
+export const VOLCANO = Object.freeze({ base: -2, height: 29, radius: 22 });
+export const LANDMARK_SCALE = Object.freeze({ castle: 0.46, tower: 0.62 });
 const VOLCANO_BEARING = Math.atan2(VOLCANO_AT[0], -VOLCANO_AT[1]);
 
 const seeded = seed => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -64,7 +65,7 @@ const hex = value => Color3.FromHexString(value);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export const aerial = distance => Math.min(1, 1 - Math.exp(-Math.max(0, distance - 12) / 72));
-const valleyFloor = distance => -8 * smooth(8.5, 20, distance) + 15 * smooth(24, 112, distance);
+export const valleyFloor = distance => -8 * smooth(8.5, 20, distance) + 4.5 * smooth(30, 150, distance);
 export const valleyMist = (x, y, z) => { const d = Math.hypot(x, z); return Math.exp(-Math.max(0, y - valleyFloor(d) - 1) * 0.3) * smooth(14, 60, d) * (1 - smooth(112, 150, d)); };
 
 function createShape() {
@@ -102,15 +103,16 @@ function createShape() {
 function terrainHeight(x, z) {
   const r = Math.hypot(x, z), a = Math.atan2(z, x);
   const cliff = -8 * smooth(8.5, 20, r + Math.sin(a * 5) * 1.6);
-  const basin = 15 * smooth(24, 112, r);
-  const rolling = (Math.sin(x * 0.07) * Math.cos(z * 0.06) * 1.6 + Math.sin(x * 0.029 + 1) * Math.cos(z * 0.034 + 2) * 3.2) * smooth(26, 45, r);
-  const mound = 6 * (1 - smooth(9, 26, Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1])));
+  const basin = 4.5 * smooth(30, 150, r);
+  const rolling = (Math.sin(x * 0.07) * Math.cos(z * 0.06) * 1.4 + Math.sin(x * 0.029 + 1) * Math.cos(z * 0.034 + 2) * 2.6 + Math.sin(x * 0.16 + z * 0.12) * 0.5) * smooth(26, 45, r);
+  const mound = 3 * (1 - smooth(6, 18, Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1])));
   const crest = (k, phase, power) => (1 - Math.abs(Math.sin(a * k + phase))) ** power;
-  const ranges = smooth(108, 150, r) * (20 + crest(5, 0.3, 1.4) * 18 + crest(13, 2, 2) * 9 + crest(29, 1, 2.5) * 3 + Math.max(0, Math.sin(a * 3 + 0.4)) * 16);
-  return cliff + basin + rolling + mound + ranges;
+  const ridge = smooth(92, 112, r) * (1 - smooth(122, 140, r)) * (1.5 + crest(7, 1.1, 2) * 4 + crest(17, 0.4, 2) * 1.5);
+  const ranges = smooth(136, 166, r) * (3 + crest(5, 0.3, 1.4) * 9 + crest(13, 2, 2) * 5 + crest(29, 1, 2.5) * 2 + Math.max(0, Math.sin(a * 3 + 0.4)) * 9);
+  return cliff + basin + rolling + mound + ridge + ranges;
 }
 
-export const SNOW_LINE = 47;
+export const SNOW_LINE = 10.5;
 const SUN_TOWARD = [-0.3, 0.81, -0.49];
 function sunFacing(x, z) {
   const step = 1.5, dx = (terrainHeight(x + step, z) - terrainHeight(x - step, z)) / (2 * step), dz = (terrainHeight(x, z + step) - terrainHeight(x, z - step)) / (2 * step);
@@ -148,13 +150,13 @@ function buildSky(shape) {
 }
 
 function buildLand(shape) {
-  const rings = [0, 6, 8.5, 10, 12, 14, 16.5, 19, 22, 26, 31, 36, 42, 50, 60, 72, 86, 100, 112, 124, 136, 142, 148, 154, 160, 166, 172], segments = 240, start = shape.roles.length;
+  const rings = [0, 6, 8.5, 10, 12, 14, 16.5, 19, 22, 26, 31, 36, 42, 50, 60, 72, 86, 96, 104, 112, 120, 128, 136, 142, 148, 154, 160, 166, 172], segments = 240, start = shape.roles.length;
   for (const r of rings) for (let s = 0; s < segments; s++) {
     const a = s / segments * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r, y = terrainHeight(x, z) - 0.06;
-    const snowy = r > 104 && y > SNOW_LINE;
-    const role = r < 9 ? 'meadow' : r < 22 ? (y > -2 ? 'grass' : 'cliff') : r < 104 ? ((s + rings.indexOf(r)) % 3 ? 'valley' : 'field') : snowy ? 'snow' : r < 136 ? 'mid' : 'far';
-    const id = shape.vertex(x, y, z, role, r > 104 ? sunFacing(x, z) : 0.86 + ((s * 7 + r) % 5) * 0.04);
-    if (r > 104) shape.fogs[id] *= snowy ? 0.5 : 0.78;
+    const snowy = r > 140 && y > SNOW_LINE;
+    const role = r < 9 ? 'meadow' : r < 22 ? (y > -2 ? 'grass' : 'cliff') : r < 112 ? ((s + rings.indexOf(r)) % 3 ? 'valley' : 'field') : snowy ? 'snow' : r < 142 ? 'mid' : 'far';
+    const id = shape.vertex(x, y, z, role, r > 112 ? sunFacing(x, z) : 0.86 + ((s * 7 + r) % 5) * 0.04);
+    if (r > 112) shape.fogs[id] *= snowy ? 0.5 : 0.78;
   }
   for (let ring = 0; ring < rings.length - 1; ring++) for (let s = 0; s < segments; s++) {
     const a = start + ring * segments + s, b = start + ring * segments + (s + 1) % segments;
@@ -202,6 +204,14 @@ function buildHamlet(shape) {
   for (let i = -3; i <= 3; i++) { const cos = Math.cos(bridgeYaw), sin = Math.sin(bridgeYaw); shape.box(bx + i * 1.1 * cos, terrainHeight(bx, bz) + 0.5 + Math.cos(i / 3 * 1.2) * 1.2, bz - i * 1.1 * sin, 1.15, 0.5, 2.2, bridgeYaw, 'stone'); }
 }
 
+function shrink(shape, start, [cx, cy, cz], scale) {
+  for (let i = start; i < shape.roles.length; i++) {
+    const x = cx + (shape.positions[i * 3] - cx) * scale, y = cy + (shape.positions[i * 3 + 1] - cy) * scale, z = cz + (shape.positions[i * 3 + 2] - cz) * scale, keep = shape.fogs[i] / Math.max(1e-6, aerial(Math.hypot(shape.positions[i * 3], shape.positions[i * 3 + 2])));
+    shape.positions[i * 3] = x; shape.positions[i * 3 + 1] = y; shape.positions[i * 3 + 2] = z;
+    shape.fogs[i] = aerial(Math.hypot(x, z)) * keep; shape.mists[i] = valleyMist(x, y, z);
+  }
+}
+
 function buildCastle(shape) {
   const [cx, cz] = CASTLE_AT, g = terrainHeight(cx, cz) - 0.5, random = seeded(43);
   const start = shape.roles.length;
@@ -229,10 +239,11 @@ function buildCastle(shape) {
   face(cx, g + 3.5, cz + 3.05, 6, 5, 6.6); face(cx, g + 11.8, cz + 2.05, 3, 2, 3.8);
   face(cx - 4.6, g + 6, cz + 1.75, 1, 5, 1.4); face(cx + 4.6, g + 6, cz + 1.75, 1, 5, 1.4); face(cx, g + 16.5, cz + 1.35, 2, 2, 1.8);
   for (let i = start; i < shape.roles.length; i++) if (shape.roles[i].startsWith('castle')) shape.fogs[i] *= 0.72;
+  shrink(shape, start, [cx, g, cz], LANDMARK_SCALE.castle);
 }
 
 function buildVolcano(shape) {
-  const [vx, vz] = VOLCANO_AT, { base, height } = VOLCANO, radius = 36, rim = 4.5, rings = 12, segments = 72, start = shape.roles.length;
+  const [vx, vz] = VOLCANO_AT, { base, height, radius } = VOLCANO, rim = 3, rings = 12, segments = 72, start = shape.roles.length;
   const streaks = [9, 14, 18, 26];
   for (let k = 0; k <= rings; k++) {
     const t = k / rings;
@@ -255,7 +266,7 @@ function buildVolcano(shape) {
 }
 
 function buildWatchtower(shape) {
-  const [tx, tz] = TOWER_AT, g = terrainHeight(tx, tz) - 0.3;
+  const [tx, tz] = TOWER_AT, g = terrainHeight(tx, tz) - 0.3, start = shape.roles.length;
   let y = g;
   shape.blob(tx, g, tz, 4.4, 1.7, 4.4, 'rock', 'moss', 0.7, 3, 10);
   for (const [w, h, twist] of [[3.4, 3, 0], [2.6, 5, 0.25], [2.1, 4.5, 0.5], [1.7, 3.5, 0.8]]) {
@@ -277,6 +288,7 @@ function buildWatchtower(shape) {
   const cy = y + 2.1, c = [shape.vertex(tx, cy + 1.6, tz, 'rune', 1.2), shape.vertex(tx, cy - 1.2, tz, 'rune', 0.8)];
   const ring = [[0.8, 0], [0, 0.8], [-0.8, 0], [0, -0.8]].map(([dx, dz], k) => shape.vertex(tx + dx, cy, tz + dz, 'rune', k % 2 ? 1 : 0.9));
   for (let k = 0; k < 4; k++) { shape.tri(c[0], ring[k], ring[(k + 1) % 4]); shape.tri(c[1], ring[(k + 1) % 4], ring[k]); }
+  shrink(shape, start, [tx, g, tz], LANDMARK_SCALE.tower);
 }
 
 function shardTop(shape, x, y, z, radius, rise) {
@@ -312,13 +324,16 @@ function buildRuins(shape) {
   }
 }
 
-function roundTree(shape, x, z, tall, random) {
+export const FOREST = Object.freeze({ trees: 620 });
+export const forestField = (x, z) => Math.sin(x * 0.07 + 0.5) * Math.sin(z * 0.06 - 1.2) + Math.sin(x * 0.023 - z * 0.019 + 2) * 0.8 + Math.sin(x * 0.19 + z * 0.17) * 0.25;
+
+function roundTree(shape, x, z, tall, random, clumps = 5, rings = 5, segments = 9) {
   const y = terrainHeight(x, z);
   shape.box(x, y + tall * 0.25, z, 0.3 + tall * 0.05, tall * 0.5, 0.3 + tall * 0.05, random() * 3, 'trunk');
-  for (let clump = 0; clump < 5; clump++) {
+  for (let clump = 0; clump < clumps; clump++) {
     const a = random() * Math.PI * 2, off = clump ? tall * (0.16 + random() * 0.08) : 0, size = tall * (clump ? 0.22 + random() * 0.06 : 0.32);
     const cx = x + Math.cos(a) * off, cy = y + tall * (clump ? 0.58 + random() * 0.22 : 0.7), cz = z + Math.sin(a) * off, start = shape.roles.length;
-    shape.blob(cx, cy, cz, size, size * 0.85, size, 'leaf', 'leafLight', 0.5, 5, 9);
+    shape.blob(cx, cy, cz, size, size * 0.85, size, 'leaf', 'leafLight', 0.5, rings, segments);
     for (let i = start; i < shape.roles.length; i++) {
       const nx = shape.positions[i * 3] - cx, ny = shape.positions[i * 3 + 1] - cy, nz = shape.positions[i * 3 + 2] - cz;
       shape.shades[i] *= 0.8 + 0.4 * Math.max(0, (nx * SUN_TOWARD[0] + ny * SUN_TOWARD[1] + nz * SUN_TOWARD[2]) / Math.hypot(nx, ny, nz));
@@ -333,20 +348,14 @@ function buildForest(shape) {
     if ((Math.abs(x) < 7.6 && Math.abs(z) < 6.4) || (bearing(x, z) > -0.9 && bearing(x, z) < 0.35)) continue;
     roundTree(shape, x, z, 3.5 + random() * 4.5, random);
   }
-  for (const [across, distance, spread, count] of [[-34, 44, 9, 16], [-6, 40, 6, 9], [26, 34, 7, 12], [48, 72, 12, 18], [-52, 78, 12, 18], [8, 64, 8, 10], [36, 90, 10, 12]]) {
-    for (let i = 0; i < count; i++) {
-      const [x, z] = ahead(across + (random() - 0.5) * spread * 2, distance + (random() - 0.5) * spread * 1.4);
-      if (nearRiver(x, z) < 4 || Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1]) < 13) continue;
-      if (random() < 0.25) {
-        const y = terrainHeight(x, z), tall = 4 + random() * 3;
-        shape.box(x, y + tall * 0.2, z, 0.3, tall * 0.4, 0.3, 0, 'trunk');
-        for (let tier = 0; tier < 3; tier++) {
-          const ty = y + tall * (0.3 + tier * 0.22), tr = tall * (0.34 - tier * 0.09), apex = shape.vertex(x, ty + tall * 0.4, z, 'leafLight', 1.05), base = [];
-          for (let s = 0; s < 6; s++) base.push(shape.vertex(x + Math.cos(s / 6 * Math.PI * 2) * tr, ty, z + Math.sin(s / 6 * Math.PI * 2) * tr, 'leaf', 0.7 + (s % 2) * 0.12));
-          for (let s = 0; s < 6; s++) shape.tri(apex, base[(s + 1) % 6], base[s]);
-        }
-      } else roundTree(shape, x, z, 3 + random() * 3, random);
-    }
+  for (let placed = 0, tries = 0; placed < FOREST.trees && tries < FOREST.trees * 12; tries++) {
+    const a = (random() - 0.5) * 3.3, r = 24 + random() ** 0.8 * 112, x = Math.sin(a) * r, z = -Math.cos(a) * r;
+    if (forestField(x, z) < 0.15 || nearRiver(x, z) < 4 || Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1]) < 9 || Math.hypot(x - TOWER_AT[0], z - TOWER_AT[1]) < 5) continue;
+    const tall = 3.2 + random() * 2.6;
+    if (r < 55) roundTree(shape, x, z, tall, random, 3, 4, 8);
+    else if (r < 90) roundTree(shape, x, z, tall, random, 2, 3, 7);
+    else roundTree(shape, x, z, tall * 1.1, random, 1, 3, 6);
+    placed++;
   }
 }
 
@@ -360,24 +369,28 @@ function buildBirds(shape) {
   }
 }
 
+export const CLOUD_WAIST = -0.3;
+export const CLOUD_BANKS = Object.freeze([
+  { count: 7, distance: [160, 170], height: [16, 24], width: [30, 44], tall: [14, 20], kind: 0 },
+  { count: 9, distance: [138, 158], height: [34, 50], width: [26, 38], tall: [20, 28], kind: 0 },
+  { count: 5, distance: [150, 165], height: [62, 84], width: [56, 80], tall: [6, 9], kind: 1 },
+]);
 function buildClouds(shape) {
   const random = seeded(19);
-  const bearings = [-1.25, -0.95, -0.62, -0.3, 0.02, 0.3, 0.55, 0.9, 1.6, 2.3, 3, -2.2, -3];
-  for (const b of bearings) {
-    const a = b + (random() - 0.5) * 0.12, r = Math.max(120 + random() * 38, Math.abs(a - VOLCANO_BEARING) < 0.45 ? 152 : 0), x = Math.sin(a) * r, z = -Math.cos(a) * r, y = 19 + random() * 11, size = 6 + random() * 4;
-    const along = [Math.cos(a), Math.sin(a)], puff = (u, lift, s, stretch = 1) => {
-      const cx = x + along[0] * u, cy = y + lift, cz = z + along[1] * u, rx = s * stretch, ry = s * 0.62, rz = s * 0.8, start = shape.roles.length;
-      shape.blob(cx, cy, cz, rx, ry, rz, 'cloudShade', 'cloud', 0.7, 7, 14);
-      for (let i = start; i < shape.roles.length; i++) {
-        const nx = (shape.positions[i * 3] - cx) / rx, ny = (shape.positions[i * 3 + 1] - cy) / ry, nz = (shape.positions[i * 3 + 2] - cz) / rz;
-        const band = smooth(-0.5, 0.6, (nx * SUN_TOWARD[0] + ny * SUN_TOWARD[1] + nz * SUN_TOWARD[2]) / Math.max(0.001, Math.hypot(nx, ny, nz)));
-        shape.roles[i] = band > 0.5 ? 'cloud' : 'cloudShade'; shape.shades[i] = 0.84 + 0.2 * band; shape.thresholds[i] = band;
-      }
-    };
-    for (let k = -2; k <= 2; k++) puff(k * size * 0.9, 0, size * (0.9 + random() * 0.3), 1.35);
-    for (let k = -1; k <= 1; k++) puff(k * size * 0.95 + (random() - 0.5) * 2, size * 0.75, size * (1 + random() * 0.35));
-    puff((random() - 0.5) * size, size * 1.45, size * (0.8 + random() * 0.3));
-  }
+  shape.uvs = []; shape.seeds = [];
+  CLOUD_BANKS.forEach(({ count, distance, height, width, tall, kind }, bank) => {
+    for (let k = 0; k < count; k++) {
+      const a = -1.45 + (k + 0.2 + random() * 0.6) / count * 2.7 + bank * 0.17;
+      const span = (range, t) => range[0] + (range[1] - range[0]) * t, r = span(distance, random()), y = span(height, random()), w = span(width, random()) / 2, h = span(tall, random()) / 2, seed = random() * 97;
+      if (kind === 0 && r < Math.hypot(...VOLCANO_AT) + 4 && Math.abs(a - VOLCANO_BEARING) < 0.3 + w / r) continue;
+      const x = Math.sin(a) * r, z = -Math.cos(a) * r, sx = Math.cos(a), sz = Math.sin(a);
+      const [base, waist, crown] = [-1, CLOUD_WAIST, 1].map(v => [-1, 1].map(u => {
+        const id = shape.vertex(x + sx * w * u, y + h * v, z + sz * w * u, v === -1 ? 'cloudShade' : 'cloud', 1, v === -1 ? 0 : 1);
+        shape.uvs.push(u * w / h, v); shape.seeds.push(kind ? -seed : seed, w / h); return id;
+      }));
+      shape.quad(base[0], base[1], waist[1], waist[0]); shape.quad(waist[0], waist[1], crown[1], crown[0]);
+    }
+  });
 }
 
 function buildSpirit(shape) {
@@ -471,6 +484,34 @@ attribute vec3 position; attribute vec4 color; uniform mat4 world, viewProjectio
 varying vec3 vColor; varying float vCloud;
 ${CLOUD_SHADE}
 void main() { vec4 p = world * vec4(position, 1.); vColor = color.rgb; vCloud = cloudShade(p.xz, time) * shadow * (1. - smoothstep(60., 110., length(p.xz))); gl_Position = viewProjection * p; }`;
+const CLOUD_VERTEX = `precision highp float;
+attribute vec3 position; attribute vec4 color; attribute vec2 uv, uv2; uniform mat4 world, viewProjection;
+varying vec3 vColor; varying vec2 vUv, vSeed;
+void main() { vColor = color.rgb; vUv = uv; vSeed = uv2; gl_Position = viewProjection * world * vec4(position, 1.); }`;
+const CLOUD_FRAGMENT = `precision highp float;
+varying vec3 vColor; varying vec2 vUv, vSeed; uniform float time;
+${CLOUD_SHADE}
+float fbm(vec2 q) { return noise(q) * .5 + noise(q * 2.1 + 1.7) * .3 + noise(q * 4.3 + 3.1) * .2; }
+void main() {
+  vec2 p = vUv;
+  float n = fbm(p * vec2(2.4, 3.) + vSeed.x * 9.7 + vec2(time * .01, 0.)), a;
+  if (vSeed.x < 0.) {
+    float streak = fbm(vec2(p.x * 1.6 + vSeed.x, p.y * 7.) + vec2(time * .006, 0.));
+    a = smoothstep(.45, .75, streak) * (1. - smoothstep(.55, 1., abs(p.x) / vSeed.y)) * (1. - smoothstep(.2, 1., abs(p.y))) * .55;
+  } else {
+    float lump = -1.;
+    for (int i = 0; i < 6; i++) {
+      float f = float(i) / 5., h = hash(vec2(vSeed.x, float(i))), k = hash(vec2(float(i), vSeed.x + 3.)), middle = 1. - abs(f - .5) * 2.;
+      vec2 c = vec2((f - .5) * 2. * (vSeed.y - .45), -.55 + middle * (.45 + k * .3));
+      float radius = .32 + middle * .28 + h * .12;
+      lump = max(lump, 1. - length(p - c) / radius);
+    }
+    float body = lump + (n - .5) * .5, base = smoothstep(-.82, -.6, p.y + (n - .5) * .1);
+    a = smoothstep(0., .28, body) * base * .97;
+  }
+  vec3 c = vColor * (.93 + .14 * smoothstep(-.4, .7, p.y + (n - .5) * .6));
+  gl_FragColor = vec4(c * a, a);
+}`;
 const LAND_FRAGMENT = `precision highp float;
 varying vec3 vColor; varying float vCloud;
 void main() { gl_FragColor = vec4(vColor * (1. - vCloud * .4), 1.); }`;
@@ -502,7 +543,7 @@ void main() {
   vec3 c = mix(mix(smoke, ember, pow(1. - vUv.y, 2.5) * glow), haze, .25);
   gl_FragColor = vec4(c * a, a);
 }`;
-export const PLUME = Object.freeze({ segments: 12, height: 12, lean: 26, base: 5, top: 11 });
+export const PLUME = Object.freeze({ segments: 12, height: 13, lean: 22, base: 3, top: 9 });
 export function plumeShape() {
   const [vx, vz] = VOLCANO_AT, positions = [], uvs = [], uv2s = [], indices = [], side = new Vector3(0, 1, 0).cross(new Vector3(vx, 0, vz)).normalize();
   for (let k = 0; k <= PLUME.segments; k++) {
@@ -677,6 +718,8 @@ export function createSeatWorld(scene, parent) {
   landPaint.backFaceCulling = false; landPaint.setFloat('time', 0); landPaint.setFloat('shadow', 0);
   grassPaint.backFaceCulling = false; grassPaint.setFloat('time', 0); grassPaint.setFloat('shadow', 0);
   const skyEffectPaint = new ShaderMaterial('seat-world-sky-effects-paint', scene, { vertexSource: SKY_EFFECT_VERTEX, fragmentSource: SKY_EFFECT_FRAGMENT }, { attributes: ['position', 'uv', 'uv2'], uniforms: ['world', 'viewProjection', 'time', 'rays', 'glow', 'rain', 'tint', 'smoke', 'ember', 'haze'], needAlphaBlending: true });
+  const cloudPaint = new ShaderMaterial('seat-world-cloud-paint', scene, { vertexSource: CLOUD_VERTEX, fragmentSource: CLOUD_FRAGMENT }, { attributes: ['position', 'color', 'uv', 'uv2'], uniforms: ['world', 'viewProjection', 'time'], needAlphaBlending: true });
+  cloudPaint.backFaceCulling = false; cloudPaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; cloudPaint.disableDepthWrite = true; cloudPaint.setFloat('time', 0);
   skyEffectPaint.backFaceCulling = false; skyEffectPaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; skyEffectPaint.disableDepthWrite = true; skyEffectPaint.setFloat('time', 0); skyEffectPaint.setFloat('rays', 0); skyEffectPaint.setFloat('glow', 0);
   let sky = null, land, grass, skyEffects, cloudRoot, clouds, flockRoot, flock, moon, shooting, spirits;
   function build() {
@@ -684,7 +727,7 @@ export function createSeatWorld(scene, parent) {
     grass = new Mesh('seat-world-grass', scene); Object.assign(new VertexData(), grassBlades()).applyToMesh(grass); grass.material = grassPaint; grass.parent = root; grass.isPickable = false; grass.metadata = { castShadow: false, seatWorld: true };
     skyEffects = new Mesh('seat-world-sky-effects', scene); Object.assign(new VertexData(), skyEffectShape()).applyToMesh(skyEffects); skyEffects.material = skyEffectPaint; skyEffects.parent = root; skyEffects.isPickable = false; skyEffects.metadata = { castShadow: false, seatWorld: true };
     cloudRoot = new TransformNode('seat-world-cloud-drift', scene); cloudRoot.parent = root;
-    clouds = make('clouds', buildClouds, unlit, cloudRoot);
+    clouds = make('clouds', buildClouds, cloudPaint, cloudRoot); clouds.setVerticesData('uv', clouds.metadata.shape.uvs); clouds.setVerticesData('uv2', clouds.metadata.shape.seeds);
     flockRoot = new TransformNode('seat-world-flock-flight', scene); flockRoot.parent = root; flockRoot.position.y = FLOCK.y;
     flock = make('flock', buildBirds, unlit, flockRoot);
     moon = make('moon', buildMoon); shooting = make('shooting', buildShootingStar); spirits = make('spirits', buildSpirit);
@@ -758,7 +801,7 @@ export function createSeatWorld(scene, parent) {
     if (!root.isEnabled(false)) return;
     seconds += reduced ? 0 : delta;
     cloudRoot.rotation.y = seconds * 0.004;
-    grassPaint.setFloat('time', seconds); landPaint.setFloat('time', seconds); skyEffectPaint.setFloat('time', seconds);
+    grassPaint.setFloat('time', seconds); landPaint.setFloat('time', seconds); cloudPaint.setFloat('time', seconds); skyEffectPaint.setFloat('time', seconds);
     const run = (seconds % FLOCK_SECONDS) / FLOCK_SECONDS * 2;
     flockRoot.rotation.y = -(FLOCK.center - FLOCK.span / 2 + FLOCK.span * Math.min(1, run));
     flockRoot.position.y = FLOCK.y + Math.sin(seconds * 0.7) * 0.9;

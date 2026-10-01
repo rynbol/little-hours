@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, valleyMist, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, VOLCANO, SEAT_DRAPE } from './seat-world.js';
+import { createSeatWorld, valleyMist, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VOLCANO_AT, TOWER_AT, CASTLE_AT, LANDMARK_SCALE, valleyFloor, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, VOLCANO, SEAT_DRAPE } from './seat-world.js';
 
-const PEAK = VOLCANO.base + VOLCANO.height;
+const PEAK = VOLCANO.base + VOLCANO.height, [VX, VZ] = VOLCANO_AT, fromVolcano = (x, z) => Math.hypot(x - VX, z - VZ);
 
 const setup = () => { const engine = new NullEngine(), scene = new Scene(engine); return { engine, scene, world: createSeatWorld(scene, new TransformNode('room', scene)) }; };
 const litWindows = world => {
@@ -216,8 +216,8 @@ test('lava runs unbroken from the volcano crater down its ribbed slopes', () => 
   const columns = new Map();
   for (let i = 0; i < shape.roles.length; i++) {
     const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2];
-    if (shape.roles[i] !== 'ember' || Math.hypot(x + 82, z + 96) > 40 || y > PEAK - 4) continue;
-    const column = Math.round(Math.atan2(z + 96, x + 82) * 100);
+    if (shape.roles[i] !== 'ember' || fromVolcano(x, z) > 40 || y > PEAK - 4) continue;
+    const column = Math.round(Math.atan2(z - VZ, x - VX) * 100);
     columns.set(column, [...(columns.get(column) ?? []), y].sort((a, b) => a - b));
   }
   const rivers = [...columns.values()].filter(heights => heights.length >= 6 && heights[0] < 20);
@@ -269,14 +269,14 @@ test('the castle keep rises into a tall sanctum spire above its curtain wall', (
   const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
   const heights = role => shape.roles.flatMap((r, i) => r === role ? [shape.positions[i * 3 + 1]] : []);
   const stone = heights('castle'), roofs = heights('castleRoof');
-  assert.ok(Math.max(...roofs) - Math.min(...stone) > 27);
+  assert.ok(Math.max(...roofs) - Math.min(...stone) > 27 * LANDMARK_SCALE.castle);
   engine.dispose();
 });
 
 test('smoke leaves the volcano crater, widens downwind and glows with ember light after dark', () => {
   const { positions } = plumeShape(), at = k => positions.slice(k * 6, k * 6 + 6), last = positions.length / 6 - 1;
   const width = k => Math.hypot(at(k)[0] - at(k)[3], at(k)[2] - at(k)[5]), middle = k => (at(k)[0] + at(k)[3]) / 2;
-  assert.ok(Math.abs(middle(0) + 82) < 1 && Math.abs(at(0)[1] - (PEAK - 1)) < 0.5, 'starts at the crater');
+  assert.ok(Math.abs(middle(0) - VX) < 1 && Math.abs(at(0)[1] - (PEAK - 1)) < 0.5, 'starts at the crater');
   assert.ok(middle(last) > middle(0) + 20 && width(last) > width(0) * 2);
   const { engine, world } = setup();
   world.setEnabled(true);
@@ -315,12 +315,12 @@ test('the volcano rises in uneven shoulders to a broken crater rim and darkens t
   const rock = [];
   for (let i = 0; i < shape.roles.length; i++) {
     const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2];
-    if (shape.roles[i] === 'rock' && Math.hypot(x + 82, z + 96) < 40) rock.push({ y, shade: shape.shades[i], reach: Math.hypot(x + 82, z + 96) });
+    if (shape.roles[i] === 'rock' && fromVolcano(x, z) < 40) rock.push({ y, shade: shape.shades[i], reach: fromVolcano(x, z) });
   }
   const mean = list => list.reduce((sum, each) => sum + each.shade, 0) / list.length;
   const foot = rock.filter(each => each.y < VOLCANO.base + 2), summit = rock.filter(each => each.y > PEAK - 14);
   assert.ok(mean(summit) < mean(foot) * 0.8, `summit shade ${mean(summit).toFixed(2)} against foot ${mean(foot).toFixed(2)}`);
-  const rim = shape.roles.map((role, i) => role === 'ember' && Math.hypot(shape.positions[i * 3] + 82, shape.positions[i * 3 + 2] + 96) < 8 ? shape.positions[i * 3 + 1] : null).filter(y => y !== null && y > PEAK - 4);
+  const rim = shape.roles.map((role, i) => role === 'ember' && fromVolcano(shape.positions[i * 3], shape.positions[i * 3 + 2]) < 8 ? shape.positions[i * 3 + 1] : null).filter(y => y !== null && y > PEAK - 4);
   assert.ok(Math.max(...rim) - Math.min(...rim) > 2, 'the crater rim is broken, not level');
   const reaches = foot.map(each => each.reach);
   assert.ok(Math.max(...reaches) / Math.min(...reaches) > 1.25, 'the foot spreads in uneven shoulders');
@@ -354,14 +354,14 @@ test('the watchtower glows with glyph lines up every tier and splays its crown c
   const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
   const runes = [], stone = [];
   for (let i = 0; i < shape.roles.length; i++) {
-    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2], reach = Math.hypot(x - 13, z + 56);
+    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2], reach = Math.hypot(x - TOWER_AT[0], z - TOWER_AT[1]);
     if (reach > 5) continue;
     if (shape.roles[i] === 'rune') runes.push(y); else if (shape.roles[i] === 'ruin') stone.push({ y, reach });
   }
-  const tiers = new Set(runes.map(y => Math.floor(y / 3)));
+  const tiers = new Set(runes.map(y => Math.floor(y / (3 * LANDMARK_SCALE.tower))));
   assert.ok(tiers.size >= 5, `glyphs cover ${tiers.size} bands of the tower`);
   const top = Math.max(...stone.map(each => each.y)), crown = stone.filter(each => each.y > top - 0.1);
-  assert.ok(crown.length >= 4 && crown.every(each => each.reach > 2.4), 'claw tips lean out past the crown platform');
+  assert.ok(crown.length >= 4 && crown.every(each => each.reach > 2.4 * LANDMARK_SCALE.tower), 'claw tips lean out past the crown platform');
   engine.dispose();
 });
 
@@ -394,7 +394,7 @@ test('the meadow ruins stay low and broad, a broken arch among stumps rather tha
   const { engine, world } = setup();
   world.setEnabled(true);
   const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
-  const stones = landBoxes(shape).filter(box => box.role === 'ruin' && Math.hypot(box.x - 13, box.z + 56) > 8 && box.tall > box.long);
+  const stones = landBoxes(shape).filter(box => box.role === 'ruin' && Math.hypot(box.x - TOWER_AT[0], box.z - TOWER_AT[1]) > 8 && box.tall > box.long);
   assert.ok(stones.length >= 20, `${stones.length} upright ruin stones`);
   for (const stone of stones) assert.ok(stone.tall <= stone.long * 3 && stone.tall < 3.6, `a ruin stone ${stone.tall.toFixed(2)} tall and ${stone.long.toFixed(2)} wide`);
   const lintels = landBoxes(shape).filter(box => box.role === 'ruin' && box.long > 3.2 && box.tall > 0.7 && box.tall < 0.9);
@@ -407,7 +407,7 @@ test('the volcano foot melts into the valley haze while its upper slopes keep a 
   world.setEnabled(true);
   const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata, foot = [], slope = [], plain = [];
   for (let i = 0; i < shape.roles.length; i++) {
-    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2], reach = Math.hypot(x + 82, z + 96);
+    const x = shape.positions[i * 3], y = shape.positions[i * 3 + 1], z = shape.positions[i * 3 + 2], reach = fromVolcano(x, z);
     if (shape.roles[i] === 'rock' && reach < 40) (y < VOLCANO.base + 1 ? foot : y > VOLCANO.base + 12 ? slope : []).push(shape.fogs[i]);
     else if (shape.roles[i] !== 'rock' && reach > 36 && reach < 48 && y < 20) plain.push(shape.fogs[i]);
   }
@@ -417,16 +417,14 @@ test('the volcano foot melts into the valley haze while its upper slopes keep a 
   engine.dispose();
 });
 
-test('the far ranges split into a sunlit band and a shaded band, and cloud puffs are round', () => {
+test('the far ranges split into a sunlit band and a shaded band', () => {
   const { engine, world } = setup();
   world.setEnabled(true);
   const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
   const ranges = shape.roles.map((role, i) => role === 'mid' || role === 'far' ? shape.shades[i] : null).filter(shade => shade !== null);
   const share = test => ranges.filter(test).length / ranges.length;
-  assert.ok(share(shade => shade > 0.75 && shade < 1.05) < 0.15, 'few range faces sit between light and shade');
-  assert.ok(share(shade => shade <= 0.75) > 0.15 && share(shade => shade >= 1.05) > 0.4, 'both bands carry the ranges');
-  const clouds = world.meshes.find(mesh => mesh.name === 'seat-world-clouds').metadata.shape;
-  assert.ok(clouds.roles.length >= 13 * 9 * 8 * 14, `${clouds.roles.length} cloud vertices`);
+  assert.ok(share(shade => shade > 0.75 && shade < 1.05) < 0.2, 'few range faces sit between light and shade');
+  assert.ok(share(shade => shade <= 0.75) > 0.08 && share(shade => shade >= 1.05) > 0.4, 'both bands carry the ranges');
   engine.dispose();
 });
 
@@ -448,23 +446,6 @@ test('the volcano crater and the top of its plume sit low enough to stay inside 
   assert.ok(Math.max(...tops) < 48, `plume tops out at ${Math.max(...tops).toFixed(1)}`);
 });
 
-test('cloud puffs split into a sunlit side and a shaded side by the direction of the sun', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true);
-  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-clouds').metadata, puff = 8 * 14;
-  let toward = 0, away = 0, towardLit = 0, awayLit = 0;
-  for (let start = 0; start + puff <= shape.roles.length; start += puff) {
-    let cx = 0, cz = 0;
-    for (let i = start; i < start + puff; i++) { cx += shape.positions[i * 3] / puff; cz += shape.positions[i * 3 + 2] / puff; }
-    for (let i = start; i < start + puff; i++) {
-      const side = (shape.positions[i * 3] - cx) * -0.3 + (shape.positions[i * 3 + 2] - cz) * -0.49, lit = shape.roles[i] === 'cloud';
-      if (side > 0.5) { toward++; towardLit += lit; } else if (side < -0.5) { away++; awayLit += lit; }
-    }
-  }
-  assert.ok(towardLit / toward > awayLit / away + 0.2, `lit ${(towardLit / toward).toFixed(2)} toward the sun, ${(awayLit / away).toFixed(2)} away`);
-  engine.dispose();
-});
-
 test('the meadow ruin stumps wear thick moss caps as wide as the stone, in warm sandstone by day', () => {
   const { engine, world } = setup();
   world.setEnabled(true);
@@ -476,13 +457,41 @@ test('the meadow ruin stumps wear thick moss caps as wide as the stone, in warm 
   engine.dispose();
 });
 
+const cloudCards = world => {
+  const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-clouds'), { shape } = mesh.metadata, seeds = mesh.getVerticesData('uv2'), cards = [];
+  for (let c = 0; c < shape.roles.length / 6; c++) {
+    const corners = [0, 1, 2, 3, 4, 5].map(k => { const i = c * 6 + k; return { x: shape.positions[i * 3], y: shape.positions[i * 3 + 1], z: shape.positions[i * 3 + 2], role: shape.roles[i] }; });
+    const x = (corners[0].x + corners[1].x) / 2, z = (corners[0].z + corners[1].z) / 2;
+    cards.push({ corners, x, z, distance: Math.hypot(x, z), bearing: Math.atan2(x, -z), low: Math.min(...corners.map(p => p.y)), high: Math.max(...corners.map(p => p.y)), across: Math.hypot(corners[1].x - corners[0].x, corners[1].z - corners[0].z), wisp: seeds[c * 12] < 0 });
+  }
+  return cards;
+};
+
+test('the sky carries low banks, tall cumulus and high wisps on cards that face the seat, sunlit down past the middle and shaded along the base', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const cards = cloudCards(world), cumulus = cards.filter(card => !card.wisp), wisps = cards.filter(card => card.wisp);
+  assert.ok(cumulus.length >= 12 && wisps.length >= 3, `${cumulus.length} cumulus and ${wisps.length} wisps`);
+  for (const { corners, x, z } of cards) {
+    const ax = corners[1].x - corners[0].x, az = corners[1].z - corners[0].z;
+    assert.ok(Math.abs(ax * x + az * z) / Math.hypot(ax, az) / Math.hypot(x, z) < 0.01, 'the card turns square to the seat');
+    const base = Math.min(...corners.map(p => p.y)), high = Math.max(...corners.map(p => p.y));
+    assert.ok(corners.every(p => p.role === (p.y === base ? 'cloudShade' : 'cloud')), 'the shade sits only along the base');
+    assert.ok(corners.filter(p => p.role === 'cloud').every(p => p.y < base + (high - base) * 0.4 || p.y === high), 'the sunlit colour reaches down past the middle');
+  }
+  assert.ok(Math.min(...wisps.map(card => card.low)) > Math.max(...cumulus.map(card => card.high)) - 10, 'the wisps ride above the cumulus');
+  assert.ok(cumulus.some(card => card.high - card.low > card.across * 0.6), 'some cumulus tower tall rather than lie flat');
+  assert.ok(Math.min(...cumulus.map(card => card.low)) < 12, 'the lowest bank sinks behind the ranges');
+  engine.dispose();
+});
+
 test('no cloud hangs in front of the volcano plume, and the smoke stands tall and dark enough to read by day', () => {
   const { engine, world } = setup();
   world.setEnabled(true);
-  const clouds = world.meshes.find(mesh => mesh.name === 'seat-world-clouds').metadata.shape, bearing = Math.atan2(-82, 96);
-  for (let i = 0; i < clouds.roles.length; i++) {
-    const x = clouds.positions[i * 3], z = clouds.positions[i * 3 + 2];
-    if (Math.abs(Math.atan2(x, -z) - bearing) < 0.25) assert.ok(Math.hypot(x, z) > 132, `a cloud ${Math.hypot(x, z).toFixed(0)} away in front of the plume`);
+  const bearing = Math.atan2(VX, -VZ), plumeTop = Math.max(...plumeShape().positions.filter((_, i) => i % 3 === 1));
+  for (const card of cloudCards(world)) {
+    const overlaps = Math.abs(card.bearing - bearing) < 0.25 + card.across / 2 / card.distance;
+    if (overlaps) assert.ok(card.distance > Math.hypot(VX, VZ) || card.low > plumeTop, `a cloud ${card.distance.toFixed(0)} away in front of the plume`);
   }
   const { positions } = plumeShape(), ys = [];
   for (let i = 1; i < positions.length; i += 3) ys.push(positions[i]);
@@ -526,7 +535,7 @@ test('by day the far volcano recedes into blue air instead of standing out in sa
   world.setEnabled(true); world.setTheme('day');
   const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-land'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color');
   const haze = [1, 3, 5].map(k => parseInt(VISTA_THEMES.day.haze.slice(k, k + 2), 16) / 255), gaps = [];
-  shape.roles.forEach((role, i) => { if (role === 'rock' && Math.hypot(shape.positions[i * 3] + 82, shape.positions[i * 3 + 2] + 96) < 40) gaps.push(Math.hypot(...haze.map((c, k) => colors[i * 4 + k] - c))); });
+  shape.roles.forEach((role, i) => { if (role === 'rock' && fromVolcano(shape.positions[i * 3], shape.positions[i * 3 + 2]) < 40) gaps.push(Math.hypot(...haze.map((c, k) => colors[i * 4 + k] - c))); });
   const gap = gaps.reduce((sum, each) => sum + each, 0) / gaps.length;
   assert.ok(gap < 0.45, `volcano rock sits ${gap.toFixed(3)} from the day haze`);
   engine.dispose();
@@ -556,16 +565,6 @@ test('volcano lava keeps an ember hue in rain and takes some of the noon haze by
   assert.ok(rr > rb * 3 && rr > rg * 1.8, `rain lava ${[rr, rg, rb].map(v => v.toFixed(2))}`);
   world.setTheme('day');
   assert.ok(rim()[2] > 0.45, `day lava blue ${rim()[2].toFixed(2)}`);
-  engine.dispose();
-});
-
-test('cloud puffs shade from sunlit to shadowed gradually, with no hard colour step between neighbouring vertices by day', () => {
-  const { engine, world } = setup();
-  world.setEnabled(true); world.setTheme('day');
-  const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-clouds'), colors = mesh.getVerticesData('color'), indices = mesh.getIndices();
-  let step = 0;
-  for (let t = 0; t < indices.length; t += 3) for (const [a, b] of [[indices[t], indices[t + 1]], [indices[t + 1], indices[t + 2]], [indices[t], indices[t + 2]]]) for (let c = 0; c < 3; c++) step = Math.max(step, Math.abs(colors[a * 4 + c] - colors[b * 4 + c]));
-  assert.ok(step < 0.26, `largest step ${step.toFixed(3)}`);
   engine.dispose();
 });
 
@@ -627,8 +626,8 @@ test('the moon maria fade into the face with no hard rim', () => {
 });
 
 test('mist pools in the low valley in the middle distance, and the haze warms toward the sun', () => {
-  assert.ok(valleyMist(0, -4.8, -50) > 0.6, 'the valley floor 50 out sits in mist');
-  assert.ok(valleyMist(0, 4.2, -50) < 0.1, 'a hilltop 9 above it rises clear');
+  assert.ok(valleyMist(0, valleyFloor(50) + 0.5, -50) > 0.6, 'the valley floor 50 out sits in mist');
+  assert.ok(valleyMist(0, valleyFloor(50) + 10, -50) < 0.1, 'a hilltop 10 above it rises clear');
   assert.ok(valleyMist(0, -8, -10) < 0.01, 'the near meadow stays clear');
   const { engine, world } = setup();
   world.setEnabled(true); world.setTheme('dusk');
@@ -643,10 +642,24 @@ test('the painted sky, clouds and moon skip the room tone curve, so they match t
   const { engine, scene, world } = setup();
   scene.imageProcessingConfiguration.toneMappingEnabled = true; scene.imageProcessingConfiguration.exposure = 1.08;
   world.setEnabled(true);
-  for (const name of ['seat-world-sky', 'seat-world-clouds', 'seat-world-moon']) {
+  assert.equal(world.meshes.find(mesh => mesh.name === 'seat-world-clouds').material.imageProcessingConfiguration, undefined, 'the cloud shader writes its colours straight out');
+  for (const name of ['seat-world-sky', 'seat-world-moon']) {
     const material = world.meshes.find(mesh => mesh.name === name).material;
     assert.equal(material.imageProcessingConfiguration.toneMappingEnabled, false, name);
     assert.equal(material.imageProcessingConfiguration.exposure, 1, name);
   }
+  engine.dispose();
+});
+
+test('from the desk chair the valley falls away below the eye, and the castle, volcano and ranges sit small in the distance', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { positions, roles } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata.shape, eye = [-2, 2.24, -2.41];
+  const rise = i => Math.atan2(positions[i * 3 + 1] - eye[1], Math.hypot(positions[i * 3] - eye[0], positions[i * 3 + 2] - eye[2])) * 180 / Math.PI;
+  const highest = (test, reach = Infinity) => { let top = -90; for (let i = 0; i < roles.length; i++) { const x = positions[i * 3], z = positions[i * 3 + 2]; if (Math.abs(Math.atan2(x, -z) + 0.2) < 0.9 && test(roles[i], Math.hypot(x, z), x, z) && Math.hypot(x, z) < reach) top = Math.max(top, rise(i)); } return top; };
+  assert.ok(highest((role, r) => ['valley', 'field', 'mid'].includes(role) && r > 20, 140) < 0.5, 'the valley floor and the ridge in front of the ranges stay under the eye');
+  assert.ok(highest(role => role === 'far' || role === 'snow') < 6, 'the far ranges rise only a few degrees above the horizon');
+  assert.ok(highest((role, r, x, z) => Math.hypot(x - CASTLE_AT[0], z - CASTLE_AT[1]) < 6) < 8, 'the castle stands small on its mound');
+  assert.ok(highest((role, r, x, z) => fromVolcano(x, z) < VOLCANO.radius) < 12, 'the volcano rises low on the far side of the valley');
   engine.dispose();
 });

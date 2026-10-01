@@ -15,6 +15,8 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
   lh serve [--ref <git ref>]        start a dev server and keep it running (Ctrl-C stops it)
   lh art                            render room preview assets from the actual game scenes
   lh asset <name...>                close-up of Blender assets under the house lighting (--theme, --turn)
+  lh world [view...]                shots of the outdoor world explorer from named views (--theme, --size, --wait,
+                                    --at x,y,z with --yaw/--pitch radians for a custom camera; y is above ground); prints gpu ms
   lh flows                          list the flows
   lh run <flow...|all>              run flows with real input; exits 1 on any failure
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
@@ -137,6 +139,27 @@ async function assetShots() {
     for (let attempt = 0; attempt < 400 && !await browser.js(`document.body.dataset.ready === 'true'`); attempt++) await sleep(50);
     if (!await browser.js(`document.body.dataset.ready === 'true'`)) throw new Error('The asset close-up did not render');
     console.log(await browser.shot(join(out, `${positional.join('+') || 'tree-round-a'}-${options.theme || 'day'}.jpg`)));
+  } finally { await browser.close(); }
+  return 0;
+}
+
+async function worldShots() {
+  const server = await start(), out = outDir('world'), [width, height] = String(options.size || '1440x1000').split('x').map(Number), theme = options.theme || 'day';
+  const browser = await launch({ width, height, scale: Number(options.scale || 1), reducedMotion: false });
+  try {
+    for (const view of positional.length ? positional : ['window']) {
+      await browser.navigate(`${server.url}/checks/world.html?${new URLSearchParams({ view, theme, ...(options.at ? { at: options.at, yaw: options.yaw || 0, pitch: options.pitch || 0 } : {}) })}`);
+      for (let attempt = 0; attempt < 600 && !await browser.js(`Boolean(window.__world?.ready())`).catch(() => false); attempt++) await sleep(50);
+      if (!await browser.js(`Boolean(window.__world?.ready())`)) throw new Error(`The world view ${view} did not render`);
+      await sleep(Number(options.wait || 1500));
+      const stats = await browser.js(`(() => {
+        const { engine, scene } = window.__world, gl = engine._gl, pixel = new Uint8Array(4), times = [];
+        for (let i = 0; i < 35; i++) { engine._drawCalls.fetchNewFrame(); const start = performance.now(); engine.beginFrame(); scene.render(); engine.endFrame(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); if (i >= 5) times.push(performance.now() - start); }
+        times.sort((a, b) => a - b);
+        return { gpuFrameMs: Number(times[15].toFixed(2)), drawCalls: engine._drawCalls.current, triangles: Math.round(scene.getActiveIndices() / 3), buildMs: window.__world.buildMs };
+      })()`);
+      console.log(`${view} ${theme}: ${JSON.stringify(stats)} ${await browser.shot(join(out, `${view}-${theme}.jpg`))}`);
+    }
   } finally { await browser.close(); }
   return 0;
 }
@@ -378,7 +401,7 @@ const commands = {
   help: async () => { console.log(HELP); return 0; },
   flows: async () => { for (const name of await flowNames()) console.log(`${name.padEnd(12)} ${(await loadFlow(name)).about}`); return 0; },
   run: async () => runFlows(!positional.length || positional[0] === 'all' ? await flowNames() : positional),
-  art: roomArt, asset: assetShots, shot: shots, perf, trace: traceCommand, heap, doctor, cleanup, serve: serveForever,
+  art: roomArt, asset: assetShots, world: worldShots, shot: shots, perf, trace: traceCommand, heap, doctor, cleanup, serve: serveForever,
 };
 
 if (!commands[command]) { console.error(`Unknown command "${command}".\n\n${HELP}`); process.exit(2); }
