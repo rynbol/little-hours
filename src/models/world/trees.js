@@ -30,13 +30,13 @@ const RIVER_CLEARANCE = WORLD.river.width * 1.4;
 
 const FOLIAGE = new Map([
   [WORLD_ATMOSPHERES.day, { leafTop: '#92c840', leafUnder: '#3a6a30', leafBack: '#d8ea78', needleTop: '#4f8a3c', needleUnder: '#24452e', bark: '#76825a' }],
-  [WORLD_ATMOSPHERES.dusk, { leafTop: '#8fa04a', leafUnder: '#2f4c38', leafBack: '#e8a050', needleTop: '#667a40', needleUnder: '#2a3a2c', bark: '#544c3c' }],
+  [WORLD_ATMOSPHERES.dusk, { leafTop: '#8fa04a', leafUnder: '#3a5642', leafBack: '#e8a050', needleTop: '#667a40', needleUnder: '#2a3a2c', bark: '#544c3c' }],
   [WORLD_ATMOSPHERES.rain, { leafTop: '#64804a', leafUnder: '#3c4c36', leafBack: '#7a8458', needleTop: '#4a6040', needleUnder: '#33402f', bark: '#4a5038' }],
 ]);
 const FOLIAGE_COLORS = Object.keys(FOLIAGE.get(WORLD_ATMOSPHERES.day));
 const LIGHT_COLORS = ['sunColor', 'skyAmbient', 'groundAmbient', 'shadowTint'];
 
-const PART = Object.freeze({ bark: 0, leaf: 0.25, needle: 0.5, farLeaf: 0.75, farNeedle: 1 });
+const PART = Object.freeze({ bark: 0, mass: 0.16, leaf: 0.25, needle: 0.5, farLeaf: 0.75, farNeedle: 1 });
 
 function hash(a, b, salt) {
   let h = Math.imul(a, 374761393) ^ Math.imul(b, 668265263) ^ Math.imul(salt, 1274126177);
@@ -112,6 +112,10 @@ const unit = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / 
 const blendNormal = (v, outer, inner, weight) => unit(add(unit(sub(v, outer)), unit(sub(v, inner)), weight));
 const sphere = rand => { const a = rand() * Math.PI * 2, y = rand() * 2 - 1, r = Math.sqrt(1 - y * y); return [Math.cos(a) * r, y, Math.sin(a) * r]; };
 
+const GOLDEN = (1 + Math.sqrt(5)) / 2;
+const ICOSAHEDRON = [[-1, GOLDEN, 0], [1, GOLDEN, 0], [-1, -GOLDEN, 0], [1, -GOLDEN, 0], [0, -1, GOLDEN], [0, 1, GOLDEN], [0, -1, -GOLDEN], [0, 1, -GOLDEN], [GOLDEN, 0, -1], [GOLDEN, 0, 1], [-GOLDEN, 0, -1], [-GOLDEN, 0, 1]].map(unit);
+const ICOSAHEDRON_FACES = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+
 function shape() {
   const s = { positions: [], normals: [], colors: [], uvs: [], indices: [] };
   s.vertex = (p, n, color, uv) => { s.positions.push(...p); s.normals.push(...n); s.colors.push(...color); s.uvs.push(...uv); return s.positions.length / 3 - 1; };
@@ -127,6 +131,14 @@ function shape() {
       s.vertex(add(from, n, r0), n, colorOf(from), [k / sides, 0]); s.vertex(add(to, n, r1), n, colorOf(to), [k / sides, 1]);
     }
     for (let k = 0; k < sides; k++) { const a = start + k * 2; s.indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  };
+  s.ball = (centre, radius, squash, normalOf, colorOf) => {
+    const start = s.positions.length / 3;
+    for (const corner of ICOSAHEDRON) {
+      const p = add(centre, [corner[0] * radius, corner[1] * radius * squash, corner[2] * radius]);
+      s.vertex(p, normalOf(p), colorOf(p), [0.5, 0.5]);
+    }
+    for (const face of ICOSAHEDRON_FACES) s.indices.push(start + face[0], start + face[1], start + face[2]);
   };
   s.data = () => ({ positions: new Float32Array(s.positions), normals: new Float32Array(s.normals), colors: new Float32Array(s.colors), uvs: new Float32Array(s.uvs), indices: new Uint16Array(s.indices) });
   return s;
@@ -145,16 +157,18 @@ function scatterCards(s, rand, centre, radius, squash, cards, half, lean, normal
 function broadleaf() {
   const s = shape(), rand = seeded(11), canopy = [0, 6.5, 0], fork = [0.2, 3.4, 0.1];
   const clumps = [{ c: [0, 7.9, 0], r: 2.7 }];
-  for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + rand() * 0.5, d = 2.5 + rand() * 0.7; clumps.push({ c: [Math.cos(a) * d, 5.9 + rand() * 1.1, Math.sin(a) * d], r: 2 + rand() * 0.5 }); }
+  for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + rand() * 0.5, d = 2.8 + rand() * 0.7; clumps.push({ c: [Math.cos(a) * d, 5.7 + rand() * 1.4, Math.sin(a) * d], r: 2 + rand() * 0.5 }); }
   const barkColor = p => [0.45 + 0.5 * smooth(-0.5, 6, p[1]), 0.08 * smooth(1, 6, p[1]), PART.bark, 0];
   s.tube([0, -0.8, 0], fork, 0.5, 0.33, 7, barkColor);
   for (const { c } of clumps) s.tube(fork, add(fork, sub(c, fork), 0.8), 0.22, 0.08, 5, barkColor);
   for (const { c, r } of clumps) {
-    const normalOf = v => blendNormal(v, canopy, c, 0.45), colorOf = seed => v => {
+    const normalOf = v => blendNormal(v, canopy, c, 1.3), light = v => {
       const out = sub(v, canopy), depth = Math.min(1, Math.hypot(...out) / 4.8);
-      return [Math.min(1, Math.max(0.2, 0.42 + 0.3 * out[1] / (Math.hypot(...out) || 1) + 0.28 * depth)), Math.min(1, (v[1] / 9) ** 1.5), PART.leaf, seed];
+      return 0.36 + 0.22 * out[1] / (Math.hypot(...out) || 1) + 0.2 * depth + 0.38 * (v[1] - c[1]) / r;
     };
-    scatterCards(s, rand, c, r, 0.8, 16, 0.62, 0.3, normalOf, colorOf);
+    const sway = v => Math.min(1, (v[1] / 9) ** 1.5), seed = rand();
+    s.ball(c, r * 0.8, 0.78, normalOf, v => [Math.min(0.75, Math.max(0.12, light(v) - 0.12)), sway(v), PART.mass, seed]);
+    scatterCards(s, rand, c, r, 0.8, 16, 0.62, 0.3, normalOf, leafSeed => v => [Math.min(1, Math.max(0.16, light(v))), sway(v), PART.leaf, leafSeed]);
   }
   return s.data();
 }
@@ -223,12 +237,12 @@ uniform vec3 leafTop, leafUnder, leafBack, needleTop, needleUnder, bark;
 uniform float sunStrength, shadowLift, fogDensity, fogHeight, time;
 ${WORLD_GLSL}
 float leaves(vec2 uv, float seed) {
-  vec2 g = uv * 12. + seed * 31.7, cell = floor(g - .5);
+  vec2 g = uv * 7. + seed * 31.7, cell = floor(g - .5);
   float best = 0.;
   for (int i = 0; i <= 1; i++) for (int j = 0; j <= 1; j++) {
-    vec2 c = cell + vec2(float(i), float(j)), d = g - c - vec2(worldHash(c + 3.1), worldHash(c + 7.7));
+    vec2 c = cell + vec2(float(i), float(j)), centre = c + vec2(worldHash(c + 3.1), worldHash(c + 7.7)), d = g - centre, q = (centre - seed * 31.7) / 3.5 - 1.;
     float h = worldHash(c), a = h * 6.283, x = (cos(a) * d.x + sin(a) * d.y) / .66, y = -sin(a) * d.x + cos(a) * d.y;
-    best = max(best, step(abs(x), 1.) * step(abs(y), .3 * (1. - x * x)) * (.86 + .14 * h));
+    best = max(best, step(dot(q, q), .7) * step(abs(x), 1.) * step(abs(y), .52 * (1. - x * x)) * (.86 + .14 * h));
   }
   return best;
 }
@@ -242,9 +256,10 @@ vec3 foliage(vec3 n, vec3 v, float ao, float needle, float tint, float leaf) {
   float wrap = clamp((dot(n, sun) + .45) / 1.45, 0., 1.), light = wrap * mix(.4, 1., ao);
   vec3 top = mix(leafTop, needleTop, needle), under = mix(leafUnder, needleUnder, needle);
   top = mix(top, top * vec3(1.12, 1.06, .78), tint * (1. - needle) * .6);
-  vec3 color = mix(under * (shade * 1.35 + .25), top * lit, light) * mix(.8, 1., clamp(n.y * .5 + .5, 0., 1.)) * mix(.7, 1., ao) * leaf;
+  vec3 color = mix(under * (shade * 1.5 + .32), top * lit, light) * mix(.8, 1., clamp(n.y * .5 + .5, 0., 1.)) * mix(.7, 1., ao) * leaf;
+  color = mix(color, top * (lit * .45 + skyAmbient * .4), smoothstep(.3, .9, n.y) * ao * (1. - light) * .8 * leaf);
   float edge = pow(1. - abs(dot(v, n)), 3.);
-  float through = pow(clamp(dot(-v, sun), 0., 1.), 4.) * (.12 + .88 * edge) * (1. - wrap * .5) * .6 * mix(.5, 1., ao);
+  float through = pow(clamp(dot(-v, sun), 0., 1.), 4.) * (.3 + .7 * edge) * (1. - wrap * .5) * .6 * mix(.5, 1., ao);
   float rim = edge * wrap * .25;
   return color + leafBack * sunStrength * (through + rim) * leaf;
 }
@@ -276,8 +291,11 @@ void main() {
       n = normalize(vRight * local.x + vec3(0., local.y, 0.) + facing * local.z);
       ao = clamp(.16 + .64 * smoothstep(3.5, 9.8, c.y) + .28 * sqrt(h), 0., 1.);
     }
-    float mottle = mix(.8 + .4 * worldNoise(c * 2.4 + seed * 7.), 1., smoothstep(350., 1100., dist));
+    vec2 turned = mat2(.8, -.6, .6, .8) * c;
+    float mottle = mix(.86 + .2 * worldNoise(turned * 1.7 + seed * 7.) + .1 * worldNoise(turned * 4.1 - seed * 3.), 1., smoothstep(350., 1100., dist));
     color = foliage(n, v, ao, needle, vSeed, mottle);
+    float back = pow(clamp(dot(-v, sun), 0., 1.), 2.), band = smoothstep(120., 260., dist) * (1. - smoothstep(900., 1600., dist));
+    color += (fogSun * .55 + leafBack * .2) * sunStrength * back * band * (.1 + .55 * (1. - sqrt(max(h, 0.))) * clamp(n.y + .4, 0., 1.));
     vec3 field = mix(mix(leafUnder, needleUnder, needle) * (shade * 1.35 + .25), mix(leafTop, needleTop, needle) * lit, .45);
     color = mix(color, field, smoothstep(300., 1500., dist) * .8);
   } else {
@@ -286,13 +304,15 @@ void main() {
       float tooth = abs(fract(vUv.x * 3. + seed * 7.) - .5) * 2., ragged = worldNoise(vec2(vUv.x * 9., seed * 11.));
       if (vUv.y > .72 + .28 * (1. - tooth) * (.6 + .4 * ragged)) discard;
       leaf = .76 + .24 * worldNoise(vec2(vUv.x * 30., vUv.y * 5. + seed * 3.));
+    } else if (part < .2) {
+      leaf = .72 + .2 * worldNoise(vWorld.xz * 1.1 + vWorld.y * .7);
     } else if (dist > mix(75., 110., seed)) {
       if (body + (worldNoise(vUv * 3.5 + seed * 17.) - .5) * .8 + (worldNoise(vUv * 9. + seed * 5.) - .5) * .3 < .3) discard;
       leaf = .92;
     } else {
       leaf = leaves(vUv, seed);
       if (leaf <= 0. && body < .62) discard;
-      if (leaf <= 0.) leaf = .8;
+      if (leaf <= 0.) leaf = .72;
     }
     color = foliage(normalize(vNormal), v, vPart.r, needle, vSeed, leaf);
   }

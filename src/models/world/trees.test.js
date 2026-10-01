@@ -88,12 +88,27 @@ test('four thin-instanced meshes split every tree between near models and far im
   scene.dispose();
 });
 
+test('every near broadleaf clump hides a darker solid leaf mass under its leaf cards', () => {
+  const { scene, trees } = forestScene(true);
+  const colors = trees.meshes[0].getVerticesData('color'), mass = [], cards = [];
+  for (let v = 0; v < colors.length; v += 4) {
+    if (Math.abs(colors[v + 2] - 0.16) < 1e-4) mass.push(colors[v]);
+    else if (Math.abs(colors[v + 2] - 0.25) < 1e-4) cards.push(colors[v]);
+  }
+  const mean = list => list.reduce((a, b) => a + b, 0) / list.length;
+  assert.equal(mass.length, 6 * 12);
+  assert.equal(trees.meshes[0].getIndices().length, cards.length / 4 * 6 + 6 * 20 * 3 + 6 * 5 * 6 + 7 * 6);
+  assert.ok(mean(mass) < mean(cards) - 0.1, `inner mass ${mean(mass)} is not darker than the cards ${mean(cards)}`);
+  scene.dispose();
+});
+
 test('dusk swaps in its own foliage and a still world never advances the wind', () => {
   const { scene, trees } = forestScene(true);
   trees.setTheme(WORLD_ATMOSPHERES.dusk);
   const color = key => trees.paint._colors3[key].toHexString().toLowerCase();
   assert.equal(color('leafTop'), '#8fa04a');
   assert.equal(color('leafBack'), '#e8a050');
+  assert.equal(color('leafUnder'), '#3a5642');
   assert.equal(color('sunColor'), WORLD_ATMOSPHERES.dusk.sunColor);
   assert.equal(trees.paint._floats.sunStrength, WORLD_ATMOSPHERES.dusk.sunStrength);
   trees.setTheme({ ...WORLD_ATMOSPHERES.rain });
