@@ -1211,8 +1211,14 @@ export function createRoom(container, options = {}) {
     const a = raySphere(ray, companionHead, 0.3), b = raySphere(ray, companionBody, 0.36);
     return a === null ? b : b === null ? a : Math.min(a, b);
   }
+  function pickThroughLeaves(ray) {
+    const hit = scene.pickWithRay(ray, usable);
+    if (hit?.pickedMesh?.metadata?.effect !== 'leaf-sway') return hit;
+    const tree = itemAncestor(hit.pickedMesh), behind = scene.pickWithRay(ray, mesh => usable(mesh) && mesh.metadata?.effect !== 'leaf-sway' && itemAncestor(mesh) !== tree);
+    return behind?.hit ? behind : hit;
+  }
   function playTarget(ray) {
-    const hit = scene.pickWithRay(ray, usable), petDistance = petModel?.root.isEnabled() ? petModel.hitTest(ray) : null, companion = companionDistance(ray);
+    const hit = pickThroughLeaves(ray), petDistance = petModel?.root.isEnabled() ? petModel.hitTest(ray) : null, companion = companionDistance(ray);
     // The pet and the companion win when they are in front of whatever else
     // the ray meets.
     if (petDistance !== null && (!hit?.hit || petDistance <= hit.distance) && (companion === null || petDistance <= companion)) return { cat: true };

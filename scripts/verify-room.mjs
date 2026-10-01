@@ -960,7 +960,10 @@ try {
     assert.equal(diagnostics().companion.requestedItemId, 'ember-sofa');
     untilMoment(() => diagnostics().companion.state === 'resting', 'a sofa tap sits on the sofa');
     assert.equal(diagnostics().companion.seatId, 'ember-sofa');
-    const teaPoint = tapPoint('ember-table'); tap(teaPoint);
+    const teaPoint = tapPoint('ember-table');
+    const pixels = engine.getRenderWidth() / canvas.clientWidth;
+    assert.equal(scene.pick(teaPoint.clientX * pixels, teaPoint.clientY * pixels, mesh => mesh.isEnabled() && mesh.isPickable).pickedMesh?.metadata?.effect, 'leaf-sway', 'a tap through the moon tree leaves reaches the tea table behind them');
+    tap(teaPoint);
     untilMoment(() => (node('ember-table').metadata.puff || 0) > .5, 'tea puffs steam during the chosen sip');
     assert.equal(diagnostics().companion.activity, 'tea');
     assert.equal(diagnostics().companionModel.cup.isEnabled(), true, 'the avatar holds a teacup');

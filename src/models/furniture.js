@@ -193,8 +193,10 @@ function batch(source, correctNormals = false) {
     }
     data.uvs = undefined; data.uvs2 = undefined;
     const color = mat.diffuseColor;
-    data.colors = [];
-    for (let i = 0; i < data.positions.length; i += 3) data.colors.push(color.r, color.g, color.b, 1);
+    if (!data.colors) {
+      data.colors = [];
+      for (let i = 0; i < data.positions.length; i += 3) data.colors.push(color.r, color.g, color.b, 1);
+    }
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(data);
   }
@@ -497,18 +499,35 @@ function petBed(parent) {
   box(tag, [0.12, 0.035, 0.018], [0, 0, 0], C.cream, 0.008);
   for (const x of [-0.06, 0.06]) for (const y of [-0.016, 0.016]) sphere(tag, [0.02, 0.02, 0.012], [x, y, 0], C.cream);
 }
-function leafBlade(parent, start, end, width, color) {
-  const direction = new Vector3(...end).subtract(new Vector3(...start));
-  const length = direction.length();
-  const positions = [0, -0.5, 0, -0.5, -0.13, 0, 0, 0.04, 0.13, 0.5, -0.13, 0, 0, 0.5, 0, 0, 0.04, -0.03];
-  const indices = [0, 2, 1, 0, 3, 2, 1, 2, 4, 2, 3, 4, 0, 1, 5, 0, 5, 3, 1, 4, 5, 5, 4, 3];
-  const data = new VertexData(); data.positions = positions; data.indices = indices; data.normals = [];
+const MOON_CANOPY = Object.freeze({ under: '#44664a', side: '#668d4f', top: '#9dbf66', sun: [-0.3, 0.82, 0.48] });
+function leafClump(parent, center, radii, seed) {
+  const rings = 6, segments = 12, positions = [], indices = [], colors = [];
+  const [under, side, top] = [MOON_CANOPY.under, MOON_CANOPY.side, MOON_CANOPY.top].map(hex => Color3.FromHexString(hex));
+  const sun = new Vector3(...MOON_CANOPY.sun).normalize();
+  for (let ring = 0; ring <= rings; ring++) {
+    const phi = ring / rings * Math.PI, y = Math.cos(phi), r = Math.sin(phi);
+    for (let s = 0; s < (ring === 0 || ring === rings ? 1 : segments); s++) {
+      const angle = (s + (ring % 2) * 0.5) / segments * Math.PI * 2, lump = 1 + (0.07 * Math.sin(angle * 3 + seed * 1.7 + ring * 2.1) + 0.04 * Math.sin(angle * 5 - seed + ring * 1.3)) * r;
+      const nx = Math.cos(angle) * r, nz = Math.sin(angle) * r;
+      positions.push(center[0] + nx * radii[0] * lump, center[1] + y * radii[1] * (y < 0 ? 0.78 : 1), center[2] + nz * radii[2] * lump);
+      const light = Math.max(0, Math.min(1, (nx * sun.x + y * sun.y + nz * sun.z) * 0.5 + 0.5));
+      const band = (from, to) => Math.max(0, Math.min(1, (light - from) / (to - from))), tone = Color3.Lerp(Color3.Lerp(under, side, band(0.4, 0.52)), top, band(0.68, 0.78));
+      colors.push(tone.r, tone.g, tone.b, 1);
+    }
+  }
+  const ringStart = ring => 1 + (ring - 1) * segments, last = 1 + (rings - 1) * segments;
+  for (let s = 0; s < segments; s++) indices.push(0, ringStart(1) + s, ringStart(1) + (s + 1) % segments);
+  for (let ring = 1; ring < rings - 1; ring++) for (let s = 0; s < segments; s++) {
+    const a = ringStart(ring) + s, b = ringStart(ring) + (s + 1) % segments, c = ringStart(ring + 1) + s, d = ringStart(ring + 1) + (s + 1) % segments;
+    indices.push(a, c, b, b, c, d);
+  }
+  for (let s = 0; s < segments; s++) indices.push(last, ringStart(rings - 1) + (s + 1) % segments, ringStart(rings - 1) + s);
+  const data = new VertexData(); Object.assign(data, { positions, indices, colors, normals: [] });
   VertexData.ComputeNormals(positions, indices, data.normals);
-  const blade = new Mesh('folded-moonleaf', parent.getScene()); data.applyToMesh(blade);
-  mesh(parent, blade, color, new Vector3(...start).add(new Vector3(...end)).scale(0.5).asArray());
-  blade.scaling.set(width, length, width * 0.55);
-  blade.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), direction.normalize(), new Quaternion());
-  return blade;
+  const clump = new Mesh('moonleaf-clump', parent.getScene()); data.applyToMesh(clump);
+  mesh(parent, clump, MOON_CANOPY.side, [0, 0, 0]);
+  clump.metadata = { sway: { anchorY: center[1] - radii[1] * 1.6, height: radii[1] * 2.6, phase: seed * 0.61 } };
+  return clump;
 }
 function moonTree(parent, canopyOnly = false) {
   const brass = { metalness: 0.4, roughness: 0.4 };
@@ -529,14 +548,16 @@ function moonTree(parent, canopyOnly = false) {
       const height = 1.34 + tier * 0.43, reach = tier === 3 ? 0.39 : 0.55;
       const end = [Math.cos(angle) * reach, height + 0.24, Math.sin(angle) * reach];
       if (!canopyOnly) rod(parent, [0, height - 0.05, 0], end, 0.020, '#816746');
-      else for (let leaf = 0; leaf < 3; leaf++) {
-        const leafAngle = angle + (leaf - 1) * 0.74;
-        const origin = [end[0] * (0.58 + leaf * 0.14), end[1] - 0.1 + leaf * 0.045, end[2] * (0.58 + leaf * 0.14)];
-        const tip = [origin[0] + Math.cos(leafAngle) * 0.25, origin[1] + 0.29 + (leaf % 2) * 0.09, origin[2] + Math.sin(leafAngle) * 0.25];
-        const blade = leafBlade(parent, origin, tip, 0.27, ['#6f876b', '#8fa075', '#587565'][(tier + leaf) % 3]);
-        blade.metadata = { sway: { anchorY: origin[1], height: tip[1] - origin[1], phase: tier * 0.7 + branch * 1.3 + leaf * 0.4 } };
+      else {
+        const size = tier === 3 ? 0.85 : 1, seed = tier * 3 + branch, offset = angle + 0.55;
+        leafClump(parent, [end[0] * 0.9, end[1] + 0.06, end[2] * 0.9], [0.3 * size, 0.23 * size, 0.3 * size], seed);
+        if (tier < 3) leafClump(parent, [Math.cos(offset) * reach * 0.72, end[1] + 0.14, Math.sin(offset) * reach * 0.72], [0.22, 0.18, 0.22], seed + 12);
       }
     }
+  }
+  if (canopyOnly) {
+    leafClump(parent, [0.08, 2.975, -0.05], [0.27, 0.22, 0.27], 24);
+    leafClump(parent, [-0.12, 2.84, 0.12], [0.2, 0.17, 0.2], 25);
   }
   if (!canopyOnly) for (const [x, y, z] of [[-0.48, 1.82, 0.2], [0.42, 2.23, 0.27], [-0.15, 2.87, -0.23]]) {
     rod(parent, [x, y, z], [x, y - 0.19, z], 0.005, '#bca36f');

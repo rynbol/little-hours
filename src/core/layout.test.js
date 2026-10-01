@@ -331,6 +331,21 @@ test('plant canopies sway while paused, keep their trunks planted, and reset the
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
 
+test('the moon tree canopy is rounded leaf clumps lit lighter on top than underneath, with no near-black', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const tree = createFurniture('moon-tree', scene), canopy = tree.getChildMeshes().find(mesh => mesh.metadata?.effect === 'leaf-sway');
+    const normals = canopy.getVerticesData('normal'), colors = canopy.getVerticesData('color'), count = canopy.getTotalVertices();
+    assert.ok(count >= 1000 && count <= 1600, `${count} canopy vertices`);
+    const luminance = i => 0.3 * colors[i * 4] + 0.59 * colors[i * 4 + 1] + 0.11 * colors[i * 4 + 2], mean = list => list.reduce((sum, value) => sum + value, 0) / list.length;
+    const tops = [], undersides = [];
+    for (let i = 0; i < count; i++) { if (normals[i * 3 + 1] > 0.6) tops.push(luminance(i)); if (normals[i * 3 + 1] < -0.6) undersides.push(luminance(i)); }
+    assert.ok(mean(tops) > mean(undersides) * 1.3, `tops ${mean(tops)} against undersides ${mean(undersides)}`);
+    assert.ok(Math.min(...Array.from({ length: count }, (_, i) => luminance(i))) > 0.3);
+    tree.dispose();
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
 test('the record spins with shared geometry while its cabinet and tonearm remain still', () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   try {
