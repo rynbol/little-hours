@@ -75,6 +75,22 @@ test('focus flies into the chair, hides the body once inside it, and flies back 
   engine.dispose();
 });
 
+test('the fly-in only ever closes in on the room from outside, never pulling back before the dive, and never goes fisheye', () => {
+  const { room, view, run, engine } = stage();
+  view.enter(false);
+  const framed = () => 2 * Vector3.Distance(view.camera.position, room.target) * Math.tan(view.camera.fov / 2), heights = [];
+  for (let i = 0; i < 40; i++) { run(SEAT_SECONDS.enter / 40, 1); if (Vector3.Distance(view.camera.position, room.target) > 8) heights.push(framed()); }
+  assert.ok(heights.length > 20, 'most of the fly-in happens outside the room');
+  const growth = Math.max(...heights.slice(1).map((height, i) => height / heights[i]));
+  assert.ok(growth <= 1.0001, `the room's framed height grows ${((growth - 1) * 100).toFixed(1)}% in one step`);
+  const { view: again, run: fly, engine: second } = stage(), widest = [];
+  again.enter(false);
+  for (let i = 0; i < 40; i++) { fly(SEAT_SECONDS.enter / 40, 1); widest.push(again.camera.fov); }
+  assert.ok(Math.max(...widest) <= 1.2201, `the widest fly-in fov is ${Math.max(...widest).toFixed(2)}`);
+  second.dispose();
+  engine.dispose();
+});
+
 test('dragging while seated turns the head a full circle, holds at the ceiling, and turns straight back', () => {
   const { view, listeners, engine } = stage();
   view.enter(true); view.update(0.016, true, 1.6);

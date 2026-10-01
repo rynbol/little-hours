@@ -39,7 +39,10 @@ export function blendFrame(from, to, t, out) {
   const e = ease(Math.min(1, Math.max(0, t))), towardSeat = e ** 1.4;
   Vector3.LerpToRef(from.position, to.position, towardSeat, out.position);
   Vector3.LerpToRef(from.target, to.target, e, out.target);
-  out.fov = 2 * Math.atan(Math.exp(Math.log(Math.tan(from.fov / 2)) * (1 - e) + Math.log(Math.tan(to.fov / 2)) * e));
+  const reach = frame => Vector3.Distance(frame.position, frame.target), anchor = (reach(from) > reach(to) ? from : to).target;
+  const framed = frame => 2 * Vector3.Distance(frame.position, anchor) * Math.tan(frame.fov / 2);
+  const height = Math.exp(Math.log(framed(from)) * (1 - e) + Math.log(framed(to)) * e);
+  out.fov = Math.min(Math.max(from.fov, to.fov), 2 * Math.atan(height / 2 / Vector3.Distance(out.position, anchor)));
   out.minZ = from.minZ + (to.minZ - from.minZ) * e;
   return out;
 }
