@@ -5,7 +5,7 @@ import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
-import { createWorldTrees, plantTrees, NEAR_TREES } from './trees.js';
+import { createWorldTrees, plantTrees, NEAR_TREES, HERO_TREES, WINDOW_EYE, VISTA } from './trees.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 import { WORLD, riverDistance } from '../../core/world-terrain.js';
 
@@ -20,9 +20,11 @@ function flatRing(radius, step, at) {
 
 const halfForest = () => [flatRing(600, 20, x => ({ y: 10, up: 1, cover: x > 0 ? 1 : 0, wet: 0 }))];
 
+const conifers = trees => trees.kind.reduce((sum, kind) => sum + kind, 0);
+
 test('forests fill canopy ground while meadows get only a few lone broadleaf trees', () => {
   const trees = plantTrees(halfForest());
-  assert.equal(trees.count, 6128);
+  assert.equal(trees.count, 2404);
   let meadow = 0, meadowConifers = 0;
   for (let i = 0; i < trees.count; i++) {
     const d = Math.hypot(trees.x[i], trees.z[i]);
@@ -31,15 +33,36 @@ test('forests fill canopy ground while meadows get only a few lone broadleaf tre
     assert.ok(Math.abs(trees.x[i]) < 600 && Math.abs(trees.z[i]) < 600, `tree ${i} is off the terrain`);
     if (trees.x[i] < -20) { meadow++; meadowConifers += trees.kind[i]; }
   }
-  assert.equal(meadow, 100);
+  assert.equal(meadow, 91);
   assert.equal(meadowConifers, 0);
   assert.ok(Math.abs(trees.y[0] - (10 - 0.5 * trees.width[0])) < 1e-5);
 });
 
-test('no trees grow on steep rock or wet river banks', () => {
-  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0 }))]).count, 188);
-  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 0.5, cover: 0, wet: 0 }))]).count, 0);
-  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0.3 }))]).count, 0);
+test('lowland forest is broadleaf and conifers only take the high ground', () => {
+  const forestAt = y => plantTrees([flatRing(600, 20, () => ({ y, up: 1, cover: 1, wet: 0 }))]);
+  assert.equal(conifers(forestAt(-40)), 0);
+  assert.equal(conifers(forestAt(200)), 1246);
+});
+
+test('no trees grow on steep rock or wet river banks except the window hero trees', () => {
+  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0 }))]).count, 187);
+  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 0.5, cover: 0, wet: 0 }))]).count, HERO_TREES.length);
+  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0.3 }))]).count, HERO_TREES.length);
+});
+
+test('hero trees frame the window vista below the far ridge and leave its clearing open', () => {
+  const trees = plantTrees([flatRing(600, 20, () => ({ y: -10, up: 1, cover: 1, wet: 0 }))]);
+  HERO_TREES.forEach((hero, i) => {
+    assert.ok(Math.abs(trees.x[i] - hero.x) < 1e-3 && Math.abs(trees.z[i] - hero.z) < 1e-3);
+    assert.equal(trees.kind[i], 0);
+    const crown = trees.y[i] + trees.height[i] * 10.6, sight = WINDOW_EYE.y - hero.distance * VISTA.dip;
+    assert.ok(crown <= sight + 1e-3, `hero ${i} crown ${crown} rises over the ridge line ${sight}`);
+  });
+  for (let i = HERO_TREES.length; i < trees.count; i++) {
+    const dx = trees.x[i] - WINDOW_EYE.x, dz = WINDOW_EYE.z - trees.z[i];
+    const inCone = dz > 0 && Math.abs(Math.atan2(dx, dz) - VISTA.bearing) < VISTA.halfAngle;
+    assert.ok(!(inCone && Math.hypot(dx, dz) < VISTA.clearing), `tree ${i} blocks the window vista`);
+  }
 });
 
 function forestScene(still) {

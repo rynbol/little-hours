@@ -6,23 +6,32 @@ import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import '@babylonjs/core/Shaders/ShadersInclude/instancesDeclaration.js';
 import '@babylonjs/core/Shaders/ShadersInclude/instancesVertex.js';
-import { WORLD, riverDistance, smooth } from '../../core/world-terrain.js';
+import { WORLD, riverDistance, smooth, noise2 } from '../../core/world-terrain.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 import { WORLD_GLSL, AIR_UNIFORMS, applyAir, followEye } from './world-glsl.js';
 
 export const TREE_BANDS = Object.freeze([
   Object.freeze({ from: 25, to: 450, spacing: 8, size: 1, behind: 450 }),
-  Object.freeze({ from: 450, to: 1300, spacing: 12, size: 1.35, behind: 200 }),
-  Object.freeze({ from: 1300, to: 3400, spacing: 19, size: 1.9, behind: 200 }),
+  Object.freeze({ from: 450, to: 1300, spacing: 14, size: 1.7, behind: 200 }),
+  Object.freeze({ from: 1300, to: 3400, spacing: 24, size: 2.6, behind: 200 }),
 ]);
-export const NEAR_TREES = 160;
+export const WINDOW_EYE = Object.freeze({ x: -2, y: 2.24, z: -2.4 });
+export const VISTA = Object.freeze({ reach: 320, clearing: 170, bearing: -0.3, halfAngle: 1.25, dip: 0.022 });
+export const HERO_TREES = Object.freeze([
+  Object.freeze({ bearing: -0.44, distance: 50, size: 1.3, turn: 0.4 }),
+  Object.freeze({ bearing: -0.86, distance: 105, size: 1.7, turn: 2.2 }),
+  Object.freeze({ bearing: 0.42, distance: 62, size: 1.3, turn: 4.1 }),
+].map(hero => Object.freeze({ ...hero, x: WINDOW_EYE.x + Math.sin(hero.bearing) * hero.distance, z: WINDOW_EYE.z - Math.cos(hero.bearing) * hero.distance })));
+const HERO_CLEARANCE = 11;
+const CROWN_TOP = 10.6;
+export const NEAR_TREES = 115;
 const LONE_TREE_AREA = 70 * 70;
 const RIVER_CLEARANCE = WORLD.river.width * 1.4;
 
 const FOLIAGE = new Map([
   [WORLD_ATMOSPHERES.day, { leafTop: '#92c840', leafUnder: '#3a6a30', leafBack: '#d8ea78', needleTop: '#4f8a3c', needleUnder: '#24452e', bark: '#76825a' }],
   [WORLD_ATMOSPHERES.dusk, { leafTop: '#8fa04a', leafUnder: '#2f4c38', leafBack: '#e8a050', needleTop: '#667a40', needleUnder: '#2a3a2c', bark: '#544c3c' }],
-  [WORLD_ATMOSPHERES.rain, { leafTop: '#55703a', leafUnder: '#2e3c28', leafBack: '#7a8458', needleTop: '#3e5634', needleUnder: '#26342a', bark: '#4a5038' }],
+  [WORLD_ATMOSPHERES.rain, { leafTop: '#64804a', leafUnder: '#3c4c36', leafBack: '#7a8458', needleTop: '#4a6040', needleUnder: '#33402f', bark: '#4a5038' }],
 ]);
 const FOLIAGE_COLORS = Object.keys(FOLIAGE.get(WORLD_ATMOSPHERES.day));
 const LIGHT_COLORS = ['sunColor', 'skyAmbient', 'groundAmbient', 'shadowTint'];
@@ -59,22 +68,38 @@ function groundOf(rings) {
   };
 }
 
+const sightLine = (px, pz) => {
+  const dx = px - WINDOW_EYE.x, dz = WINDOW_EYE.z - pz, distance = Math.hypot(dx, dz);
+  if (dz <= 0 || distance >= VISTA.reach || Math.abs(Math.atan2(dx, dz) - VISTA.bearing) >= VISTA.halfAngle) return Infinity;
+  return distance < VISTA.clearing ? -Infinity : WINDOW_EYE.y - distance * VISTA.dip;
+};
+
 export function plantTrees(rings) {
   const ground = groundOf(rings), x = [], y = [], z = [], width = [], height = [], turn = [], kind = [];
+  const plant = (px, pz, at, grow, spin, conifer, tall) => {
+    x.push(px); z.push(pz); y.push(at.y - 0.5 * grow); turn.push(spin);
+    width.push(grow); height.push(grow * tall); kind.push(conifer ? 1 : 0);
+  };
+  for (const hero of HERO_TREES) {
+    const at = ground(hero.x, hero.z), top = WINDOW_EYE.y - hero.distance * VISTA.dip;
+    if (at) plant(hero.x, hero.z, at, Math.max(0.6, Math.min(hero.size, (top - at.y) / (CROWN_TOP - 0.5))), hero.turn, false, 1);
+  }
   TREE_BANDS.forEach(({ from, to, spacing, size, behind }, band) => {
     const cells = Math.ceil(to / spacing), lone = spacing * spacing / LONE_TREE_AREA, salt = band * 8;
     for (let gx = -cells; gx < cells; gx++) for (let gz = -cells; gz < Math.ceil(behind / spacing); gz++) {
       const px = (gx + hash(gx, gz, salt + 1)) * spacing, pz = (gz + hash(gx, gz, salt + 2)) * spacing, d = Math.hypot(px, pz);
       if (d < from || d >= to || pz > behind || riverDistance(px, pz) < RIVER_CLEARANCE) continue;
+      if (HERO_TREES.some(hero => Math.hypot(px - hero.x, pz - hero.z) < HERO_CLEARANCE * hero.size)) continue;
       const at = ground(px, pz);
       if (!at) continue;
+      const grove = smooth(-0.1, 0.3, noise2(px / 150, pz / 150, 91) + 0.35 * noise2(px / 48, pz / 48, 92));
       const meadow = lone * smooth(0.9, 0.96, at.up) * (1 - smooth(0.12, 0.35, at.cover)) * (at.wet > 0 ? 0 : 1);
-      const forest = at.cover * 1.6, roll = hash(gx, gz, salt + 3);
+      const forest = smooth(0.04, 0.3, at.cover) * grove * 1.3, roll = hash(gx, gz, salt + 3);
       if (roll >= forest && roll >= meadow) continue;
-      const alone = roll >= forest, conifer = !alone && hash(gx, gz, salt + 4) < 0.08 + 0.5 * smooth(-15, 110, at.y);
-      const grow = size * (0.8 + 0.45 * hash(gx, gz, salt + 5)) * (alone ? 1.3 : 1);
-      x.push(px); z.push(pz); y.push(at.y - 0.5 * grow); turn.push(hash(gx, gz, salt + 6) * Math.PI * 2);
-      width.push(grow); height.push(grow * (0.88 + 0.28 * hash(gx, gz, salt + 7))); kind.push(conifer ? 1 : 0);
+      const alone = roll >= forest, stand = smooth(-0.05, 0.35, noise2(px / 90, pz / 90, 93)), conifer = !alone && hash(gx, gz, salt + 4) < (0.85 * smooth(25, 120, at.y) + 0.5 * smooth(0.95, 0.85, at.up)) * stand;
+      const grow = size * (0.8 + 0.45 * hash(gx, gz, salt + 5)) * (alone ? 1.3 : 1), tall = 0.88 + 0.28 * hash(gx, gz, salt + 7);
+      if (at.y - 0.5 * grow + grow * tall * (conifer ? 14.6 : CROWN_TOP) > sightLine(px, pz)) continue;
+      plant(px, pz, at, grow, hash(gx, gz, salt + 6) * Math.PI * 2, conifer, tall);
     }
   });
   return { count: x.length, x: Float32Array.from(x), y: Float32Array.from(y), z: Float32Array.from(z), width: Float32Array.from(width), height: Float32Array.from(height), turn: Float32Array.from(turn), kind: Uint8Array.from(kind) };
@@ -249,17 +274,19 @@ void main() {
       vec2 dc = (c - vec2(0., 6.6)) / 5.2;
       vec3 local = normalize(normalize(vec3(dc, sqrt(max(1. - dot(dc, dc), .05)))) * .55 + normalize(vec3(best.yz, sqrt(h))) * .45);
       n = normalize(vRight * local.x + vec3(0., local.y, 0.) + facing * local.z);
-      ao = clamp(.3 + .55 * smoothstep(4., 9.8, c.y) + .3 * sqrt(h), 0., 1.);
+      ao = clamp(.16 + .64 * smoothstep(3.5, 9.8, c.y) + .28 * sqrt(h), 0., 1.);
     }
     float mottle = mix(.8 + .4 * worldNoise(c * 2.4 + seed * 7.), 1., smoothstep(350., 1100., dist));
     color = foliage(n, v, ao, needle, vSeed, mottle);
+    vec3 field = mix(mix(leafUnder, needleUnder, needle) * (shade * 1.35 + .25), mix(leafTop, needleTop, needle) * lit, .45);
+    color = mix(color, field, smoothstep(300., 1500., dist) * .8);
   } else {
     vec2 q = vUv * 2. - 1.; float body = 1. - dot(q, q), seed = vPart.a, leaf;
     if (needle > .5) {
       float tooth = abs(fract(vUv.x * 3. + seed * 7.) - .5) * 2., ragged = worldNoise(vec2(vUv.x * 9., seed * 11.));
       if (vUv.y > .72 + .28 * (1. - tooth) * (.6 + .4 * ragged)) discard;
       leaf = .76 + .24 * worldNoise(vec2(vUv.x * 30., vUv.y * 5. + seed * 3.));
-    } else if (dist > mix(110., 160., seed)) {
+    } else if (dist > mix(75., 110., seed)) {
       if (body + (worldNoise(vUv * 3.5 + seed * 17.) - .5) * .8 + (worldNoise(vUv * 9. + seed * 5.) - .5) * .3 < .3) discard;
       leaf = .92;
     } else {
