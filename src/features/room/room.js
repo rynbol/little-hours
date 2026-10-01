@@ -1143,7 +1143,7 @@ export function createRoom(container, options = {}) {
     sun.position.set(...light.position); sun.direction.set(...light.direction).normalize();
     hemisphere.diffuse = color(light.sky); hemisphere.groundColor = color(light.ground); hemisphere.intensity = light.ambient;
     painterly.setTheme(`room-${theme}`); aimSunbeam();
-    windowGlow.intensity = daylight ? 0.22 : night ? 1.25 : 0.65;
+    windowGlow.intensity = daylight ? 0.22 : night ? 2.1 : 0.65; windowGlow.range = night ? 3.4 : 6;
     applyBulbs(); applyAccents();
     bloom.intensity = daylight ? 0.18 : night ? 0.40 : 0.26;
     shadow.darkness = light.darkness;

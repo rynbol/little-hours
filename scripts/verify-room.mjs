@@ -225,6 +225,8 @@ try {
   assert.ok(lengths.length >= 60 && Math.max(...lengths) < 0.13 && rainMesh.alpha < 0.4, 'rain falls as many short, faint streaks, not long scratches');
   room.setTheme('dusk'); advance(2);
   assert.equal(stars.isEnabled(), true); assert.equal(shootingStar.isEnabled(), true); assert.equal(rainMesh.isEnabled(), false);
+  const deskLamp = scene.getLightByName('window-lamplight');
+  assert.ok(deskLamp.intensity > 1.8 && deskLamp.range < 4, 'at dusk the desk lamp throws a close, warm pool');
   // Switched-off fairy lights stay on the wall, dark, like the accent lights of the other rooms.
   const fairy = scene.getTransformNodeByName('fairy-lights'), dark = mesh => !mesh.isEnabled() || mesh.material.emissiveColor.r + mesh.material.emissiveColor.g + mesh.material.emissiveColor.b === 0;
   assert.ok(fairy.isEnabled() && fairy.getChildMeshes().every(dark), 'changing time of day keeps switched-off fairy lights in place and dark');
