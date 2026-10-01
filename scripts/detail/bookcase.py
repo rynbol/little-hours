@@ -14,39 +14,84 @@ TIPPING_GAP = (-0.475, -0.305)
 EYE = (0.3, 0.35, 1.0)
 
 
-def spine_book(x, bottom, z, w, h, d, colour, lean=0.0, style=0):
+STYLES = (('plain', 6), ('ribs', 3), ('band', 3), ('gilt', 3), ('label', 2), ('gilt-label', 2), ('diamond', 1))
+
+
+def shade(colour, k):
+    r, g, b = (int(colour[i:i + 2], 16) for i in (1, 3, 5))
+    return '#%02x%02x%02x' % tuple(max(0, min(255, round(c * k))) for c in (r, g, b))
+
+
+def pick_style(rng):
+    roll = rng.uniform(0, sum(weight for _, weight in STYLES))
+    for style, weight in STYLES:
+        roll -= weight
+        if roll <= 0:
+            return style
+    return 'plain'
+
+
+def spine_book(x, bottom, z, w, h, d, colour, lean=0.0, style='plain', place=0.5):
     f = Frame((x, bottom + (w * math.sin(abs(lean)) + h * math.cos(lean)) / 2, z), (0, 0, lean))
     board = 0.008
+    face = d / 2 + 0.001
     parts = [rbox([board, h, d - 0.01], (side * (w / 2 - board / 2), 0, -0.005), colour, bevel=0, surface='cloth', frame=f) for side in (-1, 1)]
     parts.append(rbox([w, h, 0.03], (0, 0, d / 2 - 0.015), colour, bevel=min(0.02, w * 0.4), segments=2, surface='cloth', frame=f))
     parts.append(rbox([w - board * 2, h - 0.016, d - 0.03], (0, 0, -0.01), PAPER, bevel=0, surface='paper', frame=f))
-    if style in (1, 3):
+    if style in ('gilt', 'gilt-label'):
         for y in (h / 2 - 0.035, -h / 2 + 0.035):
-            parts.append(rbox([w * 0.92, 0.01, 0.004], (0, y, d / 2 + 0.001), GILT, bevel=0, surface='metal', layer='metal', frame=f))
-    if style in (2, 3):
-        parts.append(rbox([w * 0.6, h * 0.16, 0.003], (0, h * 0.18, d / 2 + 0.001), PAPER, bevel=0, surface='paper', frame=f))
-        parts.append(rbox([w * 0.36, 0.006, 0.002], (0, h * 0.18, d / 2 + 0.003), '#6b5a4a', bevel=0, frame=f))
-    if style == 0:
-        parts.append(rbox([w * 0.5, w * 0.5, 0.003], (0, h * 0.2, d / 2 + 0.001), GILT, bevel=0, surface='metal', layer='metal', frame=f, rotation=(0, 0, math.pi / 4)))
+            parts.append(rbox([w * 0.92, 0.01, 0.004], (0, y, face), GILT, bevel=0, surface='metal', layer='metal', frame=f))
+    if style in ('label', 'gilt-label'):
+        tall, y = h * (0.1 + 0.08 * place), h * (0.05 + 0.22 * place)
+        parts.append(rbox([w * 0.62, tall, 0.003], (0, y, face), PAPER, bevel=0, surface='paper', frame=f))
+        for k in range(1 + int(place * 2.5)):
+            parts.append(rbox([w * (0.36 - 0.1 * k), 0.006, 0.002], (0, y + tall * 0.2 - k * 0.016, face + 0.002), '#6b5a4a', bevel=0, frame=f))
+    if style == 'ribs':
+        for k in range(4):
+            parts.append(rbox([w * 1.02, 0.013, 0.008], (0, h * (0.34 - k * 0.16), face + 0.002), shade(colour, 0.78), bevel=0.003, surface='cloth', frame=f))
+        parts.append(rbox([w * 0.5, h * 0.07, 0.003], (0, h * 0.26, face + 0.002), GILT, bevel=0, surface='metal', layer='metal', frame=f))
+    if style == 'band':
+        top = h * (0.28 + 0.1 * place)
+        parts.append(rbox([w * 1.01, h * 0.18, 0.004], (0, top, face), shade(colour, 0.72), bevel=0, surface='cloth', frame=f))
+        parts.append(rbox([w * 0.9, 0.006, 0.003], (0, top - h * 0.1, face + 0.001), GILT, bevel=0, surface='metal', layer='metal', frame=f))
+    if style == 'diamond':
+        parts.append(rbox([w * 0.5, w * 0.5, 0.003], (0, h * 0.2, face), GILT, bevel=0, surface='metal', layer='metal', frame=f, rotation=(0, 0, math.pi / 4)))
     return parts
 
 
 def shelf_row(start, stop, bottom, seed, palette, lean_last=False, tall=0.52):
     rng = random.Random(seed)
-    parts, x, i = [], start, 0
+    parts, x, i, previous = [], start, 0, None
     while True:
-        w, h, d = rng.uniform(0.065, 0.12), rng.uniform(0.33, tall), rng.uniform(0.27, 0.32)
+        if i > 1 and rng.random() < 0.1 and x + 0.32 < stop:
+            width = rng.uniform(0.25, 0.3)
+            y = bottom
+            for k in range(rng.randint(2, 4)):
+                height = rng.uniform(0.04, 0.06)
+                colour = rng.choice([c for c in palette if c != previous])
+                parts += lying_book(width - k * 0.01, height, rng.uniform(0.22, 0.27), x + width / 2 + rng.uniform(-0.01, 0.01), y + height / 2, 0.235 - 0.14, colour, rng.uniform(-0.12, 0.12))
+                y += height
+                previous = colour
+            x += width + 0.012
+            i += 1
+            continue
+        if i > 0 and rng.random() < 0.08:
+            x += rng.uniform(0.03, 0.07)
+        short = rng.random() < 0.12
+        w, h, d = rng.uniform(0.05, 0.12), rng.uniform(0.25, 0.31) if short else rng.uniform(tall * 0.66, tall), rng.uniform(0.24, 0.32)
         tilt = rng.uniform(-0.015, 0.015)
         width = w * math.cos(tilt) + h * math.sin(abs(tilt))
         if x + width > stop:
             break
-        parts += spine_book(x + width / 2, bottom, 0.235 - d / 2 + rng.uniform(-0.012, 0.004), w, h, d, palette[(i * 5 + seed) % len(palette)], tilt, rng.randrange(4))
+        colour = rng.choice([c for c in palette if c != previous])
+        parts += spine_book(x + width / 2, bottom, 0.235 - d / 2 + rng.uniform(-0.03, 0.006), w, h, d, colour, tilt, pick_style(rng), rng.random())
+        previous = colour
         x += width + 0.003
         i += 1
     if lean_last:
         w, h, d = 0.08, tall * 0.85, 0.29
         lean = next((a for a in (0.42, 0.34, 0.26, 0.18) if x + w * math.cos(a) + h * math.sin(a) <= stop), 0.12)
-        parts += spine_book(x + (w * math.cos(lean) + h * math.sin(lean)) / 2, bottom, 0.235 - d / 2, w, h, d, palette[(i * 5 + seed) % len(palette)], lean, 3)
+        parts += spine_book(x + (w * math.cos(lean) + h * math.sin(lean)) / 2, bottom, 0.235 - d / 2, w, h, d, rng.choice([c for c in palette if c != previous]), lean, 'gilt-label', 0.7)
     return parts
 
 

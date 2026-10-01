@@ -131,3 +131,14 @@ test('the moon tree charms hang on strings that rise into the canopy or loop ove
   tops.forEach(top => assert.ok(top > 2.38, `a string reaches ${top}`));
   disposeDetails(scene); engine.dispose();
 });
+
+test('the bookcase spines vary in style, with raised ribs and title bands in darker shades of their cloth', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['bookcase']);
+  const { palette } = createDetail('bookcase', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint').metadata;
+  const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  const shadeOf = (dark, cloth) => [0.72, 0.78].some(k => rgb(cloth).every((c, i) => Math.abs(Math.round(c * k) - rgb(dark)[i]) <= 1));
+  const shaded = palette.filter(dark => palette.some(cloth => cloth !== dark && shadeOf(dark, cloth)));
+  assert.ok(shaded.length >= 4, `${shaded.length} darker cloth shades`);
+  disposeDetails(scene); engine.dispose();
+});
