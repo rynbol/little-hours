@@ -48,6 +48,7 @@ import { ROOM_LIGHTS, seatedDim, deskLamp, gradeFocus, roomBloom, bloomEmission,
 import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
 import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
 import { createLanternGlow, createGlowDecal, deskPoolShape, DESK_POOL } from './room-lantern-glow.js';
+import { moulding, sillNosing } from './window-trim.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
 import { createStorybook } from '../../models/storybook.js';
 import { createSeatWorld } from './seat-world.js';
@@ -304,8 +305,15 @@ export function createRoom(container, options = {}) {
   const archPoints = []; for (let i = 0; i <= 32; i++) { const angle = i / 32 * Math.PI; archPoints.push([archCenter + Math.cos(angle) * archRadius, archSpring + Math.sin(angle) * archRadius, -4.43]); }
   tube(archPoints, 0.13, windowDark); tube(archPoints.map(([x, y, z]) => [x, y, z + 0.06]), 0.065, windowFrame);
   box([4.62, 0.18, 0.68], [archCenter, 1.45, -4.25], palette.wood, 0.045);
-  box([0.065, 3.7, 0.15], [archCenter, 3.30, -4.31], glazing, 0.008);
-  box([4.12, 0.07, 0.15], [archCenter, archSpring, -4.31], glazing, 0.008);
+  const sillTones = { lit: palette.edge, shadow: palette.darkWood, grain: palette.darkWood };
+  for (const part of sillNosing(4.62, { height: 0.18, depth: 0.68 })) {
+    if (part.rod) rod(...part.rod.map(([x, y, z]) => [archCenter + x, 1.45 + y, -4.25 + z]), part.radius, sillTones[part.tone]);
+    else box(part.size, [archCenter + part.at[0], 1.45 + part.at[1], -4.25 + part.at[2]], sillTones[part.tone]);
+  }
+  const trimTones = { core: glazing, face: windowDark, lit: windowFrame, grain: glazing };
+  for (const [length, axis, y] of [[3.7, 'y', 3.30], [4.12, 'x', archSpring]]) {
+    for (const part of moulding(length, axis)) box(part.size, [archCenter + part.at[0], y + part.at[1], -4.31 + part.at[2]], trimTones[part.tone], part.bevel);
+  }
   [-1, 1].forEach(side => rod([archCenter, archSpring, -4.31], [archCenter + side * 1.47, archSpring + 1.47, -4.31], 0.026, glazing));
   // Heavy linen curtains are swept to each side with golden tiebacks.
   const curtain = material('#a88380'), curtainShade = material('#8c686d');
