@@ -39,7 +39,7 @@ export function createTimerUI(app) {
     } finally { pending = false; render(); }
   }
 
-  const focusRoomSignature = () => JSON.stringify([app.state.house.activeId, app.state.layout, app.state.theme, app.state.pet, app.state.avatar, app.state.decor]);
+  const focusRoomSignature = () => JSON.stringify([app.state.house.activeId, app.state.layout]);
   const focusUnavailable = () => !app.roomReady || app.nav.travelling || app.avatar.active || app.decorate.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.lake.isOpen || $('#room-picker').open || $('#session-celebration').open;
 
   function finishLeavingFocus() {

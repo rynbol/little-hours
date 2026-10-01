@@ -18,6 +18,10 @@ export default {
     await app.drag({ x: box.x, y: box.y }, { x: box.x + 160, y: box.y });
     await app.waitFor(`Math.abs(window.__littleHours.room.diagnostics().seat.look.yaw - ${before}) > 0.4`, { what: 'dragging to look around the room' });
     check('dragging looks around from the chair and keeps focus running', await app.js(`window.__littleHours.state.session.running && document.body.classList.contains('is-focus-mode')`));
+    const otherTheme = await app.js(`window.__littleHours.state.theme === 'rain' ? 'day' : 'rain'`); await app.js(`window.__otherTabAt = performance.now()`);
+    await app.js(`(() => { const saved = JSON.parse(localStorage.getItem('little-hours-v1')); saved.theme = '${otherTheme}'; localStorage.setItem('little-hours-v1', JSON.stringify(saved)); window.dispatchEvent(new StorageEvent('storage', { key: 'little-hours-v1' })); })()`);
+    const kept = await app.waitFor(`performance.now() - window.__otherTabAt > 2500 && window.__littleHours.room.diagnostics().seat.world.theme === '${otherTheme}'`, { what: 'the other tab theme to reach the seat', timeout: 8000 }).then(() => app.js(`window.__littleHours.room.diagnostics().seat.state === 'seated' && document.body.classList.contains('is-focus-mode')`)).catch(() => false);
+    check('a theme change from another tab repaints the view and keeps you in the chair', kept);
     const deadline = await app.js(`window.__littleHours.state.session.endsAt`);
     const seatedAmbient = await app.js(`window.__littleHours.room.diagnostics().scene.getLightByName('warm-ambient').intensity`), seatedSun = await app.js(`window.__littleHours.room.diagnostics().scene.lights.find(light => light.getClassName() === 'DirectionalLight').intensity`);
     await t.shot(app, 'desk-view'); await app.key('Escape');
