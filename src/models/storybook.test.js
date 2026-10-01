@@ -75,6 +75,22 @@ test('the Focus look fills the room air with amber haze from arm\'s length, as B
   engine.dispose();
 });
 
+test('from the chair the room falls off away from the desk: arm\'s reach keeps its light, and far corners settle deeper and a little cooler instead of lifting to the haze', () => {
+  const { falloff, haze } = STORYBOOK;
+  const smooth = (from, to, x) => { const t = Math.min(1, Math.max(0, (x - from) / (to - from))); return t * t * (3 - 2 * t); };
+  const seen = (wall, distance) => wall.map((channel, i) => { const fallen = channel * (1 + (falloff.color[i] - 1) * smooth(falloff.near, falloff.far, distance)); return fallen + (haze.color[i] - fallen) * haze.amount * smooth(haze.near, haze.far, distance); });
+  const luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b, warmth = ([r, , b]) => r / b;
+  const plaster = [0.62, 0.5, 0.34], desk = seen(plaster, 1.0), corner = seen(plaster, 5.0);
+  assert.ok(falloff.near >= 1.2, 'nothing within reach of the chair falls off');
+  assert.ok(luma(desk) > luma(plaster) * 0.97, `the desk keeps ${luma(desk).toFixed(3)} of ${luma(plaster).toFixed(3)}`);
+  assert.ok(luma(corner) < luma(plaster) * 0.85 && luma(corner) > luma(plaster) * 0.65, `far corners settle to ${(luma(corner) / luma(plaster)).toFixed(2)} of the wall, deeper but still lifted`);
+  assert.ok(warmth(corner) < warmth(plaster) * 0.95, 'far corners cool a little');
+  const [r, g, b] = falloff.color;
+  assert.ok(b > g && g > r, 'the falloff leans cool');
+  const code = new StorybookPlugin(new StandardMaterial('wall', new Scene(new NullEngine())), { amount: 1 }).getCustomCode('fragment').CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR;
+  assert.ok(code.indexOf('color.rgb*=mix(vec3(1.0),') > 0 && code.indexOf('color.rgb*=mix(vec3(1.0),') < code.indexOf('color.rgb=mix(color.rgb,'), 'the falloff darkens before the haze veils');
+});
+
 test('from the chair, wood shows painted grain: thin, uneven dark lines a few centimetres apart that follow the board and stand upright on side faces', () => {
   const { pitch, width, depth, streak, warp } = STORYBOOK.grain;
   assert.ok(pitch >= 0.03 && pitch <= 0.06, `grain lines ${pitch} m apart`);

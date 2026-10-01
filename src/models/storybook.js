@@ -7,7 +7,8 @@ export const STORYBOOK = Object.freeze({
   lift: 1.0,
   shadow: [0.94, 0.92, 0.96],
   rim: [1.0, 0.93, 0.8],
-  haze: Object.freeze({ color: [0.62, 0.52, 0.34], amount: 0.42, near: 0.5, far: 4.0 }),
+  haze: Object.freeze({ color: [0.52, 0.45, 0.36], amount: 0.42, near: 0.5, far: 4.0 }),
+  falloff: Object.freeze({ color: [0.78, 0.8, 0.86], near: 1.5, far: 5.0 }),
   grain: Object.freeze({ pitch: 0.045, width: 0.22, depth: 0.13, streak: 0.1, warp: 2.6 }),
 });
 
@@ -52,7 +53,7 @@ vec3 storyLight(vec3 light, vec3 n, vec3 v, vec3 p) {
 
 const LIGHT_HOOK = /vec3 finalDiffuse=/g;
 const OUTDOOR_PREFIX = 'seat-world';
-const { haze } = STORYBOOK;
+const { haze, falloff } = STORYBOOK;
 export const SURFACE_KIND = 'storySurface';
 
 export class StorybookPlugin extends MaterialPluginBase {
@@ -74,7 +75,7 @@ export class StorybookPlugin extends MaterialPluginBase {
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: `#ifdef STORYSURFACE\nvarying float vStorySurface;\n#endif\n${STORYBOOK_FRAGMENT}`,
       [`!${LIGHT_HOOK.source}`]: '\n#ifdef LIGHT0\ndiffuseBase=storyLight(diffuseBase,normalW,viewDirectionW,vPositionW);\n#endif\n#ifdef STORYSURFACE\nbaseColor.rgb*=mix(vec3(1.0),storySurface(vStorySurface,vPositionW,normalW),storyLook);\n#endif\nvec3 finalDiffuse=',
-      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `#ifdef STORYHAZE\ncolor.rgb=mix(color.rgb,${glsl(haze.color)},storyLook*${haze.amount.toFixed(3)}*smoothstep(${haze.near.toFixed(3)},${haze.far.toFixed(3)},length(vEyePosition.xyz-vPositionW)));\n#endif`,
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `#ifdef STORYHAZE\nfloat storyDistance=length(vEyePosition.xyz-vPositionW);\ncolor.rgb*=mix(vec3(1.0),${glsl(falloff.color)},storyLook*smoothstep(${falloff.near.toFixed(3)},${falloff.far.toFixed(3)},storyDistance));\ncolor.rgb=mix(color.rgb,${glsl(haze.color)},storyLook*${haze.amount.toFixed(3)}*smoothstep(${haze.near.toFixed(3)},${haze.far.toFixed(3)},storyDistance));\n#endif`,
     };
   }
 }
