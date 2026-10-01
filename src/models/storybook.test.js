@@ -91,12 +91,13 @@ test('from the chair the room falls off away from the desk: arm\'s reach keeps i
   assert.ok(code.indexOf('color.rgb*=mix(vec3(1.0),') > 0 && code.indexOf('color.rgb*=mix(vec3(1.0),') < code.indexOf('color.rgb=mix(color.rgb,'), 'the falloff darkens before the haze veils');
 });
 
-test('from the chair, wood shows painted grain: thin, uneven dark lines a few centimetres apart that follow the board and stand upright on side faces', () => {
-  const { pitch, width, depth, streak, warp } = STORYBOOK.grain;
-  assert.ok(pitch >= 0.03 && pitch <= 0.06, `grain lines ${pitch} m apart`);
-  assert.ok(width <= 0.3 && depth >= 0.1 && depth <= 0.18, 'lines are thin and dark enough to read without turning into stripes');
-  assert.ok(streak > 0 && warp >= 2, 'lines waver and the board carries soft streaks');
+test('from the chair, wood shows painted grain: long uneven fibres that follow the board over a slow figure, never evenly repeating rings, and stand upright on side faces', () => {
+  const { along, across, depth, tone, waver } = STORYBOOK.grain;
   const wood = STORYBOOK_FRAGMENT.slice(STORYBOOK_FRAGMENT.indexOf('vec3 storyWood'), STORYBOOK_FRAGMENT.indexOf('vec3 storySurface'));
+  assert.doesNotMatch(wood, /fract\(/, 'grain comes from noise, not a ring that repeats at a fixed pitch');
+  assert.ok(across / along >= 15 && across >= 40, `fibres run ${(across / along).toFixed(0)} times longer along the board than across it`);
+  assert.ok(depth >= 0.1 && depth <= 0.2 && tone > 0.08 && tone < 0.2, 'fibres are dark enough to read and the board drifts in tone without turning into stripes');
+  assert.ok(waver > 0 && waver < 0.05, 'fibres waver a little');
   assert.match(wood, /abs\(n\.x\) > 0\.7 \? p\.yxz : p/, 'a face turned sideways runs its grain upright');
   assert.match(STORYBOOK_FRAGMENT, /if \(code > 8\.5\) return storyWood\(p, n\);/);
   const engine = new NullEngine(), scene = new Scene(engine), state = { amount: 1 };

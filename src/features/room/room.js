@@ -31,7 +31,7 @@ import { createPetRoutine, insideBed, PETS, PET_REACTION } from '../pet/index.js
 import { createCompanionRoutine } from '../companion/index.js';
 import { interactionFor, INTERACTION_NOTICES } from '../../core/item-interactions.js';
 import { createArchitecture, styleFurniture, buildWallMesh, furnitureRepaint } from '../../models/architecture.js';
-import { hasDetail, isDetailLoaded, loadDetails, createDetail, disposeDetails, dimPage } from '../../models/detail.js';
+import { hasDetail, isDetailLoaded, loadDetails, createDetail, disposeDetails, dimPage, spillWindow } from '../../models/detail.js';
 import { getFurniture } from '../../core/catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, footprintBounds, MAX_ITEMS, pieceCount, petBed, roomDesign, rugStack, rugTouches, groundAt, standHeight, FLOOR_Y, RUG_STEP, FLAT_RUG } from '../../core/layout.js';
 import { roomDisplayName } from '../../core/house.js';
@@ -716,7 +716,7 @@ export function createRoom(container, options = {}) {
   function refreshShadows() {
     shadow.getShadowMap().renderList = scene.meshes.filter(mesh => !(drag?.active && mesh === petModel?.body && drag.id === petBed(layout)?.id) && mesh.metadata?.castShadow !== false && !mesh.metadata?.effect && (!drag?.active || itemAncestor(mesh)?.metadata.itemId !== drag.id) && mesh !== rain && mesh !== marker && (!ghost || !mesh.isDescendantOf(ghost)) && mesh.isEnabled() && mesh.getTotalVertices() > 0);
     for (const mesh of glowingMeshes) bloom.removeIncludedOnlyMesh(mesh); glowingMeshes.clear();
-    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && !mesh.metadata?.companion && (!mesh.metadata?.seatWorld || mesh.metadata.glow) && !['tea-steam', 'wall-highlight'].includes(mesh.metadata?.effect) && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
+    for (const mesh of scene.meshes) { const emission = mesh.material?.emissiveColor; const visibleOwner = mesh.isEnabled() || (mesh.metadata?.effect && mesh.parent?.isEnabled()); if (emission && !mesh.metadata?.companion && (!mesh.metadata?.seatWorld || mesh.metadata.glow) && !mesh.metadata?.spill && !['tea-steam', 'wall-highlight'].includes(mesh.metadata?.effect) && emission.r + emission.g + emission.b > 0.1 && visibleOwner && (!ghost || !mesh.isDescendantOf(ghost))) { bloom.addIncludedOnlyMesh(mesh); glowingMeshes.add(mesh); } }
     bloom.mainTexture.renderList = [...glowingMeshes];
     requestRender(true);
   }
@@ -1251,6 +1251,7 @@ export function createRoom(container, options = {}) {
     hemisphere.diffuse = color(light.sky); hemisphere.groundColor = color(light.ground); hemisphere.intensity = light.ambient;
     painterly.setTheme(`room-${theme}`); aimSunbeam();
     dimPage(scene, light.screen);
+    spillWindow(scene, light.spill);
     aimDeskLamp();
     applyBulbs(); applyAccents();
     bloom.intensity = roomBloom(theme, seatView.blend);

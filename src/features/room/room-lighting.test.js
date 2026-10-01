@@ -75,3 +75,11 @@ test('the laptop page is turned down after dark and in rain, so it never outshin
   assert.equal(ROOM_LIGHTS.day.screen, 1);
   assert.ok(ROOM_LIGHTS.dusk.screen <= 0.65 && ROOM_LIGHTS.dusk.screen < ROOM_LIGHTS.rain.screen && ROOM_LIGHTS.rain.screen < 1);
 });
+
+test('window light spills onto the desk as a faint warm wash by day, amber at dusk, and not at all in rain', () => {
+  const [dayColor, day] = ROOM_LIGHTS.day.spill ?? [], [duskColor, dusk] = ROOM_LIGHTS.dusk.spill ?? [], [, rain] = ROOM_LIGHTS.rain.spill ?? [];
+  assert.equal(dayColor, '#fff1d0');
+  assert.equal(duskColor, '#ffc478');
+  assert.ok(day >= 0.06 && day <= 0.1 && dusk >= 0.06 && dusk <= 0.1, `the spill stays faint: ${day} by day, ${dusk} at dusk`);
+  assert.equal(rain, 0);
+});

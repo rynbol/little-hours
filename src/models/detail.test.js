@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
-import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, dimPage, DETAIL_SOURCES } from './detail.js';
+import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, dimPage, spillWindow, DETAIL_SOURCES } from './detail.js';
 import { SURFACE_KIND } from './storybook.js';
 import { getFurniture } from '../core/catalog.js';
 import { createFurniture, LAPTOP } from './furniture.js';
@@ -25,7 +25,7 @@ test('a detailed model builds once it has loaded, in paint, metal and glow layer
   assert.equal(isDetailLoaded('study-desk'), true);
   const desk = createDetail('study-desk', scene);
   const layers = Object.fromEntries(desk.getChildMeshes().map(mesh => [mesh.material.name, mesh]));
-  assert.deepEqual(Object.keys(layers).sort(), ['detail-glow', 'detail-glow-page', 'detail-metal', 'detail-paint']);
+  assert.deepEqual(Object.keys(layers).sort(), ['detail-glow', 'detail-glow-page', 'detail-metal', 'detail-paint', 'detail-spill']);
   assert.equal(desk.isEnabled(false), false);
   const paint = layers['detail-paint'];
   assert.equal(paint.getVerticesData(SURFACE_KIND).length, paint.getTotalVertices());
@@ -106,6 +106,44 @@ test('turning the laptop page down dims what the page draws and what it blooms, 
   disposeDetails(scene); disposeDetails(later); engine.dispose();
 });
 
+test('window light spills onto both desk tops as a soft dappled wash, strongest by the window and fading toward the chair and the ends', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk', 'writing-desk']);
+  for (const type of ['study-desk', 'writing-desk']) {
+    const meshes = createDetail(type, scene).getChildMeshes(), spill = meshes.find(mesh => mesh.material.name === 'detail-spill'), desk = meshes.find(mesh => mesh.material.name === 'detail-paint');
+    assert.ok(spill && spill.metadata.castShadow === false && !spill.receiveShadows && !spill.isPickable, `${type} spill neither casts, takes nor catches anything`);
+    const positions = spill.getVerticesData('position'), alpha = spill.getVerticesData('color').filter((value, i) => i % 4 === 3), heights = positions.filter((value, i) => i % 3 === 1);
+    const surfaces = desk.getVerticesData(SURFACE_KIND), woodHeights = desk.getVerticesData('position').filter((value, i) => i % 3 === 1 && surfaces[(i - 1) / 3] === 9), below = woodHeights.filter(y => y > heights[0] - 0.008 && y < heights[0] - 0.001);
+    assert.ok(heights.every(y => y === heights[0]) && below.length >= 20, `${type} spill lies flat just above the wooden top, over ${below.length} top vertices`);
+    const zs = positions.filter((value, i) => i % 3 === 2), xs = positions.filter((value, i) => i % 3 === 0), window = Math.min(...zs), chair = Math.max(...zs), ends = Math.max(...xs);
+    const mean = pick => { const chosen = alpha.filter((value, v) => pick(xs[v], zs[v])); return chosen.reduce((sum, value) => sum + value, 0) / chosen.length; };
+    const back = mean((x, z) => z < window + 0.1 && Math.abs(x) < ends * 0.6), front = mean((x, z) => z > chair - 0.2 && Math.abs(x) < ends * 0.6);
+    assert.ok(back > 0.45 && front < back * 0.15, `${type} spill runs ${back.toFixed(2)} by the window and ${front.toFixed(2)} by the chair`);
+    assert.ok(Math.max(...alpha.filter((value, v) => Math.abs(xs[v]) === ends)) === 0 && Math.max(...alpha) <= 1, `${type} spill has no hard ends`);
+    const row = alpha.filter((value, v) => zs[v] === window && Math.abs(xs[v]) < ends * 0.6), rowMean = row.reduce((sum, value) => sum + value, 0) / row.length;
+    const spread = Math.sqrt(row.reduce((sum, value) => sum + (value - rowMean) ** 2, 0) / row.length);
+    assert.ok(spread / rowMean > 0.12, `${type} spill is dappled by leaves, varying ${(spread / rowMean * 100).toFixed(0)}% along the window edge`);
+  }
+  disposeDetails(scene); engine.dispose();
+});
+
+test('the window spill takes the colour and strength of each theme, stays hidden when it has none, and a desk built later picks up the current light', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  spillWindow(scene, ['#fff1d0', 0.08]);
+  const spill = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-spill');
+  assert.equal(spill.material.emissiveColor.toHexString(), '#FFF1D0', 'a desk first built by day shows the day spill');
+  assert.ok(spill.isVisible && Math.abs(spill.material.alpha - 0.08) < 1e-9, 'at the day strength');
+  assert.ok(spill.material.disableLighting && spill.material.disableDepthWrite && spill.hasVertexAlpha, 'the spill is unlit light laid over the wood without hiding what is drawn after it');
+  spillWindow(scene, ['#ffc478', 0.09]); spillWindow(scene, ['#ffc478', 0.09]);
+  assert.ok(spill.material.emissiveColor.toHexString() === '#FFC478' && Math.abs(spill.material.alpha - 0.09) < 1e-9 && spill.isVisible, 'dusk turns it amber, once');
+  spillWindow(scene, ['#ffffff', 0]);
+  assert.equal(spill.isVisible, false, 'rain casts no spill and so draws nothing');
+  const later = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-spill');
+  assert.equal(later.isVisible, false, 'a desk built in rain stays without it');
+  disposeDetails(scene); engine.dispose();
+});
+
 test('the desk lamp shade glows evenly from within instead of being lit across its pleats', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
@@ -159,7 +197,7 @@ test('baked contact shade keeps most of each colour, so crevices stay warm inste
   await loadDetails(types);
   for (const type of types) {
     const kept = [];
-    for (const mesh of createDetail(type, scene).getChildMeshes().filter(mesh => !mesh.material.name.startsWith('detail-glow'))) {
+    for (const mesh of createDetail(type, scene).getChildMeshes().filter(mesh => !mesh.material.name.startsWith('detail-glow') && !mesh.metadata.spill)) {
       const colors = mesh.getVerticesData('color'), { slots, palette } = mesh.metadata;
       const brightest = palette.map(hex => Math.max(...[1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16) / 255)));
       slots.forEach((slot, v) => kept.push(Math.max(colors[v * 4], colors[v * 4 + 1], colors[v * 4 + 2]) / brightest[slot]));
@@ -214,7 +252,7 @@ test('the desk lamp shade shows its pleat folds, a rust trim at both rims, a gil
 test('the desk close-ups are lifted earth tones, with no saturated primaries or blue cloth', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
-  const lit = createDetail('study-desk', scene).getChildMeshes().filter(mesh => !mesh.material.name.startsWith('detail-glow'));
+  const lit = createDetail('study-desk', scene).getChildMeshes().filter(mesh => !mesh.material.name.startsWith('detail-glow') && !mesh.metadata.spill);
   const used = new Set(lit.flatMap(mesh => [...mesh.metadata.slots].map(slot => mesh.metadata.palette[slot].toLowerCase())));
   const loud = [...used].filter(hex => {
     const color = Color3.FromHexString(hex), [h, s, v] = color.toHSV().asArray(), chroma = Math.max(color.r, color.g, color.b) - Math.min(color.r, color.g, color.b);
@@ -235,20 +273,31 @@ test('shelf books are earthy leather and cloth tones, with no pale pastel blues 
   disposeDetails(scene); engine.dispose();
 });
 
-test('from the chair the desk wood reads honey instead of orange and its darkest parts stay lifted, while a room design keeps its own wood', async () => {
+test('from the chair the desk wood reads a soft honey oak that drifts slowly in tone across the boards, its darkest parts stay lifted, the laptop keeps its walnut, and a room design keeps its own wood', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
   const paintOf = repaint => createDetail('study-desk', scene, repaint).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint');
-  const plain = paintOf([]), { slots, palette } = plain.metadata, surfaces = plain.getVerticesData(SURFACE_KIND), colors = plain.getVerticesData('color');
+  const plain = paintOf([]), { slots, palette, baseColors, tones } = plain.metadata, surfaces = plain.getVerticesData(SURFACE_KIND), colors = plain.getVerticesData('color'), positions = plain.getVerticesData('position');
   const hsv = (array, v) => new Color3(array[v * 4], array[v * 4 + 1], array[v * 4 + 2]).toHSV().asArray(), luma = (array, v) => 0.2126 * array[v * 4] + 0.7152 * array[v * 4 + 1] + 0.0722 * array[v * 4 + 2];
-  const wood = [...slots.keys()].filter(v => surfaces[v] === 9 && ['#aa7954', '#73533d', '#6e5444'].includes(palette[slots[v]]));
-  const hues = wood.map(v => hsv(colors, v)[0]).sort((a, b) => a - b), saturations = wood.map(v => hsv(colors, v)[1]).sort((a, b) => a - b);
-  assert.ok(hues[Math.floor(hues.length * 0.1)] >= 27, `desk wood hue starts at ${hues[Math.floor(hues.length * 0.1)].toFixed(1)}`);
-  assert.ok(saturations[Math.floor(saturations.length * 0.9)] <= 0.5, `desk wood saturation reaches ${saturations[Math.floor(saturations.length * 0.9)].toFixed(2)}`);
+  const at = (sorted, share) => sorted[Math.floor(sorted.length * share)], sorted = values => values.sort((a, b) => a - b);
+  const wood = [...slots.keys()].filter(v => surfaces[v] === 9 && ['#aa7954', '#73533d'].includes(palette[slots[v]]));
+  const hues = sorted(wood.map(v => hsv(colors, v)[0])), saturations = sorted(wood.map(v => hsv(colors, v)[1]));
+  assert.ok(at(hues, 0.1) >= 28.5 && at(hues, 0.9) <= 33, `desk wood hue runs ${at(hues, 0.1).toFixed(1)}-${at(hues, 0.9).toFixed(1)}`);
+  assert.ok(at(saturations, 0.9) <= 0.38, `desk wood saturation reaches ${at(saturations, 0.9).toFixed(2)}`);
+  const boards = wood.filter(v => palette[slots[v]] === '#aa7954'), drift = sorted(boards.map(v => colors[v * 4 + 1] / baseColors[v * 4 + 1]));
+  assert.ok(at(drift, 0.9) / at(drift, 0.1) >= 1.04, `the board tone drifts ${((at(drift, 0.9) / at(drift, 0.1) - 1) * 100).toFixed(1)}% across the desk`);
+  let steepest = 0;
+  for (let a = 0; a < boards.length; a += 7) for (const b of boards) {
+    const [i, j] = [boards[a] * 3, b * 3], gap = Math.hypot(positions[i] - positions[j], positions[i + 1] - positions[j + 1], positions[i + 2] - positions[j + 2]);
+    if (gap > 0 && gap < 0.02) steepest = Math.max(steepest, Math.abs(tones[boards[a]] - tones[b]));
+  }
+  assert.ok(steepest < 0.012, `the drift is soft: boards 2 cm apart differ in tone by up to ${(steepest * 100).toFixed(1)}%`);
+  const walnut = [...slots.keys()].filter(v => palette[slots[v]] === LAPTOP.walnut).map(v => hsv(colors, v));
+  assert.ok(walnut.length && walnut.every(([h, saturation]) => h >= 24 && h <= 32 && saturation >= 0.3), 'the laptop case stays a warm walnut instead of greying with the boards');
   const darkest = Math.min(...[...slots.keys()].map(v => luma(colors, v)));
   assert.ok(darkest >= 0.17, `the darkest desk crevice is ${darkest.toFixed(3)}`);
   const sakura = paintOf(furnitureRepaint('sakura')), top = slots.indexOf(palette.indexOf('#aa7954'));
-  const sakuraHue = Color3.FromHexString('#c39e70').toHSV().r, ratio = sakura.getVerticesData('color')[top * 4] / sakura.metadata.baseColors[top * 4];
+  const sakuraHue = Color3.FromHexString('#c39e70').toHSV().r, ratio = sakura.getVerticesData('color')[top * 4] / sakura.metadata.baseColors[top * 4] / sakura.metadata.tones[top];
   assert.ok(Math.abs(hsv(sakura.getVerticesData('color'), top)[0] - sakuraHue) < 1.5, 'sakura wood keeps its own hue');
   assert.ok(Math.abs(ratio - Color3.FromHexString('#c39e70').r / Color3.FromHexString('#aa7954').r) < 0.01, 'sakura wood is cut from the model colour, not the close-up one');
   disposeDetails(scene); engine.dispose();

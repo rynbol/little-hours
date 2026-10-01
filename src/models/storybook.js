@@ -9,7 +9,7 @@ export const STORYBOOK = Object.freeze({
   rim: [1.0, 0.93, 0.8],
   haze: Object.freeze({ color: [0.52, 0.45, 0.36], amount: 0.42, near: 0.5, far: 4.0 }),
   falloff: Object.freeze({ color: [0.78, 0.8, 0.86], near: 1.5, far: 5.0 }),
-  grain: Object.freeze({ pitch: 0.045, width: 0.22, depth: 0.13, streak: 0.1, warp: 2.6 }),
+  grain: Object.freeze({ along: 2.4, across: 60, depth: 0.17, tone: 0.14, waver: 0.03 }),
 });
 
 const glsl = values => `vec3(${values.map(value => value.toFixed(3)).join(',')})`;
@@ -24,10 +24,11 @@ float storyNoise(vec3 p) {
 }
 vec3 storyWood(vec3 p, vec3 n) {
   vec3 q = abs(n.x) > 0.7 ? p.yxz : p;
-  float ring = fract((q.y + q.z) / ${grain.pitch.toFixed(3)} + ${grain.warp.toFixed(3)} * storyNoise(vec3(q.x * 1.1, q.y * 7.0, q.z * 7.0)));
-  float line = smoothstep(${(1 - grain.width).toFixed(3)}, 1.0, 1.0 - abs(ring * 2.0 - 1.0)) * (0.35 + storyNoise(vec3(q.x * 0.7, (q.y + q.z) * 31.0, 0.5)));
-  float streak = storyNoise(vec3(q.x * 1.5, q.y * 16.0, q.z * 16.0));
-  return vec3(1.0 + ${grain.streak.toFixed(3)} * (streak - 0.5)) - ${grain.depth.toFixed(3)} * line * vec3(0.9, 1.0, 1.08);
+  float across = q.y + q.z;
+  float bent = across + ${grain.waver.toFixed(3)} * (storyNoise(vec3(q.x * 0.9, across * 3.0, 4.1)) - 0.5);
+  float fibre = 0.65 * storyNoise(vec3(q.x * ${grain.along.toFixed(3)}, bent * ${grain.across.toFixed(3)}, 0.5)) + 0.35 * storyNoise(vec3(q.x * ${(grain.along * 2.3).toFixed(3)}, bent * ${(grain.across * 2.7).toFixed(3)}, 7.3));
+  float figure = storyNoise(vec3(q.x * 0.7, across * 6.0, 2.3));
+  return vec3(1.0 + ${grain.tone.toFixed(3)} * (figure - 0.5)) - ${grain.depth.toFixed(3)} * smoothstep(0.48, 0.72, fibre) * vec3(0.9, 1.0, 1.08);
 }
 vec3 storySurface(float code, vec3 p, vec3 n) {
   if (code > 9.5) return vec3(1.0);
