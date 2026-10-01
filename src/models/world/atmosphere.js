@@ -7,7 +7,7 @@ export const WORLD_ATMOSPHERES = Object.freeze({
     skyAmbient: '#a9c4d6', groundAmbient: '#8a9a5c', shadowTint: '#6f86a8', shadowLift: 0.42,
     fogNear: '#bcd0cc', fogFar: '#7a9eae', fogSun: '#dfe8d0', fogDensity: 0.0005, fogHeight: 300, sunFocus: 10, sunScatter: 0, glareFloor: 0.2, glareHeight: 450,
     mist: '#bcd0cc', mistStrength: 0.42, ridgeLift: 0, ridgeFog: 0, ridgeLight: '#bcd0cc',
-    cloudLit: '#f7f6ec', cloudShade: '#86a7ba', cloudRim: '#fff0d0', cloudCover: 0.55,
+    cloudLit: '#f7f6ec', cloudShade: '#7092a8', cloudRim: '#fff0d0', cloudCover: 0.55,
     water: '#4f8f96', waterShallow: '#3e5a44',
     leafTop: '#9ccc3c', leafUnder: '#2f5a2e', leafBack: '#c8e070', leafCrown: '#94c23c', needleTop: '#4f8a3c', needleUnder: '#24452e', bark: '#76825a',
     grass: '#679a46', grassLight: '#8bb556', grassWarm: '#a0ae52', grassTip: '#c6dba0', grassFar: '#e6f848', flowerWhite: '#f6f4ea', flowerYellow: '#f4dc7a', flowerLilac: '#b8a4dc', forestFloor: '#4f8a3a', rock: '#8d9ea3', rockDark: '#61747e', dirt: '#a89e74', sand: '#d4cc9c', snow: '#f4f6f4', crestGlow: 0.15,

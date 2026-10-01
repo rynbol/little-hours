@@ -6,7 +6,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { heightAt, WORLD } from '../../core/world-terrain.js';
-import { CLOUD_KINDS, PLUME_COLUMN, clearsPlume, clearsSuns, cloudCards, cloudShape, createWorldClouds } from './clouds.js';
+import { CLOUD_KINDS, PLUME_COLUMN, clearsPlume, clearsSkyline, clearsSnowCap, clearsSuns, cloudCards, cloudShape, createWorldClouds } from './clouds.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 
@@ -89,4 +89,29 @@ test('every cloud, wisp and mist bank is one draw that takes the theme and drift
   assert.equal(resting.clouds.material._vectors3.eye.y, 2);
   assert.equal(resting.clouds.material._vectors4.plume.x, PLUME_COLUMN.x);
   scene.dispose();
+});
+
+test('a thin ridge just in front of the window hides a cloud behind it on every bearing', () => {
+  const ridge = (x, z) => { const r = Math.hypot(x, z); return r >= 380 && r <= 420 ? r * 0.3 : 0; };
+  for (let bearing = 0; bearing < Math.PI * 2; bearing += Math.PI / 8) {
+    const card = { x: Math.sin(bearing) * 2000, y: 500, z: -Math.cos(bearing) * 2000 };
+    assert.equal(clearsSkyline(card, ridge), false, `bearing ${bearing.toFixed(2)}`);
+    assert.equal(clearsSkyline(card, () => 0), true);
+  }
+});
+
+test('raising the land under one cloud removes that cloud and leaves every other cloud where it was', () => {
+  const before = cloudCards(), gone = before.find(card => card.kind === CLOUD_KINDS.cumulus);
+  const hill = (x, z) => Math.hypot(x - gone.x, z - gone.z) < 30 ? 5000 : heightAt(x, z);
+  const after = cloudCards(WORLD.seed, hill), at = card => `${card.x.toFixed(3)},${card.z.toFixed(3)}`, kept = new Set(after.map(at));
+  assert.equal(kept.has(at(gone)), false);
+  assert.deepEqual(before.filter(card => card !== gone && !kept.has(at(card))).map(at), []);
+});
+
+test('no cumulus stands in front of the snow cap, though banks may gather around its lower slopes', () => {
+  assert.ok(cloudCards().filter(card => card.kind === CLOUD_KINDS.cumulus).every(card => clearsSnowCap(card)));
+  const toward = (out, y, halfWidth, halfHeight) => ({ x: -4237 / 7503 * out, y, z: -6192 / 7503 * out, halfWidth, halfHeight });
+  assert.equal(clearsSnowCap(toward(4000, 1100, 900, 300)), false);
+  assert.equal(clearsSnowCap(toward(4000, 450, 900, 300)), true);
+  assert.equal(clearsSnowCap({ x: 3000, y: 1100, z: -3000, halfWidth: 900, halfHeight: 300 }), true);
 });

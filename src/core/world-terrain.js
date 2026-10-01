@@ -1,8 +1,8 @@
 export const WORLD = Object.freeze({ seed: 7, size: 12000, valleyFloor: -46, pad: Object.freeze({ halfWidth: 7.4, halfDepth: 6.2 }), river: Object.freeze({ z: -520, sway: 160, width: 34 }), massif: Object.freeze({ x: -4237, z: -6192, spread: 0.3 }),
   ranges: Object.freeze([
-    Object.freeze({ crest: 1800, rise: 190, width: 420, bench: 18, seed: 81, crags: 0 }),
-    Object.freeze({ crest: 3000, rise: 470, width: 650, bench: 38, seed: 84, crags: 0 }),
-    Object.freeze({ crest: 5200, rise: 1550, width: 1200, bench: 90, seed: 87, crags: 0.22 }),
+    Object.freeze({ crest: 1800, rise: 190, width: 420, bench: 18, seed: 81, creaseSoftness: 0, crestFade: 0 }),
+    Object.freeze({ crest: 3000, rise: 470, width: 650, bench: 38, seed: 84, creaseSoftness: 0, crestFade: 0 }),
+    Object.freeze({ crest: 5200, rise: 1550, width: 1200, bench: 90, seed: 87, creaseSoftness: 0.002, crestFade: 1 }),
   ]) });
 
 const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
@@ -28,10 +28,10 @@ export function fbm(x, y, octaves = 5, seed = WORLD.seed) {
   return sum / norm;
 }
 
-export function ridged(x, y, octaves = 5, seed = WORLD.seed) {
+export function ridged(x, y, octaves = 5, seed = WORLD.seed, creaseSoftness = 0) {
   let sum = 0, amplitude = 0.5, frequency = 1, weight = 1, norm = 0;
   for (let i = 0; i < octaves; i++) {
-    const ridge = (1 - Math.abs(noise2(x * frequency, y * frequency, seed + i * 31))) ** 2 * weight;
+    const n = noise2(x * frequency, y * frequency, seed + i * 31), ridge = (1 - Math.sqrt(n * n + creaseSoftness)) ** 2 * weight;
     sum += ridge * amplitude; norm += amplitude; weight = Math.min(1, ridge * 1.6); amplitude *= 0.5; frequency *= 2.1;
   }
   return sum / norm;
@@ -52,16 +52,14 @@ const benches = (h, rise) => { const k = Math.floor(h / rise), f = h / rise - k;
 
 export const padDistance = (x, z) => Math.hypot(Math.max(0, Math.abs(x) - WORLD.pad.halfWidth), Math.max(0, Math.abs(z) - WORLD.pad.halfDepth));
 
-function rangeHeight({ crest, rise, width, bench, seed, crags }, x, z, d) {
+function rangeHeight({ crest, rise, width, bench, seed, creaseSoftness, crestFade }, x, z, d) {
   const across = (d - crest - fbm(x / 2300, z / 2300, 2, seed) * width * 0.8) / width;
   const profile = Math.exp(-across * across * (across < 0 ? 2.6 : 1.1));
   if (profile < 0.01) return 0;
   const along = 0.4 + 0.6 * smooth(-0.35, 0.45, fbm(x / (width * 2.2), z / (width * 2.2), 3, seed + 1));
-  const crag = 0.82 + 0.36 * ridged(x / (width * 0.7), z / (width * 0.7), 3, seed + 2);
-  const warp = crags && 140 * noise2(x / 500, z / 500, seed + 4), clustered = crags && 0.4 + 0.6 * smooth(-0.25, 0.45, noise2(x / 900, z / 900, seed + 5));
-  const rough = crags && crags * clustered * (ridged((x + warp) / 210, (z - warp) / 210, 2, seed + 3) - 0.5) * smooth(0.15, 0.5, profile * along);
-  const h = rise * profile * along * (crag + rough);
-  return h + (benches(h, bench) - h) * 0.65;
+  const crag = 0.82 + 0.36 * ridged(x / (width * 0.7), z / (width * 0.7), 3, seed + 2, creaseSoftness);
+  const lift = profile * along * crag, h = rise * lift;
+  return h + (benches(h, bench) - h) * 0.65 * (1 - crestFade * smooth(0.45, 0.8, lift));
 }
 
 export function heightAt(x, z) {

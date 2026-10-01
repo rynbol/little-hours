@@ -43,7 +43,7 @@ test('far mountain normals are averaged wider than the grid so slopes shade smoo
   };
   const meshed = neighbourAgreement((i, j) => normals.subarray((i * n + j) * 3, (i * n + j) * 3 + 3));
   const perStep = neighbourAgreement((i, j) => normalAt(coordinate(i), coordinate(j), ring.step * 0.75));
-  assert.equal(Math.round(meshed * 1000) / 1000, 0.988);
+  assert.equal(Math.round(meshed * 1000) / 1000, 0.99);
   assert.ok(1 - meshed < (1 - perStep) * 0.5, `${meshed} vs ${perStep}`);
 });
 
@@ -77,6 +77,55 @@ test('the far ridges ahead of the window are meshed at 64 m out to 9 km, for few
   const triangles = TERRAIN_RINGS.reduce((sum, _, index) => sum + terrainRing(index).indices.length / 3, 0);
   assert.equal(triangles, 224900);
   assert.ok(triangles < 229400, `${triangles} triangles against 229400 for the square rings`);
+});
+
+const CHAIR_VIEW = Object.freeze({ eye: [-2, 2.236, -2.41], forward: [-0.1884, -0.2349, -0.9536], fov: 1.22, width: 1440, height: 1000 });
+
+function skylineFromChair(ringIndices) {
+  const { eye, forward, fov, width, height } = CHAIR_VIEW, unit = v => v.map(c => c / Math.hypot(...v));
+  const ahead = unit(forward), right = unit([-ahead[2], 0, ahead[0]]), up = [right[1] * ahead[2] - right[2] * ahead[1], right[2] * ahead[0] - right[0] * ahead[2], right[0] * ahead[1] - right[1] * ahead[0]];
+  const focal = height / 2 / Math.tan(fov / 2), top = new Float64Array(width).fill(height);
+  const project = (positions, v) => {
+    const dx = positions[v * 3] - eye[0], dy = positions[v * 3 + 1] - eye[1], dz = positions[v * 3 + 2] - eye[2], depth = dx * ahead[0] + dy * ahead[1] + dz * ahead[2];
+    return depth < 1 ? null : [width / 2 + focal * (dx * right[0] + dz * right[2]) / depth, height / 2 - focal * (dx * up[0] + dy * up[1] + dz * up[2]) / depth];
+  };
+  for (const index of ringIndices) {
+    const { positions, indices } = terrainRing(index);
+    for (let t = 0; t < indices.length; t += 3) for (let k = 0; k < 3; k++) {
+      const a = project(positions, indices[t + k]), b = project(positions, indices[t + (k + 1) % 3]);
+      if (!a || !b) continue;
+      const [left, end] = a[0] < b[0] ? [a, b] : [b, a];
+      for (let column = Math.max(0, Math.ceil(left[0] - 0.5)); column < Math.min(width, end[0] - 0.5); column++) {
+        const y = left[1] + (end[1] - left[1]) * (column + 0.5 - left[0]) / (end[0] - left[0]);
+        if (y < top[column]) top[column] = y;
+      }
+    }
+  }
+  return top;
+}
+
+function ridgeline(top, from, to) {
+  const y = Array.from(top.subarray(from, to)), turn = i => Math.abs(Math.atan2(y[i + 3] - y[i], 3) - Math.atan2(y[i] - y[i - 3], 3)) * 180 / Math.PI;
+  let corners = 0, spikes = 0;
+  for (let i = 3; i < y.length - 3; i++) if (turn(i) > 30) corners++;
+  for (let i = 1; i < y.length - 1; i++) {
+    if (!(y[i] <= y[i - 1] && y[i] < y[i + 1])) continue;
+    let left = y[i], right = y[i];
+    for (let j = i - 1; j >= 0 && y[j] >= y[i]; j--) left = Math.max(left, y[j]);
+    for (let j = i + 1; j < y.length && y[j] >= y[i]; j++) right = Math.max(right, y[j]);
+    if (Math.min(left, right) - y[i] >= 6) spikes++;
+  }
+  return { corners: Math.round(corners / (y.length - 6) * 100) / 100, spikes };
+}
+
+test('from the chair the far ranges meet the sky in one or two broad masses with smooth ridgelines, not a train of spikes and hard corners', () => {
+  const top = skylineFromChair([3, 4]);
+  const regions = { behindObservatory: ridgeline(top, 790, 1070), right: ridgeline(top, 1200, 1400) };
+  for (const [name, { corners, spikes }] of Object.entries(regions)) {
+    assert.ok(corners <= 0.1, `${name}: ${corners} of the ridgeline turns over 30 degrees within 3 px`);
+    assert.ok(spikes <= 2, `${name}: ${spikes} peaks stand 6 px clear of their neighbours`);
+  }
+  assert.ok(regions.behindObservatory.spikes >= 1, 'the range behind the observatory still parts into two masses');
 });
 
 test('a forward ring meets the rings around it without cracks on every side', () => {
