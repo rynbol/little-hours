@@ -24,8 +24,11 @@ test('the valley lights up and the moon climbs as a focus session goes on', () =
   assert.equal(spiritsAloft('day', 1), 0);
   assert.ok(moonRise(1) > moonRise(0));
   assert.equal(vistaPalette('dusk', 0).zenith.toLowerCase(), VISTA_THEMES.dusk.zenith);
-  assert.equal(vistaPalette('dusk', 1).zenith.toLowerCase(), '#070b24');
-  assert.equal(vistaPalette('rain', 1).zenith, '#3f4a5e');
+  const rgb = value => [1, 3, 5].map(k => parseInt(value.slice(k, k + 2), 16)), sum = value => rgb(value).reduce((a, b) => a + b);
+  for (const progress of [0, 1]) { const [r, g] = rgb(vistaPalette('dusk', progress).zenith); assert.ok(g > r, `dusk zenith at ${progress} is grey-green or night blue, not violet`); }
+  assert.ok(sum(vistaPalette('dusk', 1).zenith) < sum(vistaPalette('dusk', 0).zenith) * 0.4, 'the dusk sky deepens into night');
+  const rain = rgb(vistaPalette('rain', 1).zenith);
+  assert.ok(Math.max(...rain) - Math.min(...rain) < 16, 'the rain sky is an unsaturated olive grey');
 
   const { engine, world } = setup();
   world.setTheme('dusk'); world.setEnabled(true);
@@ -496,14 +499,14 @@ test('the daytime field reads as soft bright gold-green, with blade roots within
   for (const theme of Object.keys(VISTA_THEMES)) assert.ok(luma(grassTones(vistaPalette(theme)).root) < luma(grassTones(vistaPalette(theme)).tip), theme);
 });
 
-test('by day the clouds stay cream on their sunlit side and lavender in shade through the distance haze', () => {
+test('by day the clouds stay warm white on their sunlit side and cool blue-grey underneath through the distance haze', () => {
   const { engine, world } = setup();
   world.setEnabled(true); world.setTheme('day');
   const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-clouds'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color');
   const mean = role => { const sum = [0, 0, 0]; let n = 0; shape.roles.forEach((r, i) => { if (r === role) { n++; for (let c = 0; c < 3; c++) sum[c] += colors[i * 4 + c]; } }); return sum.map(v => v / n); };
   const [lr, lg, lb] = mean('cloud'), [sr, sg, sb] = mean('cloudShade');
-  assert.ok(lr > lb + 0.02, `sunlit ${[lr, lg, lb].map(v => v.toFixed(2))}`);
-  assert.ok(sb > sg + 0.03 && sr > sg - 0.03, `shade ${[sr, sg, sb].map(v => v.toFixed(2))}`);
+  assert.ok(lr >= lb && lr > 0.85, `sunlit ${[lr, lg, lb].map(v => v.toFixed(2))}`);
+  assert.ok(sb > sr + 0.05 && sb >= sg && sr < lr - 0.15, `shade ${[sr, sg, sb].map(v => v.toFixed(2))}`);
   engine.dispose();
 });
 

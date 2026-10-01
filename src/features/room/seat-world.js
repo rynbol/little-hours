@@ -10,31 +10,31 @@ import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 
 export const VISTA_THEMES = Object.freeze({
   dusk: {
-    zenith: '#1a1d48', high: '#4a3c78', horizon: '#f2a070', glow: '#ffc27a', haze: '#7a5f8c', below: '#3a3354',
-    far: '#5c5082', mid: '#40496c', valley: '#34485a', field: '#3d5462', cliff: '#463f56', grass: '#3a5646', meadow: '#476a4e', meadowWarm: '#6a7048', petal: '#a89cc0',
-    trunk: '#3b2e33', leaf: '#2c4a40', leafLight: '#4a6a50', walls: ['#c9a58a', '#b98f86', '#a9a3a0', '#d4b894'], roofs: ['#6a3f3a', '#4a3a3a', '#7a4a3a', '#3f4a5a'],
-    stone: '#6b6480', water: '#50608e', glint: '#f2d7b0', window: '#ffc978', windowWarm: '#ffa860', windowDark: '#2b2d44', lamp: '#ffdca0',
-    star: '#fff4d8', moon: '#ffe6bc', cloud: '#f2aa92', cloudShade: '#6a5a8c', cloudFog: 0.42,
-    castle: '#4c4668', castleRoof: '#2e2c4a', rock: '#3a3042', ember: '#ff6a3a', smoke: '#6a5a78', ruin: '#6c6478', moss: '#3f5a48', rune: '#ffb060', bird: '#221c30', spirit: '#d8ffb8', snow: '#cdb8d8',
-    light: 0.35, night: { zenith: '#070b24', high: '#171b44', horizon: '#6a4f86', glow: '#b67a8e', haze: '#3a3766', cloud: '#5a4f80', cloudShade: '#35325c' },
+    zenith: '#74868c', high: '#94a49c', horizon: '#c4c2a8', glow: '#fcbe74', glowStrength: 1, haze: '#8a96a0', hazeSun: '#b0a294', mist: '#a4a8a0', mistStrength: 0.4, below: '#5a5a4e',
+    far: '#5f7080', mid: '#5c6670', valley: '#6c8048', field: '#7a8a58', cliff: '#6a6670', grass: '#768a46', meadow: '#909c4a', meadowWarm: '#c8964c', petal: '#b0a088',
+    trunk: '#46423a', leaf: '#3e5238', leafLight: '#7a8e52', walls: ['#d8b890', '#c8a088', '#b0a8a0', '#e0c49a'], roofs: ['#6a3f3a', '#4a3a3a', '#7a4a3a', '#3f4a5a'],
+    stone: '#7a7672', water: '#6a7a88', glint: '#ffe0b0', window: '#ffc978', windowWarm: '#ffa860', windowDark: '#3a3c40', lamp: '#ffdca0',
+    star: '#fff4d8', moon: '#ffe6b4', cloud: '#ffe2b0', cloudShade: '#8c8a96', cloudFog: 0.32,
+    castle: '#5c6070', castleRoof: '#363c4a', rock: '#4e4446', ember: '#ff6a3a', emberFog: 0.6, smoke: '#6c6660', ruin: '#7a7670', moss: '#5a6440', rune: '#ffb060', bird: '#2a2a2c', spirit: '#d8ffb8', snow: '#f0d8c0',
+    light: 0.35, night: { zenith: '#141c2a', high: '#26323c', horizon: '#7a6450', glow: '#c89a70', haze: '#3c4650', hazeSun: '#6a5a4c', mist: '#3a424a', cloud: '#4c5258', cloudShade: '#2a3038' },
   },
   day: {
-    zenith: '#2f74c8', high: '#6fa9e0', horizon: '#d9ecef', glow: '#ffecc4', haze: '#a4c4df', below: '#8fb08a',
-    far: '#7090c0', mid: '#6c9a86', valley: '#7aa84c', field: '#a0c45a', cliff: '#8c8a7c', grass: '#76a843', meadow: '#8cbf4e', meadowWarm: '#c8cf5a', petal: '#fffaf0',
-    trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
-    stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
-    star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffeccc', cloudShade: '#bdb8dc', cloudFog: 0.42,
-    castle: '#687088', castleRoof: '#3a5a74', rock: '#5c3e38', ember: '#e2683c', emberFog: 0.75, smoke: '#8c827e', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
+    zenith: '#8fb3c4', high: '#a5c2c8', horizon: '#cfdcd2', glow: '#f4f2dc', glowStrength: 0.6, haze: '#a8c2c6', hazeSun: '#dfe8d0', mist: '#c8dcc4', mistStrength: 0.38, below: '#a0b8b0',
+    far: '#6a8e9c', mid: '#6a8a84', valley: '#80b050', field: '#94b862', cliff: '#7c8f96', grass: '#7eb24d', meadow: '#8cbf57', meadowWarm: '#c8cf5a', petal: '#fffaf0',
+    trunk: '#5c6440', leaf: '#3c6230', leafLight: '#6a9c3c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
+    stone: '#a7a698', water: '#6aa8c4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
+    star: '#a5c2c8', moon: '#fffbea', cloud: '#f6f2e0', cloudShade: '#b2c6ce', cloudFog: 0.32,
+    castle: '#7a8090', castleRoof: '#4a6274', rock: '#6a5e5c', ember: '#d8703c', emberFog: 0.95, smoke: '#8c8680', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
     aerial: 1.12, light: 0, night: null,
   },
   rain: {
-    zenith: '#3f4a5e', high: '#5c6878', horizon: '#9aa2a8', glow: '#b8b4ae', haze: '#7a8590', below: '#4c5864',
-    far: '#687684', mid: '#56646f', valley: '#46545a', field: '#50605e', cliff: '#5a5a60', grass: '#4a6452', meadow: '#56705a', meadowWarm: '#78784e', petal: '#b4b8bc',
-    trunk: '#3e3a3a', leaf: '#3c5448', leafLight: '#4a6454', walls: ['#b8ab9c', '#a8958e', '#9ea0a2', '#bcae90'], roofs: ['#6a4848', '#4a5468', '#5a5068', '#7a5a4a'],
-    stone: '#747880', water: '#5a6a7c', glint: '#c8ccd0', window: '#ffc27a', windowWarm: '#ffaa66', windowDark: '#3a4050', lamp: '#ffd49a',
-    star: '#5c6878', moon: '#c8ccd0', cloud: '#9aa3ac', cloudShade: '#808a94', cloudFog: 0.75,
-    castle: '#5a606c', castleRoof: '#3a4450', rock: '#4a4a50', ember: '#80361a', emberFog: 0.2, smoke: '#6a707a', ruin: '#6a6e70', moss: '#4a6050', rune: '#a0c8d0', bird: '#2a2e36', spirit: '#c8e0c8', snow: '#b8c0c8',
-    light: 0.55, night: null,
+    zenith: '#3e443c', high: '#474d42', horizon: '#555c4c', glow: '#6a6e5e', glowStrength: 0.15, haze: '#555c4c', hazeSun: '#6a6e5e', mist: '#5c6252', mistStrength: 0.55, below: '#4a5044',
+    far: '#4c5446', mid: '#4e5648', valley: '#4e5c3a', field: '#535c45', cliff: '#575c56', grass: '#515f3b', meadow: '#56663c', meadowWarm: '#787040', petal: '#a8aca0',
+    trunk: '#3a3c32', leaf: '#3d4c2d', leafLight: '#4a5a36', walls: ['#a8a08e', '#9a8c80', '#909290', '#aca284'], roofs: ['#5a4440', '#444c54', '#504a54', '#6a5040'],
+    stone: '#666a62', water: '#4e5a58', glint: '#a8aca0', window: '#ffc27a', windowWarm: '#ffaa66', windowDark: '#3a3e38', lamp: '#ffd49a',
+    star: '#474d42', moon: '#a8aca0', cloud: '#5a6052', cloudShade: '#3e443a', cloudFog: 0.6,
+    castle: '#525a58', castleRoof: '#363e40', rock: '#44443e', ember: '#80361a', emberFog: 0.2, smoke: '#5a5e56', ruin: '#62665e', moss: '#4a5a3c', rune: '#a0c8d0', bird: '#262a26', spirit: '#c8e0c8', snow: '#a8b0a8',
+    aerial: 1.1, light: 0.55, night: null,
   },
 });
 
@@ -63,12 +63,14 @@ const hex = value => Color3.FromHexString(value);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export const aerial = distance => Math.min(1, 1 - Math.exp(-Math.max(0, distance - 12) / 72));
+const valleyFloor = distance => -8 * smooth(8.5, 20, distance) + 15 * smooth(24, 112, distance);
+export const valleyMist = (x, y, z) => { const d = Math.hypot(x, z); return Math.exp(-Math.max(0, y - valleyFloor(d) - 1) * 0.3) * smooth(14, 60, d) * (1 - smooth(112, 150, d)); };
 
 function createShape() {
-  const shape = { positions: [], indices: [], roles: [], shades: [], fogs: [], thresholds: [] };
+  const shape = { positions: [], indices: [], roles: [], shades: [], fogs: [], mists: [], thresholds: [] };
   shape.vertex = (x, y, z, role, shade = 1, threshold = 0) => {
     shape.positions.push(x, y, z); shape.roles.push(role); shape.shades.push(shade); shape.thresholds.push(threshold);
-    shape.fogs.push(aerial(Math.hypot(x, z))); return shape.roles.length - 1;
+    shape.fogs.push(aerial(Math.hypot(x, z))); shape.mists.push(valleyMist(x, y, z)); return shape.roles.length - 1;
   };
   shape.quad = (a, b, c, d) => shape.indices.push(a, b, c, a, c, d);
   shape.tri = (a, b, c) => shape.indices.push(a, b, c);
@@ -612,29 +614,38 @@ function toMesh(shape, name, scene, parent, material) {
   return mesh;
 }
 
+const tones = new Map(), air = new Color3();
+const tone = value => { let color = tones.get(value); if (!color) { color = hex(value); tones.set(value, color); } return color; };
+
 export function vistaColor(palette, shape, i, out, glow) {
   const role = shape.roles[i], shade = shape.shades[i];
   let color;
   if (role === 'sky') {
     const y = shape.positions[i * 3 + 1] / 180, x = shape.positions[i * 3] / 180, z = shape.positions[i * 3 + 2] / 180;
-    const low = hex(palette.horizon), mid = hex(palette.high), high = hex(palette.zenith), below = hex(palette.below);
+    const low = tone(palette.horizon), mid = tone(palette.high), high = tone(palette.zenith), below = tone(palette.below);
     color = y < 0 ? Color3.Lerp(low, below, smooth(0, -0.2, y)) : y < 0.35 ? Color3.Lerp(low, mid, smooth(0, 0.35, y)) : Color3.Lerp(mid, high, smooth(0.35, 0.95, y));
     const toward = Math.max(0, (x * glow.x + z * glow.z) / Math.max(0.001, Math.hypot(x, z)));
-    color = Color3.Lerp(color, hex(palette.glow), toward ** 3 * (1 - smooth(0, 0.7, y)) * 0.7);
+    color = Color3.Lerp(color, tone(palette.glow), toward ** 3 * (1 - smooth(0, 0.7, y) * 0.75) * (palette.glowStrength ?? 0.7));
   } else if (role === 'window' || role === 'windowWarm') {
     const lit = shape.thresholds[i] < glow.lit;
-    color = hex(lit ? palette[role] : palette.windowDark);
+    color = tone(lit ? palette[role] : palette.windowDark);
   } else if (role === 'cloud' || role === 'cloudShade') {
-    color = Color3.Lerp(hex(palette.cloudShade), hex(palette.cloud), shape.thresholds[i]).scale(shade);
+    color = Color3.Lerp(tone(palette.cloudShade), tone(palette.cloud), shape.thresholds[i]).scale(shade);
   } else if (role === 'star') {
-    color = Color3.Lerp(hex(palette.high), hex(palette.star), shape.thresholds[i] < glow.stars ? shade : 0);
+    color = Color3.Lerp(tone(palette.high), tone(palette.star), shape.thresholds[i] < glow.stars ? shade : 0);
   } else {
     const key = role.replace(/\d$/, ''), index = Number(role.slice(-1));
     const value = Array.isArray(palette[key]) ? palette[key][index] : palette[role] ?? SHELL_ROLES[role] ?? palette.stone;
-    color = hex(value).scale(shade);
+    color = tone(value).scale(shade);
   }
-  const fog = role === 'ember' ? shape.fogs[i] * (palette.emberFog ?? 0.45) : ['lamp', 'spirit', 'window', 'windowWarm', 'glint', 'star', 'moon', 'rune'].includes(role) ? shape.fogs[i] * 0.45 : role.startsWith('cloud') ? shape.fogs[i] * palette.cloudFog : shape.fogs[i] * (palette.aerial ?? 1);
-  Color3.LerpToRef(color, hex(palette.haze), Math.min(1, fog * 0.82), out);
+  const glowing = ['lamp', 'spirit', 'window', 'windowWarm', 'glint', 'star', 'moon', 'rune'].includes(role), ground = role !== 'ember' && !glowing && !role.startsWith('cloud');
+  const fog = role === 'ember' ? shape.fogs[i] * (palette.emberFog ?? 0.45) : glowing ? shape.fogs[i] * 0.45 : role.startsWith('cloud') ? shape.fogs[i] * palette.cloudFog : shape.fogs[i] * (palette.aerial ?? 1);
+  if (ground && palette.mist) Color3.LerpToRef(color, tone(palette.mist), (shape.mists?.[i] ?? 0) * palette.mistStrength, color);
+  const x = shape.positions[i * 3], z = shape.positions[i * 3 + 2], sunward = Math.max(0, (x * glow.x + z * glow.z) / Math.max(0.001, Math.hypot(x, z))) ** 16;
+  const amount = Math.min(1, fog * 0.82);
+  Color3.LerpToRef(tone(palette.haze), tone(palette.hazeSun ?? palette.haze), sunward, air);
+  Color3.LerpToRef(color, air, amount, out);
+  if (ground) { const grey = 0.2126 * out.r + 0.7152 * out.g + 0.0722 * out.b; air.set(grey, grey, grey); Color3.LerpToRef(out, air, amount * 0.2, out); }
   return out;
 }
 
