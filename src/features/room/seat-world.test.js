@@ -446,3 +446,14 @@ test('cloud puffs split into a sunlit side and a shaded side by the direction of
   assert.ok(towardLit / toward > awayLit / away + 0.2, `lit ${(towardLit / toward).toFixed(2)} toward the sun, ${(awayLit / away).toFixed(2)} away`);
   engine.dispose();
 });
+
+test('the meadow ruin stumps wear thick moss caps as wide as the stone, in warm sandstone by day', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
+  const caps = landBoxes(shape).filter(box => box.role === 'moss' && box.tall > 0.18 && box.tall < 0.26 && box.long >= 1);
+  assert.ok(caps.length >= 20, `${caps.length} thick moss caps`);
+  const ruin = VISTA_THEMES.day.ruin, [r, , b] = [1, 3, 5].map(k => parseInt(ruin.slice(k, k + 2), 16));
+  assert.ok(r - b > 40, `day ruin ${ruin} reads warm`);
+  engine.dispose();
+});

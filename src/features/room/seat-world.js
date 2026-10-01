@@ -24,7 +24,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffffff', cloudShade: '#c4d3e6',
-    castle: '#687088', castleRoof: '#3a5a74', rock: '#5c3e38', ember: '#e2683c', smoke: '#d0cac6', ruin: '#b4ab98', moss: '#6f9a48', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
+    castle: '#687088', castleRoof: '#3a5a74', rock: '#5c3e38', ember: '#e2683c', smoke: '#d0cac6', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
     light: 0, night: null,
   },
   rain: {
@@ -289,7 +289,7 @@ function buildRuins(shape) {
       const turn = yaw + random(), tone = 0.9 + random() * 0.15;
       for (const offset of [0, Math.PI / 4]) shape.box(px, py + h / 2, pz, w, h, w, turn + offset, 'ruin', tone - offset * 0.08);
       shape.box(px, py + 0.4, pz, w + 0.3, 0.24, w + 0.3, turn, 'ruin', tone * 0.85);
-      shape.box(px + 0.12, py + h + 0.18, pz - 0.08, w * 0.55, 0.36, w * 0.5, turn + 0.4, 'ruin', tone * 1.05); shape.box(px - 0.1, py + h + 0.02, pz + 0.1, w * 0.85, 0.1, w * 0.8, turn, 'moss');
+      shape.box(px + 0.12, py + h + 0.18, pz - 0.08, w * 0.55, 0.36, w * 0.5, turn + 0.4, 'ruin', tone * 1.05); shape.box(px - 0.1, py + h + 0.04, pz + 0.1, w * 1.05, 0.22, w * 1.0, turn, 'moss'); shape.box(px, py + 0.55, pz, w + 0.4, 0.12, w + 0.4, turn, 'moss', 0.9);
       shardTop(shape, px + 0.15, py + h, pz - 0.1, w * 0.4, 0.35 + random() * 0.4);
       const drape = Math.max(0.7, h * (0.45 + random() * 0.35));
       shape.box(px + Math.sin(turn) * w * 0.52, py + h - drape / 2, pz + Math.cos(turn) * w * 0.52, 0.52, drape, 0.08, turn, 'moss', 0.85);
