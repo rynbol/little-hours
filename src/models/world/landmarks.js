@@ -3,7 +3,7 @@ import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { heightAt, noise2, ridged, smooth } from '../../core/world-terrain.js';
-import { WIND, RIDGE_LIFT_GLSL } from './terrain-paint.js';
+import { WIND, RIDGE_LIFT_GLSL, RIDGE_UNIFORMS, applyRidges } from './terrain-paint.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 import { WORLD_GLSL, AIR_UNIFORMS, applyAir, followEye } from './world-glsl.js';
 import { SKY_GLSL, SKY_UNIFORMS, applySkyTheme } from './sky.js';
@@ -262,7 +262,7 @@ void main() {
   vec3 color = albedo * mix(shadowTint * shadowLift + ambient * (.55 + .9 * snowy), sunColor * sunStrength, lit);
   float rim = pow(1. - clamp(dot(n, toEye), 0., 1.), 3.) * clamp(dot(-toEye, sun) * 1.5, 0., 1.) * (.2 + .8 * snowy);
   color += sunColor * sunStrength * (rim * .55 + albedo * vSail * pow(max(dot(-toEye, sun), 0.), 2.) * .5);
-  color = liftRidges(worldAir(color, mix(vWorld, eye, .5 * snowy - .7 * wet), eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), distance(eye, vWorld));
+  color = liftRidges(worldAir(color, mix(vWorld, eye, .5 * snowy - .7 * wet), eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), vWorld.y, distance(eye, vWorld));
   vec3 view = normalize(vec3(toEye.x, 0., toEye.z)), sunFlat = vec3(sun.x, 0., sun.z), sunAcross = normalize(sunFlat - view * dot(sunFlat, view) + vec3(0., 1e-4, 0.));
   float sunSide = (.5 + .5 * smoothstep(.05, .55, dot(n, sunAcross))) * (.6 + .4 * pow(1. - clamp(dot(n, toEye), 0., 1.), 1.2));
   color = mix(color, mix(sunColor, vec3(1.), .4), snowy * sunRim * sunSide * .7);
@@ -350,7 +350,7 @@ function landmarkMesh(name, scene, root, data, material) {
 
 export function createWorldLandmarks(scene, { root, still }) {
   const uniforms = ['world', 'view', 'viewProjection', ...AIR_UNIFORMS, ...LIGHT_COLORS, ...LIGHT_FLOATS];
-  const solidPaint = new ShaderMaterial('world-landmark-paint', scene, { vertexSource: SOLID_VERTEX, fragmentSource: SOLID_FRAGMENT }, { attributes: ['position', 'normal', 'color', 'uv', 'spin'], uniforms: [...uniforms, 'lamp', 'snow', 'ridgeLight', 'ridgeLift', ...THEME_FLOATS] });
+  const solidPaint = new ShaderMaterial('world-landmark-paint', scene, { vertexSource: SOLID_VERTEX, fragmentSource: SOLID_FRAGMENT }, { attributes: ['position', 'normal', 'color', 'uv', 'spin'], uniforms: [...uniforms, 'lamp', 'snow', ...RIDGE_UNIFORMS, ...THEME_FLOATS] });
   const veilPaint = new ShaderMaterial('world-landmark-veil-paint', scene, { vertexSource: VEIL_VERTEX, fragmentSource: VEIL_FRAGMENT }, { attributes: ['position', 'color', 'uv', 'uv2'], uniforms: [...new Set([...uniforms, ...CLOUD_COLORS, ...SKY_UNIFORMS, 'wet', 'mist', 'mistStrength'])], needAlphaBlending: true });
   solidPaint.backFaceCulling = false; veilPaint.backFaceCulling = false; veilPaint.disableDepthWrite = true;
   const paints = [solidPaint, veilPaint];
@@ -372,7 +372,7 @@ export function createWorldLandmarks(scene, { root, still }) {
       applySkyTheme(veilPaint, atmosphere);
       for (const key of CLOUD_COLORS) veilPaint.setColor3(key, Color3.FromHexString(atmosphere[key]));
       solidPaint.setColor3('snow', Color3.FromHexString(atmosphere.snow));
-      solidPaint.setColor3('ridgeLight', Color3.FromHexString(atmosphere.ridgeLight)); solidPaint.setFloat('ridgeLift', atmosphere.ridgeLift);
+      applyRidges(solidPaint, atmosphere);
       const light = themeLight(atmosphere);
       for (const key of THEME_FLOATS) solidPaint.setFloat(key, light[key]);
       veilPaint.setFloat('wet', light.wet);

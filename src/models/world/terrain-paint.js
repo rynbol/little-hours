@@ -5,15 +5,27 @@ import { WORLD_GLSL, AIR_UNIFORMS, applyAir, followEye } from './world-glsl.js';
 
 const GROUND_PALETTE = Object.freeze(['grass', 'grassLight', 'grassWarm', 'grassTip', 'grassFar', 'flowerWhite', 'flowerYellow', 'flowerLilac', 'forestFloor', 'rock', 'rockDark', 'dirt', 'sand', 'snow']);
 const GROUND_LIGHT = Object.freeze(['sunColor', 'skyAmbient', 'groundAmbient', 'shadowTint']);
-export const GROUND_UNIFORMS = Object.freeze([...AIR_UNIFORMS, ...GROUND_PALETTE, ...GROUND_LIGHT, 'sunStrength', 'shadowLift', 'crestGlow', 'gusts', 'ridgeLight', 'ridgeLift']);
+export const RIDGE_UNIFORMS = Object.freeze(['ridgeLight', 'ridgeLift', 'ridgeFog']);
+export const GROUND_UNIFORMS = Object.freeze([...AIR_UNIFORMS, ...GROUND_PALETTE, ...GROUND_LIGHT, 'sunStrength', 'shadowLift', 'crestGlow', 'gusts', ...RIDGE_UNIFORMS]);
 export const WIND = Object.freeze([0.8, -0.6]);
 export const CLOUD_SHADOW = Object.freeze({ size: 2600, depth: 0.42 });
 export const FAR_ROCK = Object.freeze({ from: 1000, to: 2000, until: 4800, fade: 0.55 });
 
 const glslFloat = value => value.toFixed(3);
 
-export const RIDGE_LIFT_GLSL = `uniform vec3 ridgeLight; uniform float ridgeLift;
-vec3 liftRidges(vec3 color, float dist) { return mix(color, ridgeLight, ridgeLift * smoothstep(700., 1500., dist) * (1. - smoothstep(2800., 4800., dist))); }`;
+const [NEAR_RANGE, MID_RANGE] = WORLD.ranges;
+export const RIDGE_FOG = Object.freeze({ crest: 1.2, clear: 0.3, from: 0.75, to: 1.15 });
+export const RIDGE_LIFT_GLSL = `uniform vec3 ridgeLight; uniform float ridgeLift, ridgeFog;
+vec3 liftRidges(vec3 color, float height, float dist) {
+  float crest = ${glslFloat(RIDGE_FOG.crest)} * mix(${glslFloat(NEAR_RANGE.rise)}, ${glslFloat(MID_RANGE.rise)}, smoothstep(${glslFloat(NEAR_RANGE.crest + NEAR_RANGE.width * 0.6)}, ${glslFloat(MID_RANGE.crest - MID_RANGE.width * 0.6)}, dist)), rise = height / crest;
+  float band = smoothstep(700., 1500., dist);
+  color = mix(color, ridgeLight, ridgeLift * band * (1. - smoothstep(2800., 4800., dist)) * (1. - smoothstep(${glslFloat(RIDGE_FOG.clear)}, .95, rise)));
+  return mix(color, fogFar, ridgeFog * band * smoothstep(${glslFloat(RIDGE_FOG.from)}, ${glslFloat(RIDGE_FOG.to)}, rise));
+}`;
+
+export function applyRidges(paint, atmosphere) {
+  paint.setColor3('ridgeLight', Color3.FromHexString(atmosphere.ridgeLight)); paint.setFloat('ridgeLift', atmosphere.ridgeLift); paint.setFloat('ridgeFog', atmosphere.ridgeFog);
+}
 
 export const GROUND_GLSL = `${WORLD_GLSL}
 uniform vec3 eye, sun, fogNear, fogFar, fogSun, sunColor, skyAmbient, groundAmbient, shadowTint;
@@ -92,14 +104,14 @@ void main() {
   color *= 1. + smoothstep(.36, .16, cover) * smoothstep(200., 500., dist) * (1. - smoothstep(3000., 6000., dist)) * .2;
   float crest = pow(1. - abs(dot(n, normalize(eye - vWorld))), 2.) * smoothstep(.3, .7, dot(n, sun)) * (1. - shade);
   color += sunColor * sunStrength * crest * crestGlow * ground.rgb * 1.6;
-  gl_FragColor = vec4(liftRidges(worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), dist), 1.);
+  gl_FragColor = vec4(liftRidges(worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), vWorld.y, dist), 1.);
 }`;
 
 export function applyGround(paint, atmosphere) {
   applyAir(paint, atmosphere);
   for (const key of [...GROUND_PALETTE, ...GROUND_LIGHT]) paint.setColor3(key, Color3.FromHexString(atmosphere[key]));
   paint.setFloat('sunStrength', atmosphere.sunStrength); paint.setFloat('shadowLift', atmosphere.shadowLift); paint.setFloat('crestGlow', atmosphere.crestGlow);
-  paint.setColor3('ridgeLight', Color3.FromHexString(atmosphere.ridgeLight)); paint.setFloat('ridgeLift', atmosphere.ridgeLift);
+  applyRidges(paint, atmosphere);
 }
 
 export function createTerrainPaint(scene, { still = false } = {}) {

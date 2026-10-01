@@ -176,7 +176,7 @@ test('dusk swaps in its own foliage and a still world never advances the wind', 
   trees.setTheme(WORLD_ATMOSPHERES.dusk);
   const color = key => trees.paint._colors3[key].toHexString().toLowerCase();
   assert.equal(color('leafCrown'), '#98ac4c');
-  assert.equal(color('leafBack'), '#ffcf6a');
+  assert.equal(color('leafBack'), '#f4d27a');
   assert.equal(color('leafUnder'), WORLD_ATMOSPHERES.dusk.leafUnder);
   assert.equal(color('sunColor'), WORLD_ATMOSPHERES.dusk.sunColor);
   assert.equal(trees.paint._floats.sunStrength, WORLD_ATMOSPHERES.dusk.sunStrength);

@@ -42,26 +42,26 @@ test('far haze is blue-grey in day and dusk, so each ridge steps from green towa
 
 test('only dusk has a golden hour, so the day and rain skies keep their colours', () => {
   assert.equal(WORLD_ATMOSPHERES.dusk.goldenHour, 1);
-  assert.equal(WORLD_ATMOSPHERES.dusk.sunGlow, '#fff1c3');
+  assert.equal(WORLD_ATMOSPHERES.dusk.sunGlow, '#ffbe68');
   assert.equal(WORLD_ATMOSPHERES.day.goldenHour, 0);
   assert.equal(WORLD_ATMOSPHERES.rain.goldenHour, 0);
   assert.equal(Math.round(hue(WORLD_ATMOSPHERES.dusk.horizon)), 33);
   assert.ok(hsv(WORLD_ATMOSPHERES.dusk.horizon).s > 0.4, 'the band near the sun is gold, not grey');
 });
 
-test('the dusk air keeps its amber in a glare around the sun and scatters it over the land toward the sun only, while day and rain keep their broad glare and no scatter', () => {
-  assert.deepEqual(Object.fromEntries(Object.entries(WORLD_ATMOSPHERES).map(([theme, air]) => [theme, [air.sunFocus, air.sunScatter]])), { day: [10, 0], dusk: [36, 0.6], rain: [10, 0] });
-  assert.ok(AIR_UNIFORMS.includes('sunFocus') && AIR_UNIFORMS.includes('sunScatter') && !AIR_UNIFORMS.includes('sunHaze'));
+test('the dusk air keeps its amber in a tight glare that stays in the low valley air under the sun, so the ridges stay cool, while day and rain keep their broad glare and no scatter', () => {
+  assert.deepEqual(Object.fromEntries(Object.entries(WORLD_ATMOSPHERES).map(([theme, air]) => [theme, [air.sunFocus, air.sunScatter, air.glareFloor, air.glareHeight]])), { day: [10, 0, 0.2, 450], dusk: [60, 0.9, 0, 110], rain: [10, 0, 0.2, 300] });
+  assert.ok(['sunFocus', 'sunScatter', 'glareFloor', 'glareHeight'].every(name => AIR_UNIFORMS.includes(name)) && !AIR_UNIFORMS.includes('sunHaze'));
   const scene = new Scene(new NullEngine()), paint = new ShaderMaterial('air', scene, { vertexSource: 'void main() {}', fragmentSource: 'void main() {}' }, { uniforms: [...AIR_UNIFORMS] });
   applyAir(paint, WORLD_ATMOSPHERES.dusk);
-  assert.deepEqual([paint._floats.sunFocus, paint._floats.sunScatter], [36, 0.6]);
+  assert.deepEqual([paint._floats.sunFocus, paint._floats.sunScatter, paint._floats.glareFloor, paint._floats.glareHeight], [60, 0.9, 0, 110]);
   applyAir(paint, WORLD_ATMOSPHERES.day);
-  assert.deepEqual([paint._floats.sunFocus, paint._floats.sunScatter], [10, 0]);
+  assert.deepEqual([paint._floats.sunFocus, paint._floats.sunScatter, paint._floats.glareFloor, paint._floats.glareHeight], [10, 0, 0.2, 450]);
   scene.dispose();
 });
 
 test('day and dusk suns carry a warm glow and rain has none', () => {
-  assert.deepEqual(Object.fromEntries(Object.entries(WORLD_ATMOSPHERES).map(([theme, air]) => [theme, [air.sunGlow, air.sunGlowStrength]])), { day: ['#ffe2bc', 0.6], dusk: ['#fff1c3', 0.8], rain: ['#6a6e5e', 0] });
+  assert.deepEqual(Object.fromEntries(Object.entries(WORLD_ATMOSPHERES).map(([theme, air]) => [theme, [air.sunGlow, air.sunGlowStrength]])), { day: ['#ffe2bc', 0.6], dusk: ['#ffbe68', 0.8], rain: ['#6a6e5e', 0] });
   const { r, b } = Color3.FromHexString(WORLD_ATMOSPHERES.dusk.sunColor);
   assert.ok(r - b < 0.4, 'the dusk sun lights the meadow gold, not orange');
 });
@@ -89,7 +89,7 @@ test('the sky dome takes each theme\'s colours and sun', () => {
   const scene = new Scene(new NullEngine()), sky = createWorldSky(scene, new TransformNode('root', scene)), paint = sky.sky.material;
   sky.setTheme(WORLD_ATMOSPHERES.dusk);
   assert.equal(paint._colors3.horizon.toHexString().toLowerCase(), '#fcbe74');
-  assert.equal(paint._colors3.sunGlow.toHexString().toLowerCase(), '#fff1c3');
+  assert.equal(paint._colors3.sunGlow.toHexString().toLowerCase(), '#ffbe68');
   assert.equal(paint._floats.goldenHour, 1);
   assert.equal(paint._colors3.zenith.toHexString().toLowerCase(), '#7e8a8c');
   assert.equal(paint._floats.glowStrength, 0.9);

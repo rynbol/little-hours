@@ -8,6 +8,7 @@ import '@babylonjs/core/Shaders/ShadersInclude/instancesDeclaration.js';
 import '@babylonjs/core/Shaders/ShadersInclude/instancesVertex.js';
 import { WORLD, riverDistance, pathDistance, smooth, noise2 } from '../../core/world-terrain.js';
 import { WORLD_GLSL, AIR_UNIFORMS, applyAir, followEye } from './world-glsl.js';
+import { RIDGE_LIFT_GLSL, RIDGE_UNIFORMS, applyRidges } from './terrain-paint.js';
 
 export const TREE_BANDS = Object.freeze([
   Object.freeze({ from: 25, to: 450, spacing: 8, size: 1, clump: 1, spread: 1, lone: 1, behind: 450, gather: 1, fray: 0 }),
@@ -240,6 +241,8 @@ uniform vec3 eye, sun, sunColor, skyAmbient, groundAmbient, shadowTint, fogNear,
 uniform vec3 leafTop, leafUnder, leafBack, leafCrown, needleTop, needleUnder, bark;
 uniform float sunStrength, shadowLift, fogDensity, fogHeight, time;
 ${WORLD_GLSL}
+${RIDGE_LIFT_GLSL}
+vec3 treeAir(vec3 color) { return liftRidges(worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), vWorld.y, distance(eye, vWorld)); }
 float leaves(vec2 uv, float seed) {
   vec2 g = uv * 7. + seed * 31.7, cell = floor(g - .5);
   float best = 0.;
@@ -266,8 +269,8 @@ vec3 foliage(vec3 n, vec3 v, float ao, float needle, float tint, float leaf) {
   color = mix(color, crown * leaf, smoothstep(.12, .75, n.y) * mix(.5, 1., ao) * (1. - light * .6) * .9);
   float edge = pow(1. - abs(dot(v, n)), 3.);
   float through = pow(clamp(dot(-v, sun), 0., 1.), 4.) * (.3 + .7 * edge) * (1. - wrap * .5) * .6 * mix(.5, 1., ao);
-  float rim = edge * wrap * .25;
-  return color + leafBack * sunStrength * (through + rim) * leaf;
+  float rim = pow(1. - abs(dot(v, n)), 1.6) * smoothstep(.4, .9, dot(n, normalize(sun + vec3(0., 1., 0.)))) * .8;
+  return mix(color, leafBack * lit * leaf, rim) + leafBack * sunStrength * through * leaf;
 }
 void main() {
   float part = vPart.b, needle = step(.37, part) * (1. - step(.62, part)) + step(.87, part);
@@ -283,7 +286,7 @@ void main() {
     if (needle > .5) {
       float t = clamp((c.y - 1.8) / 12.4, 0., 1.), tier = fract(-t * 6.5 + seed), w = 3.5 * pow(1. - t, .95) * (.74 + .26 * tier) * (.92 + .16 * worldNoise(c * 2.3 + seed * 11.));
       float nx = c.x / max(w, .05); h = 1. - nx * nx;
-      if (c.y < 1.8 || h < 0.) { if (abs(c.x) < .28 && c.y < 3.) { color = bark * shade * 1.3; gl_FragColor = vec4(worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), 1.); return; } discard; }
+      if (c.y < 1.8 || h < 0.) { if (abs(c.x) < .28 && c.y < 3.) { color = bark * shade * 1.3; gl_FragColor = vec4(treeAir(color), 1.); return; } discard; }
       n = normalize(vRight * nx * .85 + vec3(0., .25 + .45 * (1. - tier), 0.) + facing * sqrt(h));
       ao = clamp(.3 + .45 * sqrt(1. - h) + .25 * t + .2 * (1. - tier), 0., 1.);
     } else {
@@ -297,7 +300,7 @@ void main() {
         clump(c, vec2(-1.4, 5.5), 2.3, seed, best); clump(c, vec2(1.5, 5.7), 2.3, seed, best); clump(c, vec2(.4, 9.3), 1.7, seed, best);
       }
       h = best.x;
-      if (h < 0.) { if (abs(c.x) < .42 - c.y * .03 && c.y < 4.6) { color = bark * mix(shade * 1.25, lit, .25); gl_FragColor = vec4(worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), 1.); return; } discard; }
+      if (h < 0.) { if (abs(c.x) < .42 - c.y * .03 && c.y < 4.6) { color = bark * mix(shade * 1.25, lit, .25); gl_FragColor = vec4(treeAir(color), 1.); return; } discard; }
       vec2 dc = (c - vec2(0., 6.6)) / 5.2;
       vec3 local = normalize(normalize(vec3(dc, sqrt(max(1. - dot(dc, dc), .05)))) * .55 + normalize(vec3(best.yz, sqrt(h))) * .45);
       n = normalize(vRight * local.x + vec3(0., local.y, 0.) + facing * local.z);
@@ -306,8 +309,8 @@ void main() {
     vec2 turned = mat2(.8, -.6, .6, .8) * c;
     float mottle = mix(.86 + .2 * worldNoise(turned * 1.7 + seed * 7.) + .1 * worldNoise(turned * 4.1 - seed * 3.), 1., smoothstep(350., 1100., dist));
     color = foliage(n, v, ao, needle, vSeed, mottle);
-    float back = pow(clamp(dot(-v, sun), 0., 1.), 2.), band = smoothstep(120., 260., dist) * (1. - smoothstep(900., 1600., dist));
-    color += (fogSun * .55 + leafBack * .2) * sunStrength * back * band * (.1 + .55 * (1. - sqrt(max(h, 0.))) * clamp(n.y + .4, 0., 1.));
+    float back = pow(clamp(dot(-v, sun), 0., 1.), 2.), band = smoothstep(40., 180., dist) * (1. - smoothstep(900., 1600., dist));
+    color = mix(color, leafBack * lit, back * band * .7 * (1. - sqrt(max(h, 0.))) * clamp(n.y + .4, 0., 1.));
     vec3 field = mix(mix(leafUnder, needleUnder, needle) * (shade * 1.35 + .25), mix(leafCrown, needleTop * lit, needle), .32);
     color = mix(color, field, smoothstep(300., 1500., dist) * .8);
   } else {
@@ -328,14 +331,14 @@ void main() {
     }
     color = foliage(normalize(vNormal), v, vPart.r, needle, vSeed, leaf);
   }
-  gl_FragColor = vec4(worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), 1.);
+  gl_FragColor = vec4(treeAir(color), 1.);
 }`;
 
 export function createWorldTrees(scene, { root, still, rings }) {
   const planted = plantTrees(rings);
   const paint = new ShaderMaterial('world-trees-paint', scene, { vertexSource: TREE_VERTEX, fragmentSource: TREE_FRAGMENT }, {
     attributes: ['position', 'normal', 'color', 'uv'],
-    uniforms: ['world', 'viewProjection', ...AIR_UNIFORMS, 'sunStrength', 'shadowLift', ...LIGHT_COLORS, ...FOLIAGE_COLORS],
+    uniforms: ['world', 'viewProjection', ...AIR_UNIFORMS, ...RIDGE_UNIFORMS, 'sunStrength', 'shadowLift', ...LIGHT_COLORS, ...FOLIAGE_COLORS],
   });
   paint.backFaceCulling = false;
   followEye(scene, paint, still);
@@ -379,7 +382,7 @@ export function createWorldTrees(scene, { root, still, rings }) {
   return {
     planted, paint, meshes: tiers.map(tier => tier.mesh),
     setTheme(atmosphere) {
-      applyAir(paint, atmosphere);
+      applyAir(paint, atmosphere); applyRidges(paint, atmosphere);
       for (const key of [...FOLIAGE_COLORS, ...LIGHT_COLORS]) paint.setColor3(key, Color3.FromHexString(atmosphere[key]));
       paint.setFloat('sunStrength', atmosphere.sunStrength); paint.setFloat('shadowLift', atmosphere.shadowLift);
     },
