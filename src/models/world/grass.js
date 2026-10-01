@@ -8,13 +8,15 @@ import { heightAt, WORLD } from '../../core/world-terrain.js';
 import { TERRAIN_RINGS } from './terrain-mesh.js';
 import { GROUND_GLSL, GROUND_UNIFORMS, applyGround } from './terrain-paint.js';
 import { followEye } from './world-glsl.js';
+import { createWorldRocks, MEADOW_ROCKS, rockClearings } from './rocks.js';
 
 export const GRASS = Object.freeze({
   layers: Object.freeze([
     Object.freeze({ period: 16, blades: 12000, reach: 8, width: 0.022, height: 0.55 }),
     Object.freeze({ period: 48, blades: 20000, reach: 24, width: 0.04, height: 0.52 }),
+    Object.freeze({ period: 128, blades: 40000, reach: 64, width: 0.09, height: 0.56 }),
   ]),
-  step: 2, texels: 41, recentre: 8,
+  step: 2, texels: 69, recentre: 8,
   clearing: Object.freeze({ halfWidth: 6.6, halfDepth: 5.2 }),
 });
 
@@ -70,11 +72,11 @@ export function grassBlades(layers = GRASS.layers) {
   return { positions, blade, indices };
 }
 
-const perLayer = key => `(inner ? ${GRASS.layers[0][key].toFixed(3)} : ${GRASS.layers[1][key].toFixed(3)})`;
+const perLayer = key => `(blade.w < .5 ? ${GRASS.layers[0][key].toFixed(3)} : blade.w < 1.5 ? ${GRASS.layers[1][key].toFixed(3)} : ${GRASS.layers[2][key].toFixed(3)})`;
 
 const GRASS_VERTEX = `precision highp float;
 attribute vec3 position; attribute vec4 blade;
-uniform mat4 world, viewProjection; uniform sampler2D ground; uniform vec4 groundGrid;
+uniform mat4 world, viewProjection; uniform sampler2D ground; uniform vec4 groundGrid, stones[${MEADOW_ROCKS.length}];
 varying vec3 vColor;
 ${GROUND_GLSL}
 vec4 groundAt(vec2 p) {
@@ -84,22 +86,26 @@ vec4 groundAt(vec2 p) {
   return vec4(normalize(mix(mix(a.xyz, b.xyz, f.x), mix(c.xyz, d.xyz, f.x), f.y)), h);
 }
 void main() {
-  bool inner = blade.w < .5;
+  bool inner = blade.w < .5, last = blade.w > 1.5;
   float period = ${perLayer('period')}, reach = ${perLayer('reach')};
   vec2 base = position.xz + period * floor((eye.xz - position.xz) / period + .5);
   float dist = length(base - eye.xz), t = position.y, seed = blade.z;
-  float keep = inner ? 1. - smoothstep(reach * .55, reach, dist) : 1. - smoothstep(reach * .35, reach, dist);
+  float keep = inner ? 1. - smoothstep(reach * .55, reach, dist) : 1. - smoothstep(reach * .45, reach, dist);
   float grow = clamp((keep - blade.y) * 5., 0., 1.);
-  if (keep <= blade.y) { vColor = vec3(0.); gl_Position = vec4(2., 2., 2., 1.); return; }
+  vec4 aim = viewProjection * world * vec4(base.x, eye.y - 1.5, base.y, 1.);
+  if (keep <= blade.y || aim.w < -1. || abs(aim.x) > aim.w * 1.1 + 1.5) { vColor = vec3(0.); gl_Position = vec4(2., 2., 2., 1.); return; }
   vec4 surface = groundAt(base); vec3 n = surface.xyz;
   grow *= smoothstep(.76, .86, n.y) * smoothstep(${(WORLD.river.width * 0.8).toFixed(1)}, ${(WORLD.river.width * 1.1).toFixed(1)}, riverOffset(base)) * (1. - smoothstep(330., 380., surface.w));
   grow *= 1. - step(abs(base.x), ${GRASS.clearing.halfWidth.toFixed(2)}) * step(abs(base.y), ${GRASS.clearing.halfDepth.toFixed(2)});
   grow *= smoothstep(.55, 1.5, pathOffset(base));
+  for (int i = 0; i < ${MEADOW_ROCKS.length}; i++) grow *= smoothstep(stones[i].z * .8, stones[i].z, distance(base, stones[i].xy));
   float clump = .55 + .9 * worldNoise(base / 1.9 + 3.7);
-  float height = ${perLayer('height')} * (.55 + .9 * seed) * clump * grow;
-  float width = ${perLayer('width')} * (.75 + .5 * fract(seed * 7.31)) * grow;
+  float bloom = step(fract(seed * 91.7), smoothstep(.6, .78, worldNoise(base / 7. + 17.3)) * .3) * (1. - smoothstep(40., 55., dist));
+  float height = ${perLayer('height')} * (.55 + .9 * seed) * mix(clump, 1.2, bloom) * grow, head = (.028 + .005 * dist) * grow;
+  float width = mix(${perLayer('width')} * (.75 + .5 * fract(seed * 7.31)) * grow, head * (t < .25 ? .2 : .9), bloom);
+  t = mix(t, 1. - head / max(height, .05) * (t < .25 ? 1. : t < .75 ? .5 : 0.), bloom);
   vec2 view = normalize(base - eye.xz + vec2(1e-3)), across = vec2(-view.y, view.x);
-  float turn = seed * 43.7; vec2 face = normalize(mix(vec2(cos(turn), sin(turn)), across, .6));
+  float turn = seed * 43.7; vec2 face = normalize(mix(vec2(cos(turn), sin(turn)), across, mix(.6, 1., bloom)));
   float gust = groundGust(base), bend = t * t * height;
   float flutter = sin(time * 2.6 + seed * 31.) * gusts * .05;
   vec2 lean = vec2(cos(turn * 1.7), sin(turn * 1.7)) * .16 + windDir * (.34 + .34 * gust + flutter);
@@ -107,9 +113,11 @@ void main() {
   vec3 p = vec3(xz.x, surface.w - .04 + t * height * (1. - .18 * dot(lean, lean) * t), xz.y);
   vec3 soil = groundAlbedo(base, surface.w, n, 0., dist).rgb, field = soil * mix(.84, 1.1, worldNoise(base / 2.7 + 9.1)) * (.94 + .12 * fract(seed * 13.7));
   vec3 tip = mix(field, grassTip, .45 + .55 * fract(seed * 5.3));
-  vec3 color = t < .5 ? mix(field * vec3(.6, .7, .62), field, t / .5) : mix(field, tip, smoothstep(.5, 1., t));
+  vec3 color = t < .5 ? mix(field * vec3(.3, .42, .28), field, t / .5) : mix(field, tip, smoothstep(.5, 1., t));
+  vec3 petal = fract(seed * 37.1) < .1 ? flowerLilac : worldNoise(base / 19. + 41.) < .42 ? flowerWhite : flowerYellow;
+  color = mix(color, petal * (t < .85 ? .82 : 1.), bloom);
   color *= 1. + .1 * smoothstep(.7, 1., gust) * t;
-  color = mix(color, soil, inner ? 0. : smoothstep(reach * .45, reach * .9, dist));
+  color = mix(color, soil, last ? smoothstep(reach * .7, reach * .98, dist) : 0.);
   vec4 worldPos = world * vec4(p, 1.);
   vec3 toward = normalize(worldPos.xyz - eye);
   color = color * groundLight(n, 0.) + sunColor * sunStrength * pow(max(dot(toward, sun), 0.), 3.) * t * t * .3 * soil;
@@ -122,9 +130,10 @@ varying vec3 vColor;
 void main() { gl_FragColor = vec4(vColor, 1.); }`;
 
 export function createWorldGrass(scene, { root, atmosphere, still }) {
-  const paint = new ShaderMaterial('world-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'blade'], uniforms: ['world', 'viewProjection', 'groundGrid', ...GROUND_UNIFORMS], samplers: ['ground'] });
+  const paint = new ShaderMaterial('world-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'blade'], uniforms: ['world', 'viewProjection', 'groundGrid', 'stones', ...GROUND_UNIFORMS], samplers: ['ground'] });
   paint.backFaceCulling = false;
   paint.setFloat('gusts', still ? 0 : 1);
+  paint.setArray4('stones', rockClearings());
   followEye(scene, paint, still);
   const grid = createGroundGrid(GRASS), texture = new RawTexture(grid.data, GRASS.texels, GRASS.texels, Constants.TEXTUREFORMAT_RGBA, scene, false, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE, Constants.TEXTURETYPE_FLOAT);
   texture.wrapU = texture.wrapV = Constants.TEXTURE_CLAMP_ADDRESSMODE;
@@ -147,9 +156,11 @@ export function createWorldGrass(scene, { root, atmosphere, still }) {
   const watch = scene.onBeforeRenderObservable.add(() => { const active = scene.activeCamera; if (active) follow(active.globalPosition.x, active.globalPosition.z); });
   mesh.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(watch); texture.dispose(); });
   applyGround(paint, atmosphere);
+  const rocks = createWorldRocks(scene, { root, still });
+  rocks.setTheme(atmosphere);
   return {
-    mesh, follow,
+    mesh, rocks: rocks.mesh, follow,
     get origin() { return grid.origin; },
-    setTheme: next => applyGround(paint, next),
+    setTheme: next => { applyGround(paint, next); rocks.setTheme(next); },
   };
 }

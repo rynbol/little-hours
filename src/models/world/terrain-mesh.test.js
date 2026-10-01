@@ -45,3 +45,8 @@ test('far mountain normals are averaged wider than the grid so slopes shade smoo
   assert.equal(Math.round(meshed * 1000) / 1000, 0.933);
   assert.ok(meshed > perStep + 0.05, `${meshed} vs ${perStep}`);
 });
+
+test('terrain vertices carry no rock moss and count as open ground, so the shared paint leaves them unchanged', () => {
+  const { colors } = terrainRing(0, [{ radius: 64, step: 8 }]);
+  for (let v = 0; v < colors.length / 4; v++) assert.deepEqual([colors[v * 4 + 2], colors[v * 4 + 3]], [0, 1]);
+});

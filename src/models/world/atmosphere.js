@@ -9,7 +9,7 @@ export const WORLD_ATMOSPHERES = Object.freeze({
     mist: '#bcd0cc', mistStrength: 0.35,
     cloudLit: '#f2f2e8', cloudShade: '#90afc1', cloudRim: '#fffbea', cloudCover: 0.55,
     water: '#4f8f96', waterShallow: '#3e5a44',
-    grass: '#679a46', grassLight: '#8bb556', grassWarm: '#a0ae52', grassTip: '#c6dba0', forestFloor: '#4f8a3a', rock: '#8d9ea3', rockDark: '#61747e', dirt: '#a89e74', sand: '#d4cc9c', snow: '#f4f6f4',
+    grass: '#679a46', grassLight: '#8bb556', grassWarm: '#a0ae52', grassTip: '#c6dba0', flowerWhite: '#f6f4ea', flowerYellow: '#f4dc7a', flowerLilac: '#b8a4dc', forestFloor: '#4f8a3a', rock: '#8d9ea3', rockDark: '#61747e', dirt: '#a89e74', sand: '#d4cc9c', snow: '#f4f6f4',
   }),
   dusk: Object.freeze({
     sun: sunFrom(-0.2, 0.19), sunColor: '#ffb46a', sunStrength: 0.8,
@@ -19,7 +19,7 @@ export const WORLD_ATMOSPHERES = Object.freeze({
     mist: '#91928c', mistStrength: 0.45,
     cloudLit: '#ffe2b0', cloudShade: '#868892', cloudRim: '#fff1c3', cloudCover: 0.5,
     water: '#56707a', waterShallow: '#3a3e38',
-    grass: '#74a060', grassLight: '#98b264', grassWarm: '#b0ae5c', grassTip: '#dcd394', forestFloor: '#4c7448', rock: '#8c949a', rockDark: '#5f6874', dirt: '#9a8c6a', sand: '#c8b88e', snow: '#ffe2cc',
+    grass: '#76a27c', grassLight: '#9ab684', grassWarm: '#a8aa68', grassTip: '#d6d2a4', flowerWhite: '#f2e2cc', flowerYellow: '#f0d488', flowerLilac: '#b49ccc', forestFloor: '#4c7448', rock: '#8c949a', rockDark: '#5f6874', dirt: '#9a8c6a', sand: '#c8b88e', snow: '#ffe2cc',
   }),
   rain: Object.freeze({
     sun: sunFrom(0.5, 0.6), sunColor: '#c8ccc0', sunStrength: 0.4,
@@ -29,7 +29,7 @@ export const WORLD_ATMOSPHERES = Object.freeze({
     mist: '#5c6252', mistStrength: 0.6,
     cloudLit: '#4c5246', cloudShade: '#3e443a', cloudRim: '#6a6e5e', cloudCover: 0.95,
     water: '#4a5448', waterShallow: '#32382e',
-    grass: '#7f9a5a', grassLight: '#93a865', grassWarm: '#9ea05e', grassTip: '#94a274', forestFloor: '#5a7445', rock: '#8a9088', rockDark: '#6c7470', dirt: '#8a8064', sand: '#a8a084', snow: '#e0e4e2',
+    grass: '#7f9a5a', grassLight: '#93a865', grassWarm: '#9ea05e', grassTip: '#94a274', flowerWhite: '#c8ccc4', flowerYellow: '#c8bc78', flowerLilac: '#9c94b0', forestFloor: '#5a7445', rock: '#8a9088', rockDark: '#6c7470', dirt: '#8a8064', sand: '#a8a084', snow: '#e0e4e2',
   }),
 });
 

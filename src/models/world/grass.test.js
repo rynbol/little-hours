@@ -6,6 +6,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { createWorldGrass, createGroundGrid, grassBlades, surfaceAt } from './grass.js';
+import { MEADOW_ROCKS, rockClearings } from './rocks.js';
 import { heightAt } from '../../core/world-terrain.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 
@@ -36,36 +37,46 @@ test('the ground grid recentres on the camera and reuses texels it already holds
   assert.deepEqual(Array.from(fresh.data.slice(0, 4), value => Math.round(value * 1e3) / 1e3), [0.04, 0.995, -0.088, -10.925]);
 });
 
-test('two blade layers tile their own periods with five vertices and three triangles each', () => {
+test('three blade layers tile their own periods with five vertices and three triangles each', () => {
   const { positions, blade, indices } = grassBlades();
-  assert.equal(positions.length / 3, 160000);
-  assert.equal(indices.length, 288000);
-  const reach = [0, 0];
+  assert.equal(positions.length / 3, 360000);
+  assert.equal(indices.length, 648000);
+  const reach = [0, 0, 0];
   for (let v = 0; v < positions.length / 3; v++) {
     const layer = blade[v * 4 + 3];
     reach[layer] = Math.max(reach[layer], positions[v * 3], positions[v * 3 + 2]);
   }
-  assert.deepEqual(reach.map(Math.ceil), [16, 48]);
+  assert.deepEqual(reach.map(Math.ceil), [16, 48, 128]);
   assert.deepEqual(Array.from(positions.slice(1, 15).filter((_, i) => i % 3 === 0)), [0, 0, 0.5, 0.5, 1]);
 });
 
 test('world grass follows the camera in steps, takes the theme and stays still when asked', () => {
   const scene = new Scene(new NullEngine()), root = new TransformNode('world', scene), camera = new FreeCamera('eye', new Vector3(0, 2, 0), scene);
   const grass = createWorldGrass(scene, { root, atmosphere: WORLD_ATMOSPHERES.day, still: true });
-  assert.equal(grass.mesh.getTotalVertices(), 160000);
-  assert.deepEqual(grass.origin, [-40, -40]);
+  assert.equal(grass.mesh.getTotalVertices(), 360000);
+  assert.deepEqual(grass.origin, [-68, -68]);
   assert.equal(grass.follow(7, -7), false);
   assert.equal(grass.follow(9, 0), true);
-  assert.deepEqual(grass.origin, [-30, -40]);
+  assert.deepEqual(grass.origin, [-58, -68]);
   const paint = grass.mesh.material;
   assert.equal(paint._floats.gusts, 0);
   grass.setTheme(WORLD_ATMOSPHERES.dusk);
-  assert.equal(paint._colors3.grassLight.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.grassLight);
+  for (const key of ['grassLight', 'flowerWhite', 'flowerYellow', 'flowerLilac']) assert.equal(paint._colors3[key].toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk[key], key);
+  assert.equal(grass.rocks.material._colors3.rock.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.rock);
   camera.position.set(60, 2, -60);
   scene.render();
-  assert.deepEqual(grass.origin, [20, -100]);
+  assert.deepEqual(grass.origin, [-8, -128]);
   grass.mesh.dispose();
   camera.position.set(200, 2, -60);
   scene.render();
-  assert.deepEqual(grass.origin, [20, -100]);
+  assert.deepEqual(grass.origin, [-8, -128]);
+});
+
+test('grass leaves a bare ring round each meadow rock', () => {
+  const scene = new Scene(new NullEngine()), root = new TransformNode('world', scene);
+  new FreeCamera('eye', new Vector3(0, 2, 0), scene);
+  const paint = createWorldGrass(scene, { root, atmosphere: WORLD_ATMOSPHERES.day, still: true }).mesh.material;
+  assert.equal(paint._vectors4Arrays.stones.length, MEADOW_ROCKS.length * 4);
+  assert.deepEqual(paint._vectors4Arrays.stones, rockClearings());
+  assert.deepEqual(rockClearings().filter((_, i) => i % 4 === 2).map(radius => Math.round(radius * 100) / 100), [1.2, 0.5, 0.55, 0.69, 0.94, 0.49, 1.11]);
 });
