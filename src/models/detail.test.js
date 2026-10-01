@@ -132,6 +132,24 @@ test('turning the laptop page down dims what the page draws and what it blooms, 
   disposeDetails(scene); disposeDetails(later); engine.dispose();
 });
 
+test('the laptop page is written in soft ink, word by word', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const detail = createDetail('study-desk', scene), layer = name => detail.getChildMeshes().find(mesh => mesh.material.name === name);
+  const page = layer('detail-glow-page'), { slots, palette } = page.metadata, ink = LAPTOP.page.filter(hex => Color3.FromHexString(hex).toHSV().b < 0.85);
+  assert.ok(ink.length && ink.every(hex => Color3.FromHexString(hex).toHSV().g < 0.3), `the page ink ${ink.join(' ')} is soft, not an orange bar`);
+  const positions = page.getVerticesData('position'), indices = page.getIndices(), parent = Array.from({ length: slots.length }, (_, i) => i);
+  const root = i => { while (parent[i] !== i) i = parent[i] = parent[parent[i]]; return i; };
+  for (let i = 0; i < indices.length; i += 3) for (const j of [1, 2]) parent[root(indices[i + j])] = root(indices[i]);
+  const pieces = new Map();
+  for (let i = 0; i < slots.length; i++) if (palette[slots[i]] === ink.at(-1)) { const piece = pieces.get(root(i)) ?? []; piece.push(positions[i * 3 + 1]); pieces.set(root(i), piece); }
+  const rows = new Map();
+  for (const heights of pieces.values()) { const row = Math.round(heights.reduce((sum, y) => sum + y, 0) / heights.length * 200); rows.set(row, (rows.get(row) ?? 0) + 1); }
+  const words = [...rows.values()];
+  assert.ok(words.length >= 7 && words.filter(count => count >= 4).length >= 7, `the page lines hold ${words.join(', ')} words`);
+  disposeDetails(scene); engine.dispose();
+});
+
 test('window light spills onto both desk tops as a soft dappled wash, strongest by the window and fading toward the chair and the ends', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk', 'writing-desk']);

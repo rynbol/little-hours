@@ -236,7 +236,7 @@ function deskLamp(parent, x, y, z) {
   cylinder(lamp, 0.10, 0.24, 0.21, [-0.14, 0.63, 0], '#c99858');
   cylinder(lamp, 0.205, 0.205, 0.013, [-0.14, 0.52, 0], '#f4dba1', { emissive: '#ffbd61', emissiveIntensity: 0.38 });
 }
-export const LAPTOP = Object.freeze({ walnut: '#6e5444', brass: '#c2a274', leather: '#776050', page: Object.freeze(['#efe2c4', '#e3cfa8', '#fbf3df', '#a97b52', '#cdb48c']) });
+export const LAPTOP = Object.freeze({ walnut: '#6e5444', brass: '#c2a274', leather: '#776050', page: Object.freeze(['#efe2c4', '#e3cfa8', '#fbf3df', '#9a8b78', '#c9bca6']) });
 function laptop(parent) {
   const laptopGroup = group(parent, [0, 1.30, -0.40]); laptopGroup.scaling.setAll(0.65);
   box(laptopGroup, [0.97, 0.101, 0.62], [0, -0.0265, 0], LAPTOP.walnut, 0.03);
@@ -502,7 +502,7 @@ function petBed(parent) {
   box(tag, [0.12, 0.035, 0.018], [0, 0, 0], C.cream, 0.008);
   for (const x of [-0.06, 0.06]) for (const y of [-0.016, 0.016]) sphere(tag, [0.02, 0.02, 0.012], [x, y, 0], C.cream);
 }
-export const MOON_CANOPY = Object.freeze({ core: '#335a52', under: '#3c6b64', side: '#78b84c', top: '#a4ec5c', rim: '#d8f090', sun: [0.55, 0.75, -0.42], mottle: 0.015, towardShade: 0.35 });
+export const MOON_CANOPY = Object.freeze({ core: '#2e473b', under: '#476955', side: '#6da15d', top: '#a5dd78', rim: '#d3eda6', sun: [0.55, 0.75, -0.42], mottle: 0.015, step: Object.freeze([0.5, 0.56]) });
 export const MOON_PADS = Object.freeze({ tiers: Object.freeze([1.25, 1.05, 0.88, 0.7]), bare: 0.3 });
 export const LEAF_OUTLINE = Object.freeze([[0, 0], [0.25, 0.8], [0.75, 0.8], [1, 0], [0.75, -0.8], [0.25, -0.8]]);
 export function leafClump(parent, center, radii, seed, leaves) {
@@ -513,7 +513,7 @@ export function leafClump(parent, center, radii, seed, leaves) {
   const random = k => { const v = Math.sin((seed * 97.13 + k) * 12.9898) * 43758.5453; return v - Math.floor(v); };
   const tone = (n, lift) => {
     const light = Math.max(0, Math.min(1, Vector3.Dot(n, sun) * 0.5 + 0.5 + lift));
-    return Color3.Lerp(Color3.Lerp(Color3.Lerp(under, side, band(light, 0.15, 0.5)), top, band(light, 0.55, 0.95)), rim, band(light, 0.95, 1.12));
+    return Color3.Lerp(Color3.Lerp(Color3.Lerp(under, side, band(light, ...MOON_CANOPY.step)), top, band(light, 0.64, 0.92)), rim, band(light, 0.95, 1.12));
   };
   const vertex = (point, n, color) => { positions.push(point.x, point.y, point.z); normals.push(n.x, n.y, n.z); colors.push(color.r, color.g, color.b, 1); return positions.length / 3 - 1; };
   const surfaceNormal = (x, y, z) => new Vector3(x / radii[0], y / radii[1], z / radii[2]).normalize();
@@ -940,20 +940,16 @@ function recordSleeve(parent) {
 
 function lightLeaves(canopy) {
   canopy.markVerticesDataAsUpdatable('color', true);
-  const painted = Float32Array.from(canopy.getVerticesData('color')), shown = new Float32Array(painted), paint = new Color3(), leaf = new Color3(), lit = new Color3();
+  const painted = Float32Array.from(canopy.getVerticesData('color')), shown = new Float32Array(painted);
   let current = null;
   return leaves => {
     if (leaves === current) return;
     current = leaves;
     const [hex, amount] = leaves, tint = Color3.FromHexString(hex);
-    const tintLuma = Math.max(0.01, 0.2126 * tint.r + 0.7152 * tint.g + 0.0722 * tint.b), shade = Color3.FromHexString(MOON_CANOPY.under).toHSV().r;
     shown.set(painted);
     if (amount) for (let i = 0; i < painted.length; i += 4) {
-      const luma = (0.2126 * painted[i] + 0.7152 * painted[i + 1] + 0.0722 * painted[i + 2]) / tintLuma;
-      paint.set(painted[i], painted[i + 1], painted[i + 2]).toHSVToRef(leaf);
-      paint.set(painted[i] + (tint.r * luma - painted[i]) * amount, painted[i + 1] + (tint.g * luma - painted[i + 1]) * amount, painted[i + 2] + (tint.b * luma - painted[i + 2]) * amount).toHSVToRef(lit);
-      Color3.HSVtoRGBToRef(leaf.r + (shade - leaf.r) * amount * MOON_CANOPY.towardShade, lit.g, lit.b, lit);
-      shown[i] = lit.r; shown[i + 1] = lit.g; shown[i + 2] = lit.b;
+      const luma = 0.2126 * painted[i] + 0.7152 * painted[i + 1] + 0.0722 * painted[i + 2];
+      shown[i] += (tint.r * luma - painted[i]) * amount; shown[i + 1] += (tint.g * luma - painted[i + 1]) * amount; shown[i + 2] += (tint.b * luma - painted[i + 2]) * amount;
     }
     streamVertices(canopy, 'color', shown);
   };

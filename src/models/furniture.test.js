@@ -24,7 +24,8 @@ test('moon tree clumps are soft rounded leaf cards, lit fresh green on top and c
   const value = hex => Color3.FromHexString(hex).toHSV().b;
   assert.ok(hue(MOON_CANOPY.top) > 80 && hue(MOON_CANOPY.top) < 110 && hue(MOON_CANOPY.rim) < hue(MOON_CANOPY.top), 'the lit top is a fresh leaf green with warmer sunlit tips');
   assert.ok(value(MOON_CANOPY.top) > 0.85, 'the lit top is bright enough to read as sunlit from the chair');
-  assert.ok(hue(MOON_CANOPY.under) > 160, 'the underside is a cool blue-green');
+  const saturation = hex => Color3.FromHexString(hex).toHSV().g;
+  assert.ok(hue(MOON_CANOPY.under) > hue(MOON_CANOPY.top) + 40 && saturation(MOON_CANOPY.under) < 0.4 && saturation(MOON_CANOPY.side) < 0.5, 'the underside is a cooler, greyer green than the lit top, and no tone is a lime');
   assert.ok(value(MOON_CANOPY.under) / value(MOON_CANOPY.top) < 0.5, 'the underside sits well below the lit top');
   engine.dispose();
 });
@@ -113,22 +114,33 @@ test('the moon tree grows pads of clearly different sizes and flatness instead o
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
 
-test('the moon tree canopy dims and softens in the dusk and rain light but stays a green that leans to its cool shade instead of khaki, and gets its sunlit green back by day', () => {
+test('the moon tree canopy follows the theme light: dimmer and softer at dusk, a dim olive in rain, and its own sunlit green by day', () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   try {
     const tree = createFurniture('moon-tree', scene), canopy = tree.getChildMeshes(false).find(mesh => mesh.name === 'swaying-leaf-canopy'), day = Array.from(canopy.getVerticesData('color'));
     const median = values => values.sort((a, b) => a - b)[values.length >> 1];
-    const look = colors => { const hsv = []; for (let i = 0; i < colors.length; i += 4) hsv.push(new Color3(colors[i], colors[i + 1], colors[i + 2]).toHSV().asArray()); return { hue: median(hsv.map(([h]) => h)), saturation: median(hsv.map(([, s]) => s)) }; };
+    const look = colors => { const hsv = [], luma = []; for (let i = 0; i < colors.length; i += 4) { hsv.push(new Color3(colors[i], colors[i + 1], colors[i + 2]).toHSV().asArray()); luma.push(0.2126 * colors[i] + 0.7152 * colors[i + 1] + 0.0722 * colors[i + 2]); } return { hue: median(hsv.map(([h]) => h)), saturation: median(hsv.map(([, s]) => s)), luma: median(luma) }; };
     const fresh = look(day);
     tree.metadata.lightLeaves(ROOM_LIGHTS.dusk.leaves);
     const dusk = look(Array.from(canopy.getVerticesData('color')));
-    assert.ok(fresh.hue > 85 && dusk.hue >= fresh.hue, `the canopy hue goes from ${fresh.hue.toFixed(0)} by day to ${dusk.hue.toFixed(0)} at dusk, so the warm lamps and haze land on a green, not khaki`);
-    assert.ok(dusk.saturation < fresh.saturation * 0.75, `the dusk canopy saturation is ${dusk.saturation.toFixed(2)}, against ${fresh.saturation.toFixed(2)} by day`);
     tree.metadata.lightLeaves(ROOM_LIGHTS.rain.leaves);
     const rain = look(Array.from(canopy.getVerticesData('color')));
-    assert.ok(rain.hue >= fresh.hue && rain.saturation < fresh.saturation, `the rain canopy hue is ${rain.hue.toFixed(0)} at saturation ${rain.saturation.toFixed(2)}`);
+    assert.ok(dusk.luma < fresh.luma * 0.95 && dusk.saturation < fresh.saturation * 0.9 && dusk.hue > 80, `the dusk canopy is luma ${dusk.luma.toFixed(2)} at saturation ${dusk.saturation.toFixed(2)} and hue ${dusk.hue.toFixed(0)}, against ${fresh.luma.toFixed(2)} and ${fresh.saturation.toFixed(2)} by day`);
+    assert.ok(rain.luma < fresh.luma * 0.85 && rain.saturation < fresh.saturation * 0.85 && rain.hue < fresh.hue - 10, `the rain canopy is luma ${rain.luma.toFixed(2)} at saturation ${rain.saturation.toFixed(2)} and hue ${rain.hue.toFixed(0)} against ${fresh.hue.toFixed(0)} by day, a dim olive`);
     tree.metadata.lightLeaves(ROOM_LIGHTS.day.leaves);
     assert.deepEqual(Array.from(canopy.getVerticesData('color')), day, 'the day canopy is exactly its own colours');
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('the moon tree pads turn from shade to light in one clear step instead of a smooth airbrushed ramp', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const tree = createFurniture('moon-tree', scene), colors = tree.getChildMeshes(false).find(mesh => mesh.name === 'swaying-leaf-canopy').getVerticesData('color');
+    const luma = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b, tone = hex => luma(...Color3.FromHexString(hex).asArray());
+    const [shade, lit] = [tone(MOON_CANOPY.under), tone(MOON_CANOPY.side)], low = shade + (lit - shade) * 0.25, high = lit - (lit - shade) * 0.25;
+    let between = 0;
+    for (let i = 0; i < colors.length; i += 4) { const value = luma(colors[i], colors[i + 1], colors[i + 2]); if (value > low && value < high) between++; }
+    assert.ok(between / (colors.length / 4) < 0.08, `${(100 * between / (colors.length / 4)).toFixed(1)}% of the canopy sits half way between shade and light`);
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
 

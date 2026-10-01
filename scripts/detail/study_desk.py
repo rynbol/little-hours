@@ -10,6 +10,9 @@ WALNUT, LEATHER, LAPTOP_BRASS, GILT, RIBBON, INK = '#6e5444', '#776050', '#c2a27
 EYE = (0.25, 0.9, 1.0)
 SHADE_FOLD, SHADE_TRIM = '#eeb26a', '#8e6048'
 KEY_TOP, KEY_SKIRT, KEY_SHADOW = '#f4ecd8', '#d8caa9', '#22170f'
+PAGE_TITLE = '#9a8b78'
+PAGE_INK = '#c9bca6'
+WORD_WIDTHS = (0.052, 0.03, 0.074, 0.022, 0.046, 0.061, 0.035, 0.083, 0.027, 0.057)
 KEY_ROWS = ([1] * 11 + [2], [1.5] + [1] * 10 + [1.5], [1.75] + [1] * 9 + [2.25], [2.25] + [1] * 8 + [2.75], [1, 1, 1.25, 6.5, 1.25, 1, 1])
 
 
@@ -105,13 +108,23 @@ def laptop():
             parts.append(rbox([0.01, 0.05, 0.005], (cx, cy + (0.02 if sy == 0 else -0.02), 0.0165), LAPTOP_BRASS, bevel=0.002, surface='metal', layer='metal', frame=lid))
     parts.append(rbox([0.22, 0.48, 0.004], (-0.31, 0.314, 0.023), '#e3cfa8', bevel=0.002, layer='glow', frame=lid))
     parts.append(rbox([0.6, 0.46, 0.004], (0.12, 0.314, 0.023), '#fbf3df', bevel=0.002, layer='glow', frame=lid))
-    parts.append(rbox([0.32, 0.02, 0.003], (0.03, 0.49, 0.026), '#a97b52', bevel=0.001, layer='glow', frame=lid))
+    parts += words(-0.13, 0.49, 0.26, 0.016, PAGE_TITLE, 0, lid)
     for i in range(8):
-        parts.append(rbox([0.48 if i < 7 else 0.24, 0.008, 0.003], (0.12 if i < 7 else 0.0, 0.45 - i * 0.042, 0.026), '#cdb48c', bevel=0.001, layer='glow', frame=lid))
+        parts += words(-0.12, 0.45 - i * 0.042, 0.48 if i < 7 else 0.24, 0.007, PAGE_INK, i + 1, lid)
     for i in range(4):
-        parts.append(rbox([0.14 - i * 0.015, 0.012, 0.003], (-0.31, 0.48 - i * 0.05, 0.026), '#a97b52', bevel=0.001, layer='glow', frame=lid))
+        parts += words(-0.38, 0.48 - i * 0.05, 0.14 - i * 0.015, 0.01, PAGE_TITLE, i + 9, lid)
     parts.append(sphere((0.05, 0.05, 0.004), (0.2, 0.36, -0.017), '#d9bc8a', subdivisions=2, frame=lid))
     parts.append(sphere((0.022, 0.034, 0.004), (0.2, 0.43, -0.018), '#8fa878', subdivisions=2, frame=lid))
+    return parts
+
+
+def words(left, y, width, height, ink, line, lid):
+    parts, x, k = [], left, line * 3
+    while x < left + width - 0.02:
+        w = min(WORD_WIDTHS[k % len(WORD_WIDTHS)] * height / 0.007, left + width - x)
+        parts.append(rbox([w, height, 0.003], (x + w / 2, y, 0.026), ink, bevel=0, layer='glow', frame=lid))
+        x += w + height * 1.6
+        k += 1
     return parts
 
 

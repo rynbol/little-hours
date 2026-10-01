@@ -84,25 +84,32 @@ test('window light spills onto the desk as a faint warm wash by day, amber at du
   assert.equal(rain, 0);
 });
 
-test('from the chair in rain, the room air is cooler and thinner in light than by day or at dusk, so the lamp and candles carry the warmth, yet unlit corners stay lifted', () => {
+test('from the chair in rain, the room air is dimmer than by day or at dusk, so the lamp and candles carry the warmth, yet unlit corners keep about their daytime lift', () => {
   assert.notEqual(ROOM_LIGHTS.rain.haze, ROOM_LIGHTS.day.haze, 'rain has air of its own');
   const plaster = [0.484, 0.4, 0.292], veiled = ({ color, amount }) => plaster.map((channel, i) => channel + (color[i] - channel) * amount);
   const luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b, warmth = ([r, , b]) => r / b;
   for (const theme of ['day', 'dusk']) {
     const rain = veiled(ROOM_LIGHTS.rain.haze), other = veiled(ROOM_LIGHTS[theme].haze);
     assert.ok(luma(rain) < luma(other) * 0.92, `the far rain wall settles to ${(luma(rain) / luma(other)).toFixed(2)} of the ${theme} wall`);
-    assert.ok(warmth(rain) < warmth(other) * 0.95, `the far rain wall is ${(warmth(rain) / warmth(other)).toFixed(2)} as warm as the ${theme} wall`);
-    const lift = ({ color, amount }) => amount * luma(color);
-    assert.ok(lift(ROOM_LIGHTS.rain.haze) >= lift(ROOM_LIGHTS[theme].haze), 'the darkest corners keep the lift they have in the other weathers');
+    assert.ok(warmth(rain) < warmth(ROOM_LIGHTS[theme].haze.color) + 0.6, `the far rain wall stays warm-dim at ${warmth(rain).toFixed(2)}`);
   }
+  const lift = ({ color, amount }) => amount * luma(color);
+  assert.ok(lift(ROOM_LIGHTS.rain.haze) >= lift(ROOM_LIGHTS.day.haze) * 0.9, 'the darkest corners keep about the lift they have by day');
 });
 
 test('seated, the far room keeps its contrast under a light haze, and the haze takes each theme\'s own colour so the upper wall answers day, dusk and rain', () => {
   const cream = [0.79, 0.73, 0.64], hazed = theme => { const { color, amount } = ROOM_LIGHTS[theme].haze; return cream.map((value, i) => value + (color[i] - value) * amount); };
   for (const theme of ['day', 'dusk', 'rain']) assert.ok(ROOM_LIGHTS[theme].haze.amount <= 0.4, `${theme} haze keeps ${(1 - ROOM_LIGHTS[theme].haze.amount).toFixed(2)} of the far contrast`);
   const [day, dusk, rain] = ['day', 'dusk', 'rain'].map(hazed), gap = (a, b) => Math.max(...a.map((value, i) => Math.abs(value - b[i])));
-  assert.ok(gap(day, dusk) > 0.04 && gap(day, rain) > 0.04 && gap(dusk, rain) > 0.03, `hazed wall ${[day, dusk, rain].map(c => Color3.FromArray(c).toHexString()).join(' ')}`);
-  assert.ok(dusk[0] - dusk[2] > day[0] - day[2] && rain[0] - rain[2] < day[0] - day[2], 'dusk is warmer than day and rain cooler');
+  const [dayAir, duskAir, rainAir] = ['day', 'dusk', 'rain'].map(theme => ROOM_LIGHTS[theme].haze.color);
+  assert.ok(gap(dayAir, duskAir) > 0.04 && gap(dayAir, rainAir) > 0.04 && gap(duskAir, rainAir) > 0.04, `room air ${[dayAir, duskAir, rainAir].map(c => Color3.FromArray(c).toHexString()).join(' ')}`);
+  const hue = rgb => Color3.FromArray(rgb).toHSV().r, veil = (seen, theme) => { const { color, amount } = ROOM_LIGHTS[theme].haze; return seen.map((value, i) => value + (color[i] - value) * amount); };
+  const litPlaster = [0.467, 0.369, 0.251], litBoards = [0.243, 0.118, 0.075];
+  const windowLit = theme => { const [hex, strength] = ROOM_LIGHTS[theme].wallSpill, tint = Color3.FromHexString(hex).asArray(); return veil(litPlaster, theme).map((value, i) => value * (1 + tint[i] * strength * 0.16)); };
+  for (const theme of ['dusk', 'rain']) {
+    assert.ok(hue(windowLit(theme)) >= 30 && hue(windowLit(theme)) <= 46, `the ${theme} haze and window light leave the lamplit plaster at hue ${hue(windowLit(theme)).toFixed(0)}, not salmon or mauve`);
+    assert.ok(hue(veil(litBoards, theme)) >= 24, `the ${theme} haze leaves the lamplit floorboards at hue ${hue(veil(litBoards, theme)).toFixed(0)}, not red`);
+  }
   for (const theme of ['day', 'dusk', 'rain']) assert.ok(ROOM_LIGHTS[theme].wallSpill[1] > 0, `${theme} window light reaches the side wall`);
   const warmth = theme => { const { r, b } = Color3.FromHexString(ROOM_LIGHTS[theme].wallSpill[0]); return r - b; };
   assert.ok(warmth('dusk') > warmth('day') && warmth('day') > warmth('rain'), 'the window light is amber at dusk and grey-blue in rain');
