@@ -83,3 +83,16 @@ test('window light spills onto the desk as a faint warm wash by day, amber at du
   assert.ok(day >= 0.06 && day <= 0.1 && dusk >= 0.06 && dusk <= 0.1, `the spill stays faint: ${day} by day, ${dusk} at dusk`);
   assert.equal(rain, 0);
 });
+
+test('from the chair in rain, the room air is cooler and thinner in light than by day or at dusk, so the lamp and candles carry the warmth, yet unlit corners stay lifted', () => {
+  assert.notEqual(ROOM_LIGHTS.rain.haze, ROOM_LIGHTS.day.haze, 'rain has air of its own');
+  const plaster = [0.484, 0.4, 0.292], veiled = ({ color, amount }) => plaster.map((channel, i) => channel + (color[i] - channel) * amount);
+  const luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b, warmth = ([r, , b]) => r / b;
+  for (const theme of ['day', 'dusk']) {
+    const rain = veiled(ROOM_LIGHTS.rain.haze), other = veiled(ROOM_LIGHTS[theme].haze);
+    assert.ok(luma(rain) < luma(other) * 0.92, `the far rain wall settles to ${(luma(rain) / luma(other)).toFixed(2)} of the ${theme} wall`);
+    assert.ok(warmth(rain) < warmth(other) * 0.95, `the far rain wall is ${(warmth(rain) / warmth(other)).toFixed(2)} as warm as the ${theme} wall`);
+    const lift = ({ color, amount }) => amount * luma(color);
+    assert.ok(lift(ROOM_LIGHTS.rain.haze) >= lift(ROOM_LIGHTS[theme].haze), 'the darkest corners keep the lift they have in the other weathers');
+  }
+});

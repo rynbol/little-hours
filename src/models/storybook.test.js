@@ -8,6 +8,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { ShaderStore } from '@babylonjs/core/Engines/shaderStore.js';
+import { Effect } from '@babylonjs/core/Materials/effect.js';
 import '@babylonjs/core/Shaders/default.fragment.js';
 import { createStorybook, StorybookPlugin, SURFACE_KIND, STORYBOOK, STORYBOOK_FRAGMENT } from './storybook.js';
 
@@ -104,4 +105,22 @@ test('from the chair, wood shows painted grain: long uneven fibres that follow t
   const code = new StorybookPlugin(new StandardMaterial('desk', scene), state).getCustomCode('fragment');
   assert.ok(Object.values(code).some(text => text.includes('storySurface(vStorySurface,vPositionW,normalW)')), 'the surface pattern sees each face\'s normal');
   engine.dispose();
+});
+
+test('the room air takes its colour and strength from the weather on a theme change, without compiling a new shader', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  new FreeCamera('eye', new Vector3(0, 1, -4), scene); new HemisphericLight('sky', new Vector3(0, 1, 0), scene);
+  const storybook = createStorybook(scene);
+  const wall = MeshBuilder.CreateBox('wall', { size: 1 }, scene); wall.material = new StandardMaterial('wall-paint', scene);
+  const sent = [], send = Effect.prototype.setFloat4;
+  Effect.prototype.setFloat4 = function (name, ...values) { if (name === 'storyHaze') sent.push(values.map(value => Number(value.toFixed(3)))); return send.call(this, name, ...values); };
+  try {
+    scene.render();
+    const compiled = Object.keys(engine._compiledEffects).length;
+    storybook.haze = { color: [0.2, 0.3, 0.4], amount: 0.6 };
+    scene.render();
+    assert.deepEqual(sent[0], [0.52, 0.45, 0.36, 0.42], 'the room starts in amber air');
+    assert.deepEqual(sent.at(-1), [0.2, 0.3, 0.4, 0.6]);
+    assert.equal(Object.keys(engine._compiledEffects).length, compiled);
+  } finally { Effect.prototype.setFloat4 = send; engine.dispose(); }
 });

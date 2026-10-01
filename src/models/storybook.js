@@ -66,8 +66,12 @@ export class StorybookPlugin extends MaterialPluginBase {
   isCompatible(shaderLanguage) { return shaderLanguage === 0; }
   prepareDefines(defines, scene, mesh) { defines.STORYSURFACE = mesh.isVerticesDataPresent(SURFACE_KIND); defines.STORYHAZE = !this._material.name.startsWith(OUTDOOR_PREFIX); }
   getAttributes(attributes, scene, mesh) { if (mesh.isVerticesDataPresent(SURFACE_KIND)) attributes.push(SURFACE_KIND); }
-  getUniforms() { return { ubo: [{ name: 'storyLook', size: 1, type: 'float' }], fragment: 'uniform float storyLook;' }; }
-  bindForSubMesh(uniformBuffer) { uniformBuffer.updateFloat('storyLook', this.state.amount); }
+  getUniforms() { return { ubo: [{ name: 'storyLook', size: 1, type: 'float' }, { name: 'storyHaze', size: 4, type: 'vec4' }], fragment: 'uniform float storyLook;\nuniform vec4 storyHaze;' }; }
+  bindForSubMesh(uniformBuffer) {
+    const { color, amount } = this.state.haze;
+    uniformBuffer.updateFloat('storyLook', this.state.amount);
+    uniformBuffer.updateFloat4('storyHaze', color[0], color[1], color[2], amount);
+  }
   getCustomCode(shaderType) {
     if (shaderType === 'vertex') return {
       CUSTOM_VERTEX_DEFINITIONS: `#ifdef STORYSURFACE\nattribute float ${SURFACE_KIND};\nvarying float vStorySurface;\n#endif`,
@@ -76,7 +80,7 @@ export class StorybookPlugin extends MaterialPluginBase {
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: `#ifdef STORYSURFACE\nvarying float vStorySurface;\n#endif\n${STORYBOOK_FRAGMENT}`,
       [`!${LIGHT_HOOK.source}`]: '\n#ifdef LIGHT0\ndiffuseBase=storyLight(diffuseBase,normalW,viewDirectionW,vPositionW);\n#endif\n#ifdef STORYSURFACE\nbaseColor.rgb*=mix(vec3(1.0),storySurface(vStorySurface,vPositionW,normalW),storyLook);\n#endif\nvec3 finalDiffuse=',
-      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `#ifdef STORYHAZE\nfloat storyDistance=length(vEyePosition.xyz-vPositionW);\ncolor.rgb*=mix(vec3(1.0),${glsl(falloff.color)},storyLook*smoothstep(${falloff.near.toFixed(3)},${falloff.far.toFixed(3)},storyDistance));\ncolor.rgb=mix(color.rgb,${glsl(haze.color)},storyLook*${haze.amount.toFixed(3)}*smoothstep(${haze.near.toFixed(3)},${haze.far.toFixed(3)},storyDistance));\n#endif`,
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `#ifdef STORYHAZE\nfloat storyDistance=length(vEyePosition.xyz-vPositionW);\ncolor.rgb*=mix(vec3(1.0),${glsl(falloff.color)},storyLook*smoothstep(${falloff.near.toFixed(3)},${falloff.far.toFixed(3)},storyDistance));\ncolor.rgb=mix(color.rgb,storyHaze.rgb,storyLook*storyHaze.a*smoothstep(${haze.near.toFixed(3)},${haze.far.toFixed(3)},storyDistance));\n#endif`,
     };
   }
 }
@@ -87,12 +91,13 @@ const dress = (material, state) => material instanceof StandardMaterial && !mate
 
 export function createStorybook(scene) {
   if (!registered) { RegisterMaterialPlugin('Storybook', material => { const state = looks.get(material.getScene()); return state ? dress(material, state) : null; }); registered = true; }
-  const state = { amount: 0 };
+  const state = { amount: 0, haze: STORYBOOK.haze };
   looks.set(scene, state);
   scene.materials.forEach(material => dress(material, state));
   return {
     get amount() { return state.amount; },
     set amount(value) { state.amount = Math.min(1, Math.max(0, value)); },
+    set haze(value) { state.haze = value; },
     dispose() { looks.delete(scene); },
   };
 }

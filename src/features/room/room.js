@@ -1249,6 +1249,7 @@ export function createRoom(container, options = {}) {
     sun.diffuse = color(light.sunColor); sun.intensity = light.sun;
     sun.position.set(...light.position); sun.direction.set(...light.direction).normalize();
     hemisphere.diffuse = color(light.sky); hemisphere.groundColor = color(light.ground); hemisphere.intensity = light.ambient;
+    storybook.haze = light.haze;
     painterly.setTheme(`room-${theme}`); aimSunbeam();
     dimPage(scene, light.screen);
     spillWindow(scene, light.spill);
