@@ -502,3 +502,14 @@ test('rain clouds melt into the overcast haze instead of floating as hard dark l
   assert.ok(gap < 0.065, `rain clouds sit ${gap.toFixed(3)} from the haze`);
   engine.dispose();
 });
+
+test('the volcano summit glows with molten lava even at noon', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true); world.setTheme('day');
+  const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-land'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color');
+  const rim = shape.roles.flatMap((role, i) => role === 'ember' && shape.positions[i * 3 + 1] > PEAK - 6 ? [i] : []);
+  const red = rim.reduce((sum, i) => sum + colors[i * 4], 0) / rim.length, blue = rim.reduce((sum, i) => sum + colors[i * 4 + 2], 0) / rim.length;
+  assert.ok(rim.length >= 72 * 2, `${rim.length} rim lava vertices`);
+  assert.ok(red > 0.85 && red - blue > 0.35, `rim lava r ${red.toFixed(2)} b ${blue.toFixed(2)}`);
+  engine.dispose();
+});

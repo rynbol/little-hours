@@ -230,8 +230,8 @@ function buildVolcano(shape) {
       const shoulder = 0.09 * Math.sin(k * 1.3 + a * 2 + 0.5) * Math.sin(Math.PI * t) + 0.07 * Math.sin(a * 3 + 0.7) * (1 - t);
       const jag = 1 + 0.05 * Math.sin(a * 6) + 0.03 * Math.sin(a * 14 + 1) + (rib - 0.4) * 0.09 * (1 - t) + shoulder, r = (radius * (1 - t) + rim * t) * jag;
       const y = base + height * t ** 1.35 + Math.sin(a * 5 + 1) * 1.3 * t ** 4;
-      const lava = t > 0.9 || (t > 0.3 && streaks.includes(s));
-      const id = shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', (0.6 + 0.3 * Math.max(0, Math.cos(a - 2.1)) + rib * 0.22 + (k % 2) * 0.03) * (1 - 0.45 * t ** 1.5));
+      const lava = t > 0.85 || (t > 0.3 && streaks.includes(s));
+      const id = shape.vertex(vx + Math.cos(a) * r, y, vz + Math.sin(a) * r, lava ? 'ember' : 'rock', lava ? 1.1 + 0.3 * t : (0.6 + 0.3 * Math.max(0, Math.cos(a - 2.1)) + rib * 0.22 + (k % 2) * 0.03) * (1 - 0.45 * t ** 1.5));
       shape.fogs[id] *= 1 - 0.42 * Math.min(1, t * 2.4);
     }
   }
@@ -453,10 +453,10 @@ void main() {
   float body = 1. - smoothstep(.25, 1., abs(vUv.x)), rise = smoothstep(0., .02, vUv.y) * (1. - smoothstep(.35, 1., vUv.y));
   float wisp = noise(vec2(vUv.x * 2.2, vUv.y * 5. - time * .09)) * .6 + noise(vec2(vUv.x * 5. + 3., vUv.y * 11. - time * .16)) * .4;
   float a = body * rise * mix(1., smoothstep(.25, .65, wisp), smoothstep(0., .3, vUv.y)) * .9;
-  vec3 c = mix(mix(smoke, ember, pow(1. - vUv.y, 5.) * glow), haze, .25);
+  vec3 c = mix(mix(smoke, ember, pow(1. - vUv.y, 2.5) * glow), haze, .25);
   gl_FragColor = vec4(c * a, a);
 }`;
-export const PLUME = Object.freeze({ segments: 12, height: 12, lean: 26, base: 3.6, top: 11 });
+export const PLUME = Object.freeze({ segments: 12, height: 12, lean: 26, base: 5, top: 11 });
 export function plumeShape() {
   const [vx, vz] = VOLCANO_AT, positions = [], uvs = [], uv2s = [], indices = [], side = new Vector3(0, 1, 0).cross(new Vector3(vx, 0, vz)).normalize();
   for (let k = 0; k <= PLUME.segments; k++) {
@@ -647,7 +647,7 @@ export function createSeatWorld(scene, parent) {
     const tones = grassTones(palette);
     for (const [name, value] of Object.entries(tones)) grassPaint.setColor3(name, value); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
     skyEffectPaint.setFloat('rays', SUN_RAY_STRENGTH[theme] ?? 0); skyEffectPaint.setColor3('tint', Color3.Lerp(Color3.White(), hex(palette.glow), 0.6));
-    skyEffectPaint.setColor3('smoke', hex(palette.smoke)); skyEffectPaint.setColor3('ember', hex(palette.ember)); skyEffectPaint.setColor3('haze', hex(palette.haze)); skyEffectPaint.setFloat('glow', theme === 'day' ? 0.55 : 1);
+    skyEffectPaint.setColor3('smoke', hex(palette.smoke)); skyEffectPaint.setColor3('ember', hex(palette.ember)); skyEffectPaint.setColor3('haze', hex(palette.haze)); skyEffectPaint.setFloat('glow', theme === 'day' ? 0.8 : 1);
   }
   function setShell(style, wallPaint = {}, doors = []) {
     const base = SHELL_PAINT[style] || SHELL_PAINT.retreat, key = JSON.stringify([style, wallPaint, doors]);
