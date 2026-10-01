@@ -79,7 +79,8 @@ export default {
     await finish.clickSel('#start-button');
     await finish.waitFor(`document.querySelector('#session-celebration').open`, { timeout: 12000, what: 'the focus celebration' });
     t.check('focus grows the starting pet’s bond and unlocks its ribbon', await finish.js(`${bond('cat')}.affection === 8 && ${bond('cat')}.ribbon === 1`));
-    t.check('completion keeps the room interactive and celebrates overhead', await finish.js(`!document.querySelector('#session-celebration').matches(':modal') && ${diagnostics}.celebrationAge < 3.2 && Boolean(document.querySelector('.room-delight[data-kind="finish"]'))`));
+    const celebrated = await finish.js(`({ modal: document.querySelector('#session-celebration').matches(':modal'), age: ${diagnostics}.celebrationAge, delight: Boolean(document.querySelector('.room-delight[data-kind="finish"]')) })`);
+    t.check('completion keeps the room interactive and celebrates overhead', !celebrated.modal && celebrated.age < 3.2 && celebrated.delight, celebrated);
     t.check('completed study gives a daisy to the pet and displays its physical gift', await finish.js(`document.querySelector('#celebration-gift')?.textContent.includes('A daisy for you') && ${bond('cat')}.gift === 'daisy' && ${diagnostics}.petBelongings.gift.selected === 'daisy'`));
     await t.shot(finish, 'finish'); await finish.clickSel('#session-celebration .start-button'); await finish.clickSel('#pet-button');
     t.check('the unlocked ribbon is visible on the room pet', await finish.js(`${diagnostics}.petModel.ribbon === 1`));
