@@ -1,6 +1,7 @@
 import math
 import bmesh
 import kit
+from plant import leaf
 from kit import Frame, cushion, cylinder, lathe, rbox, rod, sphere, torus, tube
 
 WOOD, EDGE, DARK, BRASS, SAGE, PAPER = '#aa7954', '#bc9169', '#73533d', '#bf9762', '#83968a', '#f2ead5'
@@ -208,12 +209,20 @@ def writing(frame):
 
 def succulent(x, y, z):
     f = Frame((x, y, z))
-    parts = [lathe([(0.0, 0.0), (0.05, 0.0), (0.07, 0.09), (0.078, 0.1), (0.07, 0.1), (0.0, 0.095)], (0, 0, 0), '#bd8469', segments=24, surface='ceramic', frame=f)]
-    for ring, (count, lean, size) in enumerate(((7, 1.1, 0.05), (5, 0.7, 0.04), (3, 0.3, 0.03))):
+    wall = [(0.0, 0.0), (0.042, 0.0), (0.046, 0.006), (0.044, 0.014), (0.06, 0.04), (0.07, 0.075), (0.072, 0.088), (0.08, 0.091), (0.083, 0.098), (0.08, 0.104), (0.066, 0.104), (0.064, 0.096), (0.0, 0.096)]
+    parts = [lathe(wall, (0, 0, 0), '#7f9fa3', segments=32, surface='ceramic', frame=f),
+             torus(0.0652, 0.003, (0, 0.06, 0), '#efe2c4', rotation=(math.pi / 2, 0, 0), major_segments=32, minor_segments=5, surface='ceramic', frame=f),
+             cylinder(0.064, 0.064, 0.006, (0, 0.093, 0), '#5c4a3a', segments=24, surface='stone', frame=f)]
+    for k, (px, pz, r) in enumerate(((0.035, 0.03, 0.009), (-0.03, 0.038, 0.007), (0.042, -0.028, 0.006))):
+        parts.append(sphere((r, r * 0.6, r), (px, 0.098, pz), '#d8cfbd', subdivisions=1, surface='stone', frame=f))
+    for ring, (count, lean, length, colour) in enumerate(((9, 0.95, 0.06, '#8fb07c'), (7, 0.62, 0.05, '#a3c189'), (5, 0.32, 0.038, '#b9d39b'), (3, 0.12, 0.026, '#c9dea8'))):
         for k in range(count):
-            a = k / count * math.tau + ring * 0.5
-            leaf = sphere((size * 0.45, size * 0.2, size), (math.cos(a) * size * 0.8, 0.12 + ring * 0.015, math.sin(a) * size * 0.8), '#8fae7c', subdivisions=2, surface='leaf', frame=f, rotation=(lean, -a + math.pi / 2, 0))
-            parts.append(leaf)
+            a = k / count * math.tau + ring * 0.45
+            out = (math.cos(a) * math.sin(lean), math.cos(lean), math.sin(a) * math.sin(lean))
+            base = (x + math.cos(a) * 0.006 * (3 - ring), y + 0.1 + ring * 0.007, z + math.sin(a) * 0.006 * (3 - ring))
+            parts += leaf(base, out, (0, 1, 0), length, length * 0.62, colour, cup=0.55, droop=-0.18, fold=0.12, rib=None, rows=5, cols=2, thickness=0.006)
+            tip = (base[0] + out[0] * length * 0.86, base[1] + out[1] * length * 0.86 + 0.16 * length * math.sin(lean), base[2] + out[2] * length * 0.86)
+            parts.append(sphere((0.0035, 0.0028, 0.0035), tip, '#d8958a', subdivisions=1))
     return parts
 
 

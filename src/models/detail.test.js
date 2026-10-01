@@ -106,3 +106,11 @@ test('the desk mug turns its handle toward the seat so it reads in profile from 
   assert.ok(seatward / handle > 0.8, `${seatward} of ${handle} handle vertices face the seat`);
   disposeDetails(scene); engine.dispose();
 });
+
+test('the desk succulent is a blush-tipped rosette in a glazed pot', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const { palette } = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint').metadata;
+  assert.ok(['#7f9fa3', '#efe2c4', '#8fb07c', '#c9dea8', '#d8958a'].every(hex => palette.includes(hex)), 'glazed pot with a cream band, graded rosette leaves and blushed tips');
+  disposeDetails(scene); engine.dispose();
+});
