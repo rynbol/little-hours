@@ -5,7 +5,7 @@ import { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Vector4 } from '@babylonjs/core/Maths/math.vector.js';
 import { heightAt, WORLD } from '../../core/world-terrain.js';
-import { TERRAIN_RINGS } from './terrain-mesh.js';
+import { TERRAIN_RINGS, ringAt } from './terrain-mesh.js';
 import { GROUND_GLSL, GROUND_UNIFORMS, applyGround } from './terrain-paint.js';
 import { followEye } from './world-glsl.js';
 import { createWorldRocks, MEADOW_ROCKS, rockClearings } from './rocks.js';
@@ -14,7 +14,7 @@ import { GRASS, grassBlades } from './grass-blades.js';
 export { GRASS, grassBlades } from './grass-blades.js';
 
 export function surfaceAt(x, z, rings = TERRAIN_RINGS) {
-  const ring = rings.find(({ radius }) => Math.abs(x) <= radius && Math.abs(z) <= radius) ?? rings[rings.length - 1], s = ring.step;
+  const s = ringAt(x, z, rings).step;
   const x0 = Math.floor(x / s) * s, z0 = Math.floor(z / s) * s, fx = (x - x0) / s, fz = (z - z0) / s;
   if (fx === 0 && fz === 0) return heightAt(x, z);
   if (fx + fz <= 1) { const a = heightAt(x0, z0); return a + (heightAt(x0 + s, z0) - a) * fx + (heightAt(x0, z0 + s) - a) * fz; }

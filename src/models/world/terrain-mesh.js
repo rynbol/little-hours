@@ -1,6 +1,6 @@
 import { heightAt, canopyAt, riverDistance, WORLD } from '../../core/world-terrain.js';
 
-const square = (radius, step) => Object.freeze({ minX: -radius, maxX: radius, minZ: -radius, maxZ: radius, step, radius });
+const square = (radius, step) => Object.freeze({ minX: -radius, maxX: radius, minZ: -radius, maxZ: radius, step });
 
 export const TERRAIN_RINGS = Object.freeze([
   square(160, 2),

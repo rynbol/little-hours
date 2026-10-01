@@ -20,6 +20,7 @@ test('grass roots sit on the rendered terrain triangles, not the analytic height
   assert.ok(Math.abs(surfaceAt(41, -39.5) - heightAt(41, -39.5)) > 1e-4);
   close(surfaceAt(41.5, -38.5), -9.636919943, 'upper triangle');
   assert.equal(surfaceAt(0, 0), 0);
+  for (const [x, z] of [[3008, -3008], [-4032, -5056], [4480, 1984]]) close(surfaceAt(x, z), heightAt(x, z), `vertex of the 64 m ring at ${x}, ${z}`);
 });
 
 test('the ground grid recentres on the camera and reuses texels it already holds', () => {
