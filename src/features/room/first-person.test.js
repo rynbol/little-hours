@@ -7,7 +7,7 @@ import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
-import { createFirstPersonView, clampLook, seatFov, seatEye, lookDirection, farFrame, SEAT_SECONDS } from './first-person.js';
+import { createFirstPersonView, clampLook, seatFov, seatEye, lookDirection, farFrame, SEAT_SECONDS, SEAT_LOOK } from './first-person.js';
 
 const round = (value, places = 3) => Math.round(value * 10 ** places) / 10 ** places + 0;
 const rounded = vector => vector.asArray().map(value => round(value, 2));
@@ -31,7 +31,7 @@ function stage() {
 }
 
 test('the seat eye sits just behind and above the avatar head, facing the desk', () => {
-  assert.deepEqual(rounded(seatEye(new Vector3(-2, 2.07, -2.65), new Vector3(0, 0, -1))), [-2, 2.12, -2.41]);
+  assert.deepEqual(rounded(seatEye(new Vector3(-2, 2.07, -2.65), new Vector3(0, 0, -1))), [-2, 2.24, -2.41]);
   assert.deepEqual(rounded(lookDirection(new Vector3(0, 0, -1), 0, 0)), [0, 0, -1]);
   assert.deepEqual(rounded(lookDirection(new Vector3(0, 0, -1), Math.PI / 2, 0)), [-1, 0, 0]);
 });
@@ -65,7 +65,7 @@ test('focus flies into the chair, hides the body once inside it, and flies back 
   assert.deepEqual(changes, ['entering']);
   run(SEAT_SECONDS.enter);
   assert.deepEqual(changes, ['entering', 'entering inside', 'seated inside']);
-  assert.deepEqual(rounded(view.camera.position), [-2, 2.12, -2.41]);
+  assert.deepEqual(rounded(view.camera.position), [-2, 2.24, -2.41]);
   assert.equal(round(view.camera.fov), 1.22);
 
   view.leave();
@@ -127,7 +127,7 @@ test('focusing again during the fly-out turns back toward the chair from where t
   assert.ok(Vector3.Distance(view.camera.position, midway) < 0.05);
   run(SEAT_SECONDS.enter + 0.05);
   assert.equal(view.state, 'seated');
-  assert.deepEqual(rounded(view.camera.position), [-2, 2.12, -2.41]);
+  assert.deepEqual(rounded(view.camera.position), [-2, 2.24, -2.41]);
   engine.dispose();
 });
 
@@ -168,4 +168,11 @@ test('disposing the view stops listening to the canvas', () => {
   view.dispose();
   assert.deepEqual(Object.keys(listeners), []);
   engine.dispose();
+});
+
+test('from the chair the eye sits above the head and looks down, so the laptop drops below the far hills', () => {
+  const head = new Vector3(1, 1.4, 2), eye = seatEye(head, new Vector3(0, 0, -1));
+  assert.ok(eye.y - head.y >= 0.15, `eye ${(eye.y - head.y).toFixed(2)} above the head`);
+  const gaze = lookDirection(new Vector3(0, 0, -1), SEAT_LOOK.restYaw, SEAT_LOOK.restPitch);
+  assert.ok(gaze.y < -0.22 && gaze.y > -0.3, `rest gaze dips ${gaze.y.toFixed(2)}`);
 });
