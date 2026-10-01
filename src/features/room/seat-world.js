@@ -8,6 +8,7 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
+import { heightAt } from '../../core/world-terrain.js';
 
 export const VISTA_THEMES = Object.freeze({
   dusk: {
@@ -735,10 +736,11 @@ export function createSeatWorld(scene, parent) {
     spirits.thinInstanceSetBuffer('matrix', spiritMatrices, 16, false); spirits.alwaysSelectAsActiveMesh = true;
   }
   let shell = null, shellKey = '', theme = 'dusk', progress = 0, colorKey = '', seconds = 0, backdrop = true;
-  function showBackdrop() { for (const mesh of [sky, land, grass, clouds]) mesh?.setEnabled(backdrop); skyEffectPaint.setFloat('plume', backdrop ? 1 : 0); if (moon) placeMoon(); }
+  function showBackdrop() { for (const mesh of [sky, land, grass, clouds]) mesh?.setEnabled(backdrop); skyEffectPaint.setFloat('plume', backdrop ? 1 : 0); skyEffectPaint.setFloat('rays', sunRays()); if (moon) placeMoon(); }
+  const sunRays = () => backdrop ? SUN_RAY_STRENGTH[theme] ?? 0 : 0;
   const glow = { x: 0, z: -1, lit: 0, stars: 1 };
   const temp = new Color3(), matrix = new Matrix(), scale = new Vector3(1, 1, 1), spot = new Vector3(), turn = new Quaternion();
-  const spiritStarts = Array.from({ length: SPIRITS }, (_, i) => { const random = seeded(101 + i); const [x, z] = ahead(-10 + (random() - 0.5) * 56, 13 + random() * 40); return { x, z, ground: terrainHeight(x, z), phase: random(), sway: random() * 6 }; });
+  const spiritStarts = Array.from({ length: SPIRITS }, (_, i) => { const random = seeded(101 + i); const [x, z] = ahead(-10 + (random() - 0.5) * 56, 13 + random() * 40); return { x, z, ground: terrainHeight(x, z), outdoors: heightAt(x, z), phase: random(), sway: random() * 6 }; });
   const butterflyStarts = Array.from({ length: BUTTERFLIES }, (_, i) => { const random = seeded(211 + i); const [x, z] = ahead(-6 + (random() - 0.5) * 12, 9 + random() * 6); return { x, z, sway: random() * 6 }; });
 
   function paint(mesh, palette, only = null) {
@@ -754,7 +756,7 @@ export function createSeatWorld(scene, parent) {
     glow.x = Math.cos(sun); glow.z = Math.sin(sun);
     moon.position.set(Math.cos(heading) * Math.cos(rise) * d, Math.sin(rise) * d, Math.sin(heading) * Math.cos(rise) * d);
     moon.lookAt(Vector3.Zero()); moon.scaling.setAll(theme === 'day' ? 0.8 : 1.6);
-    moon.setEnabled(theme !== 'rain' && (backdrop || theme !== 'day'));
+    moon.setEnabled(theme !== 'rain' && backdrop);
   }
   function recolor() {
     if (!sky) return;
@@ -765,7 +767,7 @@ export function createSeatWorld(scene, parent) {
     for (const mesh of [sky, land, clouds, flock, moon, shooting, spirits]) paint(mesh, palette);
     const tones = grassTones(palette);
     for (const [name, value] of Object.entries(tones)) grassPaint.setColor3(name, value); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
-    skyEffectPaint.setFloat('rays', SUN_RAY_STRENGTH[theme] ?? 0); skyEffectPaint.setColor3('tint', Color3.Lerp(Color3.White(), hex(palette.glow), 0.6));
+    skyEffectPaint.setFloat('rays', sunRays()); skyEffectPaint.setColor3('tint', Color3.Lerp(Color3.White(), hex(palette.glow), 0.6));
     skyEffectPaint.setColor3('smoke', hex(palette.smoke)); skyEffectPaint.setColor3('ember', hex(palette.ember)); skyEffectPaint.setColor3('haze', hex(palette.haze)); skyEffectPaint.setFloat('glow', theme === 'day' ? 0.8 : 1); skyEffectPaint.setFloat('rain', theme === 'rain' ? 1 : 0);
   }
   function setShell(style, wallPaint = {}, doors = []) {
@@ -784,14 +786,14 @@ export function createSeatWorld(scene, parent) {
       if (i < fluttering) {
         const { x, z, sway } = butterflyStarts[i], t = reduced ? 0 : seconds, wander = t * 0.35 + sway, beat = reduced ? 1 : Math.abs(Math.sin(t * 13 + sway * 5));
         spot.set(x + Math.sin(wander) * 2.2 + Math.sin(wander * 2.3) * 0.8, 0.6 + (sway % 1.5) + Math.sin(t * 2.4 + sway) * 0.3, z + Math.cos(wander * 0.8) * 1.6);
-        scale.set(0.12 + beat * 0.5, 0.14, 0.3);
+        scale.set(0.06 + beat * 0.25, 0.07, 0.15);
         Quaternion.RotationYawPitchRollToRef(Math.atan2(Math.cos(wander) * 2.2, -Math.sin(wander * 0.8) * 1.3), 0, 0, turn);
         Matrix.ComposeToRef(scale, turn, spot, matrix); matrix.copyToArray(spiritMatrices, i * 16);
         continue;
       }
       const start = spiritStarts[i], life = reduced ? start.phase : (seconds / SPIRIT_SECONDS + start.phase) % 1;
       const rise = i < aloft ? life : -1;
-      spot.set(start.x + Math.sin(life * 9 + start.sway) * 1.6, rise < 0 ? -400 : start.ground + 0.8 + rise * 12, start.z + Math.cos(life * 7 + start.sway) * 1.6);
+      spot.set(start.x + Math.sin(life * 9 + start.sway) * 1.6, rise < 0 ? -400 : (backdrop ? start.ground : start.outdoors) + 0.8 + rise * 12, start.z + Math.cos(life * 7 + start.sway) * 1.6);
       scale.setAll(rise < 0 ? 0 : Math.sin(Math.PI * life) * 0.9);
       Quaternion.RotationYawPitchRollToRef(life * 4 + start.sway, 0, 0, turn);
       Matrix.ComposeToRef(scale, turn, spot, matrix); matrix.copyToArray(spiritMatrices, i * 16);

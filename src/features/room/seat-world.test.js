@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
+import { heightAt } from '../../core/world-terrain.js';
 import { createSeatWorld, valleyMist, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VOLCANO_AT, TOWER_AT, CASTLE_AT, LANDMARK_SCALE, valleyFloor, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, VOLCANO, SEAT_DRAPE } from './seat-world.js';
 
 const PEAK = VOLCANO.base + VOLCANO.height, [VX, VZ] = VOLCANO_AT, fromVolcano = (x, z) => Math.hypot(x - VX, z - VZ);
@@ -664,7 +665,7 @@ test('from the desk chair the valley falls away below the eye, and the castle, v
   engine.dispose();
 });
 
-test('when the outdoor world shows through the window, the painted backdrop steps aside but the house shell, birds and motes stay', () => {
+test('when the outdoor world shows through the window, the painted backdrop, its sun rays and its moon step aside but the house shell, birds and motes stay', () => {
   const { world } = setup();
   world.setTheme('day'); world.setEnabled(true);
   const shown = () => Object.fromEntries(world.meshes.map(mesh => [mesh.name.replace('seat-world-', ''), mesh.isEnabled(false)]));
@@ -675,10 +676,26 @@ test('when the outdoor world shows through the window, the painted backdrop step
   assert.deepEqual([day.sky, day.land, day.grass, day.clouds, day.moon], [false, false, false, false, false]);
   assert.deepEqual([day.spirits, day.flock, day['sky-effects']], [true, true, true]);
   const effects = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects').material;
-  assert.equal(effects._floats.plume, 0);
+  assert.deepEqual([effects._floats.plume, effects._floats.rays], [0, 0]);
+  world.setTheme('dusk');
+  assert.equal(shown().moon, false);
+  world.setTheme('day'); world.setBackdrop(true);
+  assert.equal(shown().land, true);
+  assert.deepEqual([effects._floats.plume, effects._floats.rays], [1, 1]);
   world.setTheme('dusk');
   assert.equal(shown().moon, true);
-  world.setBackdrop(true);
-  assert.equal(shown().land, true);
-  assert.equal(effects._floats.plume, 1);
+});
+
+test('with the outdoor world behind the window, focus spirits rise from its real ground instead of the painted hills', () => {
+  const { engine, world } = setup();
+  world.setTheme('dusk'); world.setProgress(1); world.setEnabled(true); world.setBackdrop(false);
+  world.animate(0, true);
+  const spirits = world.meshes.find(mesh => mesh.name === 'seat-world-spirits'), data = spirits._thinInstanceDataStorage.matrixData;
+  const aloft = Array.from({ length: spiritsAloft('dusk', 1) }, (_, i) => data.slice(i * 16, i * 16 + 16)).filter(m => m[13] > -100);
+  assert.equal(aloft.length, 34);
+  for (const m of aloft) {
+    const above = m[13] - heightAt(m[12], m[14]);
+    assert.ok(above > 0 && above < 14, `a spirit ${above.toFixed(1)} m above the real ground at ${m[12].toFixed(0)}, ${m[14].toFixed(0)}`);
+  }
+  engine.dispose();
 });
