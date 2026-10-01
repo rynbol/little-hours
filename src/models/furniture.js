@@ -235,7 +235,7 @@ function deskLamp(parent, x, y, z) {
   cylinder(lamp, 0.10, 0.24, 0.21, [-0.14, 0.63, 0], '#c99858');
   cylinder(lamp, 0.205, 0.205, 0.013, [-0.14, 0.52, 0], '#f4dba1', { emissive: '#ffbd61', emissiveIntensity: 0.38 });
 }
-export const LAPTOP = Object.freeze({ walnut: '#7f4c33', brass: '#c9a063', leather: '#7a5640' });
+export const LAPTOP = Object.freeze({ walnut: '#6e5444', brass: '#c2a274', leather: '#776050' });
 function laptop(parent) {
   const laptopGroup = group(parent, [0, 1.29, -0.43]);
   box(laptopGroup, [0.97, 0.045, 0.62], [0, 0, 0], LAPTOP.walnut, 0.03);

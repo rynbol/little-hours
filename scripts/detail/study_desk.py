@@ -4,11 +4,11 @@ import kit
 from plant import leaf
 from kit import Frame, cushion, cylinder, lathe, rbox, rod, sphere, torus, tube
 
-WOOD, EDGE, DARK, BRASS, SAGE, PAPER = '#aa7954', '#bc9169', '#73533d', '#bf9762', '#83968a', '#f2ead5'
-BOOKS = ['#6b7a5c', '#9c5f46', '#556673']
-WALNUT, LEATHER, LAPTOP_BRASS, GILT, RIBBON, INK = '#7f4c33', '#7a5640', '#c9a063', '#d9b36e', '#a8463e', '#3f4a5e'
+WOOD, EDGE, DARK, BRASS, SAGE, PAPER = '#aa7954', '#bc9169', '#73533d', '#b99a6e', '#83968a', '#f2ead5'
+BOOKS = ['#6b7a5c', '#9c5f46', '#5f6a68']
+WALNUT, LEATHER, LAPTOP_BRASS, GILT, RIBBON, INK = '#6e5444', '#776050', '#c2a274', '#cdb07e', '#9a5a4a', '#4d4744'
 EYE = (0.25, 0.9, 1.0)
-SHADE_FOLD, SHADE_TRIM = '#eeb26a', '#9a5a3c'
+SHADE_FOLD, SHADE_TRIM = '#eeb26a', '#8e6048'
 KEY_TOP, KEY_SKIRT, KEY_SHADOW = '#f4ecd8', '#d8caa9', '#22170f'
 KEY_ROWS = ([1] * 11 + [2], [1.5] + [1] * 10 + [1.5], [1.75] + [1] * 9 + [2.25], [2.25] + [1] * 8 + [2.75], [1, 1, 1.25, 6.5, 1.25, 1, 1])
 
@@ -90,8 +90,8 @@ def laptop():
             centre = x + units * pitch / 2
             accent = (row, k) == (2, 6)
             parts.append(rbox([w + 0.006, 0.002, 0.044], (centre, 0.0245, z), KEY_SHADOW, bevel=0.002, frame=f))
-            parts.append(rbox([w, 0.009, 0.038], (centre, 0.025, z), '#c9a46c' if accent else KEY_SKIRT, bevel=0.005, segments=2, frame=f))
-            parts.append(rbox([w - 0.009, 0.004, 0.028], (centre, 0.0305, z - 0.002), '#e0bb82' if accent else KEY_TOP, bevel=0.003, segments=2, frame=f))
+            parts.append(rbox([w, 0.009, 0.038], (centre, 0.025, z), '#c3a477' if accent else KEY_SKIRT, bevel=0.005, segments=2, frame=f))
+            parts.append(rbox([w - 0.009, 0.004, 0.028], (centre, 0.0305, z - 0.002), '#d8bc8e' if accent else KEY_TOP, bevel=0.003, segments=2, frame=f))
             x += units * pitch
     lid = Frame((0, 0.022, -0.29), (-0.28, 0, 0), f)
     parts.append(rbox([0.97, 0.62, 0.03], (0, 0.31, 0), WALNUT, bevel=0.03, surface='wood', frame=lid, dice=0.06))
@@ -109,7 +109,7 @@ def laptop():
         parts.append(rbox([0.48 if i < 7 else 0.24, 0.008, 0.003], (0.12 if i < 7 else 0.0, 0.45 - i * 0.042, 0.026), '#cdb48c', bevel=0.001, layer='glow', frame=lid))
     for i in range(4):
         parts.append(rbox([0.14 - i * 0.015, 0.012, 0.003], (-0.31, 0.48 - i * 0.05, 0.026), '#a97b52', bevel=0.001, layer='glow', frame=lid))
-    parts.append(sphere((0.05, 0.05, 0.004), (0.2, 0.36, -0.017), '#e8c079', subdivisions=2, frame=lid))
+    parts.append(sphere((0.05, 0.05, 0.004), (0.2, 0.36, -0.017), '#d9bc8a', subdivisions=2, frame=lid))
     parts.append(sphere((0.022, 0.034, 0.004), (0.2, 0.43, -0.018), '#8fa878', subdivisions=2, frame=lid))
     return parts
 
@@ -148,7 +148,7 @@ def mug(x, y, z):
     outer = [(0.0, 0.0), (0.075, 0.0), (0.082, 0.006), (0.09, 0.05), (0.1, 0.17), (0.104, 0.19), (0.094, 0.192), (0.088, 0.17), (0.08, 0.05), (0.0, 0.05)]
     parts = [lathe(outer, (0, 0, 0), '#e7dec7', segments=36, surface='ceramic', frame=f),
              cylinder(0.089, 0.089, 0.004, (0, 0.165, 0), '#6b4a33', segments=36, frame=f),
-             cylinder(0.097, 0.092, 0.022, (0, 0.11, 0), '#c98f66', segments=36, surface='ceramic', frame=f),
+             cylinder(0.097, 0.092, 0.022, (0, 0.11, 0), '#c0957a', segments=36, surface='ceramic', frame=f),
              tube([(0.088, 0.155, 0), (0.13, 0.158, 0), (0.158, 0.135, 0), (0.162, 0.1, 0), (0.145, 0.07, 0), (0.084, 0.06, 0)], 0.015, '#e7dec7', surface='ceramic', frame=f)]
     parts.append(cylinder(0.12, 0.12, 0.01, (0, -0.003, 0), '#9c7a5b', segments=36, bevel=0.004, surface='wood', frame=f))
     return parts
@@ -184,7 +184,7 @@ def book(width, height, depth, x, y, z, colour, angle, tooled=False, ribbon=Fals
 def pencil(a, b):
     axis = tuple(b[i] - a[i] for i in range(3))
     along = lambda p, t: tuple(p[i] + axis[i] * t for i in range(3))
-    parts = [rod(a, b, 0.01, '#e0a24e', sides=6, surface='wood'),
+    parts = [rod(a, b, 0.01, '#cca874', sides=6, surface='wood'),
              rod(along(a, 0.03), along(a, 0.07), 0.0102, '#3f5f45', sides=6, surface='wood'),
              tube([b, along(b, 0.12)], 0.0098, '#e9cf9f', tip=0.3, surface='wood', resolution=2),
              tube([along(b, 0.1), along(b, 0.15)], 0.0032, '#3b3a3a', tip=0.2, resolution=2)]
@@ -193,8 +193,8 @@ def pencil(a, b):
     for t in (-0.055, -0.035, -0.015):
         parts.append(torus(0.0108, 0.0016, along(a, t), '#b9a77e', major_segments=14, minor_segments=5, surface='metal', layer='metal', rotation=(0, -math.atan2(axis[2], axis[0]), math.pi / 2)))
     end = along(back, -0.04)
-    parts.append(rod(end, back, 0.0104, '#d98b86', sides=14))
-    parts.append(sphere((0.0104, 0.0104, 0.0104), end, '#d98b86', subdivisions=2))
+    parts.append(rod(end, back, 0.0104, '#c79a90', sides=14))
+    parts.append(sphere((0.0104, 0.0104, 0.0104), end, '#c79a90', subdivisions=2))
     return parts
 
 
