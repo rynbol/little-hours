@@ -43,8 +43,23 @@ test('far mountain normals are averaged wider than the grid so slopes shade smoo
   };
   const meshed = neighbourAgreement((i, j) => normals.subarray((i * n + j) * 3, (i * n + j) * 3 + 3));
   const perStep = neighbourAgreement((i, j) => normalAt(coordinate(i), coordinate(j), ring.step * 0.75));
-  assert.equal(Math.round(meshed * 1000) / 1000, 0.973);
+  assert.equal(Math.round(meshed * 1000) / 1000, 0.988);
   assert.ok(1 - meshed < (1 - perStep) * 0.5, `${meshed} vs ${perStep}`);
+});
+
+test('neighbouring far crag vertices never face apart sharply, so adjacent faces of a peak share one light', () => {
+  const ring = square(6400, 64), n = Math.round(ring.maxX * 2 / ring.step) + 1, { normals } = terrainRing(0, [ring]);
+  let bent = 0, count = 0, widest = 1;
+  for (let i = 0; i < n - 1; i++) for (let j = 0; j < n - 1; j++) {
+    if (Math.hypot(ring.minX + i * ring.step, ring.minZ + j * ring.step) < 2000) continue;
+    const a = (i * n + j) * 3;
+    for (const b of [a + n * 3, a + 3]) {
+      const dot = normals[a] * normals[b] + normals[a + 1] * normals[b + 1] + normals[a + 2] * normals[b + 2];
+      count++; if (dot < Math.cos(Math.PI * 25 / 180)) bent++; widest = Math.min(widest, dot);
+    }
+  }
+  assert.ok(bent / count < 0.03, `${bent / count} of neighbours bend over 25 degrees`);
+  assert.ok(widest > 0.2, `two neighbours meet at ${widest}`);
 });
 
 test('terrain vertices carry no rock moss and count as open ground, so the shared paint leaves them unchanged', () => {

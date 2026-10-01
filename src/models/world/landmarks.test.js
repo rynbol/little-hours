@@ -31,7 +31,7 @@ test('an observatory, a snow peak, a waterfall and windmills stand at their dist
 
 test('the observatory, waterfall butte and windmills are rooted in the ground and rise above it', () => {
   const { observatory, falls } = LANDMARKS;
-  for (const [site, reach, tall] of [[observatory, observatory.drum * 1.6, observatory.drum], [falls, falls.width + 40, falls.height * 0.8], ...LANDMARKS.windmills.map(windmill => [windmill, 6, windmill.height * 0.9])]) {
+  for (const [site, reach, tall] of [[observatory, observatory.drum * 1.6, observatory.drum], [falls, falls.width + 40, falls.height * 0.8], ...LANDMARKS.windmills.map(windmill => [windmill, windmill.height * 0.2, windmill.height * 0.9])]) {
     const ys = heights(near(site, reach)), ground = heightAt(site.x, site.z);
     assert.ok(Math.min(...ys) <= ground, `${site.x}, ${site.z} floats above the ground`);
     assert.ok(Math.max(...ys) >= ground + tall, `${site.x}, ${site.z} only reaches ${(Math.max(...ys) - ground).toFixed(0)} m`);
@@ -94,7 +94,17 @@ test('only the windmill sails carry a spin, one hub per windmill', () => {
     hubs.set(geometry.spins.slice(i, i + 3).join(), [geometry.spins[i], geometry.spins[i + 2]]);
   }
   assert.equal(hubs.size, LANDMARKS.windmills.length);
-  for (const windmill of LANDMARKS.windmills) assert.ok([...hubs.values()].some(([x, z]) => Math.hypot(x - windmill.x, z - windmill.z) < 6));
+  for (const windmill of LANDMARKS.windmills) assert.ok([...hubs.values()].some(([x, z]) => Math.hypot(x - windmill.x, z - windmill.z) < windmill.height * 0.2));
+});
+
+test('windmills stand as stout mid-toned towers under a cap, not pale crosses on sticks', () => {
+  for (const windmill of LANDMARKS.windmills) {
+    const parts = near(windmill, windmill.height * 0.7), ground = heightAt(windmill.x, windmill.z);
+    const brightest = Math.max(...parts.map(i => 0.2126 * geometry.colors[i * 4] + 0.7152 * geometry.colors[i * 4 + 1] + 0.0722 * geometry.colors[i * 4 + 2]));
+    const foot = Math.max(...parts.filter(i => Math.abs(geometry.positions[i * 3 + 1] - ground) < 4 && geometry.spins[i * 4 + 3] === 0).map(i => Math.hypot(geometry.positions[i * 3] - windmill.x, geometry.positions[i * 3 + 2] - windmill.z)));
+    assert.ok(brightest < 0.72, `windmill at ${windmill.x} carries albedo ${brightest.toFixed(2)}`);
+    assert.ok(foot > windmill.height * 0.15, `windmill at ${windmill.x} stands on a ${foot.toFixed(1)} m stick`);
+  }
 });
 
 test('the landmarks are two draws that take the theme, wet in rain and rimmed at dusk, and stand still under reduced motion', async () => {
@@ -102,7 +112,7 @@ test('the landmarks are two draws that take the theme, wet in rain and rimmed at
   const moving = createWorldLandmarks(scene, { root: new TransformNode('root', scene), still: false });
   const resting = createWorldLandmarks(scene, { root: new TransformNode('rest', scene), still: true });
   assert.deepEqual(moving.meshes.map(mesh => mesh.name), ['world-landmarks', 'world-landmark-veils']);
-  assert.equal(moving.meshes[1].getTotalIndices(), (PLUME.puffs + MIST.puffs) * 6 + 12 * 6 + 3 * 64 * 6);
+  assert.equal(moving.meshes[1].getTotalIndices(), (PLUME.puffs + MIST.puffs) * 6 + 12 * 6 + 4 * 64 * 6);
   const [solid, veil] = moving.meshes.map(mesh => mesh.material);
   moving.setTheme(WORLD_ATMOSPHERES.day);
   const dayGlow = solid._floats.lampGain;
@@ -138,13 +148,13 @@ function ribbonFit({ reach, low, high }) {
   return [reach, Math.round(shows / bearings * 10) / 10, Math.round(touches / bearings * 10) / 10];
 }
 
-test('three mist ribbons rise from the valleys into view from the window in the same veil draw, nearest last, tinted by the theme', () => {
+test('four mist ribbons rise from the valleys into view from the window in the same veil draw, nearest last, tinted by the theme', () => {
   const veil = veilGeometry(geometry.falls), ribbons = [];
   for (let v = 0; v < veil.uvs2.length / 2; v++) if (veil.uvs2[v * 2] === 3) ribbons.push(v);
   assert.equal(ribbons.length, MIST_RIBBONS.length * (RIBBON_SEGMENTS + 1) * 2);
   const reach = v => Math.round(Math.hypot(veil.positions[v * 3] + 2, veil.positions[v * 3 + 2] + 2.4));
   assert.deepEqual([...new Set(ribbons.map(reach))], MIST_RIBBONS.map(ribbon => ribbon.reach));
-  assert.deepEqual(MIST_RIBBONS.map(ribbonFit), [[2300, 0.9, 0.7], [1500, 1, 1], [950, 1, 0.7]]);
+  assert.deepEqual(MIST_RIBBONS.map(ribbonFit), [[2300, 0.9, 0.7], [1500, 1, 1], [1250, 1, 0.7], [950, 1, 0.7]]);
   const scene = new Scene(new NullEngine()); new FreeCamera('eye', new Vector3(-2, 2, -2.4), scene);
   const landmarks = createWorldLandmarks(scene, { root: new TransformNode('root', scene), still: true }), paint = landmarks.meshes[1].material;
   const misted = theme => { landmarks.setTheme(WORLD_ATMOSPHERES[theme]); return [paint._colors3.mist.toHexString().toLowerCase(), paint._floats.mistStrength]; };

@@ -23,6 +23,7 @@ export const SAIL_TURN = 0.32;
 export const MIST_RIBBONS = Object.freeze([
   Object.freeze({ reach: 2300, low: 140, high: 230, from: -62, to: 48 }),
   Object.freeze({ reach: 1500, low: 30, high: 95, from: -66, to: 50 }),
+  Object.freeze({ reach: 1250, low: 15, high: 85, from: -64, to: 50 }),
   Object.freeze({ reach: 950, low: -52, high: 6, from: -72, to: 52 }),
 ]);
 export const RIBBON_SEGMENTS = 64;
@@ -38,7 +39,7 @@ const PAINT = Object.freeze({
   stone: [0.76, 0.74, 0.69], terrace: [0.6, 0.61, 0.6], paving: [0.66, 0.66, 0.63], verdigris: [0.43, 0.65, 0.6], slit: [0.22, 0.27, 0.31], pane: [0.3, 0.28, 0.25],
   rock: [0.5, 0.55, 0.6], rockDeep: [0.37, 0.42, 0.49],
   bluff: [0.8, 0.76, 0.68], bluffBand: [0.66, 0.67, 0.65], turf: [0.42, 0.56, 0.33],
-  post: [0.82, 0.79, 0.72], roof: [0.43, 0.5, 0.57], cloth: [0.92, 0.89, 0.8], spar: [0.47, 0.45, 0.43],
+  plaster: [0.7, 0.67, 0.6], plinth: [0.5, 0.48, 0.45], thatch: [0.36, 0.32, 0.29], cloth: [0.76, 0.7, 0.6], spar: [0.33, 0.28, 0.24],
 });
 
 const SAIL_AXIS = Object.freeze([0, 0, -1]);
@@ -172,17 +173,24 @@ function buildFalls({ sheet }, { x, z, height, width, depth }) {
   return { lip: [x + ex * lipOut, level(-1, face), z + ez * lipOut], foot: level(15, face), out: [ex, ez] };
 }
 
+const MILL = Object.freeze({ foot: 0.19, waist: 0.15, neck: 0.11, cap: 0.125, stock: 0.5, sailFrom: 0.2, sailWide: 0.21, bars: 5, reefed: 0.5 });
+
 function buildWindmill({ lathe, panel }, { x, z, height }) {
-  const ground = heightAt(x, z), root = footing(x, z, 6) - 4, top = ground + height;
-  lathe([x, z], [[4.6, root], [4, ground + height * 0.12], [2.2, top - 3]], { albedo: PAINT.post }, 14);
-  lathe([x, z], [[3, top - 3], [3, top + 1.5], [0, top + 4.5]], { albedo: PAINT.roof }, 14);
-  const hub = [x - SAIL_AXIS[0] * 3.6, top, z - SAIL_AXIS[2] * 3.6], across = [-SAIL_AXIS[2], 0, SAIL_AXIS[0]], length = height * 0.5, spin = [...hub, SAIL_TURN];
+  const ground = heightAt(x, z), root = footing(x, z, height * MILL.foot) - 4, top = ground + height, plinth = ground + height * 0.08, neck = top - 3;
+  lathe([x, z], [[height * MILL.foot, root], [height * MILL.foot * 0.96, plinth]], { albedo: PAINT.plinth }, 14);
+  lathe([x, z], [[height * MILL.foot * 0.96, plinth], [height * MILL.waist, ground + height * 0.45], [height * MILL.neck, neck]], { albedo: PAINT.plaster }, 14);
+  lathe([x, z], [[height * MILL.cap, neck], [height * MILL.cap, neck + 1.5], [height * MILL.cap * 0.8, top + 2.5], [height * MILL.cap * 0.4, top + 4.5], [0, top + 5.2]], { albedo: PAINT.thatch }, 14);
+  const hub = [x - SAIL_AXIS[0] * (height * MILL.cap + 1.2), top, z - SAIL_AXIS[2] * (height * MILL.cap + 1.2)], across = [-SAIL_AXIS[2], 0, SAIL_AXIS[0]], length = height * MILL.stock, spin = [...hub, SAIL_TURN];
   const at = (dir, side, along, wide, lift) => [0, 1, 2].map(k => hub[k] + dir[k] * along + side[k] * wide + SAIL_AXIS[k] * lift);
-  panel([at(across, [0, 1, 0], -1.4, -1.4, -0.6), at(across, [0, 1, 0], 1.4, -1.4, -0.6), at(across, [0, 1, 0], 1.4, 1.4, -0.6), at(across, [0, 1, 0], -1.4, 1.4, -0.6)], SAIL_AXIS, { albedo: PAINT.roof, spin });
+  const bar = (dir, side, from, to, low, high, lift, albedo) => panel([at(dir, side, from, low, lift), at(dir, side, to, low, lift), at(dir, side, to, high, lift), at(dir, side, from, high, lift)], SAIL_AXIS, { albedo, spin });
+  bar(across, [0, 1, 0], -1.3, 1.3, -1.3, 1.3, -0.6, PAINT.thatch);
   for (let k = 0; k < 4; k++) {
     const turn = k * Math.PI / 2 + 0.4, dir = [0, 1, 2].map(i => across[i] * Math.cos(turn) + (i === 1 ? Math.sin(turn) : 0)), side = [0, 1, 2].map(i => -across[i] * Math.sin(turn) + (i === 1 ? Math.cos(turn) : 0));
-    panel([at(dir, side, 0, -0.45, 0), at(dir, side, length, -0.45, 0), at(dir, side, length, 0.45, 0), at(dir, side, 0, 0.45, 0)], SAIL_AXIS, { albedo: PAINT.spar, spin });
-    panel([at(dir, side, 3.5, 0.5, 0.2), at(dir, side, length, 0.5, 0.2), at(dir, side, length, length * 0.17, 0.2), at(dir, side, 3.5, length * 0.12, 0.2)], SAIL_AXIS, { albedo: PAINT.cloth, spin });
+    const inner = length * MILL.sailFrom, outer = 0.4 + length * MILL.sailWide;
+    bar(dir, side, -0.8, length, -0.35, 0.35, 0, PAINT.spar);
+    bar(dir, side, inner, k % 2 ? inner + (length - inner) * MILL.reefed : length, 0.4, outer, 0.2, PAINT.cloth);
+    bar(dir, side, inner, length, outer - 0.6, outer, 0.3, PAINT.spar);
+    for (let j = 0; j <= MILL.bars; j++) { const along = inner + (length - inner) * j / MILL.bars; bar(dir, side, along - 0.3, along + 0.3, 0.35, outer, 0.3, PAINT.spar); }
   }
 }
 

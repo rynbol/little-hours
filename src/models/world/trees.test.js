@@ -7,7 +7,7 @@ import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { createWorldTrees, plantTrees, NEAR_TREES, HERO_TREES, WINDOW_EYE, VISTA } from './trees.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
-import { WORLD, riverDistance } from '../../core/world-terrain.js';
+import { WORLD, riverDistance, pathDistance } from '../../core/world-terrain.js';
 import { TERRAIN_RINGS, terrainRing, ringAt } from './terrain-mesh.js';
 
 function flatRing(radius, step, at) {
@@ -25,7 +25,7 @@ const conifers = trees => trees.kind.reduce((sum, kind) => sum + kind, 0);
 
 test('forests fill canopy ground while meadows get only a few lone broadleaf trees', () => {
   const trees = plantTrees(halfForest());
-  assert.equal(trees.count, 1847);
+  assert.equal(trees.count, 1180);
   let meadow = 0, meadowConifers = 0;
   for (let i = 0; i < trees.count; i++) {
     const d = Math.hypot(trees.x[i], trees.z[i]);
@@ -34,7 +34,7 @@ test('forests fill canopy ground while meadows get only a few lone broadleaf tre
     assert.ok(Math.abs(trees.x[i]) < 600 && Math.abs(trees.z[i]) < 600, `tree ${i} is off the terrain`);
     if (trees.x[i] < -20) { meadow++; meadowConifers += trees.kind[i]; }
   }
-  assert.equal(meadow, 67);
+  assert.equal(meadow, 68);
   assert.equal(meadowConifers, 0);
   assert.ok(Math.abs(trees.y[0] - (10 - 0.5 * trees.width[0])) < 1e-5);
 });
@@ -42,7 +42,7 @@ test('forests fill canopy ground while meadows get only a few lone broadleaf tre
 test('lowland forest is broadleaf and conifers only take the high ground', () => {
   const forestAt = y => plantTrees([flatRing(600, 20, () => ({ y, up: 1, cover: 1, wet: 0 }))]);
   assert.equal(conifers(forestAt(-40)), 0);
-  assert.equal(conifers(forestAt(200)), 898);
+  assert.equal(conifers(forestAt(200)), 609);
 });
 
 test('far hills hold a few wide grove clumps instead of a carpet of single trees', () => {
@@ -68,7 +68,7 @@ test('valley canopy sizes range from about 0.6 to 1.6 so groves are not one stam
 });
 
 test('no trees grow on steep rock or wet river banks except the window hero trees', () => {
-  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0 }))]).count, 134);
+  assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0 }))]).count, 135);
   assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 0.5, cover: 0, wet: 0 }))]).count, HERO_TREES.length);
   assert.equal(plantTrees([flatRing(600, 20, () => ({ y: 0, up: 1, cover: 0, wet: 0.3 }))]).count, HERO_TREES.length);
 });
@@ -86,6 +86,33 @@ test('hero trees frame the window vista below the far ridge and leave its cleari
     const inCone = dz > 0 && Math.abs(Math.atan2(dx, dz) - VISTA.bearing) < VISTA.halfAngle;
     assert.ok(!(inCone && Math.hypot(dx, dz) < VISTA.clearing), `tree ${i} blocks the window vista`);
   }
+});
+
+test('a valley forest gathers in thickets of mixed sizes with clearings between, not an orchard grid', () => {
+  const trees = plantTrees([flatRing(600, 20, () => ({ y: -40, up: 1, cover: 1, wet: 0 }))]), stand = [];
+  for (let i = HERO_TREES.length; i < trees.count; i++) if (trees.x[i] > -250 && trees.x[i] < -50 && trees.z[i] > -250 && trees.z[i] < -50) stand.push(i);
+  const nearest = stand.map(i => Math.min(...stand.filter(j => j !== i).map(j => Math.hypot(trees.x[i] - trees.x[j], trees.z[i] - trees.z[j]))));
+  const spread = 0.5 / Math.sqrt(stand.length / (200 * 200)), clumping = nearest.reduce((a, b) => a + b, 0) / nearest.length / spread;
+  const widths = stand.map(i => trees.width[i]), mean = widths.reduce((a, b) => a + b, 0) / widths.length;
+  const variation = Math.sqrt(widths.reduce((a, b) => a + (b - mean) ** 2, 0) / widths.length) / mean;
+  assert.ok(clumping < 0.7, `nearest-neighbour ratio ${clumping.toFixed(2)} reads as evenly planted rows`);
+  assert.ok(variation > 0.25, `crown widths vary only ${variation.toFixed(2)}`);
+});
+
+test('the winding path runs clear of tree crowns all the way down the valley', () => {
+  const trees = plantTrees([flatRing(600, 20, () => ({ y: -40, up: 1, cover: 1, wet: 0 }))]), blocking = [];
+  for (let i = HERO_TREES.length; i < trees.count; i++) if (pathDistance(trees.x[i], trees.z[i]) < 2 + 5 * trees.width[i]) blocking.push(`${Math.round(trees.x[i])},${Math.round(trees.z[i])}`);
+  assert.deepEqual(blocking, []);
+});
+
+test('trees stand along the crest of a terrace and fray out of its forest edge instead of stopping on a line', () => {
+  const rise = z => Math.min(1, Math.max(0, (-z - 860) / 40));
+  const terrace = flatRing(1300, 25, (x, z) => ({ y: 40 * rise(z), up: rise(z) > 0 && rise(z) < 1 ? 0.7 : 1, cover: 0, wet: 0 }));
+  const trees = plantTrees([terrace]), count = (near, far) => Array.from(trees.z).filter((z, i) => -z > near && -z < far && Math.abs(trees.x[i]) < 800).length;
+  assert.ok(count(900, 950) > 2.5 * count(1100, 1150) + 2, `${count(900, 950)} trees on the crest against ${count(1100, 1150)} on the open terrace`);
+  const edge = plantTrees([flatRing(1300, 25, x => ({ y: 0, up: 1, cover: x > 0 ? 1 : 0, wet: 0 }))]), strip = (low, high) => Array.from(edge.x).filter((x, i) => x > low && x < high && Math.hypot(x, edge.z[i]) > 500).length;
+  const open = strip(-400, -150) / 5;
+  assert.ok(strip(-50, 0) > 2.5 * open + 2, `${strip(-50, 0)} trees fray out of the forest edge against ${open} per strip in the open`);
 });
 
 function drawnSurface(meshes) {

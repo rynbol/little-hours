@@ -6,13 +6,13 @@ import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import '@babylonjs/core/Shaders/ShadersInclude/instancesDeclaration.js';
 import '@babylonjs/core/Shaders/ShadersInclude/instancesVertex.js';
-import { WORLD, riverDistance, smooth, noise2 } from '../../core/world-terrain.js';
+import { WORLD, riverDistance, pathDistance, smooth, noise2 } from '../../core/world-terrain.js';
 import { WORLD_GLSL, AIR_UNIFORMS, applyAir, followEye } from './world-glsl.js';
 
 export const TREE_BANDS = Object.freeze([
-  Object.freeze({ from: 25, to: 450, spacing: 8, size: 1, clump: 1, spread: 1, lone: 1, behind: 450 }),
-  Object.freeze({ from: 450, to: 1300, spacing: 34, size: 1.7, clump: 3.2, spread: 1.7, lone: 0.3, behind: 200 }),
-  Object.freeze({ from: 1300, to: 3400, spacing: 60, size: 2.6, clump: 5, spread: 1.8, lone: 0.25, behind: 200 }),
+  Object.freeze({ from: 25, to: 450, spacing: 8, size: 1, clump: 1, spread: 1, lone: 1, behind: 450, gather: 1, fray: 0 }),
+  Object.freeze({ from: 450, to: 1300, spacing: 34, size: 1.7, clump: 3.2, spread: 1.7, lone: 0.3, behind: 200, gather: 0, fray: 1 }),
+  Object.freeze({ from: 1300, to: 3400, spacing: 60, size: 2.6, clump: 5, spread: 1.8, lone: 0.25, behind: 200, gather: 0, fray: 1 }),
 ]);
 export const WINDOW_EYE = Object.freeze({ x: -2, y: 2.24, z: -2.4 });
 export const VISTA = Object.freeze({ reach: 320, clearing: 170, bearing: -0.3, halfAngle: 1.25, dip: 0.022 });
@@ -26,6 +26,8 @@ const CROWN_TOP = 10.6;
 export const NEAR_TREES = 115;
 const LONE_TREE_AREA = 70 * 70;
 const RIVER_CLEARANCE = WORLD.river.width * 1.4;
+export const PATH_CLEARANCE = 2;
+const FRAY_REACH = 50;
 
 const FOLIAGE_COLORS = Object.freeze(['leafTop', 'leafUnder', 'leafBack', 'leafCrown', 'needleTop', 'needleUnder', 'bark']);
 const LIGHT_COLORS = ['sunColor', 'skyAmbient', 'groundAmbient', 'shadowTint'];
@@ -78,23 +80,30 @@ export function plantTrees(rings) {
     const at = ground(hero.x, hero.z), top = WINDOW_EYE.y - hero.distance * VISTA.dip;
     if (at) plant(hero.x, hero.z, at, Math.max(0.6, Math.min(hero.size, (top - at.y) / (CROWN_TOP - 0.5))), hero.turn, false, 1);
   }
-  TREE_BANDS.forEach(({ from, to, spacing, size, clump, spread, lone: loneShare, behind }, band) => {
-    const cells = Math.ceil(to / spacing), lone = loneShare * spacing * spacing / LONE_TREE_AREA, salt = band * 8;
+  const neighbour = groundOf(rings), coverAt = (x, z) => neighbour(x, z)?.cover ?? 0, heightToward = (x, z, fallback) => neighbour(x, z)?.y ?? fallback;
+  TREE_BANDS.forEach(({ from, to, spacing, size, clump, spread, lone: loneShare, behind, gather, fray }, band) => {
+    const cells = Math.ceil(to / spacing), lone = loneShare * spacing * spacing / LONE_TREE_AREA, salt = band * 8, scatter = 1 + 0.7 * gather;
     for (let gx = -cells; gx < cells; gx++) for (let gz = -cells; gz < Math.ceil(behind / spacing); gz++) {
-      const px = (gx + hash(gx, gz, salt + 1)) * spacing, pz = (gz + hash(gx, gz, salt + 2)) * spacing, d = Math.hypot(px, pz);
+      const px = (gx + 0.5 + (hash(gx, gz, salt + 1) - 0.5) * scatter) * spacing, pz = (gz + 0.5 + (hash(gx, gz, salt + 2) - 0.5) * scatter) * spacing, d = Math.hypot(px, pz);
       if (d < from || d >= to || pz > behind || riverDistance(px, pz) < RIVER_CLEARANCE) continue;
       if (HERO_TREES.some(hero => Math.hypot(px - hero.x, pz - hero.z) < HERO_CLEARANCE * hero.size)) continue;
       const at = ground(px, pz);
       if (!at) continue;
       const grove = smooth(0.02, 0.32, noise2(px / 150, pz / 150, 91) + 0.35 * noise2(px / 48, pz / 48, 92));
-      const meadow = lone * smooth(0.9, 0.96, at.up) * (1 - smooth(0.12, 0.35, at.cover)) * (at.wet > 0 ? 0 : 1);
-      const forest = smooth(0.04, 0.3, at.cover) * grove * 1.3, roll = hash(gx, gz, salt + 3);
+      const open = (1 - smooth(0.12, 0.35, at.cover)) * (at.wet > 0 ? 0 : 1), up = at.up;
+      const edge = fray && open && up > 0.55 ? Math.max(coverAt(px + FRAY_REACH, pz), coverAt(px - FRAY_REACH, pz), coverAt(px, pz + FRAY_REACH), coverAt(px, pz - FRAY_REACH)) : 0;
+      const crest = fray && open && up > 0.85 ? smooth(8, 22, at.y - heightToward(px * (1 - FRAY_REACH / d), pz * (1 - FRAY_REACH / d), at.y)) : 0;
+      const frayed = fray * Math.max(smooth(0.3, 0.8, edge) * smooth(0.55, 0.75, up) * 0.8, crest) * smooth(-0.3, 0.3, noise2(px / 70, pz / 70, 96));
+      const meadow = Math.max(lone * smooth(0.9, 0.96, up), frayed) * open;
+      const thicket = smooth(-0.25, 0.4, noise2(px / 30, pz / 30, 94) + 0.45 * noise2(px / 12, pz / 12, 95)), gathered = 1 - gather + gather * thicket;
+      const forest = smooth(0.04, 0.3, at.cover) * grove * 1.3 * gathered * (1 + gather), roll = hash(gx, gz, salt + 3);
       if (roll >= forest && roll >= meadow) continue;
       const alone = roll >= forest, stand = smooth(-0.05, 0.35, noise2(px / 90, pz / 90, 93)), conifer = !alone && hash(gx, gz, salt + 4) < (0.85 * smooth(25, 120, at.y) + 0.5 * smooth(0.95, 0.85, at.up)) * stand;
-      const massed = !alone && !conifer, scale = 0.6 + 0.65 * hash(gx, gz, salt + 5) + 0.35 * smooth(0.4, 0.9, grove);
-      const grow = (massed ? clump : size) * scale * (alone ? 1.3 : 1), tall = 0.88 + 0.28 * hash(gx, gz, salt + 7);
+      const massed = !alone && !conifer, scale = (0.6 + 0.65 * hash(gx, gz, salt + 5) + 0.35 * smooth(0.4, 0.9, grove)) * (1 - gather * 0.55 + gather * gathered);
+      const grow = (massed ? clump : size) * scale * (alone ? 1.3 : 1), tall = 0.88 + 0.28 * hash(gx, gz, salt + 7) + gather * 0.2 * (hash(gx, gz, salt + 8) - 0.5);
       if (at.y - 0.5 * grow + grow * tall * (conifer ? 14.6 : CROWN_TOP) > sightLine(px, pz)) continue;
-      plant(px, pz, at, grow, hash(gx, gz, salt + 6) * Math.PI * 2, conifer, tall, massed ? spread : 1);
+      if (pathDistance(px, pz) < PATH_CLEARANCE + 5 * grow) continue;
+      plant(px, pz, at, grow, hash(gx, gz, salt + 6) * Math.PI * 2, conifer, tall, massed ? spread : 1 + gather * 0.3 * (hash(gx, gz, salt + 9) - 0.5));
     }
   });
   return { count: x.length, x: Float32Array.from(x), y: Float32Array.from(y), z: Float32Array.from(z), width: Float32Array.from(width), height: Float32Array.from(height), turn: Float32Array.from(turn), kind: Uint8Array.from(kind) };
