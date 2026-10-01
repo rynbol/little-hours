@@ -6,8 +6,8 @@ from kit import _finish, _mesh_from_bmesh, at
 
 BACK, CASE, TRIM, CROWN, BRASS = '#64483b', '#936c4e', '#c29c68', '#73533f', '#c6a16b'
 PAPER, VASE, BASKET, WEAVE, LINEN = '#f2ead5', '#d4b897', '#b8a17d', '#d4bd94', '#dfd1b2'
-BOOKS = ['#788e84', '#bb8066', '#d5b77c', '#a4ac8e', '#829da3', '#c7a696']
-ACCENTS = ['#8c6d85', '#5f7a6c', '#b8664f']
+BOOKS = ['#6b7a5c', '#9c5f46', '#b89358', '#857a58', '#5f7270', '#a07c62']
+ACCENTS = ['#74586a', '#4f6553', '#94503c']
 GILT = '#d9b36e'
 SHELVES = (0.08, 0.82, 1.58, 2.36, 3.29)
 TIPPING_GAP = (-0.475, -0.305)

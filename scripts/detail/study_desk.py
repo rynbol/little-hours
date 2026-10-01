@@ -5,7 +5,7 @@ from plant import leaf
 from kit import Frame, cushion, cylinder, lathe, rbox, rod, sphere, torus, tube
 
 WOOD, EDGE, DARK, BRASS, SAGE, PAPER = '#aa7954', '#bc9169', '#73533d', '#bf9762', '#83968a', '#f2ead5'
-BOOKS = ['#788e84', '#bb8066', '#5f7a8c']
+BOOKS = ['#6b7a5c', '#9c5f46', '#556673']
 WALNUT, LEATHER, LAPTOP_BRASS, GILT, RIBBON, INK = '#7f4c33', '#7a5640', '#c9a063', '#d9b36e', '#a8463e', '#3f4a5e'
 EYE = (0.25, 0.9, 1.0)
 SHADE_FOLD, SHADE_TRIM = '#eeb26a', '#9a5a3c'
@@ -231,7 +231,7 @@ def writing(frame):
 def succulent(x, y, z):
     f = Frame((x, y, z))
     wall = [(0.0, 0.0), (0.042, 0.0), (0.046, 0.006), (0.044, 0.014), (0.06, 0.04), (0.07, 0.075), (0.072, 0.088), (0.08, 0.091), (0.083, 0.098), (0.08, 0.104), (0.066, 0.104), (0.064, 0.096), (0.0, 0.096)]
-    parts = [lathe(wall, (0, 0, 0), '#7f9fa3', segments=32, surface='ceramic', frame=f),
+    parts = [lathe(wall, (0, 0, 0), '#667c78', segments=32, surface='ceramic', frame=f),
              torus(0.0652, 0.003, (0, 0.06, 0), '#efe2c4', rotation=(math.pi / 2, 0, 0), major_segments=32, minor_segments=5, surface='ceramic', frame=f),
              cylinder(0.064, 0.064, 0.006, (0, 0.093, 0), '#5c4a3a', segments=24, surface='stone', frame=f)]
     for k, (px, pz, r) in enumerate(((0.035, 0.03, 0.009), (-0.03, 0.038, 0.007), (0.042, -0.028, 0.006))):

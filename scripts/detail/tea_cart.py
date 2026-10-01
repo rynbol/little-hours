@@ -6,7 +6,7 @@ from bookcase import basket
 
 BRASS, TYRE, WOOD, EDGE, CREAM, PAPER, BISCUIT = '#bf9762', '#50564c', '#aa7954', '#bc9169', '#e7dec7', '#f2ead5', '#d7b572'
 SAGE, TERRACOTTA, GRIP = '#83968a', '#bd8469', '#73533d'
-BOOKS = ['#bb8066', '#a4ac8e']
+BOOKS = ['#9c5f46', '#857a58']
 EYE = (0.4, 0.6, 1.0)
 
 

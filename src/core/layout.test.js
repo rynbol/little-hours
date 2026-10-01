@@ -340,8 +340,8 @@ test('the moon tree canopy is clumps of leaf cards, each card one tone on its cl
     assert.ok(count >= 12000 && count <= 14500, `${count} canopy vertices`);
     const same = (data, size, a, b) => Array.from({ length: size }, (_, k) => data[a * size + k] === data[b * size + k]).every(Boolean);
     let cards = 0;
-    for (let i = 0; i + 3 < count; i++) if ([1, 2, 3].every(k => same(colors, 4, i, i + k) && same(normals, 3, i, i + k))) { cards++; i += 3; }
-    assert.ok(cards >= 2500, `${cards} leaf cards`);
+    for (let i = 0; i + 5 < count; i++) if ([1, 2, 3, 4, 5].every(k => same(colors, 4, i, i + k) && same(normals, 3, i, i + k))) { cards++; i += 5; }
+    assert.ok(cards >= 1700, `${cards} leaf cards`);
     const luminance = i => 0.3 * colors[i * 4] + 0.59 * colors[i * 4 + 1] + 0.11 * colors[i * 4 + 2], mean = list => list.reduce((sum, value) => sum + value, 0) / list.length;
     const tops = [], undersides = [];
     for (let i = 0; i < count; i++) { if (normals[i * 3 + 1] > 0.6) tops.push(luminance(i)); if (normals[i * 3 + 1] < -0.6) undersides.push(luminance(i)); }

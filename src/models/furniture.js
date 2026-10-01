@@ -501,8 +501,9 @@ function petBed(parent) {
   box(tag, [0.12, 0.035, 0.018], [0, 0, 0], C.cream, 0.008);
   for (const x of [-0.06, 0.06]) for (const y of [-0.016, 0.016]) sphere(tag, [0.02, 0.02, 0.012], [x, y, 0], C.cream);
 }
-const MOON_CANOPY = Object.freeze({ core: '#41665f', under: '#46696a', side: '#5f9a4c', top: '#a3c95a', rim: '#dcea93', sun: [-0.3, 0.82, 0.48] });
-function leafClump(parent, center, radii, seed, leaves) {
+export const MOON_CANOPY = Object.freeze({ core: '#3d5e5c', under: '#41686b', side: '#628f4e', top: '#b0bf5e', rim: '#e6d98c', sun: [-0.3, 0.82, 0.48], mottle: 0.015 });
+export const LEAF_OUTLINE = Object.freeze([[0, 0], [0.35, 0.8], [0.75, 0.75], [1, 0], [0.75, -0.75], [0.35, -0.8]]);
+export function leafClump(parent, center, radii, seed, leaves) {
   const positions = [], indices = [], colors = [], normals = [];
   const [core, under, side, top, rim] = ['core', 'under', 'side', 'top', 'rim'].map(key => Color3.FromHexString(MOON_CANOPY[key]));
   const sun = new Vector3(...MOON_CANOPY.sun).normalize(), normal = new Vector3(), along = new Vector3(), across = new Vector3();
@@ -538,14 +539,12 @@ function leafClump(parent, center, radii, seed, leaves) {
     Vector3.CrossToRef(n, Math.abs(n.y) > 0.9 ? Vector3.Right() : Vector3.Up(), across); across.normalize();
     Vector3.CrossToRef(across, n, along); along.normalize();
     const spin = random(k + 100) * Math.PI * 2;
-    normal.copyFrom(along.scale(Math.cos(spin))).addInPlace(across.scale(Math.sin(spin))).scaleInPlace(0.9).addInPlace(n.scale(0.22)).addInPlace(new Vector3(0, -0.35, 0)).normalize();
+    normal.copyFrom(along.scale(Math.cos(spin))).addInPlace(across.scale(Math.sin(spin))).scaleInPlace(0.9).addInPlace(n.scale(0.1)).addInPlace(new Vector3(0, -0.15, 0)).normalize();
     Vector3.CrossToRef(normal, n, across); across.normalize();
-    const length = (0.062 + random(k + 200) * 0.024) * scale, width = length * 0.34, cup = n.scale(-width * 0.35);
-    const base = point.subtract(normal.scale(length * 0.2)), tip = point.add(normal.scale(length)), middle = point.add(normal.scale(length * 0.28));
-    const left = middle.add(across.scale(width)).addInPlace(cup), right = middle.subtract(across.scale(width)).addInPlace(cup);
-    const shade = tone(n, (random(k + 300) - 0.5) * 0.06);
-    const ids = [vertex(base, n, shade), vertex(left, n, shade), vertex(tip, n, shade), vertex(right, n, shade)];
-    indices.push(ids[0], ids[1], ids[2], ids[0], ids[2], ids[3], ids[0], ids[2], ids[1], ids[0], ids[3], ids[2]);
+    const length = (0.072 + random(k + 200) * 0.028) * scale, width = length * 0.42, start = point.subtract(normal.scale(length * 0.2));
+    const shade = tone(n, (random(k + 300) - 0.5) * MOON_CANOPY.mottle * 2);
+    const ids = LEAF_OUTLINE.map(([u, v]) => vertex(start.add(normal.scale(length * 1.2 * u)).addInPlace(across.scale(width * v)).addInPlace(n.scale(-width * 0.35 * v * v)), n, shade));
+    for (let i = 1; i < ids.length - 1; i++) indices.push(ids[0], ids[i], ids[i + 1], ids[0], ids[i + 1], ids[i]);
   }
   const data = new VertexData(); Object.assign(data, { positions, indices, colors, normals });
   const clump = new Mesh('moonleaf-clump', parent.getScene()); data.applyToMesh(clump);
@@ -579,14 +578,14 @@ function moonTree(parent, canopyOnly = false) {
       if (!canopyOnly) { rod(parent, [0, height - 0.05, 0], end, 0.020, '#816746'); rod(parent, fork, twig, 0.010, '#816746'); }
       else {
         const seed = tier * 3 + branch, size = (tier === 3 ? 0.85 : 1) * (0.9 + vary(seed) * 0.2), small = 0.85 + vary(seed + 12) * 0.3;
-        leafClump(parent, [end[0] * 1.04, end[1] + 0.04, end[2] * 1.04], [0.25 * size, 0.18 * size, 0.25 * size], seed, 160);
-        leafClump(parent, [twig[0], twig[1] + 0.07, twig[2]], [0.15 * small, 0.115 * small, 0.15 * small], seed + 12, 76);
+        leafClump(parent, [end[0] * 1.04, end[1] + 0.04, end[2] * 1.04], [0.25 * size, 0.18 * size, 0.25 * size], seed, 110);
+        leafClump(parent, [twig[0], twig[1] + 0.07, twig[2]], [0.15 * small, 0.115 * small, 0.15 * small], seed + 12, 52);
       }
     }
   }
   if (canopyOnly) {
-    leafClump(parent, [0.1, 3.04, -0.06], [0.24, 0.19, 0.24], 24, 160);
-    leafClump(parent, [-0.1, 2.9, 0.13], [0.17, 0.13, 0.17], 25, 90);
+    leafClump(parent, [0.1, 3.024, -0.06], [0.24, 0.19, 0.24], 24, 110);
+    leafClump(parent, [-0.1, 2.9, 0.13], [0.17, 0.13, 0.17], 25, 62);
   }
   if (!canopyOnly) for (const [x, y, z] of [[-0.48, 1.82, 0.2], [0.42, 2.23, 0.27], [-0.15, 2.87, -0.23]]) {
     rod(parent, [x, y, z], [x, y - 0.19, z], 0.005, '#bca36f');

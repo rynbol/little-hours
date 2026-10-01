@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
+import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, DETAIL_SOURCES } from './detail.js';
 import { SURFACE_KIND } from './storybook.js';
 import { getFurniture } from '../core/catalog.js';
@@ -111,7 +112,7 @@ test('the desk succulent is a blush-tipped rosette in a glazed pot', async () =>
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
   const { palette } = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint').metadata;
-  assert.ok(['#7f9fa3', '#efe2c4', '#8fb07c', '#c9dea8', '#d8958a'].every(hex => palette.includes(hex)), 'glazed pot with a cream band, graded rosette leaves and blushed tips');
+  assert.ok(['#667c78', '#efe2c4', '#8fb07c', '#c9dea8', '#d8958a'].every(hex => palette.includes(hex)), 'glazed pot with a cream band, graded rosette leaves and blushed tips');
   disposeDetails(scene); engine.dispose();
 });
 
@@ -186,5 +187,16 @@ test('the desk lamp shade shows its pleat folds, a rust trim at both rims, a gil
   const beads = at('detail-metal', '#d9b36e').filter(([x, y, z]) => Math.abs(Math.hypot(x - 0.96, z + 0.69) - 0.256) < 0.012 && Math.abs(y - 1.76) < 0.015);
   assert.ok(beads.length > 24 * 6, `${beads.length} fringe bead vertices`);
   assert.ok(at('detail-metal', '#bf9762').some(([x, y, z]) => Math.hypot(x - 0.96, z + 0.69) < 0.03 && y > 2.05), 'a brass finial crowns the shade');
+  disposeDetails(scene); engine.dispose();
+});
+
+test('shelf books are earthy leather and cloth tones, with no pale pastel blues or greens', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine), types = ['bookcase', 'wall-shelf'];
+  await loadDetails(types);
+  for (const type of types) {
+    const { palette } = createDetail(type, scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint').metadata;
+    const pastel = palette.filter(hex => { const [h, s, v] = Color3.FromHexString(hex).toHSV().asArray(); return h > 120 && h < 260 && s > 0.08 && v > 0.5; });
+    assert.deepEqual(pastel, [], `${type} has pale cool spines`);
+  }
   disposeDetails(scene); engine.dispose();
 });

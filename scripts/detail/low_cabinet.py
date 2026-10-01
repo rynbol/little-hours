@@ -6,7 +6,7 @@ from writing_desk import orient
 
 WOOD, EDGE, DARK, DOOR, BRASS = '#aa7954', '#bc9169', '#73533d', '#c29b71', '#bf9762'
 PLINTH, CANE, CANE_BACK = '#a07858', '#e6d2a8', '#7a5a40'
-BOOKS = ['#788e84', '#d5b77c']
+BOOKS = ['#6b7a5c', '#b89358']
 RECORD = (-0.33, -0.01)
 EYE = (0.3, 0.7, 1.0)
 
