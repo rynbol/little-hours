@@ -116,3 +116,10 @@ test('a software renderer draws the full-screen room at a reduced density so fra
   expect(room.pixelRatio).toBe(0.6);
   expect(room.scale).toBeCloseTo(0.6, 2);
 });
+
+test('the room keeps no hidden copy of the old room navigation, picker or in-room house view', async ({ page }) => {
+  await open(page, { width: 1440, height: 1000 });
+  await expect(page.locator('.retired-navigation, #coin-wallet, #previous-room, #next-room, #room-switcher-toggle, .home-wide, #room-picker, #house-in-room')).toHaveCount(0);
+  await page.locator('#rooms-button').click();
+  await expect(page.locator('body')).toHaveClass(/is-house/);
+});

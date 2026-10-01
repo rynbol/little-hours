@@ -45,7 +45,8 @@ test('meals and belongings spend earned coins once and fullness survives reload'
   await page.locator('#pet-belongings > summary').click();
   await page.locator('#pet-fabric-rose').click();
   await expect(page.locator('#coin-balance')).toHaveText('0');
-  await page.locator('#pet-fabric-linen').click(); await page.locator('#pet-fabric-rose').click();
+  await page.locator('#pet-fabric-linen').click(); await expect(page.locator('#pet-fabric-linen')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#pet-fabric-rose').click(); await expect(page.locator('#pet-fabric-rose')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#coin-balance')).toHaveText('0');
   await page.reload(); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 }); await page.locator('#pet-button').click();
   await expect(page.locator('#pet-feed')).toContainText('Full');

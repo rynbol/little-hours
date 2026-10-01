@@ -88,7 +88,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   for (let i = 0; i < 36; i++) petals[i * 16 + 15] = 1;
   sparkles.thinInstanceSetBuffer('matrix', petals, 16, false); sparkles.setEnabled(false);
   const controls = document.createElement('div'); controls.className = 'house-camera-controls';
-  controls.innerHTML = `<div class="house-camera-group"><button type="button" data-house-open aria-pressed="true">Close the house</button></div>${container.id === 'house-in-room' ? '<div class="house-camera-group" role="group" aria-label="House angle"><button type="button" class="house-camera-turn" data-turn="-1" aria-label="Turn house left">↶</button><button type="button" data-turn="0" aria-label="Reset house view">Recenter</button><button type="button" class="house-camera-turn" data-turn="1" aria-label="Turn house right">↷</button></div>' : ''}`;
+  controls.innerHTML = `<div class="house-camera-group"><button type="button" data-house-open aria-pressed="true">Close the house</button></div>`;
   container.appendChild(controls);
   const tags = document.createElement('div'); tags.className = 'house-room-tags'; container.appendChild(tags);
   const note = document.createElement('span'); note.className = 'house-camera-note'; container.appendChild(note);
@@ -219,7 +219,6 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   controls.addEventListener('click', event => {
     const button = event.target.closest('button'); if (!button) return;
     if (button.dataset.houseOpen !== undefined) setClosed(!closed);
-    if (button.dataset.turn !== undefined) turn(Number(button.dataset.turn));
   });
   tags.addEventListener('click', event => { const button = event.target.closest('button'); if (button) onSelect(button.dataset.room); });
   function update(next, selected, atmosphere = theme, appearance = avatar) {

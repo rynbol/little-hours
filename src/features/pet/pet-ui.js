@@ -13,7 +13,7 @@ import { remainingAt, formatTime, sessionStarted } from '../../core/session.js';
 export function createPetUI(app) {
   const name = () => petName(app.state), drafts = new Map();
   let offered = null, signature = '', careSignature = '', closeup = null, closeupHost = null;
-  const available = () => !app.nav.travelling && !app.nav.houseOpen && !app.nav.connected && !app.roomUI.compact && !app.decorate.active && !app.avatar.active;
+  const available = () => !app.nav.travelling && !app.nav.houseOpen && !app.roomUI.compact && !app.decorate.active && !app.avatar.active;
   async function feedback({ species = app.state.pet, by = 'you' } = {}) {
     const bond = app.state.petBonds[species];
     if (by === 'you' && available()) {

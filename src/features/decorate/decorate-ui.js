@@ -16,7 +16,6 @@ export function createDecorateUI(app) {
   function setEditMode(enabled) {
     if (app.nav.travelling) return;
     if (enabled && !app.room) return;
-    if (enabled && app.nav.connected) app.nav.setConnectedView(false);
     editMode = enabled;
     if (enabled) app.roomUI.leaveMini();
     document.body.classList.toggle('is-decorating', enabled);

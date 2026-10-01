@@ -28,7 +28,7 @@ controls.querySelector('#test-held').onclick = async () => {
 };
 controls.querySelector('#test-frames').onclick = async () => {
   ++run;
-  const app = window.__littleHours, overview = app.connected || app.house;
+  const app = window.__littleHours, overview = app.house;
   const start = overview.diagnostics(), roomFrame = app.room.diagnostics().scene.getFrameId();
   if (!start) return;
   await new Promise(resolve => setTimeout(resolve, 2000));
@@ -41,7 +41,7 @@ controls.querySelector('#test-motion').onclick = event => {
   event.target.setAttribute('aria-pressed', String(motion.matches));
   requestAnimationFrame(() => {
     const app = window.__littleHours;
-    controls.querySelector('output').textContent = `${document.getAnimations().filter(a => a.playState === 'running').length} running UI animations · ${(app.connected || app.house).diagnostics()?.activeRoomMotions || 0} room reactions`;
+    controls.querySelector('output').textContent = `${document.getAnimations().filter(a => a.playState === 'running').length} running UI animations · ${app.house.diagnostics()?.activeRoomMotions || 0} room reactions`;
   });
 };
 let run = 0;
@@ -52,7 +52,7 @@ document.addEventListener('click', event => {
   let uiPeak = 0, roomPeak = 0, startFrames;
   function measure(now) {
     if (id !== run) return;
-    const app = window.__littleHours, overview = (app.connected || app.house).diagnostics();
+    const app = window.__littleHours, overview = app.house.diagnostics();
     const running = document.getAnimations().filter(a => a.playState === 'running').length;
     startFrames ??= overview?.renderCount;
     uiPeak = Math.max(uiPeak, running); roomPeak = Math.max(roomPeak, overview?.activeRoomMotions || 0);
