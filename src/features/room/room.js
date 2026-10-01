@@ -21,6 +21,7 @@ import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
 import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstrumentation.js';
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 import '@babylonjs/core/Culling/ray.js';
+import { BoundingBox } from '@babylonjs/core/Culling/boundingBox.js';
 import '@babylonjs/core/Rendering/outlineRenderer.js';
 import { createFurniture, createRoundedBox, createContactShadow, createMobileCompanion, disposeAvatarTemplates, disposeFurnitureAssets, WINDOW_VIEW_DEPTH, PET_BED_SURFACE } from '../../models/furniture.js';
 import { celebrationWeight } from '../../core/delight.js';
@@ -52,7 +53,7 @@ import { createLanternGlow, createGlowDecal, deskPoolShape, DESK_POOL } from './
 import { moulding, sillNosing } from './window-trim.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
 import { createStorybook } from '../../models/storybook.js';
-import { createSeatWorld } from './seat-world.js';
+import { createSeatWorld, SEAT_WINDOW } from './seat-world.js';
 import { createWindowWorld, yieldToBrowser } from './window-world.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
@@ -1669,7 +1670,13 @@ export function createRoom(container, options = {}) {
     if (wanted) camera.attachControl(canvas, false); else camera.detachControl();
   }
   syncCameraControl();
-  let seatShadersStale = true, seatSitting = null;
+  let seatShadersStale = true, seatSitting = null, windowOpenings = new Float32Array(0);
+  const seatWindowLow = new Vector3(SEAT_WINDOW.x - SEAT_WINDOW.width / 2, SEAT_WINDOW.y - SEAT_WINDOW.height / 2, SEAT_WINDOW.z - SEAT_WINDOW.depth / 2);
+  const seatWindowHigh = new Vector3(SEAT_WINDOW.x + SEAT_WINDOW.width / 2, SEAT_WINDOW.y + SEAT_WINDOW.height / 2, SEAT_WINDOW.z + SEAT_WINDOW.depth / 2);
+  function collectWindowOpenings(views) {
+    const boxes = [...views.map(mesh => { mesh.computeWorldMatrix(true); return mesh.getBoundingInfo().boundingBox; }), new BoundingBox(seatWindowLow, seatWindowHigh, seatWorld.root.computeWorldMatrix(true))];
+    windowOpenings = Float32Array.from(boxes.flatMap(box => [...box.minimumWorld.asArray(), ...box.maximumWorld.asArray()]));
+  }
   function shapeSeatShell() { seatWorld.setShell(architectureStyle, surfacePaint(architectureStyle, 'walls', layout.walls) || {}, (passages?.links || []).map(link => link.z)); }
   function syncSeatWorld() {
     const inside = seatView.inside;
@@ -1678,7 +1685,9 @@ export function createRoom(container, options = {}) {
     passages?.root.setEnabled(!editing && !inside);
     roof?.root?.setEnabled(!inside);
     skyStars.setEnabled(theme === 'dusk' && !inside);
-    for (const mesh of scene.meshes) if (mesh.material && (mesh.material === retreatView || mesh.material === architecture?.viewMaterial)) mesh.isVisible = !inside;
+    const views = scene.meshes.filter(mesh => mesh.material && (mesh.material === retreatView || mesh.material === architecture?.viewMaterial));
+    for (const mesh of views) mesh.isVisible = !inside;
+    if (inside) collectWindowOpenings(views);
   }
   function syncDetails() {
     for (const object of placedObjects.values()) {
@@ -1694,7 +1703,7 @@ export function createRoom(container, options = {}) {
   function drawScene() {
     const outdoor = Boolean(windowWorld?.ready && seatWorld.root.isEnabled(false));
     scene.autoClear = !outdoor;
-    if (outdoor) windowWorld.render(scene.activeCamera);
+    if (outdoor) windowWorld.render(scene.activeCamera, windowOpenings);
     scene.render();
   }
   async function prepareSeat(sitting) {

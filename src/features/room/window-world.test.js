@@ -11,6 +11,7 @@ import { WORLD_ATMOSPHERES } from '../../models/world/atmosphere.js';
 function uploadingEngine() {
   const engine = new NullEngine(), createRawTexture = engine.createRawTexture.bind(engine);
   engine.createRawTexture = (...args) => Object.assign(createRawTexture(...args), { isReady: true });
+  engine.enableScissor = engine.disableScissor = () => {};
   return engine;
 }
 const near = (actual, expected) => assert.ok(Vector3.Distance(actual, expected) < 1e-4, `${actual} vs ${expected}`);
@@ -22,11 +23,12 @@ test('the window world draws nothing until built, then sees the outdoors from wh
   seat.setTarget(Vector3.TransformCoordinates(new Vector3(-2, 2.24, -12.4), anchor.getWorldMatrix())); seat.fov = 1.4; seat.computeWorldMatrix(true);
   const windowWorld = createWindowWorld(engine, anchor, { workers: false });
   t.after(() => windowWorld.scene.isDisposed || windowWorld.dispose());
-  assert.equal(windowWorld.render(seat), false);
+  const glass = Vector3.TransformCoordinates(new Vector3(-2, 2.24, -8), anchor.getWorldMatrix()), ahead = Float32Array.from([...glass.subtractFromFloats(1, 1, 1).asArray(), ...glass.add(new Vector3(1, 1, 1)).asArray()]);
+  assert.equal(windowWorld.render(seat, ahead), false);
   assert.equal(engine.scenes.includes(windowWorld.scene), false);
   await windowWorld.prepare({ theme: 'dusk' });
   assert.equal(windowWorld.ready, true);
-  assert.equal(windowWorld.render(seat), true);
+  assert.equal(windowWorld.render(seat, ahead), true);
   near(windowWorld.camera.position, new Vector3(-2, 2.24, -2.4));
   near(windowWorld.camera.getTarget(), new Vector3(-2, 2.24, -12.4));
   assert.equal(windowWorld.camera.fov, 1.4);
@@ -34,6 +36,29 @@ test('the window world draws nothing until built, then sees the outdoors from wh
   assert.ok(windowWorld.scene.meshes.some(mesh => mesh.name === 'world-terrain-0'));
   windowWorld.dispose();
   assert.equal(room.isDisposed, false);
+});
+
+test('from the chair the outdoor world draws only the screen rectangle its window openings cover, and nothing when none is in view', { timeout: 30000 }, async t => {
+  const engine = uploadingEngine(), room = new Scene(engine), anchor = new TransformNode('seat-world', room);
+  room.useRightHandedSystem = true;
+  const seat = new TargetCamera('seat', new Vector3(0, 0, 0), room);
+  seat.setTarget(new Vector3(0, 0, -10)); seat.fov = Math.PI / 2;
+  const windowWorld = createWindowWorld(engine, anchor, { workers: false });
+  t.after(() => windowWorld.scene.isDisposed || windowWorld.dispose());
+  await windowWorld.prepare({ theme: 'day' });
+  const scissors = [];
+  let drawn = 0;
+  engine.enableScissor = (...rect) => scissors.push(rect);
+  engine.disableScissor = () => scissors.push('off');
+  windowWorld.scene.onAfterRenderObservable.add(() => drawn++);
+  const draw = (...boxes) => { scissors.length = 0; drawn = 0; windowWorld.render(seat, Float32Array.from(boxes.flat())); return { scissors: [...scissors], drawn }; };
+  assert.deepEqual(draw([-1.3, -0.7, -5.1, 1.3, 0.7, -4.9]), { scissors: [[216, 104, 80, 48], 'off'], drawn: 1 }, 'a window straight ahead');
+  assert.deepEqual(draw([-1.3, -0.7, -5.1, 1.3, 0.7, -4.9], [3, -0.7, -5.1, 5, 0.7, -4.9]), { scissors: [[216, 104, 178, 48], 'off'], drawn: 1 }, 'two windows ahead draw their union');
+  assert.deepEqual(draw([-1.3, -0.7, 4.9, 1.3, 0.7, 5.1]), { scissors: [], drawn: 0 }, 'a window behind the chair draws nothing');
+  assert.deepEqual(draw([-30, -20, -5.1, 30, 20, -4.9]), { scissors: [[0, 0, 512, 256], 'off'], drawn: 1 }, 'a window wider than the view fills the canvas');
+  assert.deepEqual(draw([-1.3, -0.7, -5.1, 1.3, 0.7, 5.1]), { scissors: [[0, 0, 512, 256], 'off'], drawn: 1 }, 'a window box the chair sits inside fills the canvas');
+  assert.deepEqual(draw([2, -0.7, -1, 4, 0.7, 1]), { scissors: [[475, 18, 37, 220], 'off'], drawn: 1 }, 'a side window beside the chair is cut at the screen edge');
+  windowWorld.dispose();
 });
 
 test('the window world builds its terrain, landmarks, trees and grass in separate turns of the event loop, so the dollhouse keeps drawing frames while it builds', { timeout: 30000 }, async t => {

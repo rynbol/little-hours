@@ -47,7 +47,7 @@ export const SHELL_PAINT = Object.freeze({
   metro: { wall: '#5b4f5b', wainscot: '#343546', trim: '#262d3f', ceiling: '#3c4256', beam: '#262d3f', door: '#4a3e4a' },
 });
 
-export const SEAT_WINDOW = Object.freeze({ x: 0, y: 3.05, width: 4.2, height: 3.1 });
+export const SEAT_WINDOW = Object.freeze({ x: 0, y: 3.05, width: 4.2, height: 3.1, z: 4.71, depth: 0.22 });
 export const FLOCK_SECONDS = 38;
 export const CLOUD_SHADOW = Object.freeze({ day: 1, dusk: 0, rain: 0.5 });
 export const SUN_RAY_STRENGTH = Object.freeze({ day: 1, dusk: 0, rain: 0.35 });
@@ -363,10 +363,10 @@ function buildShell(shape, doors) {
   shape.flat = true;
   const W = SEAT_WINDOW, left = W.x - W.width / 2, right = W.x + W.width / 2, bottom = W.y - W.height / 2, top = W.y + W.height / 2;
   const wall = (cx, cy, cz, w, h, d, role, shade = 1) => shape.box(cx, cy, cz, w, h, d, 0, role, shade);
-  wall(0.08, (0.2 + bottom) / 2, 4.71, 12.3, bottom - 0.2, 0.22, 'wall');
-  wall(0.08, (5.8 + top) / 2, 4.71, 12.3, 5.8 - top, 0.22, 'wall');
-  wall((left - 6.07) / 2, W.y, 4.71, left + 6.07, W.height, 0.22, 'wall');
-  wall((right + 6.23) / 2, W.y, 4.71, 6.23 - right, W.height, 0.22, 'wall');
+  wall(0.08, (0.2 + bottom) / 2, W.z, 12.3, bottom - 0.2, W.depth, 'wall');
+  wall(0.08, (5.8 + top) / 2, W.z, 12.3, 5.8 - top, W.depth, 'wall');
+  wall((left - 6.07) / 2, W.y, W.z, left + 6.07, W.height, W.depth, 'wall');
+  wall((right + 6.23) / 2, W.y, W.z, 6.23 - right, W.height, W.depth, 'wall');
   wall(6.11, 3.0, 0, 0.22, 5.6, 9.42, 'wall');
   wall(0.08, 0.8, 4.56, 12.1, 1.1, 0.08, 'wainscot'); wall(5.96, 0.8, 0, 0.08, 1.1, 9.1, 'wainscot');
   for (let i = 0; i < 14; i++) wall(-5.5 + i * 0.83, 0.8, 4.51, 0.035, 0.94, 0.045, 'trim');
