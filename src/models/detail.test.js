@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
-import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, shadeGlow, DETAIL_SOURCES } from './detail.js';
+import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, dimPage, DETAIL_SOURCES } from './detail.js';
 import { SURFACE_KIND } from './storybook.js';
 import { getFurniture } from '../core/catalog.js';
 import { createFurniture, LAPTOP } from './furniture.js';
 import { furnitureRepaint } from './architecture.js';
+import { bloomEmission } from '../features/room/room-lighting.js';
 
 const bounds = node => { const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity]; for (const mesh of node.getChildMeshes()) { mesh.computeWorldMatrix(true); const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox; minimumWorld.asArray().forEach((v, i) => { low[i] = Math.min(low[i], v); }); maximumWorld.asArray().forEach((v, i) => { high[i] = Math.max(high[i], v); }); } return [...low, ...high]; };
 const extent = mesh => { mesh.computeWorldMatrix(true); const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox; return { min: minimumWorld.asArray(), max: maximumWorld.asArray() }; };
@@ -24,12 +25,12 @@ test('a detailed model builds once it has loaded, in paint, metal and glow layer
   assert.equal(isDetailLoaded('study-desk'), true);
   const desk = createDetail('study-desk', scene);
   const layers = Object.fromEntries(desk.getChildMeshes().map(mesh => [mesh.material.name, mesh]));
-  assert.deepEqual(Object.keys(layers).sort(), ['detail-glow', 'detail-metal', 'detail-paint']);
+  assert.deepEqual(Object.keys(layers).sort(), ['detail-glow', 'detail-glow-page', 'detail-metal', 'detail-paint']);
   assert.equal(desk.isEnabled(false), false);
   const paint = layers['detail-paint'];
   assert.equal(paint.getVerticesData(SURFACE_KIND).length, paint.getTotalVertices());
   assert.ok(paint.getVerticesData(SURFACE_KIND).includes(9));
-  assert.equal(layers['detail-glow'].metadata.castShadow, false);
+  for (const glow of ['detail-glow', 'detail-glow-page']) assert.ok(layers[glow].metadata.castShadow === false && !layers[glow].receiveShadows, `${glow} neither casts nor takes shadow`);
   const { min, max } = extent(paint);
   assert.ok(max[0] - min[0] > 2.9 && max[0] - min[0] < 3.2, `desk is ${max[0] - min[0]} wide`);
   assert.ok(min[1] > -0.01 && min[1] < 0.05, `legs reach ${min[1]}`);
@@ -75,9 +76,8 @@ test('the study laptop is a walnut case with brass fittings and a sepia screen, 
   assert.ok(palette('detail-metal').includes(LAPTOP.brass) && !palette('detail-metal').includes('#b3a189'), 'detailed laptop fittings are brass');
   const luminance = hex => { const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   assert.ok(palette('detail-paint').includes('#aa7954') && luminance(LAPTOP.walnut) < luminance('#aa7954') * 0.75, 'the walnut case is a clearly deeper value than the desk boards so the laptop does not dissolve into them');
-  const glow = meshes.find(mesh => mesh.material.name === 'detail-glow');
-  const colors = glow.getVerticesData('color'), tints = new Set();
-  for (let i = 0; i < colors.length; i += 4) tints.add(colors[i] >= colors[i + 2] ? 'warm' : 'cool');
+  const tints = new Set();
+  for (const glow of meshes.filter(mesh => mesh.material.name.startsWith('detail-glow'))) { const colors = glow.getVerticesData('color'); for (let i = 0; i < colors.length; i += 4) tints.add(colors[i] >= colors[i + 2] ? 'warm' : 'cool'); }
   assert.deepEqual([...tints], ['warm'], 'every lit part of the desk glows warm');
   const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
   const has = hex => { const target = rgb(hex), near = (c, i) => Math.abs(c[i] - target[0]) + Math.abs(c[i + 1] - target[1]) + Math.abs(c[i + 2] - target[2]) < 0.02;
@@ -86,21 +86,24 @@ test('the study laptop is a walnut case with brass fittings and a sepia screen, 
   disposeDetails(scene); engine.dispose();
 });
 
-test('turning the laptop page down dims only its glowing parts, leaves the lamp shade and the mug lit, and never compounds', async () => {
+test('turning the laptop page down dims what the page draws and what it blooms, leaves the lamp shade lit, and never compounds', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
-  const detail = createDetail('study-desk', scene), untouched = createDetail('study-desk', scene), layer = (node, name) => node.getChildMeshes().find(mesh => mesh.material.name === name);
-  const glow = layer(detail, 'detail-glow'), { slots, palette } = glow.metadata, lit = Float32Array.from(glow.getVerticesData('color')), paint = Float32Array.from(layer(detail, 'detail-paint').getVerticesData('color'));
-  const page = Object.fromEntries(LAPTOP.page.map(hex => [hex, 0.6]));
-  shadeGlow(detail, page); shadeGlow(detail, page);
-  const colors = glow.getVerticesData('color'), at = hex => slots.findIndex(slot => slot === palette.indexOf(hex));
-  for (const hex of LAPTOP.page) { const i = at(hex); assert.ok(Math.abs(colors[i * 4 + 1] - lit[i * 4 + 1] * 0.6) < 1e-4, `${hex} is turned down once`); }
-  const shade = at('#ffd08a'); assert.equal(colors[shade * 4 + 1], lit[shade * 4 + 1], 'the lamp shade keeps its glow');
-  assert.deepEqual(Array.from(layer(detail, 'detail-paint').getVerticesData('color')), Array.from(paint), 'the painted parts, the mug rim among them, are untouched');
-  assert.deepEqual(Array.from(layer(untouched, 'detail-glow').getVerticesData('color')), Array.from(lit), 'another desk keeps its own bright page');
-  shadeGlow(detail, Object.fromEntries(LAPTOP.page.map(hex => [hex, 1])));
-  assert.deepEqual(Array.from(glow.getVerticesData('color')), Array.from(lit), 'turning it back up restores the page');
-  disposeDetails(scene); engine.dispose();
+  const detail = createDetail('study-desk', scene), layer = name => detail.getChildMeshes().find(mesh => mesh.material.name === name);
+  const page = layer('detail-glow-page'), shade = layer('detail-glow'), used = mesh => new Set([...mesh.metadata.slots].map(slot => mesh.metadata.palette[slot]));
+  assert.deepEqual([...used(page)].sort(), [...LAPTOP.page].sort(), 'the page layer holds the whole page and nothing else');
+  assert.ok(![...used(shade)].some(hex => LAPTOP.page.includes(hex)) && used(shade).has('#ffd08a'), 'the lamp shade glows on its own');
+  const bloom = material => { const out = {}; bloomEmission(material, 1, { set: (r, g, b) => Object.assign(out, { r, g, b }) }); return out; };
+  const lit = { draw: page.material.emissiveColor.g, bloom: bloom(page.material).g, shade: bloom(shade.material).g };
+  dimPage(scene, 0.58); dimPage(scene, 0.58);
+  assert.ok(Math.abs(page.material.emissiveColor.g - lit.draw * 0.58) < 1e-6, 'the page draws at the dimmed level, once');
+  assert.ok(Math.abs(bloom(page.material).g - lit.bloom * 0.58) < 1e-6, 'and its bloom follows, so the halo cannot put the brightness back');
+  assert.equal(bloom(shade.material).g, lit.shade, 'the lamp shade keeps its glow');
+  dimPage(scene, 1);
+  assert.equal(page.material.emissiveColor.g, lit.draw, 'turning it back up restores the page');
+  const later = new Scene(engine); dimPage(later, 0.58);
+  assert.ok(Math.abs(createDetail('study-desk', later).getChildMeshes().find(mesh => mesh.material.name === 'detail-glow-page').material.emissiveColor.g - lit.draw * 0.58) < 1e-6, 'a desk first built after dark gets the dimmed page');
+  disposeDetails(scene); disposeDetails(later); engine.dispose();
 });
 
 test('the desk lamp shade glows evenly from within instead of being lit across its pleats', async () => {
@@ -156,7 +159,7 @@ test('baked contact shade keeps most of each colour, so crevices stay warm inste
   await loadDetails(types);
   for (const type of types) {
     const kept = [];
-    for (const mesh of createDetail(type, scene).getChildMeshes().filter(mesh => mesh.material.name !== 'detail-glow')) {
+    for (const mesh of createDetail(type, scene).getChildMeshes().filter(mesh => !mesh.material.name.startsWith('detail-glow'))) {
       const colors = mesh.getVerticesData('color'), { slots, palette } = mesh.metadata;
       const brightest = palette.map(hex => Math.max(...[1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16) / 255)));
       slots.forEach((slot, v) => kept.push(Math.max(colors[v * 4], colors[v * 4 + 1], colors[v * 4 + 2]) / brightest[slot]));
@@ -211,7 +214,7 @@ test('the desk lamp shade shows its pleat folds, a rust trim at both rims, a gil
 test('the desk close-ups are lifted earth tones, with no saturated primaries or blue cloth', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
-  const lit = createDetail('study-desk', scene).getChildMeshes().filter(mesh => mesh.material.name !== 'detail-glow');
+  const lit = createDetail('study-desk', scene).getChildMeshes().filter(mesh => !mesh.material.name.startsWith('detail-glow'));
   const used = new Set(lit.flatMap(mesh => [...mesh.metadata.slots].map(slot => mesh.metadata.palette[slot].toLowerCase())));
   const loud = [...used].filter(hex => {
     const color = Color3.FromHexString(hex), [h, s, v] = color.toHSV().asArray(), chroma = Math.max(color.r, color.g, color.b) - Math.min(color.r, color.g, color.b);
@@ -248,5 +251,17 @@ test('from the chair the desk wood reads honey instead of orange and its darkest
   const sakuraHue = Color3.FromHexString('#c39e70').toHSV().r, ratio = sakura.getVerticesData('color')[top * 4] / sakura.metadata.baseColors[top * 4];
   assert.ok(Math.abs(hsv(sakura.getVerticesData('color'), top)[0] - sakuraHue) < 1.5, 'sakura wood keeps its own hue');
   assert.ok(Math.abs(ratio - Color3.FromHexString('#c39e70').r / Color3.FromHexString('#aa7954').r) < 0.01, 'sakura wood is cut from the model colour, not the close-up one');
+  disposeDetails(scene); engine.dispose();
+});
+
+test('from the chair the keyboard well and the key gaps are lifted enough to stay above the frame floor in the lid shadow, and the keys still read against them', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const paint = createDetail('study-desk', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint'), { slots, palette } = paint.metadata, colors = paint.getVerticesData('color');
+  const shown = hex => { const values = [...slots.keys()].filter(v => palette[slots[v]] === hex).map(v => 0.2126 * colors[v * 4] + 0.7152 * colors[v * 4 + 1] + 0.0722 * colors[v * 4 + 2]).sort((a, b) => a - b); return values[values.length >> 1]; };
+  const well = shown('#3d2b22'), gaps = shown('#22170f'), keys = shown('#d8caa9');
+  assert.ok(well >= 0.29, `the keyboard well shows at luma ${well.toFixed(3)}`);
+  assert.ok(gaps >= 0.26 && gaps < well, `the key gaps show at luma ${gaps.toFixed(3)}, under the well at ${well.toFixed(3)}`);
+  assert.ok(keys > well * 1.35, `the key skirts at ${keys.toFixed(3)} stand clear of the well at ${well.toFixed(3)}`);
   disposeDetails(scene); engine.dispose();
 });

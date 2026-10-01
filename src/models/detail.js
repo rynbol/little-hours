@@ -4,6 +4,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { SURFACE_KIND } from './storybook.js';
+import { LAPTOP } from './furniture.js';
 
 export const DETAIL_SOURCES = Object.freeze({
   'study-desk': () => import('./detail/study-desk.js'),
@@ -65,7 +66,7 @@ export const isDetailLoaded = type => loaded.has(type);
 
 const bytes = text => { const raw = atob(text), out = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i); return out.buffer; };
 
-export const CLOSE_UP_PAINT = Object.freeze({ woodHue: 28.5, woodSaturation: 0.48, darkest: 0.26, darkestKept: 0.75 });
+export const CLOSE_UP_PAINT = Object.freeze({ woodHue: 28.5, woodSaturation: 0.48, darkest: 0.26, darkestKept: 0.75, shadowed: Object.freeze({ '#3d2b22': 1.3, '#22170f': 1.25 }) });
 const luma = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 function honeyRatio(hex) {
   const model = Color3.FromHexString(hex), [hue, saturation, value] = model.toHSV().asArray();
@@ -75,7 +76,7 @@ function honeyRatio(hex) {
   return [shown.r / Math.max(model.r, 0.01), shown.g / Math.max(model.g, 0.01), shown.b / Math.max(model.b, 0.01)];
 }
 function closeUp(colors, surfaces, slots, palette) {
-  const shown = Float32Array.from(colors), ratios = new Map(), { darkest, darkestKept } = CLOSE_UP_PAINT;
+  const shown = Float32Array.from(colors), ratios = new Map(), { darkest, darkestKept, shadowed } = CLOSE_UP_PAINT, shade = palette.map(hex => shadowed[hex] ?? 1);
   for (let i = 0; i < slots.length; i++) {
     if (surfaces[i] === 9) {
       if (!ratios.has(slots[i])) ratios.set(slots[i], honeyRatio(palette[slots[i]]));
@@ -83,8 +84,8 @@ function closeUp(colors, surfaces, slots, palette) {
       for (let channel = 0; channel < 3; channel++) shown[i * 4 + channel] = Math.min(1, colors[i * 4 + channel] * ratio[channel]);
     }
     const value = luma(shown[i * 4], shown[i * 4 + 1], shown[i * 4 + 2]);
-    if (value >= darkest) continue;
-    const lift = darkest * (darkestKept + (1 - darkestKept) * value / darkest) / Math.max(value, 0.005);
+    const lift = (value >= darkest ? 1 : darkest * (darkestKept + (1 - darkestKept) * value / darkest) / Math.max(value, 0.005)) * shade[slots[i]];
+    if (lift === 1) continue;
     for (let channel = 0; channel < 3; channel++) shown[i * 4 + channel] = Math.min(1, shown[i * 4 + channel] * lift);
   }
   return shown;
@@ -100,24 +101,45 @@ function decode(source) {
     const indices = shape.indices32 ? new Uint32Array(bytes(shape.indices32)) : new Uint16Array(bytes(shape.indices)), slots = new Uint8Array(bytes(shape.slots));
     layers[layer] = { positions, normals, colors: layer === 'glow' ? colors : closeUp(colors, surfaces, slots, palette), modelColors: colors, surfaces, indices, slots };
   }
+  if (layers.glow) {
+    const page = palette.map(hex => LAPTOP.page.includes(hex)), [glow, screen] = [false, true].map(wanted => pick(layers.glow, slot => page[slot] === wanted));
+    if (screen) { layers['glow-page'] = screen; if (glow) layers.glow = glow; else delete layers.glow; }
+  }
   return { palette, layers };
 }
 
+function pick(shape, wanted) {
+  const kept = new Int32Array(shape.slots.length).fill(-1), indices = [];
+  let count = 0;
+  for (const index of shape.indices) if (wanted(shape.slots[index])) { if (kept[index] < 0) kept[index] = count++; indices.push(kept[index]); }
+  if (!indices.length) return null;
+  const take = (values, size) => { const out = new values.constructor(count * size); kept.forEach((to, from) => { if (to >= 0) for (let k = 0; k < size; k++) out[to * size + k] = values[from * size + k]; }); return out; };
+  return { positions: take(shape.positions, 3), normals: take(shape.normals, 3), colors: take(shape.colors, 4), modelColors: take(shape.modelColors, 4), surfaces: take(shape.surfaces, 1), slots: take(shape.slots, 1), indices: count > 65535 ? Uint32Array.from(indices) : Uint16Array.from(indices) };
+}
+
+const GLOW_LIT = Color3.FromHexString('#a8a294');
 const LAYER_LOOK = {
   paint: material => { material.specularColor = Color3.FromHexString('#1a1612'); material.specularPower = 18; },
   metal: material => { material.specularColor = Color3.FromHexString('#8a7050'); material.specularPower = 42; },
-  glow: material => { material.diffuseColor = Color3.Black(); material.specularColor = Color3.Black(); material.emissiveColor = Color3.FromHexString('#a8a294'); },
+  glow: material => { material.diffuseColor = Color3.Black(); material.specularColor = Color3.Black(); material.emissiveColor = GLOW_LIT.clone(); },
 };
+LAYER_LOOK['glow-page'] = LAYER_LOOK.glow;
 
 function templates(scene) {
-  if (!templatesByScene.has(scene)) templatesByScene.set(scene, { materials: new Map(), nodes: new Map() });
+  if (!templatesByScene.has(scene)) templatesByScene.set(scene, { materials: new Map(), nodes: new Map(), page: 1 });
   return templatesByScene.get(scene);
 }
 
 function layerMaterial(scene, layer) {
   const cache = templates(scene).materials;
-  if (!cache.has(layer)) { const material = new StandardMaterial(`detail-${layer}`, scene); material.diffuseColor = Color3.White(); LAYER_LOOK[layer](material); cache.set(layer, material); }
+  if (!cache.has(layer)) { const material = new StandardMaterial(`detail-${layer}`, scene); material.diffuseColor = Color3.White(); LAYER_LOOK[layer](material); cache.set(layer, material); if (layer === 'glow-page') dimPage(scene, templates(scene).page); }
   return cache.get(layer);
+}
+
+export function dimPage(scene, level) {
+  const cache = templates(scene), page = cache.materials.get('glow-page');
+  cache.page = level;
+  if (page) GLOW_LIT.scaleToRef(level, page.emissiveColor);
 }
 
 function template(type, scene) {
@@ -129,8 +151,8 @@ function template(type, scene) {
     Object.assign(data, { positions: shape.positions, normals: shape.normals, colors: shape.colors, indices: shape.indices });
     data.applyToMesh(mesh, true); mesh.setVerticesData(SURFACE_KIND, shape.surfaces, false, 1);
     mesh.material = layerMaterial(scene, layer); mesh.hasVertexAlpha = false; mesh.useVertexColors = true;
-    mesh.receiveShadows = layer !== 'glow'; mesh.isPickable = false; mesh.parent = root;
-    mesh.metadata = { detail: true, castShadow: layer !== 'glow', slots: shape.slots, palette: source.palette, baseColors: shape.modelColors };
+    mesh.receiveShadows = !layer.startsWith('glow'); mesh.isPickable = false; mesh.parent = root;
+    mesh.metadata = { detail: true, castShadow: !layer.startsWith('glow'), slots: shape.slots, palette: source.palette, baseColors: shape.modelColors };
   }
   root.setEnabled(false);
   cache.set(type, root);
@@ -154,18 +176,6 @@ function repaintDetail(mesh, repaint) {
     colors[i * 4] = Math.min(1, baseColors[i * 4] * ratio[0]); colors[i * 4 + 1] = Math.min(1, baseColors[i * 4 + 1] * ratio[1]); colors[i * 4 + 2] = Math.min(1, baseColors[i * 4 + 2] * ratio[2]);
   }
   mesh.makeGeometryUnique(); mesh.setVerticesData('color', colors);
-}
-
-const litColors = new WeakMap();
-export function shadeGlow(detail, factors) {
-  for (const mesh of detail.getChildMeshes()) {
-    const { slots, palette } = mesh.metadata ?? {};
-    if (mesh.material?.name !== 'detail-glow' || !palette.some(hex => hex in factors)) continue;
-    if (!litColors.has(mesh)) { if (mesh.geometry.meshes.length > 1) mesh.makeGeometryUnique(); litColors.set(mesh, Float32Array.from(mesh.getVerticesData('color'))); }
-    const lit = litColors.get(mesh), colors = Float32Array.from(lit), scale = palette.map(hex => factors[hex] ?? 1);
-    for (let i = 0; i < slots.length; i++) for (let channel = 0; channel < 3; channel++) colors[i * 4 + channel] = lit[i * 4 + channel] * scale[slots[i]];
-    mesh.updateVerticesData('color', colors);
-  }
 }
 
 export function disposeDetails(scene) {

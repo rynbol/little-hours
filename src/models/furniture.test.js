@@ -6,6 +6,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { createFurniture, disposeFurnitureAssets, leafClump, LEAF_OUTLINE, MOON_CANOPY } from './furniture.js';
 import { FURNITURE } from '../core/catalog.js';
+import { ROOM_LIGHTS } from '../features/room/room-lighting.js';
 
 test('moon tree clumps are soft rounded leaf cards, lit fresh green on top and cool beneath, without speckled tones', () => {
   const engine = new NullEngine(), scene = new Scene(engine), leaves = 120;
@@ -76,5 +77,39 @@ test('animated furniture streams its moving vertices without making any material
     }
     assert.ok(moved.length >= 3, `animated pieces moved: ${moved.join(', ')}`);
     assert.deepEqual(rebuilt, []);
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('the desk tea steam is a short soft wisp that fades out at its sides instead of a tall hard ribbon', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const desk = createFurniture('study-desk', scene), cupTop = 1.465, heights = [], hardSides = [];
+    for (const seconds of [0.4, 1.3, 2.9]) {
+      desk.metadata.animate(seconds, false, false, 0);
+      const steam = desk.getChildMeshes(false).find(mesh => mesh.name === 'curling-tea-steam');
+      const positions = steam.getVerticesData('position'), colors = steam.getVerticesData('color'), indices = steam.getIndices(), edges = new Map();
+      for (let i = 0; i < positions.length / 3; i++) if (colors[i * 4 + 3] > 0.02) heights.push(positions[i * 3 + 1] - cupTop);
+      for (let t = 0; t < indices.length; t += 3) for (let k = 0; k < 3; k++) { const [a, b] = [indices[t + k], indices[t + (k + 1) % 3]].sort((x, y) => x - y), key = `${a}:${b}`; edges.set(key, (edges.get(key) ?? 0) + 1); }
+      for (const [key, uses] of edges) if (uses === 1) for (const vertex of key.split(':').map(Number)) if (colors[vertex * 4 + 3] > 0.01) hardSides.push(colors[vertex * 4 + 3]);
+    }
+    const tallest = Math.max(...heights);
+    assert.ok(tallest > 0.18 && tallest < 0.36, `the visible steam rises ${tallest.toFixed(2)} m above the cup`);
+    assert.deepEqual(hardSides, [], 'every vertex on the outline of the steam is fully transparent');
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('the moon tree canopy takes on the dusk room light instead of keeping its sunlit day green, and gets that green back by day', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const tree = createFurniture('moon-tree', scene), canopy = tree.getChildMeshes(false).find(mesh => mesh.name === 'swaying-leaf-canopy'), day = Array.from(canopy.getVerticesData('color'));
+    const median = values => values.sort((a, b) => a - b)[values.length >> 1];
+    const look = colors => { const hsv = []; for (let i = 0; i < colors.length; i += 4) hsv.push(new Color3(colors[i], colors[i + 1], colors[i + 2]).toHSV().asArray()); return { hue: median(hsv.map(([h]) => h)), saturation: median(hsv.map(([, s]) => s)) }; };
+    const fresh = look(day);
+    tree.metadata.lightLeaves(ROOM_LIGHTS.dusk.leaves);
+    const dusk = look(Array.from(canopy.getVerticesData('color')));
+    assert.ok(fresh.hue > 85 && dusk.hue < fresh.hue - 8 && dusk.hue > 75, `the canopy hue goes from ${fresh.hue.toFixed(0)} by day to a muted olive green ${dusk.hue.toFixed(0)} at dusk, warmer but still a plant under the warm lamps`);
+    assert.ok(dusk.saturation < fresh.saturation * 0.75, `the dusk canopy saturation is ${dusk.saturation.toFixed(2)}, against ${fresh.saturation.toFixed(2)} by day`);
+    tree.metadata.lightLeaves(ROOM_LIGHTS.day.leaves);
+    assert.deepEqual(Array.from(canopy.getVerticesData('color')), day, 'the day canopy is exactly its own colours');
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });

@@ -233,7 +233,7 @@ test('tea curls and fades in one small mesh, stays inside its furniture footprin
       const steam = furniture.getChildMeshes().find(mesh => mesh.metadata?.effect === 'tea-steam');
       const neutralPositions = Array.from(steam.getVerticesData('position'));
       const neutralColors = Array.from(steam.getVerticesData('color'));
-      assert.equal(steam.getTotalIndices() / 3, 56);
+      assert.equal(steam.getTotalIndices() / 3, 112);
       assert.equal(steam.isPickable, false);
       const [width, depth] = getFurniture(type).footprint;
       for (const seconds of [0.4, 1.7, 3.2, 7.8]) {

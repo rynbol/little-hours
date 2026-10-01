@@ -937,6 +937,25 @@ function recordSleeve(parent) {
   tube(parent, Array.from({ length: 33 }, (_, i) => [Math.cos(i / 32 * Math.PI * 2) * 0.34, Math.sin(i / 32 * Math.PI * 2) * 0.34, 0.1775]), 0.06, '#343c52');
 }
 
+function lightLeaves(canopy) {
+  canopy.markVerticesDataAsUpdatable('color', true);
+  const painted = Float32Array.from(canopy.getVerticesData('color')), shown = new Float32Array(painted);
+  let current = null;
+  return leaves => {
+    if (leaves === current) return;
+    current = leaves;
+    const [hex, amount] = leaves, tint = Color3.FromHexString(hex);
+    const tintLuma = Math.max(0.01, 0.2126 * tint.r + 0.7152 * tint.g + 0.0722 * tint.b);
+    for (let i = 0; i < painted.length; i += 4) {
+      const luma = (0.2126 * painted[i] + 0.7152 * painted[i + 1] + 0.0722 * painted[i + 2]) / tintLuma;
+      shown[i] = painted[i] + (tint.r * luma - painted[i]) * amount;
+      shown[i + 1] = painted[i + 1] + (tint.g * luma - painted[i + 1]) * amount;
+      shown[i + 2] = painted[i + 2] + (tint.b * luma - painted[i + 2]) * amount;
+    }
+    streamVertices(canopy, 'color', shown);
+  };
+}
+
 function createSwayingCanopy(parent, type) {
   const scene = parent.getScene(), templates = cacheFor(scene).templates, key = `${type}-canopy`;
   if (!templates.has(key)) {
@@ -959,6 +978,7 @@ function createSwayingCanopy(parent, type) {
   const originalBounds = canopy.getBoundingInfo().boundingBox;
   canopy.setBoundingInfo(new BoundingInfo(new Vector3(-width / 2, originalBounds.minimum.y - 0.02, -depth / 2), new Vector3(width / 2, originalBounds.maximum.y + 0.02, depth / 2)));
   const amplitude = type === 'plant' ? 0.075 : type === 'monstera' ? 0.06 : 0.11, phaseOffset = parent.uniqueId * 0.37;
+  if (type === 'moon-tree') parent.metadata.lightLeaves = lightLeaves(canopy);
   let resting = true;
   return (seconds, focused, reducedMotion) => {
     if (reducedMotion) {
@@ -1240,30 +1260,30 @@ function createTeaSteam(parent, origin, scale = 1) {
     steamMaterial.backFaceCulling = false;
     cache.batches.set('tea-steam', steamMaterial);
   }
-  const segments = 14, ribbons = 2, positions = new Float32Array((segments + 1) * ribbons * 6);
-  const colors = new Float32Array((segments + 1) * ribbons * 8), indices = [], normals = new Float32Array(positions.length);
+  const segments = 14, ribbons = 2, across = 3, positions = new Float32Array((segments + 1) * ribbons * across * 3);
+  const colors = new Float32Array((segments + 1) * ribbons * across * 4), indices = [], normals = new Float32Array(positions.length);
   for (let ribbon = 0; ribbon < ribbons; ribbon++) {
     for (let point = 0; point <= segments; point++) {
-      const first = (ribbon * (segments + 1) + point) * 2;
-      for (let side = 0; side < 2; side++) { normals[(first + side) * 3] = Math.SQRT1_2; normals[(first + side) * 3 + 2] = Math.SQRT1_2; }
-      if (point < segments) indices.push(first, first + 2, first + 1, first + 1, first + 2, first + 3);
+      const first = (ribbon * (segments + 1) + point) * across;
+      for (let side = 0; side < across; side++) { normals[(first + side) * 3] = Math.SQRT1_2; normals[(first + side) * 3 + 2] = Math.SQRT1_2; }
+      if (point < segments) for (let side = 0; side < across - 1; side++) { const a = first + side, b = a + across; indices.push(a, b, a + 1, a + 1, b, b + 1); }
     }
   }
   function pose(seconds, puff = 0) {
     for (let ribbon = 0; ribbon < ribbons; ribbon++) {
       for (let point = 0; point <= segments; point++) {
-        const height = point / segments, phase = seconds * 1.25 + ribbon * 2.7;
-        const curl = Math.sin(height * 8.5 - phase) * (0.008 + height * 0.028);
-        const centerX = (ribbon ? 0.023 : -0.023) + curl + Math.sin(phase * 0.6) * height * 0.028;
-        const centerZ = Math.cos(height * 6.5 - phase) * height * 0.028;
-        const width = (0.009 + Math.sin(height * Math.PI) * 0.010) * scale;
-        const opacity = Math.min(1, Math.sin(height * Math.PI) ** 1.3 * (0.23 + 0.11 * Math.sin(height * 6.2 - phase)) * (1 + puff * 0.9));
-        for (let side = 0; side < 2; side++) {
-          const vertex = (ribbon * (segments + 1) + point) * 2 + side, sign = side ? 1 : -1;
-          positions[vertex * 3] = origin[0] + centerX * scale + sign * width * (1 + puff * 0.5);
-          positions[vertex * 3 + 1] = origin[1] + height * 0.57 * scale * (1 + puff * 0.7);
-          positions[vertex * 3 + 2] = origin[2] + centerZ * scale - sign * width;
-          colors[vertex * 4] = 0.91; colors[vertex * 4 + 1] = 0.88; colors[vertex * 4 + 2] = 0.80; colors[vertex * 4 + 3] = opacity;
+        const height = point / segments, phase = seconds * 1.1 + ribbon * 2.7;
+        const curl = Math.sin(height * 6 - phase) * (0.006 + height * 0.016);
+        const centerX = (ribbon ? 0.02 : -0.02) + curl + Math.sin(phase * 0.6) * height * 0.022;
+        const centerZ = Math.cos(height * 5 - phase) * height * 0.018;
+        const width = (0.012 + Math.sin(height * Math.PI) * 0.02 + height * 0.012) * scale;
+        const opacity = Math.min(1, Math.sin(height * Math.PI) ** 1.5 * (0.2 + 0.07 * Math.sin(height * 5 - phase)) * (1 + puff * 0.9));
+        for (let side = 0; side < across; side++) {
+          const vertex = (ribbon * (segments + 1) + point) * across + side, offset = side - 1;
+          positions[vertex * 3] = origin[0] + centerX * scale + offset * width * (1 + puff * 0.5);
+          positions[vertex * 3 + 1] = origin[1] + height * 0.32 * scale * (1 + puff * 0.7);
+          positions[vertex * 3 + 2] = origin[2] + centerZ * scale - offset * width;
+          colors[vertex * 4] = 0.91; colors[vertex * 4 + 1] = 0.88; colors[vertex * 4 + 2] = 0.80; colors[vertex * 4 + 3] = offset ? 0 : opacity;
         }
       }
     }
