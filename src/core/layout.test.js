@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
+import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { FURNITURE, getFurniture } from './catalog.js';
 import { ROOM_BOUNDS, MAX_ITEMS, PRESETS, PET_HOME, createLayout, validatePlacement, normalizeLayout, findFreePosition, nearestValidPlacement, rugsOverlap, pieceCount, petBed, rugStack, rugTouches, groundAt, standHeight, footprintBounds, FLOOR_Y, RUG_STEP, FLAT_RUG } from './layout.js';
-import { createFurniture, disposeFurnitureAssets, TANK_WATER } from '../models/furniture.js';
+import { createFurniture, disposeFurnitureAssets, TANK_WATER, GLOBE_PAINT } from '../models/furniture.js';
 import { cutRect, subtractRect, openings, OPENING_INSET } from './walls.js';
 import { SURFACES } from './surfaces.js';
 
@@ -336,13 +337,33 @@ test('the moon tree canopy is rounded leaf clumps lit lighter on top than undern
   try {
     const tree = createFurniture('moon-tree', scene), canopy = tree.getChildMeshes().find(mesh => mesh.metadata?.effect === 'leaf-sway');
     const normals = canopy.getVerticesData('normal'), colors = canopy.getVerticesData('color'), count = canopy.getTotalVertices();
-    assert.ok(count >= 2000 && count <= 2800, `${count} canopy vertices`);
+    assert.ok(count >= 7000 && count <= 8400, `${count} canopy vertices`);
     const luminance = i => 0.3 * colors[i * 4] + 0.59 * colors[i * 4 + 1] + 0.11 * colors[i * 4 + 2], mean = list => list.reduce((sum, value) => sum + value, 0) / list.length;
     const tops = [], undersides = [];
     for (let i = 0; i < count; i++) { if (normals[i * 3 + 1] > 0.6) tops.push(luminance(i)); if (normals[i * 3 + 1] < -0.6) undersides.push(luminance(i)); }
     assert.ok(mean(tops) > mean(undersides) * 1.3, `tops ${mean(tops)} against undersides ${mean(undersides)}`);
+    const coolness = i => colors[i * 4 + 2] / colors[i * 4 + 1], cool = [];
+    for (let i = 0; i < count; i++) if (normals[i * 3 + 1] < -0.6) cool.push(coolness(i));
+    assert.ok(mean(cool) > 0.76, `undersides lean blue: ${mean(cool)}`);
     assert.ok(Math.min(...Array.from({ length: count }, (_, i) => luminance(i))) > 0.3);
     tree.dispose();
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
+});
+
+test('the globe is painted with deep seas, sandy coasts and green inland, under a varnish gloss', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  try {
+    const globe = createFurniture('globe', scene).metadata.globe, colors = globe.getVerticesData('color');
+    const deep = Color3.FromHexString(GLOBE_PAINT.deep), tones = { sea: false, sand: false, green: false };
+    for (let i = 0; i < colors.length; i += 4) {
+      const [r, g, b] = [colors[i], colors[i + 1], colors[i + 2]];
+      if (Math.abs(r - deep.r) + Math.abs(g - deep.g) + Math.abs(b - deep.b) < 0.06) tones.sea = true;
+      if (r > g && g > b && r - b > 0.2) tones.sand = true;
+      if (g > r && g - b > 0.15) tones.green = true;
+    }
+    assert.deepEqual(tones, { sea: true, sand: true, green: true });
+    assert.ok(globe.getTotalVertices() > 1500);
+    assert.ok(globe.material.specularColor.r > 0.2 && globe.material.specularPower >= 48);
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
 

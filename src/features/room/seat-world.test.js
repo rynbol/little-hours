@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, VOLCANO } from './seat-world.js';
+import { createSeatWorld, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, VOLCANO, SEAT_DRAPE } from './seat-world.js';
 
 const PEAK = VOLCANO.base + VOLCANO.height;
 
@@ -50,6 +50,21 @@ test('the seated room closes its open sides, with a door for every passage, and 
   const wall = roles.indexOf('wall');
   assert.deepEqual([...colors.slice(wall * 4, wall * 4 + 3)].map(v => Math.round(v * 255)), [0xaa, 0xbb, 0xcc]);
   assert.ok(world.meshes.every(mesh => mesh.metadata.castShadow === false));
+  engine.dispose();
+});
+
+test('the window curtains are gathered drapes, pinched at a brass tie-back, folded front to back, in the one shell mesh', () => {
+  const { engine, world } = setup();
+  world.setShell('retreat', {}, []);
+  const shells = world.meshes.filter(mesh => mesh.name === 'seat-world-shell'), { roles, positions } = shells[0].metadata.shape;
+  assert.equal(shells.length, 1);
+  const cloth = [];
+  roles.forEach((role, i) => { if ((role === 'curtain' || role === 'curtainShade') && positions[i * 3] > 0) cloth.push([positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]]); });
+  assert.ok(cloth.length > 700, `${cloth.length} cloth vertices on one side`);
+  const span = (low, high, axis) => { const values = cloth.filter(([, y]) => y >= low && y <= high).map(point => point[axis]); return Math.max(...values) - Math.min(...values); };
+  assert.ok(span(SEAT_DRAPE.tie - 0.1, SEAT_DRAPE.tie + 0.1, 0) < span(SEAT_DRAPE.top - 0.2, SEAT_DRAPE.top, 0) * 0.5, 'the drape narrows at the tie-back');
+  assert.ok(span(SEAT_DRAPE.tie - 0.1, SEAT_DRAPE.tie + 0.1, 2) > 0.1, 'the folds have depth at the tie-back');
+  assert.ok(roles.some((role, i) => role === 'brass' && Math.abs(positions[i * 3 + 1] - SEAT_DRAPE.tie) < 0.05));
   engine.dispose();
 });
 

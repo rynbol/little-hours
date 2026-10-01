@@ -501,31 +501,49 @@ function petBed(parent) {
   box(tag, [0.12, 0.035, 0.018], [0, 0, 0], C.cream, 0.008);
   for (const x of [-0.06, 0.06]) for (const y of [-0.016, 0.016]) sphere(tag, [0.02, 0.02, 0.012], [x, y, 0], C.cream);
 }
-const MOON_CANOPY = Object.freeze({ under: '#44664a', side: '#668d4f', top: '#9dbf66', sun: [-0.3, 0.82, 0.48] });
+const MOON_CANOPY = Object.freeze({ under: '#44605f', side: '#6a9652', top: '#9cc163', rim: '#c9dc8c', sun: [-0.3, 0.82, 0.48] });
 function leafClump(parent, center, radii, seed) {
-  const rings = 8, segments = 14, positions = [], indices = [], colors = [];
-  const [under, side, top] = [MOON_CANOPY.under, MOON_CANOPY.side, MOON_CANOPY.top].map(hex => Color3.FromHexString(hex));
-  const sun = new Vector3(...MOON_CANOPY.sun).normalize();
-  for (let ring = 0; ring <= rings; ring++) {
-    const phi = ring / rings * Math.PI, y = Math.cos(phi), r = Math.sin(phi);
-    for (let s = 0; s < (ring === 0 || ring === rings ? 1 : segments); s++) {
-      const angle = s / segments * Math.PI * 2, lump = 1 + (0.045 * Math.sin(angle * 5 + seed * 1.7 + ring * 1.1) + 0.035 * Math.sin(angle * 8 - seed + ring * 2.3)) * r;
-      const nx = Math.cos(angle) * r, nz = Math.sin(angle) * r;
-      positions.push(center[0] + nx * radii[0] * lump, center[1] + y * radii[1] * (y < 0 ? 0.82 : 1), center[2] + nz * radii[2] * lump);
-      const light = Math.max(0, Math.min(1, (nx * sun.x + y * sun.y + nz * sun.z) * 0.5 + 0.5));
-      const band = (from, to) => Math.max(0, Math.min(1, (light - from) / (to - from))), tone = Color3.Lerp(Color3.Lerp(under, side, band(0.4, 0.52)), top, band(0.68, 0.78));
-      colors.push(tone.r, tone.g, tone.b, 1);
+  const positions = [], indices = [], colors = [];
+  const [under, side, top, rim] = [MOON_CANOPY.under, MOON_CANOPY.side, MOON_CANOPY.top, MOON_CANOPY.rim].map(hex => Color3.FromHexString(hex));
+  const sun = new Vector3(...MOON_CANOPY.sun).normalize(), toward = new Vector3();
+  const band = (value, from, to) => Math.max(0, Math.min(1, (value - from) / (to - from)));
+  const puffs = [{ offset: [0, 0, 0], scale: 0.9, rings: 8, segments: 15, flatten: 0.82 }, { offset: [0.15 * Math.cos(seed), 0.4, 0.15 * Math.sin(seed)], scale: 0.58, rings: 6, segments: 11, flatten: 1 }];
+  for (let k = 0; k < 3; k++) {
+    const angle = seed * 2.1 + k * Math.PI * 2 / 3;
+    puffs.push({ offset: [0.62 * Math.cos(angle), 0.22, 0.62 * Math.sin(angle)], scale: 0.52, rings: 6, segments: 11, flatten: 1 });
+  }
+  for (const [index, puff] of puffs.entries()) {
+    const first = positions.length / 3, { rings, segments } = puff;
+    const middle = puff.offset.map((value, axis) => center[axis] + value * radii[axis]);
+    for (let ring = 0; ring <= rings; ring++) {
+      const phi = ring / rings * Math.PI, y = Math.cos(phi), r = Math.sin(phi);
+      for (let s = 0; s < (ring === 0 || ring === rings ? 1 : segments); s++) {
+        const angle = s / segments * Math.PI * 2, lump = 1 + (0.05 * Math.sin(angle * 3 + seed * 1.7 + index * 2.3 + ring * 1.1) + 0.03 * Math.sin(angle * 5 - seed + ring * 2.3)) * r;
+        const nx = Math.cos(angle) * r, nz = Math.sin(angle) * r;
+        const x = middle[0] + nx * radii[0] * puff.scale * lump, height = middle[1] + y * radii[1] * puff.scale * (y < 0 ? puff.flatten : 1), z = middle[2] + nz * radii[2] * puff.scale * lump;
+        positions.push(x, height, z);
+        toward.set((x - center[0]) / radii[0], (height - center[1]) / radii[1], (z - center[2]) / radii[2]).normalize();
+        const light = Math.max(0, Math.min(1, ((nx * 0.25 + toward.x * 0.75) * sun.x + (y * 0.25 + toward.y * 0.75) * sun.y + (nz * 0.25 + toward.z * 0.75) * sun.z) * 0.5 + 0.5));
+        const tone = Color3.Lerp(Color3.Lerp(Color3.Lerp(under, side, band(light, 0.08, 0.45)), top, band(light, 0.5, 1)), rim, band(light, 0.9, 1.08));
+        const tucked = index === 0 ? 1 : 0.9 + 0.1 * band(y, -0.6, 0.2);
+        colors.push(tone.r * tucked, tone.g * tucked, tone.b * tucked, 1);
+      }
     }
+    const ringStart = ring => first + 1 + (ring - 1) * segments, last = first + 1 + (rings - 1) * segments;
+    for (let s = 0; s < segments; s++) indices.push(first, ringStart(1) + s, ringStart(1) + (s + 1) % segments);
+    for (let ring = 1; ring < rings - 1; ring++) for (let s = 0; s < segments; s++) {
+      const a = ringStart(ring) + s, b = ringStart(ring) + (s + 1) % segments, c = ringStart(ring + 1) + s, d = ringStart(ring + 1) + (s + 1) % segments;
+      indices.push(a, c, b, b, c, d);
+    }
+    for (let s = 0; s < segments; s++) indices.push(last, ringStart(rings - 1) + (s + 1) % segments, ringStart(rings - 1) + s);
   }
-  const ringStart = ring => 1 + (ring - 1) * segments, last = 1 + (rings - 1) * segments;
-  for (let s = 0; s < segments; s++) indices.push(0, ringStart(1) + s, ringStart(1) + (s + 1) % segments);
-  for (let ring = 1; ring < rings - 1; ring++) for (let s = 0; s < segments; s++) {
-    const a = ringStart(ring) + s, b = ringStart(ring) + (s + 1) % segments, c = ringStart(ring + 1) + s, d = ringStart(ring + 1) + (s + 1) % segments;
-    indices.push(a, c, b, b, c, d);
-  }
-  for (let s = 0; s < segments; s++) indices.push(last, ringStart(rings - 1) + (s + 1) % segments, ringStart(rings - 1) + s);
   const data = new VertexData(); Object.assign(data, { positions, indices, colors, normals: [] });
   VertexData.ComputeNormals(positions, indices, data.normals);
+  for (let i = 0; i < positions.length; i += 3) {
+    toward.set((positions[i] - center[0]) / radii[0], (positions[i + 1] - center[1]) / radii[1], (positions[i + 2] - center[2]) / radii[2]).normalize();
+    const blended = new Vector3(data.normals[i] * 0.35 + toward.x * 0.65, data.normals[i + 1] * 0.35 + toward.y * 0.65, data.normals[i + 2] * 0.35 + toward.z * 0.65).normalize();
+    data.normals[i] = blended.x; data.normals[i + 1] = blended.y; data.normals[i + 2] = blended.z;
+  }
   const clump = new Mesh('moonleaf-clump', parent.getScene()); data.applyToMesh(clump);
   mesh(parent, clump, MOON_CANOPY.side, [0, 0, 0]);
   clump.metadata = { sway: { anchorY: center[1] - radii[1] * 1.6, height: radii[1] * 2.6, phase: seed * 0.61 } };
@@ -960,20 +978,29 @@ function createSwayingCanopy(parent, type) {
   };
 }
 
+export const GLOBE_PAINT = Object.freeze({ deep: '#2f5f7d', shallow: '#5f9bab', shore: '#d6bb80', meadow: '#9aa868', ice: '#f1efe6' });
 // The globe's painted sphere, once per scene: seas, low continents and white
 // poles in its vertex colors, on the shared white paint.
 function globeTemplate(scene) {
   const templates = cacheFor(scene).templates;
   if (!templates.has('globe-sphere')) {
-    const globe = CreateSphere('globe-sphere', { diameter: 0.6, segments: 18 }, scene), positions = globe.getVerticesData('position'), colors = [];
+    const globe = CreateSphere('globe-sphere', { diameter: 0.6, segments: 40 }, scene), positions = globe.getVerticesData('position'), colors = [];
     const lands = [[0.3, 0.5, 0.8, 0.55], [-0.6, 0.2, 0.7, 0.62], [0.7, -0.35, -0.2, 0.5], [-0.25, -0.6, -0.7, 0.58], [0.1, 0.85, -0.45, 0.6], [-0.8, -0.3, -0.3, 0.7]].map(([x, y, z, t]) => [new Vector3(x, y, z).normalize(), t]);
-    const sea = Color3.FromHexString('#6f96ae'), land = Color3.FromHexString('#a9b887'), ice = Color3.FromHexString('#eef0ea'), direction = new Vector3();
+    const [deep, shallow, shore, meadow, ice] = Object.values(GLOBE_PAINT).map(hex => Color3.FromHexString(hex)), direction = new Vector3(), paint = new Color3();
     for (let i = 0; i < positions.length; i += 3) {
       direction.set(positions[i], positions[i + 1], positions[i + 2]).normalize();
-      const paint = Math.abs(direction.y) > 0.9 ? ice : lands.some(([center, t]) => Vector3.Dot(direction, center) > t) ? land : sea;
+      const coast = 0.05 * Math.sin(direction.x * 11 + 1.3) * Math.sin(direction.y * 9 - 0.7) + 0.03 * Math.sin(direction.z * 17 + direction.x * 5);
+      const land = Math.max(...lands.map(([center, t]) => Vector3.Dot(direction, center) - t - 0.27)) + coast;
+      if (Math.abs(direction.y) > 0.9 - coast) paint.copyFrom(ice);
+      else {
+        const ground = Color3.Lerp(shore, meadow, Math.max(0, Math.min(1, land / 0.16))), water = Color3.Lerp(deep, shallow, Math.max(0, Math.min(1, 1 + land / 0.1)));
+        Color3.LerpToRef(water, ground, Math.max(0, Math.min(1, 0.5 + land / 0.05)), paint);
+      }
       colors.push(paint.r, paint.g, paint.b, 1);
     }
-    globe.setVerticesData('color', colors); globe.material = material(scene, '#ffffff'); globe.receiveShadows = true; globe.isPickable = true;
+    const varnish = material(scene, '#ffffff', { part: 'globe' });
+    varnish.specularColor = new Color3(0.3, 0.28, 0.24); varnish.specularPower = 72;
+    globe.setVerticesData('color', colors); globe.material = varnish; globe.receiveShadows = true; globe.isPickable = true;
     globe.setEnabled(false); templates.set('globe-sphere', globe);
   }
   return templates.get('globe-sphere');

@@ -397,6 +397,33 @@ function buildShootingStar(shape) {
   shape.quad(shape.vertex(0, -0.12, 0, 'star', 1), shape.vertex(0, 0.12, 0, 'star', 1), shape.vertex(-14, 0.02, 0, 'haze', 0.6), shape.vertex(-14, -0.02, 0, 'haze', 0.6));
 }
 
+export const SEAT_DRAPE = Object.freeze({ top: 5, tie: 2.3, hem: 1.25, back: 4.42, folds: 4, across: 28, rows: 30 });
+function drapePanel(shape, side) {
+  const W = SEAT_WINDOW, D = SEAT_DRAPE, outer = W.x + side * (W.width / 2 + 0.78), start = shape.roles.length;
+  const innerAt = y => {
+    if (y >= D.tie) return outer - side * (0.24 + 0.44 * (1 - Math.pow((D.top - y) / (D.top - D.tie), 1.6)));
+    return outer - side * (0.24 + 0.14 * Math.sqrt((D.tie - y) / (D.tie - D.hem)));
+  };
+  for (let row = 0; row <= D.rows; row++) {
+    const y = D.top - (D.top - D.hem) * row / D.rows, inner = innerAt(y), width = Math.abs(outer - inner);
+    const gather = 1 - (width - 0.24) / 0.44, depth = 0.03 + 0.06 * gather + 0.05 * Math.exp(-(((y - D.tie) / 0.35) ** 2)), hem = y < D.hem + 0.09;
+    const [from, to] = side < 0 ? [outer, inner] : [inner, outer];
+    for (let i = 0; i <= D.across; i++) {
+      const u = i / D.across, fold = 0.5 + 0.5 * Math.cos(u * Math.PI * 2 * D.folds);
+      const z = D.back - depth * fold - 0.025 * Math.sin(u * Math.PI) - (hem ? 0.018 : 0);
+      shape.vertex(from + (to - from) * u, y - (hem ? 0.012 * fold : 0), z, hem || fold < 0.22 ? 'curtainShade' : 'curtain', 0.8 + 0.2 * fold);
+    }
+  }
+  const at = (row, i) => start + row * (D.across + 1) + i;
+  for (let row = 0; row < D.rows; row++) for (let i = 0; i < D.across; i++) shape.quad(at(row, i + 1), at(row, i), at(row + 1, i), at(row + 1, i + 1));
+  const tieIn = innerAt(D.tie), middle = (outer + tieIn) / 2, half = Math.abs(outer - tieIn) / 2 + 0.025, band = [];
+  for (let k = 0; k <= 16; k++) {
+    const a = Math.PI * k / 16;
+    for (const dy of [-0.035, 0.035]) band.push(shape.vertex(middle + Math.cos(a) * half, D.tie + dy, D.back + 0.01 - Math.sin(a) * (0.17), 'brass', 0.9 + 0.2 * Math.sin(a)));
+  }
+  for (let k = 0; k < 16; k++) shape.quad(band[k * 2 + 1], band[k * 2 + 3], band[k * 2 + 2], band[k * 2]);
+}
+
 function buildShell(shape, doors) {
   shape.flat = true;
   const W = SEAT_WINDOW, left = W.x - W.width / 2, right = W.x + W.width / 2, bottom = W.y - W.height / 2, top = W.y + W.height / 2;
@@ -420,10 +447,7 @@ function buildShell(shape, doors) {
   wall(W.x, top + 0.07, 4.56, W.width + 0.3, 0.16, 0.2, 'trim');
   wall(W.x, W.y, 4.62, 0.07, W.height, 0.08, 'trim', 1.15);
   for (const y of [bottom + W.height / 3, bottom + W.height * 2 / 3]) wall(W.x, y, 4.62, W.width, 0.06, 0.08, 'trim', 1.15);
-  for (const side of [-1, 1]) for (let fold = 0; fold < 4; fold++) {
-    const x = W.x + side * (W.width / 2 + 0.25 + fold * 0.13);
-    shape.blob(x, 3.25, 4.34 - (fold % 2) * 0.05, 0.12, 2.3, 0.1, fold % 2 ? 'curtainShade' : 'curtain', fold % 2 ? 'curtainShade' : 'curtain', 0.8, 5, 8);
-  }
+  for (const side of [-1, 1]) drapePanel(shape, side);
   wall(W.x, top + 0.45, 4.4, W.width + 1.6, 0.05, 0.05, 'brass');
   for (const z of doors) {
     wall(5.9, 1.52, z, 0.14, 2.64, 1.62, 'trim');

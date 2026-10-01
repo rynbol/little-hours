@@ -114,3 +114,20 @@ test('the desk succulent is a blush-tipped rosette in a glazed pot', async () =>
   assert.ok(['#7f9fa3', '#efe2c4', '#8fb07c', '#c9dea8', '#d8958a'].every(hex => palette.includes(hex)), 'glazed pot with a cream band, graded rosette leaves and blushed tips');
   disposeDetails(scene); engine.dispose();
 });
+
+test('the moon tree charms hang on strings that rise into the canopy or loop over a branch', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['moon-tree']);
+  const paint = createDetail('moon-tree', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint');
+  const positions = paint.getVerticesData('position'), colors = paint.getVerticesData('color'), string = [0x8e / 255, 0x6f / 255, 0x45 / 255];
+  const tops = [-Infinity, -Infinity];
+  let strands = 0;
+  for (let i = 0, c = 0; i < positions.length; i += 3, c += 4) {
+    if (Math.abs(colors[c] - string[0]) + Math.abs(colors[c + 1] - string[1]) + Math.abs(colors[c + 2] - string[2]) > 0.08) continue;
+    strands++;
+    [[-0.48, 0.2], [0.42, 0.27]].forEach(([x, z], k) => { if (Math.hypot(positions[i] - x, positions[i + 2] - z) < 0.02) tops[k] = Math.max(tops[k], positions[i + 1]); });
+  }
+  assert.ok(strands > 20, `${strands} string vertices`);
+  tops.forEach(top => assert.ok(top > 2.38, `a string reaches ${top}`));
+  disposeDetails(scene); engine.dispose();
+});
