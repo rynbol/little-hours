@@ -1,7 +1,7 @@
 import { TargetCamera } from '@babylonjs/core/Cameras/targetCamera.js';
 import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector.js';
 
-export const SEAT_LOOK = { pitchMin: -0.85, pitchMax: 0.24, restYaw: 0.3, restPitch: -0.24, pull: 0.24, rise: 0.17 };
+export const SEAT_LOOK = { pitchMin: -0.85, pitchMax: 0.24, restYaw: 0.195, restPitch: -0.24, pull: 0.24, rise: 0.17 };
 export const SEAT_SECONDS = { enter: 1.6, leave: 1.2 };
 const FAR = 60, BODY_CLEARANCE = 0.9, DRAG_RADIANS_PER_PIXEL = 0.0042;
 
