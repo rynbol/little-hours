@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
-import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, DETAIL_SOURCES } from './detail.js';
+import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, shadeGlow, DETAIL_SOURCES } from './detail.js';
 import { SURFACE_KIND } from './storybook.js';
 import { getFurniture } from '../core/catalog.js';
 import { createFurniture, LAPTOP } from './furniture.js';
@@ -82,6 +82,23 @@ test('the study laptop is a walnut case with brass fittings and a sepia screen, 
   const has = hex => { const target = rgb(hex), near = (c, i) => Math.abs(c[i] - target[0]) + Math.abs(c[i + 1] - target[1]) + Math.abs(c[i + 2] - target[2]) < 0.02;
     return createFurniture('study-desk', scene).getChildMeshes().some(mesh => { const colors = mesh.getVerticesData('color'); if (colors) { for (let i = 0; i < colors.length; i += 4) if (near(colors, i)) return true; } const paint = mesh.material?.diffuseColor; return paint && near([paint.r, paint.g, paint.b], 0); }); };
   assert.ok(has(LAPTOP.walnut) && has(LAPTOP.brass), 'the dollhouse laptop shares the walnut case and brass hinge');
+  disposeDetails(scene); engine.dispose();
+});
+
+test('turning the laptop page down dims only its glowing parts, leaves the lamp shade and the mug lit, and never compounds', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const detail = createDetail('study-desk', scene), untouched = createDetail('study-desk', scene), layer = (node, name) => node.getChildMeshes().find(mesh => mesh.material.name === name);
+  const glow = layer(detail, 'detail-glow'), { slots, palette } = glow.metadata, lit = Float32Array.from(glow.getVerticesData('color')), paint = Float32Array.from(layer(detail, 'detail-paint').getVerticesData('color'));
+  const page = Object.fromEntries(LAPTOP.page.map(hex => [hex, 0.6]));
+  shadeGlow(detail, page); shadeGlow(detail, page);
+  const colors = glow.getVerticesData('color'), at = hex => slots.findIndex(slot => slot === palette.indexOf(hex));
+  for (const hex of LAPTOP.page) { const i = at(hex); assert.ok(Math.abs(colors[i * 4 + 1] - lit[i * 4 + 1] * 0.6) < 1e-4, `${hex} is turned down once`); }
+  const shade = at('#ffd08a'); assert.equal(colors[shade * 4 + 1], lit[shade * 4 + 1], 'the lamp shade keeps its glow');
+  assert.deepEqual(Array.from(layer(detail, 'detail-paint').getVerticesData('color')), Array.from(paint), 'the painted parts, the mug rim among them, are untouched');
+  assert.deepEqual(Array.from(layer(untouched, 'detail-glow').getVerticesData('color')), Array.from(lit), 'another desk keeps its own bright page');
+  shadeGlow(detail, Object.fromEntries(LAPTOP.page.map(hex => [hex, 1])));
+  assert.deepEqual(Array.from(glow.getVerticesData('color')), Array.from(lit), 'turning it back up restores the page');
   disposeDetails(scene); engine.dispose();
 });
 

@@ -22,10 +22,15 @@ export default {
     await app.drag({ x: box.x, y: box.y }, { x: box.x + 160, y: box.y });
     await app.waitFor(`Math.abs(window.__littleHours.room.diagnostics().seat.look.yaw - ${before}) > 0.4`, { what: 'dragging to look around the room' });
     check('dragging looks around from the chair and keeps focus running', await app.js(`window.__littleHours.state.session.running && document.body.classList.contains('is-focus-mode')`));
+    const screenShade = `(() => { const d = window.__littleHours.room.diagnostics(), desk = d.scene.transformNodes.find(node => node.metadata?.itemId === d.layout.activeDeskId), glow = desk.metadata.detail.getChildMeshes().find(mesh => mesh.material?.name === 'detail-glow'), { slots, palette, baseColors } = glow.metadata, i = slots.indexOf(palette.indexOf('#fbf3df')); return { theme: d.seat.world.theme, ratio: glow.getVerticesData('color')[i * 4 + 1] / baseColors[i * 4 + 1] }; })()`;
+    const dimmedFor = ({ theme, ratio }) => theme === 'day' ? Math.abs(ratio - 1) < 0.02 : theme === 'dusk' ? ratio < 0.7 : ratio > 0.7 && ratio < 0.9;
+    const screenBefore = await app.js(screenShade);
     const otherTheme = await app.js(`window.__littleHours.state.theme === 'rain' ? 'day' : 'rain'`); await app.js(`window.__otherTabAt = performance.now()`);
     await app.js(`(() => { const saved = JSON.parse(localStorage.getItem('little-hours-v1')); saved.theme = '${otherTheme}'; localStorage.setItem('little-hours-v1', JSON.stringify(saved)); window.dispatchEvent(new StorageEvent('storage', { key: 'little-hours-v1' })); })()`);
     const kept = await app.waitFor(`performance.now() - window.__otherTabAt > 2500 && window.__littleHours.room.diagnostics().seat.world.theme === '${otherTheme}'`, { what: 'the other tab theme to reach the seat', timeout: 8000 }).then(() => app.js(`window.__littleHours.room.diagnostics().seat.state === 'seated' && document.body.classList.contains('is-focus-mode')`)).catch(() => false);
     check('a theme change from another tab repaints the view and keeps you in the chair', kept);
+    const screenAfter = await app.js(screenShade);
+    check('the laptop page is turned down after dark and in rain, and follows a theme change, so the lamp stays the brightest thing in view', dimmedFor(screenBefore) && dimmedFor(screenAfter) && screenBefore.theme !== screenAfter.theme, { screenBefore, screenAfter });
     if (otherTheme === 'rain') check('in rain the chair sees layered rain sheets in the valley, not sticks painted on the glass', await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene, glass = scene.getMeshByName('window-rain'), sheets = scene.getMeshByName('seat-world-sky-effects').material; return glass.isEnabled() && glass.alpha < 0.02 && sheets._floats.rain === 1; })()`));
     const deadline = await app.js(`window.__littleHours.state.session.endsAt`);
     const seatedAmbient = await app.js(`window.__littleHours.room.diagnostics().scene.getLightByName('warm-ambient').intensity`), seatedSun = await app.js(`window.__littleHours.room.diagnostics().scene.lights.find(light => light.getClassName() === 'DirectionalLight').intensity`);

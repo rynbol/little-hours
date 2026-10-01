@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
-import { seatedDim, deskLamp, LAMP_AT, gradeFocus, roomBloom, bloomEmission } from './room-lighting.js';
+import { ROOM_LIGHTS, seatedDim, deskLamp, LAMP_AT, gradeFocus, roomBloom, bloomEmission } from './room-lighting.js';
 
 test('seated at dusk or in rain, the room ambient and key light dim so the lamp and candles lead', () => {
   assert.equal(seatedDim('day', 1), 1);
@@ -55,4 +55,9 @@ test('seated, glowing paint like the laptop screen blooms faintly so it keeps it
   const seated = bloomEmission(paint, 1, new Color4());
   assert.ok(seated.r * roomBloom('dusk', 1) < 0.3, `screen glow ${seated.r * roomBloom('dusk', 1)} at dusk would wash the page out`);
   assert.deepEqual(bloomEmission(flame, 1, new Color4()).asArray(), [1, 0.8, 0.5, 1]);
+});
+
+test('the laptop page is turned down after dark and in rain, so it never outshines the lamp', () => {
+  assert.equal(ROOM_LIGHTS.day.screen, 1);
+  assert.ok(ROOM_LIGHTS.dusk.screen <= 0.65 && ROOM_LIGHTS.dusk.screen < ROOM_LIGHTS.rain.screen && ROOM_LIGHTS.rain.screen < 1);
 });

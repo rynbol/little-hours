@@ -21,7 +21,7 @@ import { SceneInstrumentation } from '@babylonjs/core/Instrumentation/sceneInstr
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.js';
 import '@babylonjs/core/Culling/ray.js';
 import '@babylonjs/core/Rendering/outlineRenderer.js';
-import { createFurniture, createRoundedBox, createContactShadow, createMobileCompanion, disposeAvatarTemplates, disposeFurnitureAssets, WINDOW_VIEW_DEPTH, PET_BED_SURFACE } from '../../models/furniture.js';
+import { createFurniture, createRoundedBox, createContactShadow, createMobileCompanion, disposeAvatarTemplates, disposeFurnitureAssets, WINDOW_VIEW_DEPTH, PET_BED_SURFACE, LAPTOP } from '../../models/furniture.js';
 import { celebrationWeight } from '../../core/delight.js';
 import { AVATAR_DEFAULT, avatarAppearanceKey, normalizeAvatarAppearance } from '../../core/avatar.js';
 import { createPetModel, createPetBelongings } from '../pet/index.js';
@@ -29,7 +29,7 @@ import { createPetRoutine, insideBed, PETS, PET_REACTION } from '../pet/index.js
 import { createCompanionRoutine } from '../companion/index.js';
 import { interactionFor, INTERACTION_NOTICES } from '../../core/item-interactions.js';
 import { createArchitecture, styleFurniture, buildWallMesh, furnitureRepaint } from '../../models/architecture.js';
-import { hasDetail, isDetailLoaded, loadDetails, createDetail, disposeDetails } from '../../models/detail.js';
+import { hasDetail, isDetailLoaded, loadDetails, createDetail, disposeDetails, shadeGlow } from '../../models/detail.js';
 import { getFurniture } from '../../core/catalog.js';
 import { createLayout, normalizeLayout, validatePlacement, findFreePosition, nearestValidPlacement, footprintBounds, MAX_ITEMS, pieceCount, petBed, roomDesign, rugStack, rugTouches, groundAt, standHeight, FLOOR_Y, RUG_STEP, FLAT_RUG } from '../../core/layout.js';
 import { roomDisplayName } from '../../core/house.js';
@@ -1247,6 +1247,7 @@ export function createRoom(container, options = {}) {
     sun.position.set(...light.position); sun.direction.set(...light.direction).normalize();
     hemisphere.diffuse = color(light.sky); hemisphere.groundColor = color(light.ground); hemisphere.intensity = light.ambient;
     painterly.setTheme(`room-${theme}`); aimSunbeam();
+    for (const object of placedObjects.values()) if (object.metadata.detail) dimScreen(object.metadata.detail);
     aimDeskLamp();
     applyBulbs(); applyAccents();
     bloom.intensity = roomBloom(theme, seatView.blend);
@@ -1677,11 +1678,12 @@ export function createRoom(container, options = {}) {
     skyStars.setEnabled(theme === 'dusk' && !inside);
     for (const mesh of scene.meshes) if (mesh.material && (mesh.material === retreatView || mesh.material === architecture?.viewMaterial)) mesh.isVisible = !inside;
   }
+  function dimScreen(detail) { shadeGlow(detail, Object.fromEntries(LAPTOP.page.map(hex => [hex, ROOM_LIGHTS[theme].screen]))); }
   function syncDetails() {
     for (const object of placedObjects.values()) {
       const type = object.metadata.furnitureType; if (!hasDetail(type)) continue;
       let detail = object.metadata.detail;
-      if (!detail) { detail = createDetail(type, scene, furnitureRepaint(architectureStyle, tintPaint(type, object.metadata.tint))); if (!detail) continue; detail.parent = object; object.metadata.detail = detail; }
+      if (!detail) { detail = createDetail(type, scene, furnitureRepaint(architectureStyle, tintPaint(type, object.metadata.tint))); if (!detail) continue; detail.parent = object; object.metadata.detail = detail; dimScreen(detail); }
       detail.setEnabled(seatView.inside); object.metadata.body.setEnabled(!seatView.inside);
     }
   }
