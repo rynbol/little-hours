@@ -71,6 +71,8 @@ test('the study laptop is a walnut case with brass fittings and a sepia screen, 
   const meshes = createDetail('study-desk', scene).getChildMeshes(), palette = name => meshes.find(mesh => mesh.material.name === name).metadata.palette;
   assert.ok(palette('detail-paint').includes(LAPTOP.walnut) && palette('detail-paint').includes(LAPTOP.leather), 'detailed laptop case is walnut with a leather trackpad');
   assert.ok(palette('detail-metal').includes(LAPTOP.brass) && !palette('detail-metal').includes('#b3a189'), 'detailed laptop fittings are brass');
+  const luminance = hex => { const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  assert.ok(palette('detail-paint').includes('#aa7954') && luminance(LAPTOP.walnut) < luminance('#aa7954') * 0.75, 'the walnut case is a clearly deeper value than the desk boards so the laptop does not dissolve into them');
   const glow = meshes.find(mesh => mesh.material.name === 'detail-glow');
   const colors = glow.getVerticesData('color'), tints = new Set();
   for (let i = 0; i < colors.length; i += 4) tints.add(colors[i] >= colors[i + 2] ? 'warm' : 'cool');

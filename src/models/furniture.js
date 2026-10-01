@@ -235,7 +235,7 @@ function deskLamp(parent, x, y, z) {
   cylinder(lamp, 0.10, 0.24, 0.21, [-0.14, 0.63, 0], '#c99858');
   cylinder(lamp, 0.205, 0.205, 0.013, [-0.14, 0.52, 0], '#f4dba1', { emissive: '#ffbd61', emissiveIntensity: 0.38 });
 }
-export const LAPTOP = Object.freeze({ walnut: '#9c6542', brass: '#c9a063', leather: '#7a5640' });
+export const LAPTOP = Object.freeze({ walnut: '#7f4c33', brass: '#c9a063', leather: '#7a5640' });
 function laptop(parent) {
   const laptopGroup = group(parent, [0, 1.29, -0.43]);
   box(laptopGroup, [0.97, 0.045, 0.62], [0, 0, 0], LAPTOP.walnut, 0.03);
@@ -503,15 +503,15 @@ function petBed(parent) {
 }
 const MOON_CANOPY = Object.freeze({ under: '#44664a', side: '#668d4f', top: '#9dbf66', sun: [-0.3, 0.82, 0.48] });
 function leafClump(parent, center, radii, seed) {
-  const rings = 6, segments = 12, positions = [], indices = [], colors = [];
+  const rings = 8, segments = 14, positions = [], indices = [], colors = [];
   const [under, side, top] = [MOON_CANOPY.under, MOON_CANOPY.side, MOON_CANOPY.top].map(hex => Color3.FromHexString(hex));
   const sun = new Vector3(...MOON_CANOPY.sun).normalize();
   for (let ring = 0; ring <= rings; ring++) {
     const phi = ring / rings * Math.PI, y = Math.cos(phi), r = Math.sin(phi);
     for (let s = 0; s < (ring === 0 || ring === rings ? 1 : segments); s++) {
-      const angle = (s + (ring % 2) * 0.5) / segments * Math.PI * 2, lump = 1 + (0.07 * Math.sin(angle * 3 + seed * 1.7 + ring * 2.1) + 0.04 * Math.sin(angle * 5 - seed + ring * 1.3)) * r;
+      const angle = s / segments * Math.PI * 2, lump = 1 + (0.045 * Math.sin(angle * 5 + seed * 1.7 + ring * 1.1) + 0.035 * Math.sin(angle * 8 - seed + ring * 2.3)) * r;
       const nx = Math.cos(angle) * r, nz = Math.sin(angle) * r;
-      positions.push(center[0] + nx * radii[0] * lump, center[1] + y * radii[1] * (y < 0 ? 0.78 : 1), center[2] + nz * radii[2] * lump);
+      positions.push(center[0] + nx * radii[0] * lump, center[1] + y * radii[1] * (y < 0 ? 0.82 : 1), center[2] + nz * radii[2] * lump);
       const light = Math.max(0, Math.min(1, (nx * sun.x + y * sun.y + nz * sun.z) * 0.5 + 0.5));
       const band = (from, to) => Math.max(0, Math.min(1, (light - from) / (to - from))), tone = Color3.Lerp(Color3.Lerp(under, side, band(0.4, 0.52)), top, band(0.68, 0.78));
       colors.push(tone.r, tone.g, tone.b, 1);

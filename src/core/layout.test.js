@@ -336,7 +336,7 @@ test('the moon tree canopy is rounded leaf clumps lit lighter on top than undern
   try {
     const tree = createFurniture('moon-tree', scene), canopy = tree.getChildMeshes().find(mesh => mesh.metadata?.effect === 'leaf-sway');
     const normals = canopy.getVerticesData('normal'), colors = canopy.getVerticesData('color'), count = canopy.getTotalVertices();
-    assert.ok(count >= 1000 && count <= 1600, `${count} canopy vertices`);
+    assert.ok(count >= 2000 && count <= 2800, `${count} canopy vertices`);
     const luminance = i => 0.3 * colors[i * 4] + 0.59 * colors[i * 4 + 1] + 0.11 * colors[i * 4 + 2], mean = list => list.reduce((sum, value) => sum + value, 0) / list.length;
     const tops = [], undersides = [];
     for (let i = 0; i < count; i++) { if (normals[i * 3 + 1] > 0.6) tops.push(luminance(i)); if (normals[i * 3 + 1] < -0.6) undersides.push(luminance(i)); }

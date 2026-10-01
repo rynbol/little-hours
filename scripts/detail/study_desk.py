@@ -5,7 +5,7 @@ from kit import Frame, cushion, cylinder, lathe, rbox, rod, sphere, torus, tube
 
 WOOD, EDGE, DARK, BRASS, SAGE, PAPER = '#aa7954', '#bc9169', '#73533d', '#bf9762', '#83968a', '#f2ead5'
 BOOKS = ['#788e84', '#bb8066', '#5f7a8c']
-WALNUT, LEATHER, LAPTOP_BRASS, GILT, RIBBON, INK = '#9c6542', '#7a5640', '#c9a063', '#d9b36e', '#a8463e', '#3f4a5e'
+WALNUT, LEATHER, LAPTOP_BRASS, GILT, RIBBON, INK = '#7f4c33', '#7a5640', '#c9a063', '#d9b36e', '#a8463e', '#3f4a5e'
 EYE = (0.25, 0.9, 1.0)
 
 
@@ -70,7 +70,9 @@ def laptop():
              rbox([0.72, 0.006, 0.26], (0, 0.021, -0.07), '#3d2b22', bevel=0.004, frame=f),
              rbox([0.29, 0.003, 0.15], (0, 0.0205, 0.19), LAPTOP_BRASS, bevel=0.006, surface='metal', layer='metal', frame=f),
              rbox([0.27, 0.004, 0.13], (0, 0.021, 0.19), LEATHER, bevel=0.01, surface='cloth', frame=f),
-             rbox([0.86, 0.007, 0.006], (0, 0.004, 0.311), LAPTOP_BRASS, bevel=0.002, surface='metal', layer='metal', frame=f)]
+             rbox([0.9, 0.009, 0.006], (0, -0.006, 0.311), LAPTOP_BRASS, bevel=0.002, surface='metal', layer='metal', frame=f)]
+    for x in (-1, 1):
+        parts.append(rbox([0.006, 0.009, 0.52], (x * 0.486, -0.006, 0.0), LAPTOP_BRASS, bevel=0.002, surface='metal', layer='metal', frame=f))
     for x in (-1, 1):
         parts.append(rbox([0.06, 0.044, 0.06], (x * 0.457, 0, 0.282), LAPTOP_BRASS, bevel=0.018, surface='metal', layer='metal', frame=f))
     parts.append(rod((-0.4, 0.024, -0.3), (0.4, 0.024, -0.3), 0.017, LAPTOP_BRASS, sides=16, surface='metal', layer='metal', frame=f))
