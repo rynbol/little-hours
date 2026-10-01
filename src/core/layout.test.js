@@ -332,15 +332,15 @@ test('plant canopies sway while paused, keep their trunks planted, and reset the
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
 
-test('the moon tree canopy is clumps of leaf cards, each card one tone on its clump normal, lit lighter on top than underneath, with no near-black', () => {
+test('the moon tree canopy is clumps of small leaf cards, lit lighter on top than underneath, with no near-black', () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   try {
     const tree = createFurniture('moon-tree', scene), canopy = tree.getChildMeshes().find(mesh => mesh.metadata?.effect === 'leaf-sway');
-    const normals = canopy.getVerticesData('normal'), colors = canopy.getVerticesData('color'), count = canopy.getTotalVertices();
+    const normals = canopy.getVerticesData('normal'), colors = canopy.getVerticesData('color'), positions = canopy.getVerticesData('position'), count = canopy.getTotalVertices();
     assert.ok(count >= 12000 && count <= 14500, `${count} canopy vertices`);
-    const same = (data, size, a, b) => Array.from({ length: size }, (_, k) => data[a * size + k] === data[b * size + k]).every(Boolean);
+    const span = i => Math.max(...[0, 1, 2].map(axis => { const values = [0, 1, 2, 3, 4, 5].map(k => positions[(i + k) * 3 + axis]); return Math.max(...values) - Math.min(...values); }));
     let cards = 0;
-    for (let i = 0; i + 5 < count; i++) if ([1, 2, 3, 4, 5].every(k => same(colors, 4, i, i + k) && same(normals, 3, i, i + k))) { cards++; i += 5; }
+    for (let i = 0; i + 5 < count; i++) if (span(i) > 0.02 && span(i) < 0.16) { cards++; i += 5; }
     assert.ok(cards >= 1700, `${cards} leaf cards`);
     const luminance = i => 0.3 * colors[i * 4] + 0.59 * colors[i * 4 + 1] + 0.11 * colors[i * 4 + 2], mean = list => list.reduce((sum, value) => sum + value, 0) / list.length;
     const tops = [], undersides = [];

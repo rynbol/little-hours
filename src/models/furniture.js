@@ -542,8 +542,11 @@ export function leafClump(parent, center, radii, seed, leaves) {
     normal.copyFrom(along.scale(Math.cos(spin))).addInPlace(across.scale(Math.sin(spin))).scaleInPlace(0.9).addInPlace(n.scale(0.1)).addInPlace(new Vector3(0, -0.15, 0)).normalize();
     Vector3.CrossToRef(normal, n, across); across.normalize();
     const length = (0.072 + random(k + 200) * 0.028) * scale, width = length * 0.42, start = point.subtract(normal.scale(length * 0.2));
-    const shade = tone(n, (random(k + 300) - 0.5) * MOON_CANOPY.mottle * 2);
-    const ids = LEAF_OUTLINE.map(([u, v]) => vertex(start.add(normal.scale(length * 1.2 * u)).addInPlace(across.scale(width * v)).addInPlace(n.scale(-width * 0.35 * v * v)), n, shade));
+    const lift = (random(k + 300) - 0.5) * MOON_CANOPY.mottle * 2;
+    const ids = LEAF_OUTLINE.map(([u, v]) => {
+      const at = start.add(normal.scale(length * 1.2 * u)).addInPlace(across.scale(width * v)).addInPlace(n.scale(-width * 0.35 * v * v)), facing = surfaceNormal(at.x - center[0], at.y - center[1], at.z - center[2]);
+      return vertex(at, facing, tone(facing, lift));
+    });
     for (let i = 1; i < ids.length - 1; i++) indices.push(ids[0], ids[i], ids[i + 1], ids[0], ids[i + 1], ids[i]);
   }
   const data = new VertexData(); Object.assign(data, { positions, indices, colors, normals });

@@ -23,3 +23,18 @@ test('moon tree clumps are soft rounded leaf cards, lit gold on top and cool ben
   assert.ok(hue(MOON_CANOPY.under) > 170, 'the underside is a cool blue-green');
   engine.dispose();
 });
+
+test('moon tree leaf cards shade by where each corner sits on the clump, so touching cards blend into one soft mass', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), leaves = 110;
+  const clump = leafClump(new TransformNode('tree', scene), [0, 2, 0], [0.25, 0.18, 0.25], 3, leaves);
+  const positions = clump.getVerticesData('position'), colors = clump.getVerticesData('color'), count = colors.length / 4, cardStart = count - leaves * LEAF_OUTLINE.length;
+  const card = v => Math.floor((v - cardStart) / LEAF_OUTLINE.length), seams = [];
+  for (let a = cardStart; a < count; a++) for (let b = a + 1; b < count; b++) {
+    if (card(a) === card(b) || Math.hypot(...[0, 1, 2].map(i => positions[a * 3 + i] - positions[b * 3 + i])) > 0.012) continue;
+    seams.push(Math.max(...[0, 1, 2].map(i => Math.abs(colors[a * 4 + i] - colors[b * 4 + i]))));
+  }
+  seams.sort((x, y) => x - y);
+  assert.ok(seams.length > 20, `${seams.length} touching corners`);
+  assert.ok(seams[Math.floor(seams.length * 0.95)] < 0.04, `touching cards differ by up to ${seams[Math.floor(seams.length * 0.95)].toFixed(3)} at the 95th percentile`);
+  engine.dispose();
+});
