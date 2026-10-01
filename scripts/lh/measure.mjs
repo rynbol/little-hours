@@ -75,3 +75,36 @@ export async function trace(app, path, action) {
   const long = main.filter(event => event.dur > 50000).map(event => Math.round(event.dur / 1000)).sort((a, b) => b - a);
   return { events: events.length, longTasks: long.length, longestTasksMs: long.slice(0, 5), busyMs: Math.round(main.reduce((sum, event) => sum + event.dur, 0) / 1000) };
 }
+
+const SEAT = 'window.__littleHours.room.diagnostics()';
+export async function focusTrip(app, { width, height }) {
+  await app.js(`(() => { const trip = window.__lhTrip = { frames: [], marks: [] }; let last = performance.now(); let seat = ''; const tick = now => { trip.frames.push([now, now - last, performance.memory?.usedJSHeapSize ?? 0]); last = now; const state = ${SEAT}.seat.state; if (state !== seat && (state === 'entering' || state === 'leaving')) trip.marks.push([state === 'entering' ? 'flight-in' : 'flight-out', now, Object.keys(${SEAT}.engine._compiledEffects).length]); seat = state; if (window.__lhTrip === trip) requestAnimationFrame(tick); }; requestAnimationFrame(tick); return true; })()`);
+  const mark = name => app.js(`window.__lhTrip.marks.push([${JSON.stringify(name)}, performance.now(), Object.keys(${SEAT}.engine._compiledEffects).length])`);
+  const theme = next => app.js(`(() => { const saved = JSON.parse(localStorage.getItem('little-hours-v1')); saved.theme = '${next}'; localStorage.setItem('little-hours-v1', JSON.stringify(saved)); window.dispatchEvent(new StorageEvent('storage', { key: 'little-hours-v1' })); })()`);
+  await mark('load');
+  await app.waitFor(`${SEAT}.seat.world.outdoor !== false`, { what: 'the outdoor world to be built', timeout: 30000 }); await sleep(1000);
+  await mark('prepare'); await app.clickSel('#focus-mode-enter');
+  await app.waitFor(`${SEAT}.seat.state === 'seated'`, { what: 'the view to settle in the chair', timeout: 30000 });
+  await mark('seated'); await sleep(3000);
+  await mark('look-around');
+  for (const step of [300, 300, -300, -300, -300, 300]) await app.drag({ x: width / 2, y: height / 2 }, { x: width / 2 + step, y: height / 2 + step / 6 }, 24);
+  await sleep(800);
+  const start = await app.js(`window.__littleHours.state.theme`);
+  await mark('theme-switch');
+  for (const next of [start === 'rain' ? 'day' : 'rain', start]) { await theme(next); await sleep(2000); }
+  await mark('leave'); await app.key('Escape');
+  await app.waitFor(`${SEAT}.seat.state === 'room' && !${SEAT}.moving`, { what: 'the view to fly back out to the dollhouse', timeout: 30000 });
+  await mark('dollhouse'); await sleep(2500); await mark('end');
+  return app.js(`(() => {
+    const { frames, marks } = window.__lhTrip; window.__lhTrip = null; marks.sort((a, b) => a[1] - b[1]);
+    const result = {};
+    for (let k = 0; k < marks.length - 1; k++) {
+      const [name, from, effectsFrom] = marks[k], [, to, effectsTo] = marks[k + 1], span = frames.filter(([at]) => at > from && at <= to), gaps = span.map(([, gap]) => gap).sort((a, b) => a - b);
+      let allocated = 0, collections = 0;
+      for (let i = 1; i < span.length; i++) { const grew = span[i][2] - span[i - 1][2]; if (grew > 0) allocated += grew; else if (grew < -1e6) collections++; }
+      const seconds = (to - from) / 1000;
+      Object.assign(result, { [name + ' maxGapMs']: gaps.at(-1) ?? 0, [name + ' gaps>20']: gaps.filter(gap => gap > 20).length, [name + ' gaps>50']: gaps.filter(gap => gap > 50).length, [name + ' fps']: span.length / seconds, [name + ' newShaders']: effectsTo - effectsFrom, [name + ' allocMBps']: allocated / 1e6 / seconds, [name + ' heapDrops']: collections, [name + ' slowAt']: span.filter(([, gap]) => gap > 20).map(([at, gap]) => Math.round(at - from) + ':' + Math.round(gap)).join(' ') });
+    }
+    return result;
+  })()`);
+}
