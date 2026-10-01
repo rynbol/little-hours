@@ -6,26 +6,43 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { heightAt, WORLD } from '../../core/world-terrain.js';
-import { CLOUD_KINDS, PLUME_COLUMN, clearsPlume, clearsSuns, cloudCards, createWorldClouds } from './clouds.js';
+import { CLOUD_KINDS, PLUME_COLUMN, clearsPlume, clearsSuns, cloudCards, cloudShape, createWorldClouds } from './clouds.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-test('cumulus sit 1 to 6 km out and clear the land, wisps ride high and mist stays in the valley', () => {
-  const cards = cloudCards(), of = kind => cards.filter(card => card.kind === CLOUD_KINDS[kind]);
-  assert.equal(of('cumulus').length, 30);
-  assert.equal(of('wisp').length, 10);
+test('fewer cumulus banks, at least three times apart in width, with big low banks near the ridges, all above the skyline from the window', () => {
+  const cards = cloudCards(), of = kind => cards.filter(card => card.kind === CLOUD_KINDS[kind]), cumulus = of('cumulus');
+  assert.ok(cumulus.length >= 12 && cumulus.length <= 20, `${cumulus.length} cumulus`);
+  assert.equal(of('wisp').length, 7);
   assert.ok(of('mist').length >= 12 && of('mist').length <= 24);
-  for (const card of of('cumulus')) {
+  const widths = cumulus.map(card => card.halfWidth * 2);
+  assert.ok(Math.max(...widths) / Math.min(...widths) >= 3, `width spread ${(Math.max(...widths) / Math.min(...widths)).toFixed(2)}`);
+  const lowBanks = cumulus.filter(card => card.halfWidth * 2 >= 1800 && card.y - card.halfHeight * 0.6 <= 450 && Math.hypot(card.x, card.z) >= 3400);
+  assert.ok(lowBanks.length >= 3, `${lowBanks.length} big low banks`);
+  for (const card of cumulus) {
     const out = Math.hypot(card.x, card.z), base = card.y - card.halfHeight * 0.6;
-    assert.ok(out >= 1100 && out <= 6000 && base >= 300 && base <= 1000, `cumulus at ${out.toFixed(0)} m, base ${base.toFixed(0)} m`);
+    assert.ok(out >= 1600 && out <= 6500 && base >= 200 && base <= 1000, `cumulus at ${out.toFixed(0)} m, base ${base.toFixed(0)} m`);
     assert.ok(base >= heightAt(card.x, card.z) + 120);
+  }
+  for (const card of [...cumulus, ...of('wisp')]) {
+    const out = Math.hypot(card.x, card.z);
+    for (let step = 300; step < out; step += 100) assert.ok(heightAt(card.x * step / out, card.z * step / out) / step < card.y / out, `card ${out.toFixed(0)} m out hides behind land ${step} m out`);
   }
   for (const card of of('wisp')) assert.ok(card.y >= 1300);
   for (const card of of('mist')) assert.ok(heightAt(card.x, card.z) <= WORLD.valleyFloor + 2);
   const reach = cards.map(card => Math.hypot(card.x, card.z));
   assert.deepEqual(reach, [...reach].sort((a, b) => b - a));
+});
+
+test('cumulus quads hug the bank between its feathered base and its top, so the big banks rasterise under three quarters of their card', () => {
+  const cards = cloudCards(), { uvs } = cloudShape(cards);
+  cards.forEach((card, c) => {
+    const rows = [1, 3, 5, 7].map(k => uvs[c * 8 + k]), tall = Math.max(...rows) - Math.min(...rows);
+    if (card.kind === CLOUD_KINDS.cumulus) assert.ok(tall <= 1.5 && Math.min(...rows) <= -0.6 && Math.max(...rows) >= 0.78, `cumulus rows ${rows}`);
+    else assert.equal(tall, 2);
+  });
 });
 
 test('no cloud or wisp starts in front of the volcano plume, and the shader keeps it clear as they drift', () => {

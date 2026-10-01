@@ -12,11 +12,13 @@ import { WORLD_ATMOSPHERES } from './atmosphere.js';
 
 export const CLOUD_KINDS = Object.freeze({ cumulus: 0, wisp: 1, mist: 2 });
 export const CLOUD_BANKS = Object.freeze([
-  Object.freeze({ kind: 'cumulus', count: 30, distance: [1100, 6000], base: [300, 1000], width: [320, 900], tall: [0.24, 0.38], spin: 0.0011 }),
-  Object.freeze({ kind: 'wisp', count: 10, distance: [2500, 7000], base: [1300, 1500], width: [900, 2000], tall: [0.08, 0.14], spin: 0.0005 }),
-  Object.freeze({ kind: 'mist', count: 24, distance: [260, 1900], base: [-6, -3], width: [160, 420], tall: [0.07, 0.12], spin: 0 }),
+  Object.freeze({ kind: 'cumulus', count: 14, distance: [1600, 6500], base: [360, 1000], width: [700, 2600], tall: [0.27, 0.36], skew: 1.6, front: 0.65, arc: 1.1, spin: 0.0011 }),
+  Object.freeze({ kind: 'cumulus', count: 5, distance: [3400, 4400], base: [200, 420], width: [1800, 3200], tall: [0.17, 0.22], skew: 1, front: 1, arc: 0.9, spin: 0.0006 }),
+  Object.freeze({ kind: 'wisp', count: 7, distance: [4000, 8000], base: [1150, 1450], width: [1800, 3800], tall: [0.05, 0.08], skew: 1, front: 0.65, arc: 1.2, spin: 0.0005 }),
+  Object.freeze({ kind: 'mist', count: 24, distance: [260, 1900], base: [-6, -3], width: [160, 420], tall: [0.07, 0.12], skew: 1, front: 0.65, arc: 1.2, spin: 0 }),
 ]);
 const CLOUD_COLORS = ['cloudLit', 'cloudShade', 'cloudRim'];
+const CUMULUS_ROWS = Object.freeze([-0.62, 0.8]);
 export const PLUME_COLUMN = Object.freeze({ x: LANDMARKS.peak.x, z: LANDMARKS.peak.z, reach: 0.1, summit: LANDMARKS.peak.summit + PLUME.rise * 0.1 });
 
 export function clearsPlume({ x, y, z, halfWidth, halfHeight }, eye = [0, 0]) {
@@ -33,6 +35,12 @@ export function clearsSuns({ x, y, z, halfWidth, halfHeight }) {
   return SUNS.every(([sunX, sunY, sunZ]) => Math.hypot((bearing - Math.atan2(sunX, -sunZ)) * out / halfWidth, (up - Math.asin(sunY)) * out / halfHeight) > 1.2);
 }
 
+export function clearsSkyline({ x, y, z }) {
+  const out = Math.hypot(x, z);
+  for (let step = 300; step < out; step += 250) if (heightAt(x * step / out, z * step / out) / step >= y / out) return false;
+  return true;
+}
+
 const seeded = seed => () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const span = ([low, high], t) => low + (high - low) * t;
 
@@ -40,15 +48,15 @@ export function cloudCards(seed = WORLD.seed) {
   const random = seeded(seed * 977 + 13), cards = [];
   for (const bank of CLOUD_BANKS) {
     for (let placed = 0, tries = 0; placed < bank.count && tries < bank.count * 12; tries++) {
-      const front = random() < 0.65, bearing = front ? (random() - 0.5) * 2.4 : random() * Math.PI * 2;
+      const front = random() < bank.front, bearing = front ? (random() - 0.5) * 2 * bank.arc : random() * Math.PI * 2;
       const r = span(bank.distance, random() ** 0.8), x = Math.sin(bearing) * r, z = -Math.cos(bearing) * r;
-      const halfWidth = span(bank.width, random()) / 2, halfHeight = halfWidth * span(bank.tall, random()) * 2;
+      const halfWidth = span(bank.width, random() ** bank.skew) / 2, halfHeight = halfWidth * span(bank.tall, random()) * 2;
       const ground = Math.max(heightAt(x, z), heightAt(x + halfWidth, z), heightAt(x - halfWidth, z));
       let base = span(bank.base, random());
       if (bank.kind === 'mist') { if (ground > WORLD.valleyFloor + 2) continue; base += ground; }
       else if (base < ground + 120) continue;
       const card = { kind: CLOUD_KINDS[bank.kind], x, y: base + halfHeight * 0.6, z, halfWidth, halfHeight, spin: bank.spin, seed: random() * 97 };
-      if (bank.kind !== 'mist' && !(clearsPlume(card) && clearsSuns(card))) continue;
+      if (bank.kind !== 'mist' && !(clearsPlume(card) && clearsSuns(card) && clearsSkyline(card))) continue;
       cards.push(card);
       placed++;
     }
@@ -59,7 +67,8 @@ export function cloudCards(seed = WORLD.seed) {
 export function cloudShape(cards) {
   const positions = new Float32Array(cards.length * 12), uvs = new Float32Array(cards.length * 8), seeds = new Float32Array(cards.length * 8), sizes = new Float32Array(cards.length * 16), indices = new Uint16Array(cards.length * 6);
   cards.forEach((card, c) => {
-    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([u, v], k) => {
+    const [low, high] = card.kind === CLOUD_KINDS.cumulus ? CUMULUS_ROWS : [-1, 1];
+    [[-1, low], [1, low], [1, high], [-1, high]].forEach(([u, v], k) => {
       const i = c * 4 + k;
       positions.set([card.x, card.y, card.z], i * 3); uvs.set([u, v], i * 2); seeds.set([card.seed, card.kind], i * 2);
       sizes.set([card.halfWidth, card.halfHeight, card.spin, 1], i * 4);
@@ -92,22 +101,42 @@ uniform vec3 eye, fogNear, cloudLit, cloudShade, cloudRim;
 uniform float time, fogDensity, fogHeight, cloudCover, sunStrength;
 ${WORLD_GLSL}
 ${SKY_GLSL}
+vec2 cloudField(vec2 p, vec2 lit, float seed, float aspect) {
+  vec2 core = vec2(p.x / (aspect * .82), (p.y + .32) / .3), litCore = vec2((p.x + lit.x) / (aspect * .82), (p.y + lit.y + .32) / .3);
+  vec2 f = max(vec2(1. - dot(core, core), 1. - dot(litCore, litCore)), 0.); f *= f * .9;
+  for (int i = 0; i < 9; i++) {
+    float fi = float(i) * 4., r = .2 + worldHash(vec2(seed, fi + 1.)) * .3;
+    float u = (worldHash(vec2(seed, fi + 2.)) - .5) * 2. * max(aspect - 1.15 * r - .25, 0.), edge = abs(u) / aspect;
+    r *= 1.1 - .55 * edge;
+    vec2 at = vec2(u, -.34 + r * .6 + worldHash(vec2(seed, fi + 3.)) * .3 * (1. - edge)), shape = vec2(r * 1.15, r), d = (p - at) / shape, dLit = (p + lit - at) / shape;
+    vec2 blob = max(vec2(1. - dot(d, d), 1. - dot(dLit, dLit)), 0.); f += blob * blob;
+  }
+  return f;
+}
 void main() {
   vec2 p = vUv; float seed = vSeed.x, kind = vSeed.y, a;
-  float toward = pow(max(dot(normalize(vWorld - eye), sun), 0.), 6.);
+  float x = p.x / vAspect, lean = worldHash(vec2(seed, 31.)) * .7 - .15;
+  vec2 s = vec2(p.x - lean * (p.y + .1) * .45, p.y);
+  float sunSide = dot(sun, normalize(vec3(-(vWorld.z - eye.z), 0., vWorld.x - eye.x)));
+  vec2 field = kind < .5 ? cloudField(s, vec2(sunSide * .08, .15), seed, vAspect) : vec2(1.);
+  if (field.x < .04) discard;
+  float f = field.x, toward = pow(max(dot(normalize(vWorld - eye), sun), 0.), 6.);
   vec2 q = p + fract(seed * .618) * 13. + vec2(time * .012, 0.);
   float n = worldNoise(q * 2.2) * .5 + worldNoise(q * 5.1 + 3.1) * .3 + worldNoise(q * 11.3 - vec2(time * .02, 0.)) * .2;
-  vec3 color;
+  vec3 color, glow = vec3(0.);
   if (kind < .5) {
-    float x = p.x / vAspect, span = max(1. - x * x / .8, 0.), centre = (worldHash(vec2(seed, 1.)) - .5) * .5, heap = max(1. - (x - centre) * (x - centre) / .3, 0.);
-    float big = p.x * 1.15 + seed, small = p.x * 2.7 - seed, fine = p.x * 5.3 + seed * 2., bigArc = fract(big) * 2. - 1., smallArc = fract(small) * 2. - 1., fineArc = fract(fine) * 2. - 1.;
-    float scallop = sqrt(max(1. - bigArc * bigArc, 0.)) * (.1 + worldHash(vec2(floor(big), seed)) * .16) + sqrt(max(1. - smallArc * smallArc, 0.)) * (.04 + worldHash(vec2(floor(small), seed)) * .08) + sqrt(max(1. - fineArc * fineArc, 0.)) * .035;
-    float base = -.6 + (worldNoise(vec2(p.x * .8, seed)) - .5) * .05;
-    float top = base + span * .18 + sqrt(heap) * (.65 + worldHash(vec2(seed, 2.)) * .25) + scallop * sqrt(span) + (cloudCover - .55) * .3;
-    float fringe = (n - .5) * .15, depth = top - p.y + fringe, rise = p.y - base + fringe * .5;
-    a = smoothstep(0., .12, depth) * smoothstep(0., .16, rise) * smoothstep(0., .1, span) * .97;
-    float lit = smoothstep(0., .5, rise + (n - .5) * .1) * (1. - .18 * smoothstep(.06, .4, depth));
+    float base = -.38 + .2 * x * x + (worldNoise(vec2(p.x * .9, seed * 7.)) - .5) * .2;
+    vec2 tq = vec2(p.x * 1.4 + time * .01, p.y * 3.4) + seed * 3.;
+    float tatter = worldNoise(tq) * .55 + worldNoise(tq * vec2(3.1, 2.2) - 5.7) * .45;
+    float rise = p.y - base, edge = mix(f * (.2 + 1.6 * clamp(n * 2.6 - .8, 0., 1.)), f, smoothstep(.5, 1.2, f)) + (cloudCover - .55) * .3;
+    float fade = smoothstep(-.05, .3, rise + (tatter - .5) * 1.1) * (1. - smoothstep(.9, 1., abs(x)));
+    a = smoothstep(.16, .5, edge) * fade * .97;
+    float shadow = smoothstep(0., 1.6, field.y + (n - .5) * .4);
+    float lit = clamp(smoothstep(-.65, .5, p.y) * .85 + (1. - shadow) * .3 + (n - .5) * .15 - .02, 0., 1.);
     color = mix(cloudShade, cloudLit, lit);
+    float near = smoothstep(.83, .95, dot(normalize(vWorld - eye), sun)) * smoothstep(.5, 1., sunStrength), thin = (1. - smoothstep(.16, .7, min(edge, f))) * smoothstep(-.5, .2, p.y);
+    color = mix(color, cloudRim, clamp(near * (thin + .35 * smoothstep(-.3, .6, p.y)), 0., 1.));
+    glow = cloudRim * near * thin * smoothstep(.04, .3, edge) * fade * .4;
   } else if (kind < 1.5) {
     float streak = worldNoise(vec2(p.x * .7 + seed, p.y * 1.8 + p.x * .35 + time * .004)) * .65 + worldNoise(vec2(p.x * 1.6 - seed, p.y * 3.6)) * .35;
     a = smoothstep(.42, .9, streak + (cloudCover - .55) * .3) * (1. - smoothstep(.3, 1., abs(p.x) / vAspect)) * (1. - smoothstep(0., 1., abs(p.y))) * .55;
@@ -118,9 +147,9 @@ void main() {
     color = mix(fogNear, fogSun, toward * .6) * (.92 + .16 * smoothstep(-.5, .8, p.y));
   }
   vec3 ray = vWorld - eye;
-  color = kind > 1.5 ? worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight) : mix(color, worldSky(normalize(ray)), (1. - exp(-length(ray) * fogDensity * .3)) * .5);
+  color = kind > 1.5 ? worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight) : mix(color, worldSky(normalize(ray)), (1. - exp(-length(ray) * fogDensity * .3)) * (kind < .5 ? .35 : .5));
   a *= vClear;
-  gl_FragColor = vec4(color * a, a);
+  gl_FragColor = vec4(color * a + glow * vClear, a);
 }`;
 
 export function createWorldClouds(scene, { root, still }) {
