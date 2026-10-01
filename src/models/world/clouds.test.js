@@ -9,6 +9,7 @@ import { heightAt, WORLD } from '../../core/world-terrain.js';
 import { CLOUD_KINDS, PLUME_COLUMN, clearsPlume, clearsSkyline, clearsSnowCap, clearsSuns, cloudCards, cloudShape, createWorldClouds } from './clouds.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
+import { LANDMARKS } from './landmarks.js';
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -114,4 +115,30 @@ test('no cumulus stands in front of the snow cap, though banks may gather around
   assert.equal(clearsSnowCap(toward(4000, 1100, 900, 300)), false);
   assert.equal(clearsSnowCap(toward(4000, 450, 900, 300)), true);
   assert.equal(clearsSnowCap({ x: 3000, y: 1100, z: -3000, halfWidth: 900, halfHeight: 300 }), true);
+});
+
+const bearingOf = card => Math.atan2(card.x, -card.z);
+
+test('a long, flat collar of layered banks hugs the snow peak below its snow line, anchored in front of its foot, with no puffy bank above it', () => {
+  const { x, z, radius, summit, snowLine } = LANDMARKS.peak, far = Math.hypot(x, z), peak = Math.atan2(x, -z), foot = radius * 0.5 / far;
+  const silhouette = card => { const out = Math.hypot(card.x, card.z), reach = card.halfWidth / out, nearest = Math.min(Math.max(peak, bearingOf(card) - reach), bearingOf(card) + reach); return summit / far * Math.max(0, 1 - Math.abs(nearest - peak) / foot); };
+  const ahead = cloudCards().filter(card => card.kind === CLOUD_KINDS.cumulus && Math.hypot(card.x, card.z) < far && (card.y - card.halfHeight * 0.62) / Math.hypot(card.x, card.z) < silhouette(card));
+  const collar = ahead.filter(card => Math.hypot(card.x, card.z) <= far - radius * 0.5);
+  assert.ok(collar.length >= 2, `${collar.length} collar layers`);
+  for (const card of ahead) {
+    const out = Math.hypot(card.x, card.z), top = card.y + card.halfHeight * 0.8, flat = card.halfWidth * 2 / (card.halfHeight * 1.42);
+    assert.ok(flat >= 4.5, `bank ${out.toFixed(0)} m out is only ${flat.toFixed(1)} times wider than tall`);
+    assert.ok(top < snowLine, `bank ${out.toFixed(0)} m out tops out at ${top.toFixed(0)} m, above the ${snowLine} m snow line`);
+    assert.equal(card.spin, 0, `bank ${out.toFixed(0)} m out drifts off the mountain`);
+  }
+  const left = Math.min(...collar.map(card => bearingOf(card) - card.halfWidth / Math.hypot(card.x, card.z))), right = Math.max(...collar.map(card => bearingOf(card) + card.halfWidth / Math.hypot(card.x, card.z)));
+  assert.ok(left < peak - foot && right > peak + foot, `collar spans ${left.toFixed(2)} to ${right.toFixed(2)} around the foot at ${peak.toFixed(2)}`);
+});
+
+test('the sky framed by the window is authored, so a new world seed leaves every bank and wisp in it where it was', () => {
+  const framed = seed => cloudCards(seed).filter(card => card.kind !== CLOUD_KINDS.mist && bearingOf(card) > -0.9 && bearingOf(card) < 0.55).map(card => [card.x, card.y, card.z, card.halfWidth].map(value => value.toFixed(1)).join(',')).sort();
+  const composed = framed(WORLD.seed);
+  assert.ok(composed.length >= 8, `${composed.length} banks framed`);
+  assert.deepEqual(framed(WORLD.seed + 1), composed);
+  assert.deepEqual(framed(WORLD.seed * 7 + 3), composed);
 });
