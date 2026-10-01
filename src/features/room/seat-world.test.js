@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, VOLCANO } from './seat-world.js';
+import { createSeatWorld, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, VOLCANO } from './seat-world.js';
 
 const PEAK = VOLCANO.base + VOLCANO.height;
 
@@ -593,5 +593,17 @@ test('rain falls in sheets at three depths outside the room, denser and fainter 
   world.setEnabled(true);
   const paint = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects').material;
   for (const [theme, rain] of [['rain', 1], ['day', 0], ['dusk', 0]]) { world.setTheme(theme); assert.equal(paint._floats.rain, rain, theme); }
+  engine.dispose();
+});
+
+test('the moon maria fade into the face with no hard rim', () => {
+  const { engine, world } = setup();
+  world.setTheme('dusk'); world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-moon').metadata;
+  const face = (x, y) => MOON_FACE.center - (MOON_FACE.center - MOON_FACE.limb) * Math.hypot(x, y) / MOON_FACE.radius;
+  const maria = shape.roles.flatMap((_, i) => shape.positions[i * 3 + 2] > 0.01 ? [i] : []);
+  const edges = maria.filter(i => shape.shades[i] > face(shape.positions[i * 3], shape.positions[i * 3 + 1]) - 0.02);
+  assert.ok(maria.length > 20 && edges.length >= maria.length * 0.8, `${edges.length} of ${maria.length} mare vertices match the face beneath them`);
+  for (const i of edges) assert.ok(Math.abs(shape.shades[i] - face(shape.positions[i * 3], shape.positions[i * 3 + 1])) < 0.01, 'a mare rim meets the face at its shade');
   engine.dispose();
 });

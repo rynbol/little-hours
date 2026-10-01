@@ -383,13 +383,16 @@ function buildSpirit(shape) {
   for (let k = 0; k < 4; k++) { shape.tri(top, ring[k], ring[(k + 1) % 4]); shape.tri(bottom, ring[(k + 1) % 4], ring[k]); }
 }
 
+export const MOON_FACE = Object.freeze({ radius: 6.5, center: 1.05, limb: 0.92 });
 function buildMoon(shape) {
-  const center = shape.vertex(0, 0, 0, 'moon', 1.05);
-  const ring = []; for (let s = 0; s < 28; s++) { const a = s / 28 * Math.PI * 2; ring.push(shape.vertex(Math.cos(a) * 6.5, Math.sin(a) * 6.5, 0, 'moon', 0.92)); }
+  const disc = (x, y) => MOON_FACE.center - (MOON_FACE.center - MOON_FACE.limb) * Math.hypot(x, y) / MOON_FACE.radius;
+  const center = shape.vertex(0, 0, 0, 'moon', MOON_FACE.center);
+  const ring = []; for (let s = 0; s < 28; s++) { const a = s / 28 * Math.PI * 2; ring.push(shape.vertex(Math.cos(a) * MOON_FACE.radius, Math.sin(a) * MOON_FACE.radius, 0, 'moon', MOON_FACE.limb)); }
   for (let s = 0; s < 28; s++) shape.tri(center, ring[s], ring[(s + 1) % 28]);
-  for (const [x, y, r] of [[-1.8, 1.4, 1.3], [2, -1.2, 1.6], [0.8, 2.6, 0.8], [-0.6, -2.8, 1.1], [2.9, 1.6, 0.6]]) {
-    const c = shape.vertex(x, y, 0.05, 'moon', 0.9), rim = []; for (let s = 0; s < 10; s++) { const a = s / 10 * Math.PI * 2, wobble = 1 + 0.25 * Math.sin(a * 3 + x); rim.push(shape.vertex(x + Math.cos(a) * r * wobble, y + Math.sin(a) * r * wobble * 0.85, 0.05, 'moon', 0.95)); }
-    for (let s = 0; s < 10; s++) shape.tri(c, rim[s], rim[(s + 1) % 10]);
+  for (const [x, y, r] of [[-1.8, 1.4, 1.7], [2, -1.2, 2], [-0.6, -2.8, 1.3]]) {
+    const c = shape.vertex(x, y, 0.05, 'moon', disc(x, y) - 0.08), rim = [];
+    for (let s = 0; s < 14; s++) { const a = s / 14 * Math.PI * 2, wobble = 1 + 0.2 * Math.sin(a * 3 + x), px = x + Math.cos(a) * r * wobble, py = y + Math.sin(a) * r * wobble * 0.85; rim.push(shape.vertex(px, py, 0.05, 'moon', disc(px, py))); }
+    for (let s = 0; s < 14; s++) shape.tri(c, rim[s], rim[(s + 1) % 14]);
   }
 }
 
