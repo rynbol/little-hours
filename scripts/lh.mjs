@@ -40,6 +40,7 @@ Options:
   --closed           house shots: close the house first
   --look <degrees>   focus shots: drag the view round by this many degrees first
   --probe "<expr>"   shots: print an expression evaluated with the live Babylon scene bound to scene
+  --before "<expr>"  shots: evaluate an expression with scene bound before the picture is taken
   --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
   --still            prefers-reduced-motion: reduce
   --headed           show the browser window
@@ -248,6 +249,7 @@ async function shots() {
         await app.drag({ x: viewport.width / 2, y }, { x: viewport.width / 2 + step, y });
       }
       if (options.turn || options.closed || options.look) await app.settle();
+      if (options.before) await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; ${options.before}; })()`);
       await sleep(Number(options.wait || 600));
       const file = await app.shot(join(out, `${name}-${list.length > 1 ? (side === list[0] ? 'this' : String(options.against).replace(/[^\w.-]+/g, '_')) : 'this'}.jpg`));
       console.log(`${side.label} ${name}: ${file}${app.errors.length ? `  page errors: ${app.errors.join(' | ').slice(0, 200)}` : ''}`);
