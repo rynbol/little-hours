@@ -553,3 +553,14 @@ test('the seated room baseboards sit on the floor so no wall shows beneath them'
   assert.ok(low.front <= 0.2 && low.side <= 0.2, `baseboards reach down to ${low.front.toFixed(3)} and ${low.side.toFixed(3)}`);
   engine.dispose();
 });
+
+test('hamlet roofs read as tiled gables, with a lit and a shaded slope, courses and a dark ridge and fascia', () => {
+  const { engine, world } = setup();
+  world.setTheme('day'); world.setEnabled(true);
+  const land = world.meshes.find(mesh => mesh.name === 'seat-world-land'), { shape } = land.metadata, shades = [];
+  shape.roles.forEach((role, i) => { if (role.startsWith('roofs')) shades.push(shape.shades[i]); });
+  const max = Math.max(...shades), min = Math.min(...shades);
+  assert.ok(max >= 1.2 && min <= 0.45, `roof shades run ${min.toFixed(2)} to ${max.toFixed(2)}`);
+  assert.ok(new Set(shades.map(shade => shade.toFixed(2))).size >= 6, 'slopes, courses, ridge and fascia each have their own value');
+  engine.dispose();
+});

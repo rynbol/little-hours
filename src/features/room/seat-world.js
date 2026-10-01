@@ -176,8 +176,16 @@ function buildHamlet(shape) {
     shape.box(x, ground + h / 2, z, w, h, d, yaw, wall, 0.9 + random() * 0.15);
     const cos = Math.cos(yaw), sin = Math.sin(yaw), at = (lx, ly, lz, role, s = 1, t = 0) => shape.vertex(x + lx * cos + lz * sin, ground + ly, z - lx * sin + lz * cos, role, s, t);
     const eave = w / 2 + 0.3, ridge = h + size * (0.7 + random() * 0.3), overhang = d / 2 + 0.3;
-    shape.quad(at(-eave, h, overhang, roof, 1), at(eave, h, overhang, roof, 1), at(eave, ridge, 0, roof, 1.15), at(-eave, ridge, 0, roof, 1.15));
-    shape.quad(at(eave, h, -overhang, roof, 0.7), at(-eave, h, -overhang, roof, 0.7), at(-eave, ridge, 0, roof, 0.85), at(eave, ridge, 0, roof, 0.85));
+    for (const [side, low, high] of [[1, 0.92, 1.22], [-1, 0.58, 0.76]]) {
+      const slope = (t, lift = 0) => [h + (ridge - h) * t + lift, side * overhang * (1 - t)];
+      shape.quad(at(-eave * side, h, side * overhang, roof, low), at(eave * side, h, side * overhang, roof, low), at(eave * side, ridge, 0, roof, high), at(-eave * side, ridge, 0, roof, high));
+      for (const t of [0.18, 0.38, 0.58, 0.78]) {
+        const [y0, z0] = slope(t, 0.02), [y1, z1] = slope(t + 0.06, 0.02);
+        shape.quad(at(-eave * side, y0, z0, roof, low * 0.8), at(eave * side, y0, z0, roof, low * 0.8), at(eave * side, y1, z1, roof, low * 0.8), at(-eave * side, y1, z1, roof, low * 0.8));
+      }
+      shape.quad(at(-eave * side, h - 0.22, side * overhang, roof, 0.42), at(eave * side, h - 0.22, side * overhang, roof, 0.42), at(eave * side, h, side * overhang, roof, 0.42), at(-eave * side, h, side * overhang, roof, 0.42));
+    }
+    shape.box(x, ground + ridge, z, w + 0.7, 0.18, 0.26, yaw, roof, 0.5);
     shape.tri(at(eave, h, overhang, wall, 0.8), at(eave, h, -overhang, wall, 0.8), at(eave, ridge, 0, wall, 0.8));
     shape.tri(at(-eave, h, -overhang, wall, 0.75), at(-eave, h, overhang, wall, 0.75), at(-eave, ridge, 0, wall, 0.75));
     if (random() < 0.5) shape.box(x + (w * 0.25) * cos, ground + ridge - 0.1, z - (w * 0.25) * sin, 0.3, size * 0.6, 0.3, yaw, 'stone');
