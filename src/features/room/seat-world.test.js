@@ -264,6 +264,26 @@ test('butterflies flutter over the meadow by day, beating their wings, and hold 
   engine.dispose();
 });
 
+test('rain spirits stay small pinpricks behind the wet glass while dusk spirits keep their full glow', () => {
+  const { engine, world } = setup();
+  world.setProgress(1); world.setEnabled(true);
+  const spirits = world.meshes.find(mesh => mesh.name === 'seat-world-spirits');
+  const largest = theme => {
+    world.setTheme(theme);
+    let size = 0;
+    for (let step = 0; step < 40; step++) {
+      world.animate(1, false);
+      const m = spirits._thinInstanceDataStorage.matrixData;
+      for (let i = 0; i < 34; i++) size = Math.max(size, Math.hypot(m[i * 16 + 8], m[i * 16 + 9], m[i * 16 + 10]));
+    }
+    return size;
+  };
+  assert.ok(largest('dusk') > 0.85, 'dusk spirits swell to their full size');
+  const rain = largest('rain');
+  assert.ok(rain > 0.3 && rain <= 0.4 + 1e-6, `rain spirits peak at ${rain.toFixed(2)}, not a lens-dust blob`);
+  engine.dispose();
+});
+
 test('dusk spirits are soft round motes turned toward the chair, and day butterflies flap two lobed wings, all in one blended draw', () => {
   const { engine, world } = setup();
   world.setTheme('dusk'); world.setProgress(1); world.setEnabled(true);

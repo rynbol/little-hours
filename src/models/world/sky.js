@@ -11,14 +11,14 @@ export const SKY_GLSL = `
 uniform vec3 sun, zenith, high, horizon, horizonAway, glow, sunGlow, fogFar, fogSun; uniform float glowStrength, sunGlowStrength, goldenHour;
 vec3 worldSky(vec3 d) {
   float up = d.y, toward = max(dot(d, sun), 0.), lift = smoothstep(0., .62, up);
-  float sunward = dot(normalize(d.xz + vec2(1e-4)), normalize(sun.xz + vec2(1e-4))) * .5 + .5;
+  float facing = dot(normalize(d.xz + vec2(1e-4)), normalize(sun.xz + vec2(1e-4))), sunward = facing * .5 + .5;
   vec3 color = mix(mix(horizonAway, horizon, pow(sunward, 6.)), high, smoothstep(0., .3, lift));
   color = mix(color, zenith, smoothstep(.3, 1., lift));
-  color = mix(color, horizon, clamp(pow(toward, 10.) * .5 * glowStrength * (1. - lift) * (1. - lift), 0., 1.));
-  float near = pow(toward, 20.), band = 1. - smoothstep(.04, .16 + .2 * near, up);
-  color = mix(color, horizon * mix(.9, 1., near), near * band * goldenHour);
-  color = mix(color, sunGlow, pow(toward, 32.) * sunGlowStrength);
-  color = mix(color, glow, clamp(pow(toward, 56.) * .6 * glowStrength, 0., 1.));
+  color *= 1. + pow(toward, 40.) * .3 * glowStrength;
+  float near = pow(toward, 12.), top = .24 + .12 * near, band = smoothstep(.5, .98, facing) * (1. - smoothstep(top * .3, top, up));
+  color = mix(color, mix(horizon, glow, pow(toward, 48.) * .6), band * goldenHour);
+  color = mix(color, sunGlow, pow(toward, 90. + 110. * goldenHour) * sunGlowStrength);
+  color = mix(color, glow, clamp(pow(toward, 300.) * .6 * glowStrength, 0., 1.));
   vec3 air = mix(fogFar, fogSun, pow(toward, 8.) * .9);
   return mix(air, color, smoothstep(-.025, .09, up));
 }`;
@@ -33,9 +33,9 @@ ${SKY_GLSL}
 void main() {
   vec3 d = normalize(vDir); float toward = max(dot(d, sun), 0.);
   vec3 color = worldSky(d);
-  float disc = smoothstep(.2, .5, glowStrength), bloom = clamp((pow(toward, 2400.) * .7 + pow(toward, 600.) * .35 + pow(toward, 140.) * .2) * glowStrength, 0., 1.);
+  float disc = smoothstep(.2, .5, glowStrength), bloom = clamp((pow(toward, 2400.) * .7 * (1. - .7 * goldenHour) + pow(toward, 600.) * .35 + pow(toward, 140.) * .2) * glowStrength, 0., 1.);
   color = 1. - (1. - min(color, vec3(1.))) * (1. - glow * bloom);
-  color = mix(color, mix(vec3(1.), sunGlow, goldenHour * .5), smoothstep(.99984, .99994, toward) * disc);
+  color = mix(color, vec3(1.), smoothstep(.99984, .99994, toward) * disc);
   gl_FragColor = vec4(color, 1.);
 }`;
 

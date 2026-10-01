@@ -22,7 +22,7 @@ test('dusk rims sun-facing crests in gold on an olive ramp, day barely, rain not
   const { paint, setTheme } = createTerrainPaint(new Scene(new NullEngine()), { still: true });
   const painted = theme => { setTheme(WORLD_ATMOSPHERES[theme]); return [paint._floats.crestGlow, ...['grass', 'grassLight', 'grassTip', 'grassFar'].map(key => paint._colors3[key].toHexString())]; };
   assert.deepEqual(painted('day'), [0.15, '#679A46', '#8BB556', '#C6DBA0', '#E6F848']);
-  assert.deepEqual(painted('dusk'), [0.9, '#7A9058', '#ACB474', '#FAE6B0', '#D2BC52']);
+  assert.deepEqual(painted('dusk'), [0.9, '#6E9450', '#A0B468', '#FAE6B0', '#C0C050']);
   assert.deepEqual(painted('rain'), [0, '#7F9A5A', '#93A865', '#94A274', '#7A9050']);
 });
 

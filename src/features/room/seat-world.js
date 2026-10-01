@@ -53,6 +53,7 @@ export const CLOUD_SHADOW = Object.freeze({ day: 1, dusk: 0, rain: 0.5 });
 export const SUN_RAY_STRENGTH = Object.freeze({ day: 1, dusk: 0, rain: 0.35 });
 const SUN_RAYS = [[-44, 72, 10, 80], [-20, 84, 7, 90], [2, 66, 11, 75], [22, 92, 8, 95], [-64, 98, 12, 90], [40, 78, 6, 70]];
 const SPIRITS = 34, SPIRIT_SECONDS = 40, SHOOTING_SECONDS = 23;
+const SPIRIT_SIZE = Object.freeze({ day: 0.9, dusk: 0.9, rain: 0.4 });
 const ahead = (across, distance) => [across, -distance];
 const bearing = (x, z) => Math.atan2(x, -z);
 
@@ -705,7 +706,7 @@ export function createSeatWorld(scene, parent) {
       const start = spiritStarts[i], life = reduced ? start.phase : (seconds / SPIRIT_SECONDS + start.phase) % 1;
       const rise = i < aloft ? life : -1;
       spot.set(start.x + Math.sin(life * 9 + start.sway) * 1.6, rise < 0 ? -400 : (backdrop ? start.ground : start.outdoors) + 0.8 + rise * 12, start.z + Math.cos(life * 7 + start.sway) * 1.6);
-      scale.setAll(rise < 0 ? 0 : Math.sin(Math.PI * life) * 0.9);
+      scale.setAll(rise < 0 ? 0 : Math.sin(Math.PI * life) * SPIRIT_SIZE[theme]);
       Quaternion.RotationYawPitchRollToRef(Math.atan2(spot.x, spot.z), -Math.atan2(spot.y, Math.hypot(spot.x, spot.z)), 0, turn);
       Matrix.ComposeToRef(scale, turn, spot, matrix); matrix.copyToArray(spiritMatrices, i * 16);
     }
