@@ -16,7 +16,7 @@ export const CLOUD_BANKS = Object.freeze([
   Object.freeze({ kind: 'mist', count: 24, distance: [260, 1900], base: [-6, -3], width: [160, 420], tall: [0.07, 0.12], spin: 0 }),
 ]);
 const CLOUD_COLORS = ['cloudLit', 'cloudShade', 'cloudRim'];
-export const PLUME_COLUMN = Object.freeze({ x: LANDMARKS.volcano.x, z: LANDMARKS.volcano.z, reach: 0.1, summit: LANDMARKS.volcano.summit + PLUME.rise * 0.1 });
+export const PLUME_COLUMN = Object.freeze({ x: LANDMARKS.peak.x, z: LANDMARKS.peak.z, reach: 0.1, summit: LANDMARKS.peak.summit + PLUME.rise * 0.1 });
 
 export function clearsPlume({ x, y, z, halfWidth, halfHeight }, eye = [0, 0]) {
   const cardX = x - eye[0], cardZ = z - eye[1], plumeX = PLUME_COLUMN.x - eye[0], plumeZ = PLUME_COLUMN.z - eye[1], out = Math.hypot(cardX, cardZ);
