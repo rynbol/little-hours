@@ -84,6 +84,11 @@ export function createAudio(storage) {
       if (!prefs.chime) return;
       try { ensureContext().resume().then(settle, () => {}); } catch { /* No audio here; the room is still quiet and fine. */ }
     },
+    warm() {
+      if (!prefs.chime) return;
+      try { ensureContext(); } catch { return; }
+      settle();
+    },
     async setRain(on) {
       const ctx = ensureContext();
       await ctx.resume();

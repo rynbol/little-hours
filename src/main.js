@@ -36,6 +36,7 @@ const deviceStorage = pinnedStorage || {
 };
 const store = createSharedStateStore(deviceStorage);
 const audio = createAudio(deviceStorage);
+setTimeout(() => audio.warm());
 const listeners = new AbortController();
 let hiddenSince = 0, updating = 0;
 

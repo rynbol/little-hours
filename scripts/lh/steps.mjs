@@ -23,6 +23,7 @@ export const cycles = {
   house: { about: 'open the house page, then go back to the room', async run(app) { await steps.openHouse(app); await steps.backToRoom(app); } },
   decorate: { about: 'open Decorate, then leave it', async run(app) { await steps.openDecorate(app); await steps.closeDecorate(app); } },
   avatar: { about: 'open the avatar editor, then press Done', async run(app) { await steps.openAvatar(app); await steps.closeAvatar(app); } },
+  sit: { about: 'with the outdoor world built, fly into the Focus chair and back out', async setup(app) { await app.waitFor(`window.__littleHours.room.diagnostics().seat.world.outdoor !== false`, { what: 'the outdoor world to be built', timeout: 30000 }); await app.settle(); }, async run(app) { await app.clickSel('#focus-mode-enter'); await app.waitFor(`window.__littleHours.room.diagnostics().seat.state === 'seated'`, { what: 'the view to settle in the chair', timeout: 30000 }); await app.key('Escape'); await app.waitFor(`window.__littleHours.room.diagnostics().seat.state === 'room' && !window.__littleHours.room.diagnostics().moving`, { what: 'the view to fly back out', timeout: 30000 }); } },
   'house-toggle': { about: 'on the house page, close the house and open it again', async setup(app) { await steps.openHouse(app); }, async run(app) { await steps.toggleHouse(app); await steps.toggleHouse(app); } },
 };
 

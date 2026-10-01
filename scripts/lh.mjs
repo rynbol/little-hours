@@ -22,7 +22,7 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
   lh perf [--view house|garden|lake|room|decorate|pet|focus|focus-trip]
                                     idle cost, frame gaps, click-to-paint, GPU time, draw calls
-  lh trace <cycle>                  Chrome performance trace of one cycle
+  lh trace <cycle>                  Chrome performance trace of one cycle (--cold: the first run, without a warm-up run)
   lh heap <cycle> [--repeat 30]     leak check: heap growth and Babylon object counts over repeated cycles
                                     (--snapshots also saves .heapsnapshot files, about 500 MB each)
   lh cleanup [--all]                stop anything lh started and delete its temporary files
@@ -301,7 +301,7 @@ async function traceCommand() {
   const server = await start(options.ref);
   const app = await openApp(server.url, { ...viewport, scale: Number(options.scale || 2), seed: options.seed || 'three-rooms', theme: options.theme });
   try {
-    await sleep(1500); await app.settle(); await cycle.setup?.(app); await cycle.run(app);
+    await sleep(1500); await app.settle(); await cycle.setup?.(app); if (!options.cold) await cycle.run(app);
     const file = join(out, `trace-${name}.json`);
     const summary = await trace(app, file, () => cycle.run(app));
     console.log(`lh trace ${name} (${cycle.about}) on ${server.label}\n  main-thread busy ${summary.busyMs} ms, long tasks (>50 ms): ${summary.longTasks}${summary.longTasks ? ` [${summary.longestTasksMs.join(', ')} ms]` : ''}\n  trace: ${file}\n  Open it in Chrome DevTools > Performance > Load profile.`);

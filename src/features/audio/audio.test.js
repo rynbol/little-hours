@@ -29,3 +29,19 @@ test('blocked storage keeps the defaults', () => {
   audio.setVolume(10);
   assert.equal(audio.prefs.volume, 10);
 });
+
+test('the audio device opens while the room loads, so the Start or Focus gesture only resumes it', async () => {
+  const opened = [], resumed = [], node = () => ({ connect: next => next, start() {}, stop() {}, frequency: { value: 0 }, gain: { value: 0, setTargetAtTime() {} } });
+  globalThis.AudioContext = class { constructor() { opened.push(this); this.sampleRate = 8; this.currentTime = 0; this.destination = {}; } createBuffer(channels, length) { return { getChannelData: () => new Float32Array(length) }; } createBufferSource() { return node(); } createBiquadFilter() { return node(); } createGain() { return node(); } resume() { resumed.push(this); return Promise.resolve(); } suspend() { return Promise.resolve(); } close() {} };
+  try {
+    const audio = createAudio({ getItem: () => null, setItem() {} });
+    audio.warm();
+    assert.equal(opened.length, 1);
+    audio.unlock();
+    assert.deepEqual([opened.length, resumed.length], [1, 1]);
+    audio.dispose();
+    const quiet = createAudio({ getItem: () => JSON.stringify({ chime: false }), setItem() {} });
+    quiet.warm();
+    assert.equal(opened.length, 1);
+  } finally { delete globalThis.AudioContext; }
+});
