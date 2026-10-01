@@ -44,7 +44,7 @@ import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
-import { ROOM_LIGHTS, seatedDim, deskLamp, gradeFocus } from './room-lighting.js';
+import { ROOM_LIGHTS, seatedDim, deskLamp, gradeFocus, roomBloom } from './room-lighting.js';
 import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
 import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
 import { createLanternGlow } from './room-lantern-glow.js';
@@ -198,7 +198,7 @@ export function createRoom(container, options = {}) {
     for (const mesh of mobileCompanion.root.getChildMeshes()) mesh.layerMask |= portraitMask;
     mobileCompanion.contact.layerMask |= portraitMask;
   }
-  const bloom = new GlowLayer('candlelight-bloom', scene, { mainTextureFixedSize: 512, blurKernelSize: 24 }); bloom.intensity = 0.34;
+  const bloom = new GlowLayer('candlelight-bloom', scene, { mainTextureFixedSize: 512, blurKernelSize: 48 }); bloom.intensity = 0.34;
   const glowingMeshes = new Set();
 
   // A generous timber retreat: deep floorboards, paneled walls and exposed beams.
@@ -1223,7 +1223,7 @@ export function createRoom(container, options = {}) {
   function setTheme(name) {
     if (savedAvatarEffects) restoreAvatarEffects();
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
-    const daylight = theme === 'day', night = theme === 'dusk';
+    const night = theme === 'dusk';
     companionRoutine?.setContext({ night });
     paintSky(theme); seatWorld.setTheme(theme); architecture?.setTheme(theme); roof?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
     if (!night) { shootingStar.setEnabled(false); streakMaterial.alpha = 0; }
@@ -1234,7 +1234,7 @@ export function createRoom(container, options = {}) {
     painterly.setTheme(`room-${theme}`); aimSunbeam();
     aimDeskLamp();
     applyBulbs(); applyAccents();
-    bloom.intensity = daylight ? 0.18 : night ? 0.40 : 0.26;
+    bloom.intensity = roomBloom(theme, seatView.blend);
     shadow.darkness = light.darkness;
     if (avatarCameraEditing) {
       savedAvatarEffects = [fireflies, skyStars, moths, shootingStar, rain, windowGlow, hearthGlow].map(effect => [effect, effect.isEnabled()]);
@@ -1866,7 +1866,7 @@ export function createRoom(container, options = {}) {
     companionTime = now;
     animateAvatarCamera(companionDelta);
     if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
-    if (storybook.amount !== seatView.blend) gradeFocus(scene.imageProcessingConfiguration.colorCurves, seatView.blend);
+    if (storybook.amount !== seatView.blend) { gradeFocus(scene.imageProcessingConfiguration.colorCurves, seatView.blend); bloom.intensity = roomBloom(theme, seatView.blend); }
     storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = ROOM_LIGHTS[theme].sun * seatedDim(theme, seatView.blend); aimDeskLamp(seatView.blend); rain.alpha = windowRainAlpha * (1 - seatView.blend);
     sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend);
     seatWorld.animate(companionDelta, reducedMotion);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
-import { seatedDim, deskLamp, LAMP_AT, gradeFocus } from './room-lighting.js';
+import { seatedDim, deskLamp, LAMP_AT, gradeFocus, roomBloom } from './room-lighting.js';
 
 test('seated at dusk or in rain, the room ambient and key light dim so the lamp and candles lead', () => {
   assert.equal(seatedDim('day', 1), 1);
@@ -39,4 +39,11 @@ test('the Focus grade lifts shade, softens highlights and warms toward gold, and
   assert.ok(lightR < 0.95, `highlights ease to ${lightR}`);
   assert.ok(shadeB < shadeG && shadeG > shadeR * 0.97, `tint ${shadeR} ${shadeG} ${shadeB} leans gold, not red`);
   assert.ok(midSaturation > 1.1, `midtones saturate ${midSaturation}`);
+});
+
+test('seated, candle and lamp bloom roughly doubles so flames carry soft halos, strongest after dark', () => {
+  for (const theme of ['day', 'dusk', 'rain']) assert.ok(roomBloom(theme, 1) >= roomBloom(theme, 0) * 1.6, `${theme} bloom ${roomBloom(theme, 0)} → ${roomBloom(theme, 1)}`);
+  assert.equal(roomBloom('dusk', 0), 0.4);
+  assert.ok(roomBloom('dusk', 1) > roomBloom('rain', 1) && roomBloom('rain', 1) > roomBloom('day', 1));
+  assert.ok(roomBloom('dusk', 1) <= 1.4, 'halos stay soft, not a wash');
 });
