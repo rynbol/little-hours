@@ -491,3 +491,14 @@ test('by day the clouds stay cream on their sunlit side and lavender in shade th
   assert.ok(sb > sg + 0.03 && sr > sg - 0.03, `shade ${[sr, sg, sb].map(v => v.toFixed(2))}`);
   engine.dispose();
 });
+
+test('rain clouds melt into the overcast haze instead of floating as hard dark lumps', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true); world.setTheme('rain');
+  const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-clouds'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color'), haze = vistaPalette('rain').haze;
+  const sky = [1, 3, 5].map(k => parseInt(haze.slice(k, k + 2), 16) / 255);
+  let gap = 0;
+  shape.roles.forEach((_, i) => { gap += Math.max(...sky.map((v, c) => Math.abs(colors[i * 4 + c] - v))) / shape.roles.length; });
+  assert.ok(gap < 0.065, `rain clouds sit ${gap.toFixed(3)} from the haze`);
+  engine.dispose();
+});
