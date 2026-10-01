@@ -108,3 +108,20 @@ export async function focusTrip(app, { width, height }) {
     return result;
   })()`);
 }
+
+export async function allocations(app, action, { top = 15 } = {}) {
+  await app.send('HeapProfiler.enable');
+  await app.send('HeapProfiler.startSampling', { samplingInterval: 8192, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+  const began = Date.now();
+  await action();
+  const seconds = (Date.now() - began) / 1000, { profile } = await app.send('HeapProfiler.stopSampling');
+  const bytes = new Map();
+  const walk = node => {
+    const { functionName, url, lineNumber } = node.callFrame, here = `${functionName || '(anonymous)'} ${url.split('/').pop().split('?')[0]}:${lineNumber + 1}`;
+    if (node.selfSize) bytes.set(here, (bytes.get(here) ?? 0) + node.selfSize);
+    for (const child of node.children) walk(child);
+  };
+  walk(profile.head);
+  const total = [...bytes.values()].reduce((sum, size) => sum + size, 0);
+  return { seconds, mbPerSecond: total / 1e6 / seconds, top: [...bytes].sort((a, b) => b[1] - a[1]).slice(0, top).map(([where, size]) => ({ where, kbPerSecond: Math.round(size / 1e3 / seconds) })) };
+}

@@ -4,7 +4,8 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
-import { leafClump, LEAF_OUTLINE, MOON_CANOPY } from './furniture.js';
+import { createFurniture, disposeFurnitureAssets, leafClump, LEAF_OUTLINE, MOON_CANOPY } from './furniture.js';
+import { FURNITURE } from '../core/catalog.js';
 
 test('moon tree clumps are soft rounded leaf cards, lit gold on top and cool beneath, without speckled tones', () => {
   const engine = new NullEngine(), scene = new Scene(engine), leaves = 120;
@@ -37,4 +38,26 @@ test('moon tree leaf cards shade by where each corner sits on the clump, so touc
   assert.ok(seams.length > 20, `${seams.length} touching corners`);
   assert.ok(seams[Math.floor(seams.length * 0.95)] < 0.04, `touching cards differ by up to ${seams[Math.floor(seams.length * 0.95)].toFixed(3)} at the 95th percentile`);
   engine.dispose();
+});
+
+test('animated furniture streams its moving vertices without making any material rebuild its shader setup each frame', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), rebuilt = [], moved = [];
+  try {
+    for (const { id } of FURNITURE) {
+      const item = createFurniture(id, scene);
+      if (!item.metadata?.animate) { item.dispose(); continue; }
+      item.metadata.animate(1, false, false, 0);
+      const meshes = item.getChildMeshes(false).filter(mesh => mesh.subMeshes?.length && mesh.material);
+      for (const mesh of meshes) for (const subMesh of mesh.subMeshes) subMesh.getMaterial()?.isReadyForSubMesh(mesh, subMesh);
+      const before = meshes.map(mesh => Array.from(mesh.getVerticesData('position') ?? []));
+      item.metadata.animate(1.7, false, false, 0); item.metadata.animate(2.3, false, false, 0);
+      meshes.forEach((mesh, i) => {
+        if (mesh.subMeshes.some(subMesh => subMesh.materialDefines?.isDirty)) rebuilt.push(`${id}/${mesh.name}`);
+        if (before[i].some((value, k) => value !== mesh.getVerticesData('position')[k])) moved.push(`${id}/${mesh.name}`);
+      });
+      item.dispose();
+    }
+    assert.ok(moved.length >= 3, `animated pieces moved: ${moved.join(', ')}`);
+    assert.deepEqual(rebuilt, []);
+  } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });

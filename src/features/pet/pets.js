@@ -1,4 +1,5 @@
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
+import { streamVertices } from '../../models/stream-vertices.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { CreateSphereVertexData } from '@babylonjs/core/Meshes/Builders/sphereBuilder.js';
@@ -481,7 +482,7 @@ export function createPetModel(scene, species = 'cat', ribbon = 0) {
         const life = (seconds / 3.6 + i / 3) % 1, size = Math.sin(life * Math.PI) * (0.035 + life * 0.035), x = 0.06 + life * 0.1 + Math.sin(life * 5 + i) * 0.02, y = life * 0.34;
         for (let k = 0; k < 4; k++) { const o = (i * 4 + k) * 3; letterPositions[o] = x + letter[k][0] * size; letterPositions[o + 1] = y + letter[k][1] * size; letterPositions[o + 2] = 0; }
       }
-      sleepLetters.updateVerticesData('position', letterPositions, false, false);
+      streamVertices(sleepLetters, 'position', letterPositions);
     }
     const live = pose.hearts.filter(each => each.age >= 0), shown = reducedMotion ? live.slice(-1) : live;
     if (shown.length) headPoint(w);

@@ -1,6 +1,7 @@
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
+import { streamVertices } from './stream-vertices.js';
 import { CreateBox, CreateSegmentedBoxVertexData } from '@babylonjs/core/Meshes/Builders/boxBuilder.js';
 import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder.js';
 import { CreateCylinder } from '@babylonjs/core/Meshes/Builders/cylinderBuilder.js';
@@ -961,7 +962,7 @@ function createSwayingCanopy(parent, type) {
   let resting = true;
   return (seconds, focused, reducedMotion) => {
     if (reducedMotion) {
-      if (!resting) { positions.set(neutral); canopy.updateVerticesData('position', positions, false, false); }
+      if (!resting) { positions.set(neutral); streamVertices(canopy, 'position', positions); }
       resting = true; return;
     }
     resting = false;
@@ -984,7 +985,7 @@ function createSwayingCanopy(parent, type) {
         positions[index + 2] = Math.max(-limitZ, Math.min(limitZ, neutral[index + 2] + swayZ * bend));
       }
     }
-    canopy.updateVerticesData('position', positions, false, false);
+    streamVertices(canopy, 'position', positions);
   };
 }
 
@@ -1209,7 +1210,7 @@ function createDancingFire(parent) {
   return (seconds, focused, reducedMotion) => {
     if (parent.metadata.off) return;
     if (reducedMotion) {
-      if (!resting) { positions.set(neutral); fire.updateVerticesData('position', positions, false, false); }
+      if (!resting) { positions.set(neutral); streamVertices(fire, 'position', positions); }
       resting = true; return;
     }
     resting = false;
@@ -1225,7 +1226,7 @@ function createDancingFire(parent) {
         positions[index + 2] = neutral[index + 2] + drift * tip;
       }
     }
-    fire.updateVerticesData('position', positions, false, false);
+    streamVertices(fire, 'position', positions);
     fire.material.setFloat('time', seconds);
   };
 }
@@ -1280,8 +1281,8 @@ function createTeaSteam(parent, origin, scale = 1) {
       if (resting) return;
       positions.set(neutralPositions); colors.set(neutralColors); resting = true;
     } else { pose(seconds, parent.metadata.puff || 0); resting = false; }
-    steam.updateVerticesData('position', positions, false, false);
-    steam.updateVerticesData('color', colors, false, false);
+    streamVertices(steam, 'position', positions);
+    streamVertices(steam, 'color', colors);
   };
 }
 
@@ -1348,7 +1349,7 @@ function createHearthEmbers(parent) {
     } else {
       embers.setEnabled(true); pose(seconds); resting = false;
     }
-    embers.updateVerticesData('position', positions, false, false); embers.updateVerticesData('color', colors, false, false);
+    streamVertices(embers, 'position', positions); streamVertices(embers, 'color', colors);
   };
 }
 
@@ -1374,8 +1375,8 @@ function createArticulatedUpperBody(avatar, template) {
     if (reducedMotion) {
       if (!resting) {
         positions.set(neutral); normals.set(neutralNormals);
-        upper.updateVerticesData('position', positions, false, false);
-        upper.updateVerticesData('normal', normals, false, false);
+        streamVertices(upper, 'position', positions);
+        streamVertices(upper, 'normal', normals);
       }
       resting = true; return;
     }
@@ -1435,8 +1436,8 @@ function createArticulatedUpperBody(avatar, template) {
         }
       }
     }
-    upper.updateVerticesData('position', positions, false, false);
-    upper.updateVerticesData('normal', normals, false, false);
+    streamVertices(upper, 'position', positions);
+    streamVertices(upper, 'normal', normals);
   };
 }
 
@@ -1944,7 +1945,7 @@ export function createMobileCompanion(scene, choice = AVATAR_DEFAULT) {
           }
         }
       }
-      body.updateVerticesData('position', positions, false, false); body.updateVerticesData('normal', normals, false, false);
+      streamVertices(body, 'position', positions); streamVertices(body, 'normal', normals);
       torsoPoint(0, 1.02, -.09, hip + breath, lean, roll, head.position);
       const look = w * (LOOK[kind] ?? 0), glance = kind === 'window' ? w * calm * Math.sin(seconds * .31) * .3 : 0;
       // The head stays steadier than the body under it.

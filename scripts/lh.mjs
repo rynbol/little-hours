@@ -6,7 +6,7 @@ import { openApp } from './lh/app.mjs';
 import { serve } from './lh/server.mjs';
 import { SEEDS } from './lh/seeds.mjs';
 import { cycles, steps, views } from './lh/steps.mjs';
-import { collectGarbage, focusTrip, heapSnapshot, heapUsed, idle, takeEvents, trace, watchEvents } from './lh/measure.mjs';
+import { allocations, collectGarbage, focusTrip, heapSnapshot, heapUsed, idle, takeEvents, trace, watchEvents } from './lh/measure.mjs';
 import { commandOf, lhDir, outDir, repoRoot, stopTracked, tracked } from './lh/state.mjs';
 
 const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence.
@@ -23,6 +23,7 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
   lh perf [--view house|garden|lake|room|decorate|pet|focus|focus-trip]
                                     idle cost, frame gaps, click-to-paint, GPU time, draw calls
   lh trace <cycle>                  Chrome performance trace of one cycle (--cold: the first run, without a warm-up run)
+  lh alloc <cycle>                  sampled allocations during one cycle, by allocating function (--cold as for trace)
   lh heap <cycle> [--repeat 30]     leak check: heap growth and Babylon object counts over repeated cycles
                                     (--snapshots also saves .heapsnapshot files, about 500 MB each)
   lh cleanup [--all]                stop anything lh started and delete its temporary files
@@ -309,6 +310,18 @@ async function traceCommand() {
   } finally { await app.close(); }
 }
 
+async function allocCommand() {
+  const name = positional[0] || 'house', cycle = cycleFor(name), server = await start(options.ref);
+  const app = await openApp(server.url, { ...viewport, scale: Number(options.scale || 2), seed: options.seed || 'three-rooms', theme: options.theme });
+  try {
+    await sleep(1500); await app.settle(); await cycle.setup?.(app); if (!options.cold) await cycle.run(app);
+    const result = await allocations(app, () => cycle.run(app));
+    console.log(`lh alloc ${name} (${cycle.about}) on ${server.label}\n  ${result.mbPerSecond.toFixed(2)} MB/s allocated over ${result.seconds.toFixed(1)} s, including objects already collected`);
+    for (const { where, kbPerSecond } of result.top) console.log(`  ${String(kbPerSecond).padStart(6)} KB/s  ${where}`);
+    return app.errors.length ? 1 : 0;
+  } finally { await app.close(); }
+}
+
 async function heapOnce(side, cycle, repeat, out, tag) {
   const app = await openApp(side.url, { ...viewport, scale: 1, seed: options.seed || 'three-rooms', theme: options.theme });
   try {
@@ -404,7 +417,7 @@ const commands = {
   help: async () => { console.log(HELP); return 0; },
   flows: async () => { for (const name of await flowNames()) console.log(`${name.padEnd(12)} ${(await loadFlow(name)).about}`); return 0; },
   run: async () => runFlows(!positional.length || positional[0] === 'all' ? await flowNames() : positional),
-  art: roomArt, asset: assetShots, world: worldShots, shot: shots, perf, trace: traceCommand, heap, doctor, cleanup, serve: serveForever,
+  art: roomArt, asset: assetShots, world: worldShots, shot: shots, perf, trace: traceCommand, alloc: allocCommand, heap, doctor, cleanup, serve: serveForever,
 };
 
 if (!commands[command]) { console.error(`Unknown command "${command}".\n\n${HELP}`); process.exit(2); }

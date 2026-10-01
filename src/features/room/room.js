@@ -7,6 +7,7 @@ import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
+import { streamVertices } from '../../models/stream-vertices.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture.js';
@@ -1972,7 +1973,7 @@ export function createRoom(container, options = {}) {
         mothPositions[offset] = x + localX * (mothWings[vertex] ? foldX : 1); mothPositions[offset + 1] = y + mothLocalPositions[offset + 1]; mothPositions[offset + 2] = z + (mothWings[vertex] ? Math.abs(localX) * foldZ : mothLocalPositions[offset + 2]);
       }
     }
-    moths.updateVerticesData('position', mothPositions, false, false);
+    streamVertices(moths, 'position', mothPositions);
     const streakAge = seconds - ambienceStart - shootingStar.metadata.delaySeconds, streakPhase = streakAge % shootingStar.metadata.periodSeconds;
     const streakVisible = theme === 'dusk' && !reducedMotion && streakAge >= 0 && streakPhase < shootingStar.metadata.durationSeconds;
     shootingStar.setEnabled(streakVisible);
@@ -2014,7 +2015,7 @@ export function createRoom(container, options = {}) {
     if (settled) requestRender(true);
     if (rain.isEnabled()) {
       for (let i = 0; i < rainSeeds.length; i++) { const seed = rainSeeds[i], top = seed.top, y = 1.62 + ((seed.y - (reducedMotion ? 0 : seconds * seed.speed) % 1 + 1) % 1) * (top - 1.62); rainPositions[i * 6 + 1] = y; rainPositions[i * 6 + 4] = Math.min(y + seed.length, top); }
-      rain.updateVerticesData('position', rainPositions, false, false);
+      streamVertices(rain, 'position', rainPositions);
     }
   }
   function reportStats(now, submitMs) {
