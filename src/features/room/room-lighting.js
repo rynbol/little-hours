@@ -4,4 +4,4 @@ export const ROOM_LIGHTS = Object.freeze({
   rain: { glow: .45, sun: .82, sunColor: '#d5dfeb', ambient: .7, seated: .62, sky: '#e0e7ed', ground: '#645441', darkness: 0, beam: 0, direction: [3, -8, -5], position: [-5, 10, 6] },
 });
 
-export const ambientAt = (theme, blend) => ROOM_LIGHTS[theme].ambient * (1 - blend * (1 - ROOM_LIGHTS[theme].seated));
+export const seatedDim = (theme, blend) => 1 - blend * (1 - ROOM_LIGHTS[theme].seated);
