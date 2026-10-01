@@ -502,8 +502,8 @@ function petBed(parent) {
   box(tag, [0.12, 0.035, 0.018], [0, 0, 0], C.cream, 0.008);
   for (const x of [-0.06, 0.06]) for (const y of [-0.016, 0.016]) sphere(tag, [0.02, 0.02, 0.012], [x, y, 0], C.cream);
 }
-export const MOON_CANOPY = Object.freeze({ core: '#3d5e5c', under: '#41686b', side: '#628f4e', top: '#b0bf5e', rim: '#e6d98c', sun: [-0.3, 0.82, 0.48], mottle: 0.015 });
-export const LEAF_OUTLINE = Object.freeze([[0, 0], [0.35, 0.8], [0.75, 0.75], [1, 0], [0.75, -0.75], [0.35, -0.8]]);
+export const MOON_CANOPY = Object.freeze({ core: '#335a52', under: '#3c6b64', side: '#78b84c', top: '#a4ec5c', rim: '#d8f090', sun: [-0.3, 0.82, 0.48], mottle: 0.015 });
+export const LEAF_OUTLINE = Object.freeze([[0, 0], [0.25, 0.8], [0.75, 0.8], [1, 0], [0.75, -0.8], [0.25, -0.8]]);
 export function leafClump(parent, center, radii, seed, leaves) {
   const positions = [], indices = [], colors = [], normals = [];
   const [core, under, side, top, rim] = ['core', 'under', 'side', 'top', 'rim'].map(key => Color3.FromHexString(MOON_CANOPY[key]));
@@ -536,7 +536,7 @@ export function leafClump(parent, center, radii, seed, leaves) {
   for (let k = 0; k < leaves; k++) {
     const y = Math.max(-0.95, Math.min(0.98, 1 - 2 * (k + 0.5) / leaves + (random(k) - 0.5) * 0.12)), r = Math.sqrt(1 - y * y), angle = k * 2.39996 + seed * 1.3 + random(k + 50) * 0.4;
     const ux = Math.cos(angle) * r, uz = Math.sin(angle) * r;
-    const n = surfaceNormal(ux, y, uz), point = new Vector3(center[0] + ux * radii[0] * 0.9, center[1] + y * radii[1] * 0.9, center[2] + uz * radii[2] * 0.9);
+    const n = surfaceNormal(ux, y, uz), point = new Vector3(center[0] + ux * radii[0] * 0.86, center[1] + y * radii[1] * 0.86, center[2] + uz * radii[2] * 0.86);
     Vector3.CrossToRef(n, Math.abs(n.y) > 0.9 ? Vector3.Right() : Vector3.Up(), across); across.normalize();
     Vector3.CrossToRef(across, n, along); along.normalize();
     const spin = random(k + 100) * Math.PI * 2;
@@ -545,7 +545,7 @@ export function leafClump(parent, center, radii, seed, leaves) {
     const length = (0.072 + random(k + 200) * 0.028) * scale, width = length * 0.42, start = point.subtract(normal.scale(length * 0.2));
     const lift = (random(k + 300) - 0.5) * MOON_CANOPY.mottle * 2;
     const ids = LEAF_OUTLINE.map(([u, v]) => {
-      const at = start.add(normal.scale(length * 1.2 * u)).addInPlace(across.scale(width * v)).addInPlace(n.scale(-width * 0.35 * v * v)), facing = surfaceNormal(at.x - center[0], at.y - center[1], at.z - center[2]);
+      const at = start.add(normal.scale(length * 1.2 * u)).addInPlace(across.scale(width * v)).addInPlace(n.scale(-width * 0.35 * v * v - length * 0.3 * u * u)), facing = surfaceNormal(at.x - center[0], at.y - center[1], at.z - center[2]);
       return vertex(at, facing, tone(facing, lift));
     });
     for (let i = 1; i < ids.length - 1; i++) indices.push(ids[0], ids[i], ids[i + 1], ids[0], ids[i + 1], ids[i]);

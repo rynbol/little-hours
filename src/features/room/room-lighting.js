@@ -1,10 +1,19 @@
+import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+
 export const ROOM_LIGHTS = Object.freeze({
-  day: { screen: 1, bloom: [.18, .45], pool: [.06, .22], sun: 1.6, sunColor: '#fff1d2', ambient: .9, seated: 1, lamp: [.22, 6], seatedLamp: [.3, 1.8], sky: '#edf4e8', ground: '#a48b6b', darkness: 0, beam: .45, glow: 0, direction: [3, -8, 7], position: [-4, 10, -8] },
-  dusk: { screen: .6, bloom: [.4, 1.3], pool: [.3, .8], glow: .85, sun: .62, sunColor: '#c5ccec', ambient: .44, seated: .5, lamp: [2.1, 3.4], seatedLamp: [2.8, 1.9], sky: '#e1d3ed', ground: '#645441', darkness: 0, beam: 0, direction: [3, -8, -5], position: [-5, 10, 6] },
-  rain: { screen: .8, bloom: [.26, 1], pool: [.2, .66], glow: .45, sun: .82, sunColor: '#d5dfeb', ambient: .7, seated: .38, lamp: [.65, 6], seatedLamp: [2.2, 1.9], sky: '#e0e7ed', ground: '#645441', darkness: 0, beam: 0, direction: [3, -8, -5], position: [-5, 10, 6] },
+  day: { screen: 1, bloom: [.18, .45], pool: [.06, .22], sun: 1.6, sunColor: '#fff1d2', seatedSun: [2.6, '#e3ebff'], ambient: .9, seated: .69, lamp: [.22, 6], seatedLamp: [.3, 1.8], sky: '#edf4e8', ground: '#a48b6b', darkness: 0, beam: .45, glow: 0, direction: [3, -8, 7], position: [-4, 10, -8] },
+  dusk: { screen: .6, bloom: [.4, 1.3], pool: [.3, .8], glow: .85, sun: .62, sunColor: '#c5ccec', seatedSun: [.5, '#c5ccec'], ambient: .44, seated: .5, lamp: [2.1, 3.4], seatedLamp: [2.8, 1.9], sky: '#e1d3ed', ground: '#645441', darkness: 0, beam: 0, direction: [3, -8, -5], position: [-5, 10, 6] },
+  rain: { screen: .8, bloom: [.26, 1], pool: [.2, .66], glow: .45, sun: .82, sunColor: '#d5dfeb', seatedSun: [.5, '#d5dfeb'], ambient: .7, seated: .38, lamp: [.65, 6], seatedLamp: [2.2, 1.9], sky: '#e0e7ed', ground: '#645441', darkness: 0, beam: 0, direction: [3, -8, -5], position: [-5, 10, 6] },
 });
 
 export const seatedDim = (theme, blend) => 1 - blend * (1 - ROOM_LIGHTS[theme].seated);
+
+const SUN_TINTS = Object.fromEntries(Object.entries(ROOM_LIGHTS).map(([theme, { sunColor, seatedSun }]) => [theme, [Color3.FromHexString(sunColor), Color3.FromHexString(seatedSun[1])]]));
+export function windowSun(theme, blend, color) {
+  const { sun, seatedSun } = ROOM_LIGHTS[theme], [room, seated] = SUN_TINTS[theme];
+  Color3.LerpToRef(room, seated, blend, color);
+  return sun + (seatedSun[0] - sun) * blend;
+}
 
 const towardSeat = (theme, key, blend) => { const [room, seated] = ROOM_LIGHTS[theme][key]; return room + (seated - room) * blend; };
 export const roomBloom = (theme, blend) => towardSeat(theme, 'bloom', blend);

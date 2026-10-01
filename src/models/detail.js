@@ -65,17 +65,42 @@ export const isDetailLoaded = type => loaded.has(type);
 
 const bytes = text => { const raw = atob(text), out = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i); return out.buffer; };
 
+export const CLOSE_UP_PAINT = Object.freeze({ woodHue: 28.5, woodSaturation: 0.48, darkest: 0.26, darkestKept: 0.75 });
+const luma = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+function honeyRatio(hex) {
+  const model = Color3.FromHexString(hex), [hue, saturation, value] = model.toHSV().asArray();
+  if (hue >= CLOSE_UP_PAINT.woodHue) return [1, 1, 1];
+  const shown = Color3.FromHSV(CLOSE_UP_PAINT.woodHue, Math.min(saturation, CLOSE_UP_PAINT.woodSaturation), value);
+  shown.scaleInPlace(luma(model.r, model.g, model.b) / luma(shown.r, shown.g, shown.b));
+  return [shown.r / Math.max(model.r, 0.01), shown.g / Math.max(model.g, 0.01), shown.b / Math.max(model.b, 0.01)];
+}
+function closeUp(colors, surfaces, slots, palette) {
+  const shown = Float32Array.from(colors), ratios = new Map(), { darkest, darkestKept } = CLOSE_UP_PAINT;
+  for (let i = 0; i < slots.length; i++) {
+    if (surfaces[i] === 9) {
+      if (!ratios.has(slots[i])) ratios.set(slots[i], honeyRatio(palette[slots[i]]));
+      const ratio = ratios.get(slots[i]);
+      for (let channel = 0; channel < 3; channel++) shown[i * 4 + channel] = Math.min(1, colors[i * 4 + channel] * ratio[channel]);
+    }
+    const value = luma(shown[i * 4], shown[i * 4 + 1], shown[i * 4 + 2]);
+    if (value >= darkest) continue;
+    const lift = darkest * (darkestKept + (1 - darkestKept) * value / darkest) / Math.max(value, 0.005);
+    for (let channel = 0; channel < 3; channel++) shown[i * 4 + channel] = Math.min(1, shown[i * 4 + channel] * lift);
+  }
+  return shown;
+}
+
 function decode(source) {
-  const layers = {};
+  const layers = {}, palette = source.palette.map(hex => hex.toLowerCase());
   for (const [layer, shape] of Object.entries(source.layers)) {
     const positions = Float32Array.from(new Int16Array(bytes(shape.positions)), value => value / source.scale);
     const normals = Float32Array.from(new Int8Array(bytes(shape.normals)), value => value / 127);
     const colors = Float32Array.from(new Uint8Array(bytes(shape.colors)), value => value / 255), surfaces = new Float32Array(colors.length / 4);
     for (let i = 0; i < surfaces.length; i++) { surfaces[i] = Math.round(colors[i * 4 + 3] * 10); colors[i * 4 + 3] = 1; }
-    const indices = shape.indices32 ? new Uint32Array(bytes(shape.indices32)) : new Uint16Array(bytes(shape.indices));
-    layers[layer] = { positions, normals, colors, surfaces, indices, slots: new Uint8Array(bytes(shape.slots)) };
+    const indices = shape.indices32 ? new Uint32Array(bytes(shape.indices32)) : new Uint16Array(bytes(shape.indices)), slots = new Uint8Array(bytes(shape.slots));
+    layers[layer] = { positions, normals, colors: layer === 'glow' ? colors : closeUp(colors, surfaces, slots, palette), modelColors: colors, surfaces, indices, slots };
   }
-  return { palette: source.palette.map(hex => hex.toLowerCase()), layers };
+  return { palette, layers };
 }
 
 const LAYER_LOOK = {
@@ -105,7 +130,7 @@ function template(type, scene) {
     data.applyToMesh(mesh, true); mesh.setVerticesData(SURFACE_KIND, shape.surfaces, false, 1);
     mesh.material = layerMaterial(scene, layer); mesh.hasVertexAlpha = false; mesh.useVertexColors = true;
     mesh.receiveShadows = layer !== 'glow'; mesh.isPickable = false; mesh.parent = root;
-    mesh.metadata = { detail: true, castShadow: layer !== 'glow', slots: shape.slots, palette: source.palette, baseColors: shape.colors };
+    mesh.metadata = { detail: true, castShadow: layer !== 'glow', slots: shape.slots, palette: source.palette, baseColors: shape.modelColors };
   }
   root.setEnabled(false);
   cache.set(type, root);
@@ -123,10 +148,10 @@ function repaintDetail(mesh, repaint) {
   const { slots, palette, baseColors } = mesh.metadata;
   const ratios = palette.map(hex => { const swap = repaint.find(entry => entry.from === hex); if (!swap) return null; const from = Color3.FromHexString(hex), to = Color3.FromHexString(swap.to); return [to.r / Math.max(from.r, 0.01), to.g / Math.max(from.g, 0.01), to.b / Math.max(from.b, 0.01)]; });
   if (!ratios.some(Boolean)) return;
-  const colors = Float32Array.from(baseColors);
+  const colors = Float32Array.from(mesh.getVerticesData('color'));
   for (let i = 0; i < slots.length; i++) {
     const ratio = ratios[slots[i]]; if (!ratio) continue;
-    colors[i * 4] = Math.min(1, colors[i * 4] * ratio[0]); colors[i * 4 + 1] = Math.min(1, colors[i * 4 + 1] * ratio[1]); colors[i * 4 + 2] = Math.min(1, colors[i * 4 + 2] * ratio[2]);
+    colors[i * 4] = Math.min(1, baseColors[i * 4] * ratio[0]); colors[i * 4 + 1] = Math.min(1, baseColors[i * 4 + 1] * ratio[1]); colors[i * 4 + 2] = Math.min(1, baseColors[i * 4 + 2] * ratio[2]);
   }
   mesh.makeGeometryUnique(); mesh.setVerticesData('color', colors);
 }

@@ -2,14 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
-import { ROOM_LIGHTS, seatedDim, deskLamp, LAMP_AT, gradeFocus, roomBloom, bloomEmission } from './room-lighting.js';
+import { ROOM_LIGHTS, seatedDim, windowSun, deskLamp, LAMP_AT, gradeFocus, roomBloom, bloomEmission } from './room-lighting.js';
 
-test('seated at dusk or in rain, the room ambient and key light dim so the lamp and candles lead', () => {
-  assert.equal(seatedDim('day', 1), 1);
+test('seated at dusk or in rain, the room ambient dims so the lamp and candles lead', () => {
+  assert.ok(seatedDim('day', 1) >= 0.6 && seatedDim('day', 1) < 0.8, 'by day the seat keeps most of its ambient light');
   assert.equal(seatedDim('dusk', 0), 1);
   assert.ok(seatedDim('dusk', 1) <= 0.55);
   assert.ok(seatedDim('rain', 1) <= 0.7);
   assert.ok(seatedDim('dusk', 0.5) < 1 && seatedDim('dusk', 0.5) > seatedDim('dusk', 1));
+});
+
+test('seated by day, a cool sun through the window outweighs the ambient so the desk reads window-lit, and dusk and rain keep a gentler cool wash', () => {
+  const color = new Color3(), warmth = c => c.r - c.b;
+  assert.equal(windowSun('day', 0, color), ROOM_LIGHTS.day.sun);
+  assert.equal(color.toHexString().toLowerCase(), ROOM_LIGHTS.day.sunColor, 'the dollhouse keeps its sun');
+  const daySun = windowSun('day', 1, color), ambient = ROOM_LIGHTS.day.ambient * seatedDim('day', 1);
+  assert.ok(daySun >= 2.4 && daySun / ambient >= 3.5, `day sun ${daySun} against ambient ${ambient.toFixed(2)}`);
+  assert.ok(color.b > color.r && warmth(color) < warmth(Color3.FromHexString(ROOM_LIGHTS.day.sunColor)), `the seated day sun is cool, ${color.toHexString()}`);
+  for (const theme of ['dusk', 'rain']) {
+    const sun = windowSun(theme, 1, color);
+    assert.ok(sun > ROOM_LIGHTS[theme].sun * seatedDim(theme, 1) && sun < daySun * 0.3, `${theme} wash ${sun}`);
+    assert.ok(color.b > color.r, `${theme} wash is cool`);
+  }
 });
 
 test('seated, the desk lamp tucks under its shade and throws a tight warm pool at dusk and in rain', () => {

@@ -7,6 +7,7 @@ import { createDetail, disposeDetails, hasDetail, isDetailLoaded, loadDetails, s
 import { SURFACE_KIND } from './storybook.js';
 import { getFurniture } from '../core/catalog.js';
 import { createFurniture, LAPTOP } from './furniture.js';
+import { furnitureRepaint } from './architecture.js';
 
 const bounds = node => { const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity]; for (const mesh of node.getChildMeshes()) { mesh.computeWorldMatrix(true); const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox; minimumWorld.asArray().forEach((v, i) => { low[i] = Math.min(low[i], v); }); maximumWorld.asArray().forEach((v, i) => { high[i] = Math.max(high[i], v); }); } return [...low, ...high]; };
 const extent = mesh => { mesh.computeWorldMatrix(true); const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox; return { min: minimumWorld.asArray(), max: maximumWorld.asArray() }; };
@@ -228,5 +229,24 @@ test('shelf books are earthy leather and cloth tones, with no pale pastel blues 
     const pastel = palette.filter(hex => { const [h, s, v] = Color3.FromHexString(hex).toHSV().asArray(); return h > 120 && h < 260 && s > 0.08 && v > 0.5; });
     assert.deepEqual(pastel, [], `${type} has pale cool spines`);
   }
+  disposeDetails(scene); engine.dispose();
+});
+
+test('from the chair the desk wood reads honey instead of orange and its darkest parts stay lifted, while a room design keeps its own wood', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const paintOf = repaint => createDetail('study-desk', scene, repaint).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint');
+  const plain = paintOf([]), { slots, palette } = plain.metadata, surfaces = plain.getVerticesData(SURFACE_KIND), colors = plain.getVerticesData('color');
+  const hsv = (array, v) => new Color3(array[v * 4], array[v * 4 + 1], array[v * 4 + 2]).toHSV().asArray(), luma = (array, v) => 0.2126 * array[v * 4] + 0.7152 * array[v * 4 + 1] + 0.0722 * array[v * 4 + 2];
+  const wood = [...slots.keys()].filter(v => surfaces[v] === 9 && ['#aa7954', '#73533d', '#6e5444'].includes(palette[slots[v]]));
+  const hues = wood.map(v => hsv(colors, v)[0]).sort((a, b) => a - b), saturations = wood.map(v => hsv(colors, v)[1]).sort((a, b) => a - b);
+  assert.ok(hues[Math.floor(hues.length * 0.1)] >= 27, `desk wood hue starts at ${hues[Math.floor(hues.length * 0.1)].toFixed(1)}`);
+  assert.ok(saturations[Math.floor(saturations.length * 0.9)] <= 0.5, `desk wood saturation reaches ${saturations[Math.floor(saturations.length * 0.9)].toFixed(2)}`);
+  const darkest = Math.min(...[...slots.keys()].map(v => luma(colors, v)));
+  assert.ok(darkest >= 0.17, `the darkest desk crevice is ${darkest.toFixed(3)}`);
+  const sakura = paintOf(furnitureRepaint('sakura')), top = slots.indexOf(palette.indexOf('#aa7954'));
+  const sakuraHue = Color3.FromHexString('#c39e70').toHSV().r, ratio = sakura.getVerticesData('color')[top * 4] / sakura.metadata.baseColors[top * 4];
+  assert.ok(Math.abs(hsv(sakura.getVerticesData('color'), top)[0] - sakuraHue) < 1.5, 'sakura wood keeps its own hue');
+  assert.ok(Math.abs(ratio - Color3.FromHexString('#c39e70').r / Color3.FromHexString('#aa7954').r) < 0.01, 'sakura wood is cut from the model colour, not the close-up one');
   disposeDetails(scene); engine.dispose();
 });

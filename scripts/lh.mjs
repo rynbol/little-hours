@@ -42,6 +42,7 @@ Options:
   --turn <n>         house shots: press the turn buttons n times first (negative turns left)
   --closed           house shots: close the house first
   --look <degrees>   focus shots: drag the view round by this many degrees first
+  --pitch <degrees>  focus shots: drag the view up (positive) or down by this many degrees first
   --backdrop         focus shots: show the painted fallback valley the window falls back to when the outdoor world cannot build
   --probe "<expr>"   shots: print an expression evaluated with the live Babylon scene bound to scene
   --before "<expr>"  shots: evaluate an expression with scene bound before the picture is taken
@@ -274,7 +275,11 @@ async function shots() {
         const step = Math.sign(left) * Math.min(Math.abs(left), 300), y = viewport.height / 2;
         await app.drag({ x: viewport.width / 2, y }, { x: viewport.width / 2 + step, y });
       }
-      if (options.turn || options.closed || options.look) await app.settle();
+      for (let up = Number(options.pitch || 0) * Math.PI / 180 / 0.0042; Math.abs(up) > 1; up -= Math.sign(up) * Math.min(Math.abs(up), 300)) {
+        const step = Math.sign(up) * Math.min(Math.abs(up), 300), x = viewport.width / 2;
+        await app.drag({ x, y: viewport.height / 2 - step / 2 }, { x, y: viewport.height / 2 + step / 2 });
+      }
+      if (options.turn || options.closed || options.look || options.pitch) await app.settle();
       if (options.backdrop) await app.js(`window.__littleHours.room.diagnostics().seat.world.setBackdrop(true)`);
       if (options.before) await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; ${options.before}; })()`);
       await sleep(Number(options.wait || 600));
