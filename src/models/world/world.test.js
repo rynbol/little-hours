@@ -22,8 +22,9 @@ test('the outdoor world builds terrain rings and a sky that switch theme togethe
   const terrainPaint = world.terrain[0].material, skyPaint = world.sky.material;
   world.setTheme('dusk');
   assert.equal(world.atmosphere, WORLD_ATMOSPHERES.dusk);
-  assert.equal(terrainPaint._colors3.grass.toHexString().toLowerCase(), '#6a8a3a');
-  assert.equal(skyPaint._colors3.horizon.toHexString().toLowerCase(), '#f0b67c');
+  assert.equal(terrainPaint._colors3.grass.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.grass);
+  assert.equal(skyPaint._colors3.horizon.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.horizon);
+  assert.notEqual(WORLD_ATMOSPHERES.dusk.horizon, WORLD_ATMOSPHERES.day.horizon);
   assert.equal(skyPaint._vectors3.sun.y, WORLD_ATMOSPHERES.dusk.sun[1]);
   world.dispose();
   assert.equal(scene.meshes.length, 0);

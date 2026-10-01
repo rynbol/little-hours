@@ -51,6 +51,7 @@ import { createLanternGlow } from './room-lantern-glow.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
 import { createStorybook } from '../../models/storybook.js';
 import { createSeatWorld } from './seat-world.js';
+import { createWindowWorld } from './window-world.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -93,6 +94,7 @@ export function createRoom(container, options = {}) {
   const color = value => Color3.FromHexString(value);
   const world = new TransformNode('room', scene);
   const seatWorld = createSeatWorld(scene, world);
+  const windowWorld = options.engineFactory ? null : createWindowWorld(engine, seatWorld.root);
   const classicArchitecture = new TransformNode('architecture-retreat', scene); classicArchitecture.parent = world;
   const decor = { plants: new TransformNode('window-greenery', scene), lights: new TransformNode('fairy-lights', scene), rug: new TransformNode('legacy-rug', scene) };
   Object.values(decor).forEach(group => { group.parent = world; });
@@ -1225,7 +1227,7 @@ export function createRoom(container, options = {}) {
     theme = ['dusk', 'rain', 'day'].includes(name) ? name : 'dusk';
     const night = theme === 'dusk';
     companionRoutine?.setContext({ night });
-    paintSky(theme); seatWorld.setTheme(theme); architecture?.setTheme(theme); roof?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
+    paintSky(theme); seatWorld.setTheme(theme); windowWorld?.setTheme(theme); architecture?.setTheme(theme); roof?.setTheme(theme); rain.setEnabled(theme === 'rain'); skyStars.setEnabled(night);
     if (!night) { shootingStar.setEnabled(false); streakMaterial.alpha = 0; }
     const light = ROOM_LIGHTS[theme];
     sun.diffuse = color(light.sunColor); sun.intensity = light.sun;
@@ -1671,7 +1673,18 @@ export function createRoom(container, options = {}) {
     }
   }
   const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
+  function prepareWindowWorld() {
+    return windowWorld?.prepare({ theme, still: reducedMotion }).then(() => { if (!disposed) { seatWorld.setBackdrop(!windowWorld.ready); requestRender(); } });
+  }
+  function drawScene() {
+    const outdoor = Boolean(windowWorld?.ready && seatWorld.root.isEnabled(false));
+    scene.autoClear = !outdoor;
+    if (outdoor) windowWorld.render(scene.activeCamera);
+    scene.render();
+  }
   async function prepareSeat(sitting) {
+    await prepareWindowWorld();
+    if (disposed || seatSitting !== sitting) return;
     for (const type of new Set(layout.items.map(item => item.type).filter(type => hasDetail(type) && !isDetailLoaded(type)))) {
       await loadDetails([type]); await yieldToBrowser();
       if (disposed || seatSitting !== sitting) return;
@@ -1816,7 +1829,7 @@ export function createRoom(container, options = {}) {
     } else fitRoom();
     // A new size clears the canvas. Draw at once, before this frame paints,
     // so a layout change never shows one empty frame.
-    if (visible && onScreen && !suspended && readyReported) { engine.beginFrame(); scene.render(); engine.endFrame(); }
+    if (visible && onScreen && !suspended && readyReported) { engine.beginFrame(); drawScene(); engine.endFrame(); }
     requestRender();
   }
   function applyPixelRatio(value) { pixelRatio = value; engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; steadySamples = 0; resize(); }
@@ -2019,10 +2032,10 @@ export function createRoom(container, options = {}) {
     if (reducedMotion && !needsRender && readyReported && !downPosition && Math.abs(camera.inertialAlphaOffset) + Math.abs(camera.inertialBetaOffset) <= 0.0001 && now - petStart >= PET_REACTION * 1000 + 50 && !outlinesPending()) return;
     needsRender = false;
     lastFrame = elapsed > interval * 3 ? now : lastFrame + interval; animate(now);
-    const start = performance.now(); engine.beginFrame(); scene.render(); engine.endFrame(); reportStats(now, performance.now() - start); lastRenderedAt = now; outlineFrames--;
+    const start = performance.now(); engine.beginFrame(); drawScene(); engine.endFrame(); reportStats(now, performance.now() - start); lastRenderedAt = now; outlineFrames--;
     options.onFrame?.();
     if (companionRoutine.doorProgress !== null) options.onDoorProgress?.(companionRoutine.doorProgress);
-    if (!readyReported && scene.isReady()) { readyReported = true; requestRender(true); options.onReady?.(); }
+    if (!readyReported && scene.isReady()) { readyReported = true; requestRender(true); options.onReady?.(); setTimeout(prepareWindowWorld, 1500); }
     // Until the room reports ready, frames go on: shaders can finish between
     // the two asks, and a still room would stop before it reports.
     if (!reducedMotion || !readyReported || !scene.isReady() || downPosition || Math.abs(camera.inertialAlphaOffset) + Math.abs(camera.inertialBetaOffset) > 0.0001 || now - petStart < PET_REACTION * 1000 + 50 || outlinesPending()) if (!frame) frame = requestAnimationFrame(tick);
@@ -2081,7 +2094,7 @@ export function createRoom(container, options = {}) {
     buddyState() { return { mode: buddyFlight.mode, visible: buddyFrame.visible, activity: buddyFrame.activity, plan: buddyPlan?.kind ?? null, arrived: buddyArrived !== Infinity, holding: buddyFrame.holding, x: buddyFrame.x, y: buddyFrame.y, z: buddyFrame.z }; },
     setDecor(key, value) { if (!(key in decorVisible)) return; cancelDrag(); decorVisible[key] = Boolean(value); if (key === 'lights') { applyBulbs(); architecture?.setLights(Boolean(value)); } else decor[key]?.setEnabled(architectureStyle === 'retreat' && Boolean(value)); syncFurniture(); },
     resetView() { if (avatarCameraEditing) return; camera.inertialAlphaOffset = 0; camera.inertialBetaOffset = 0; camera.inertialRadiusOffset = 0; camera.inertialPanningX = 0; camera.inertialPanningY = 0; camera.alpha = alphaHome; camera.beta = betaHome; camera.radius = 19; camera.target.copyFrom(targetHome); fitRoom(); requestRender(); },
-    diagnostics() { return { scene, engine, camera, seat: { state: seatView.state, look: seatView.look, camera: seatView.camera, storybook: storybook.amount, painterly: painterly.state.look, sunbeam: sunbeam.mesh.isEnabled(false), preparing: Boolean(seatSitting), world: { enabled: seatWorld.root.isEnabled(false), theme: seatWorld.theme, progress: seatWorld.progress } }, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition || seatView.state === 'entering' || seatView.state === 'leaving'), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, tapTarget: playTarget, petBelongings, petBond, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
-    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); petModel?.dispose(); buddyModel?.dispose(); petBelongings.dispose(); seatView.dispose(); seatWorld.dispose(); storybook.dispose(); disposeDetails(scene); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
+    diagnostics() { return { scene, engine, camera, draw: drawScene, seat: { state: seatView.state, look: seatView.look, camera: seatView.camera, storybook: storybook.amount, painterly: painterly.state.look, sunbeam: sunbeam.mesh.isEnabled(false), preparing: Boolean(seatSitting), world: { enabled: seatWorld.root.isEnabled(false), theme: seatWorld.theme, progress: seatWorld.progress, backdrop: seatWorld.backdrop, outdoor: Boolean(windowWorld?.ready), outdoorScene: windowWorld?.scene ?? null } }, plantPhase, drawCalls: instrumentation.drawCallsCounter.current, moving: Boolean(avatarCameraTransition || avatarPoseTransition || seatView.state === 'entering' || seatView.state === 'leaving'), passages, architectureStyle, layout: copyLayout(), editing, avatarEditing: avatarCameraEditing, selectedId, placement: placement ? { ...placement } : null, quality, pixelRatio, hoveredId, playHover, companion: companionRoutine.diagnostics(), pet: petRoutine.diagnostics(), petSpecies, petModel, tapTarget: playTarget, petBelongings, petBond, celebrationAge, companionModel: mobileCompanion, dragging: drag ? { id: drag.id, candidate: { ...drag.candidate }, overCollection: drag.overCollection, valid: drag.valid } : null }; },
+    dispose() { if (disposed) return; cancelDrag(); avatarCanvasAnimation?.cancel(); disposed = true; cancelAnimationFrame(frame); clearTimeout(petWake); clearTimeout(clockWake); observer.disconnect(); viewObserver?.disconnect(); densityQuery?.removeEventListener('change', onDensityChange); document.removeEventListener('visibilitychange', onVisibility); motionQuery.removeEventListener('change', onMotionChange); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointerup', onPointerUp); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('lostpointercapture', onPointerCancel); window.removeEventListener('blur', onPointerCancel); settlingPieces.clear(); animatedObjects.length = 0; passages?.dispose(); roof?.dispose(); windowWorld?.dispose(); petModel?.dispose(); buddyModel?.dispose(); petBelongings.dispose(); seatView.dispose(); seatWorld.dispose(); storybook.dispose(); disposeDetails(scene); instrumentation.dispose(); architecture?.dispose(); disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); canvas.remove(); },
   };
 }

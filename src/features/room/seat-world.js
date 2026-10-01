@@ -516,8 +516,8 @@ const LAND_FRAGMENT = `precision highp float;
 varying vec3 vColor; varying float vCloud;
 void main() { gl_FragColor = vec4(vColor * (1. - vCloud * .4), 1.); }`;
 const SKY_EFFECT_VERTEX = `precision highp float;
-attribute vec3 position; attribute vec2 uv, uv2; uniform mat4 world, viewProjection; uniform float rain; varying vec2 vUv, vKind;
-void main() { vUv = uv; vKind = uv2; gl_Position = uv2.y > 1.5 && rain < .01 ? vec4(0.) : viewProjection * world * vec4(position, 1.); }`;
+attribute vec3 position; attribute vec2 uv, uv2; uniform mat4 world, viewProjection; uniform float rain, plume; varying vec2 vUv, vKind;
+void main() { vUv = uv; vKind = uv2; gl_Position = (uv2.y > 1.5 && rain < .01) || (uv2.y > .5 && uv2.y < 1.5 && plume < .5) ? vec4(0.) : viewProjection * world * vec4(position, 1.); }`;
 const SKY_EFFECT_FRAGMENT = `precision highp float;
 varying vec2 vUv, vKind; uniform float time, rays, glow, rain; uniform vec3 tint, smoke, ember, haze;
 ${CLOUD_SHADE}
@@ -717,10 +717,10 @@ export function createSeatWorld(scene, parent) {
   const landPaint = new ShaderMaterial('seat-world-land-paint', scene, { vertexSource: LAND_VERTEX, fragmentSource: LAND_FRAGMENT }, { attributes: ['position', 'color'], uniforms: ['world', 'viewProjection', 'time', 'shadow'] });
   landPaint.backFaceCulling = false; landPaint.setFloat('time', 0); landPaint.setFloat('shadow', 0);
   grassPaint.backFaceCulling = false; grassPaint.setFloat('time', 0); grassPaint.setFloat('shadow', 0);
-  const skyEffectPaint = new ShaderMaterial('seat-world-sky-effects-paint', scene, { vertexSource: SKY_EFFECT_VERTEX, fragmentSource: SKY_EFFECT_FRAGMENT }, { attributes: ['position', 'uv', 'uv2'], uniforms: ['world', 'viewProjection', 'time', 'rays', 'glow', 'rain', 'tint', 'smoke', 'ember', 'haze'], needAlphaBlending: true });
+  const skyEffectPaint = new ShaderMaterial('seat-world-sky-effects-paint', scene, { vertexSource: SKY_EFFECT_VERTEX, fragmentSource: SKY_EFFECT_FRAGMENT }, { attributes: ['position', 'uv', 'uv2'], uniforms: ['world', 'viewProjection', 'time', 'rays', 'glow', 'rain', 'plume', 'tint', 'smoke', 'ember', 'haze'], needAlphaBlending: true });
   const cloudPaint = new ShaderMaterial('seat-world-cloud-paint', scene, { vertexSource: CLOUD_VERTEX, fragmentSource: CLOUD_FRAGMENT }, { attributes: ['position', 'color', 'uv', 'uv2'], uniforms: ['world', 'viewProjection', 'time'], needAlphaBlending: true });
   cloudPaint.backFaceCulling = false; cloudPaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; cloudPaint.disableDepthWrite = true; cloudPaint.setFloat('time', 0);
-  skyEffectPaint.backFaceCulling = false; skyEffectPaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; skyEffectPaint.disableDepthWrite = true; skyEffectPaint.setFloat('time', 0); skyEffectPaint.setFloat('rays', 0); skyEffectPaint.setFloat('glow', 0);
+  skyEffectPaint.backFaceCulling = false; skyEffectPaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; skyEffectPaint.disableDepthWrite = true; skyEffectPaint.setFloat('time', 0); skyEffectPaint.setFloat('rays', 0); skyEffectPaint.setFloat('glow', 0); skyEffectPaint.setFloat('plume', 1);
   let sky = null, land, grass, skyEffects, cloudRoot, clouds, flockRoot, flock, moon, shooting, spirits;
   function build() {
     sky = make('sky', buildSky); land = make('land', shape => { buildLand(shape); buildHamlet(shape); buildForest(shape); buildRuins(shape); buildCastle(shape); buildWatchtower(shape); buildVolcano(shape); }, landPaint);
@@ -734,7 +734,8 @@ export function createSeatWorld(scene, parent) {
     spirits.metadata.glow = true;
     spirits.thinInstanceSetBuffer('matrix', spiritMatrices, 16, false); spirits.alwaysSelectAsActiveMesh = true;
   }
-  let shell = null, shellKey = '', theme = 'dusk', progress = 0, colorKey = '', seconds = 0;
+  let shell = null, shellKey = '', theme = 'dusk', progress = 0, colorKey = '', seconds = 0, backdrop = true;
+  function showBackdrop() { for (const mesh of [sky, land, grass, clouds]) mesh?.setEnabled(backdrop); skyEffectPaint.setFloat('plume', backdrop ? 1 : 0); if (moon) placeMoon(); }
   const glow = { x: 0, z: -1, lit: 0, stars: 1 };
   const temp = new Color3(), matrix = new Matrix(), scale = new Vector3(1, 1, 1), spot = new Vector3(), turn = new Quaternion();
   const spiritStarts = Array.from({ length: SPIRITS }, (_, i) => { const random = seeded(101 + i); const [x, z] = ahead(-10 + (random() - 0.5) * 56, 13 + random() * 40); return { x, z, ground: terrainHeight(x, z), phase: random(), sway: random() * 6 }; });
@@ -753,7 +754,7 @@ export function createSeatWorld(scene, parent) {
     glow.x = Math.cos(sun); glow.z = Math.sin(sun);
     moon.position.set(Math.cos(heading) * Math.cos(rise) * d, Math.sin(rise) * d, Math.sin(heading) * Math.cos(rise) * d);
     moon.lookAt(Vector3.Zero()); moon.scaling.setAll(theme === 'day' ? 0.8 : 1.6);
-    moon.setEnabled(theme !== 'rain');
+    moon.setEnabled(theme !== 'rain' && (backdrop || theme !== 'day'));
   }
   function recolor() {
     if (!sky) return;
@@ -819,8 +820,10 @@ export function createSeatWorld(scene, parent) {
     setTheme(next) { theme = VISTA_THEMES[next] ? next : 'dusk'; recolor(); },
     setProgress(next) { progress = Math.min(1, Math.max(0, Number(next) || 0)); recolor(); },
     setShell,
-    prepare() { if (!sky) { build(); recolor(); } },
-    setEnabled(enabled) { if (enabled && !sky) build(); root.setEnabled(enabled); if (enabled) { recolor(); placeSpirits(true); } },
+    prepare() { if (!sky) { build(); recolor(); showBackdrop(); } },
+    get backdrop() { return backdrop; },
+    setBackdrop(next) { backdrop = Boolean(next); showBackdrop(); },
+    setEnabled(enabled) { if (enabled && !sky) { build(); showBackdrop(); } root.setEnabled(enabled); if (enabled) { recolor(); placeSpirits(true); } },
     animate,
     dispose() { root.dispose(false, false); unlit.dispose(); lit.dispose(); grassPaint.dispose(); landPaint.dispose(); skyEffectPaint.dispose(); },
   };
