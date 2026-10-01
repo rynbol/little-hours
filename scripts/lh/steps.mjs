@@ -28,7 +28,13 @@ export const cycles = {
 
 export const views = {
   garden: { about: 'the personal garden, or the whole house on older refs', async go(app) { await steps.openHouse(app); if (await app.visible('#house-open-garden')) await app.clickSel('#house-open-garden'); await app.settle(); } },
-  focus: { about: 'the whole room in Focus mode, or the room on older refs', async go(app) { if (await app.js(`Boolean(document.getElementById('focus-mode-enter'))`)) await steps.openFocus(app); } },
+  focus: { about: 'the seated Focus view, or the room on older refs', async go(app) {
+    const enter = await app.waitFor(`Boolean(document.getElementById('focus-mode-enter'))`, { what: 'the Focus button', timeout: 8000 }).then(() => true, () => false);
+    if (!enter) return;
+    await steps.openFocus(app);
+    if (await app.js(`Boolean(window.__littleHours.room.diagnostics().seat)`)) await app.waitFor(`window.__littleHours.room.diagnostics().seat.state === 'seated'`, { what: 'the view to settle in the chair', timeout: 30000 });
+    if (await app.js(`Boolean(window.__littleHours.room.diagnostics().seat?.world?.outdoorScene)`)) await app.waitFor(`window.__littleHours.room.diagnostics().seat.world.outdoor`, { what: 'the outdoor world behind the window', timeout: 30000 });
+  } },
   'room-picker': { about: 'the illustrated room picker', async go(app) { await steps.openRoomPicker(app); } },
   pet: { about: 'your pet care card', async go(app) { await app.clickSel('#pet-button'); await app.settle(); } },
   room: { about: 'the room at rest', async go() {} },
