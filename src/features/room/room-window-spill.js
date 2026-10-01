@@ -10,8 +10,8 @@ const VERTEX = `precision highp float;
 attribute vec3 position; attribute float reach; uniform mat4 viewProjection; varying float vReach;
 void main() { vReach = reach; gl_Position = viewProjection * vec4(position + vec3(${SIDE_WALL_STANDOFF * 2}, 0., 0.), 1.); }`;
 const FRAGMENT = `precision highp float;
-varying float vReach; uniform vec3 tint; uniform float strength;
-void main() { gl_FragColor = vec4(tint * strength * vReach, 1.); }`;
+varying float vReach; uniform vec3 tint; uniform float strength, flash;
+void main() { gl_FragColor = vec4((tint * strength + vec3(.62, .72, .95) * flash) * vReach, 1.); }`;
 
 export const SIDE_WALL_SPILL = Object.freeze({
   faces: Object.freeze([Object.freeze({ x: -5.83, bottom: 1.415, top: 5.69 }), Object.freeze({ x: -5.6, bottom: 0.25, top: 1.415 })]),
@@ -52,17 +52,18 @@ export function sideWallSpillShape(window = CLASSIC_WINDOW) {
 export function createWindowSpill(scene, parent) {
   const mesh = new Mesh('side-wall-window-spill', scene), { positions, reach, indices } = sideWallSpillShape(), data = new VertexData();
   Object.assign(data, { positions, indices }); data.applyToMesh(mesh); mesh.setVerticesData('reach', reach, false, 1);
-  const paint = new ShaderMaterial('side-wall-window-spill-paint', scene, { vertexSource: VERTEX, fragmentSource: FRAGMENT }, { attributes: ['position', 'reach'], uniforms: ['viewProjection', 'tint', 'strength'], needAlphaBlending: true });
+  const paint = new ShaderMaterial('side-wall-window-spill-paint', scene, { vertexSource: VERTEX, fragmentSource: FRAGMENT }, { attributes: ['position', 'reach'], uniforms: ['viewProjection', 'tint', 'strength', 'flash'], needAlphaBlending: true });
   paint.backFaceCulling = false; paint.disableDepthWrite = true; paint.alphaMode = Constants.ALPHA_ONEONE_ONEZERO;
-  paint.setColor3('tint', Color3.White()); paint.setFloat('strength', 0);
+  paint.setColor3('tint', Color3.White()); paint.setFloat('strength', 0); paint.setFloat('flash', 0);
   mesh.onBeforeDrawObservable.add(() => scene.getEngine().alphaState.setAlphaBlendFunctionParameters(Constants.GL_ALPHA_FUNCTION_DST_COLOR, 1, 0, 1));
   mesh.material = paint; mesh.parent = parent; mesh.isPickable = false; mesh.receiveShadows = false; mesh.metadata = { castShadow: false, effect: 'window-spill' }; mesh.setEnabled(false);
-  let strength = 0, presence = 0;
-  const show = () => { paint.setFloat('strength', strength * presence); mesh.setEnabled(strength * presence > 0); };
+  let strength = 0, presence = 0, flash = 0;
+  const show = () => { paint.setFloat('strength', strength * presence); paint.setFloat('flash', flash * presence); mesh.setEnabled((strength + flash) * presence > 0); };
   return {
     mesh,
     setLight([hex, next]) { paint.setColor3('tint', Color3.FromHexString(hex)); strength = next; show(); },
     show(blend) { if (blend !== presence) { presence = blend; show(); } },
+    flash(level) { if (level !== flash) { flash = level; show(); } },
     dispose() { paint.dispose(); mesh.dispose(); },
   };
 }

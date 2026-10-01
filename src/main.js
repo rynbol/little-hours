@@ -133,6 +133,7 @@ try {
     onPetCarry: app.pet.onPetCarry,
     onSeatChange: change => app.timer.onSeatChange(change),
     onFrame() { app.speech?.update(); app.delights?.update(); },
+    onThunder: delay => audio.rumble(delay),
     onBuddy: event => app.buddy?.onRoom(event),
     onDoorProgress: app.nav.onDoorProgress,
     onCompanionState: app.companion.onCompanionState,

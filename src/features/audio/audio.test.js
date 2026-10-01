@@ -45,3 +45,24 @@ test('the audio device opens while the room loads, so the Start or Focus gesture
     assert.equal(opened.length, 1);
   } finally { delete globalThis.AudioContext; }
 });
+
+test('a distant rumble follows a flash only while the rain is playing, low and after the delay', async () => {
+  const played = [];
+  const param = () => ({ value: 1, steps: [], setValueAtTime(v, t) { this.steps.push([v, t]); }, exponentialRampToValueAtTime(v, t) { this.steps.push([v, t]); }, setTargetAtTime(v) { this.value = v; } });
+  const node = () => ({ connect: next => next, start(at) { this.startAt = at; played.push(this); }, stop() {}, frequency: param(), gain: param(), playbackRate: param() });
+  globalThis.AudioContext = class { constructor() { this.sampleRate = 8; this.currentTime = 10; this.destination = {}; } createBuffer(channels, length) { return { getChannelData: () => new Float32Array(length) }; } createBufferSource() { return node(); } createBiquadFilter() { return node(); } createGain() { return node(); } resume() { return Promise.resolve(); } suspend() { return Promise.resolve(); } close() {} };
+  try {
+    const audio = createAudio({ getItem: () => JSON.stringify({ volume: 65 }), setItem() {} });
+    audio.rumble(17);
+    assert.equal(played.length, 0, 'no sound before any gesture');
+    await audio.setRain(true);
+    audio.rumble(17);
+    assert.equal(played.length, 2, 'the rain loop and one rumble');
+    assert.equal(played[1].startAt, 27);
+    assert.ok(played[1].playbackRate.value < 1, 'the rumble is the rain noise slowed down');
+    await audio.setRain(false);
+    audio.rumble(17);
+    assert.equal(played.length, 2, 'no rumble once the rain sound is off');
+    audio.dispose();
+  } finally { delete globalThis.AudioContext; }
+});

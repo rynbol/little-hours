@@ -109,6 +109,17 @@ export function createAudio(storage) {
       chime();
     },
     chime,
+    rumble(delay) {
+      if (!rain || !context) return;
+      const start = context.currentTime + delay, source = context.createBufferSource(), filter = context.createBiquadFilter(), swell = context.createGain();
+      source.buffer = rainSource.buffer; source.loop = true; source.playbackRate.value = 0.4;
+      filter.type = 'lowpass'; filter.frequency.value = 150;
+      swell.gain.setValueAtTime(0.0001, start);
+      swell.gain.exponentialRampToValueAtTime(rainLevel() * 0.6, start + 0.7);
+      swell.gain.exponentialRampToValueAtTime(0.0001, start + 5.5);
+      source.connect(filter).connect(swell).connect(context.destination);
+      source.start(start); source.stop(start + 5.6);
+    },
     dispose() {
       clearTimeout(suspendTimer);
       rainSource?.stop();

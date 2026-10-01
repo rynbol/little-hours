@@ -56,6 +56,7 @@ import { createFirstPersonView, seatEye } from './first-person.js';
 import { createStorybook } from '../../models/storybook.js';
 import { createSeatWorld, SEAT_WINDOW } from './seat-world.js';
 import { createWindowWorld, yieldToBrowser } from './window-world.js';
+import { createWindowLightning } from './window-lightning.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -258,6 +259,7 @@ export function createRoom(container, options = {}) {
   // Added windows show other parts of the view; mirroring never shows a seam.
   skyTexture.wrapU = skyTexture.wrapV = DynamicTexture.MIRROR_ADDRESSMODE;
   const retreatView = picture(4.2, 3.82, skyTexture, [archCenter, 3.34, -4.64]).material;
+  const storm = createWindowLightning({ outdoor: windowWorld?.scene, spill: sideWallSpill, backdrop: () => architecture?.viewMaterial || retreatView, onThunder: options.onThunder }); storm.ready();
   function paintSky(theme) {
     const ctx = skyTexture.getContext(), size = 768, daylight = theme === 'day', night = theme === 'dusk';
     const stops = daylight ? ['#8bc5dc', '#bededc', '#f7e6b4'] : night ? ['#182643', '#384667', '#8b7e9c'] : ['#5a7288', '#a1b2b8', '#d1cebb'];
@@ -1910,7 +1912,7 @@ export function createRoom(container, options = {}) {
     if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
     if (storybook.amount !== seatView.blend) { gradeFocus(scene.imageProcessingConfiguration.colorCurves, seatView.blend); bloom.intensity = roomBloom(theme, seatView.blend); }
     storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = windowSun(theme, seatView.blend, sun.diffuse); aimDeskLamp(seatView.blend); rain.alpha = windowRainAlpha * (1 - seatView.blend); rain.isVisible = rain.alpha > 0.005;
-    sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend); sideWallSpill.show(seatView.blend);
+    sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend); sideWallSpill.show(seatView.blend); storm.update(seconds, theme === 'rain', reducedMotion);
     seatWorld.animate(companionDelta, reducedMotion);
     passages?.animate(companionDelta, houseHover, reducedMotion, lockedDoor, openingDoor);
     const celebrating = celebrationAge < 3.2;
@@ -2077,6 +2079,7 @@ export function createRoom(container, options = {}) {
   requestRender();
 
   return {
+    lightning: storm,
     setHouse, setPlantPhase, setTankFish,
     celebrate() { if (!editing && !avatarCameraEditing && !suspended && !reducedMotion) { celebrationAge = 0; requestRender(); } },
     petCareBusy() { return Boolean(editing || avatarCameraEditing || suspended || petRoutine.pose.held || petRoutine.pose.care); },
