@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, VOLCANO, SEAT_DRAPE } from './seat-world.js';
+import { createSeatWorld, valleyMist, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, MOON_FACE, VOLCANO, SEAT_DRAPE } from './seat-world.js';
 
 const PEAK = VOLCANO.base + VOLCANO.height;
 
@@ -623,5 +623,18 @@ test('the moon maria fade into the face with no hard rim', () => {
   const edges = maria.filter(i => shape.shades[i] > face(shape.positions[i * 3], shape.positions[i * 3 + 1]) - 0.02);
   assert.ok(maria.length > 20 && edges.length >= maria.length * 0.8, `${edges.length} of ${maria.length} mare vertices match the face beneath them`);
   for (const i of edges) assert.ok(Math.abs(shape.shades[i] - face(shape.positions[i * 3], shape.positions[i * 3 + 1])) < 0.01, 'a mare rim meets the face at its shade');
+  engine.dispose();
+});
+
+test('mist pools in the low valley in the middle distance, and the haze warms toward the sun', () => {
+  assert.ok(valleyMist(0, -4.8, -50) > 0.6, 'the valley floor 50 out sits in mist');
+  assert.ok(valleyMist(0, 4.2, -50) < 0.1, 'a hilltop 9 above it rises clear');
+  assert.ok(valleyMist(0, -8, -10) < 0.01, 'the near meadow stays clear');
+  const { engine, world } = setup();
+  world.setEnabled(true); world.setTheme('dusk');
+  const mesh = world.meshes.find(mesh => mesh.name === 'seat-world-land'), { shape } = mesh.metadata, colors = mesh.getVerticesData('color'), sun = -Math.PI / 2 - 0.55;
+  const warmth = test => { const ids = shape.roles.flatMap((role, i) => (role === 'mid' || role === 'far') && test(Math.atan2(shape.positions[i * 3 + 2], shape.positions[i * 3])) ? [i] : []); return ids.reduce((sum, i) => sum + colors[i * 4] - colors[i * 4 + 2], 0) / ids.length; };
+  const off = a => Math.abs(Math.atan2(Math.sin(a - sun), Math.cos(a - sun)));
+  assert.ok(warmth(a => off(a) < 0.15) > warmth(a => off(a) > 1) + 0.04, 'ranges toward the sun take warmer haze than ranges away from it');
   engine.dispose();
 });
