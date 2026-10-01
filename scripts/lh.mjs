@@ -45,7 +45,7 @@ Options:
   --pitch <degrees>  focus shots: drag the view up (positive) or down by this many degrees first
   --backdrop         focus shots: show the painted fallback valley the window falls back to when the outdoor world cannot build
   --probe "<expr>"   shots: print an expression evaluated with the live Babylon scene bound to scene
-  --before "<expr>"  shots: evaluate an expression with scene bound before the picture is taken
+  --before "<expr>"  shots and world: evaluate an expression with scene bound before the picture is taken
   --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
   --still            prefers-reduced-motion: reduce
   --headed           show the browser window
@@ -147,13 +147,14 @@ async function assetShots() {
 }
 
 async function worldShots() {
-  const server = await start(), out = outDir('world'), [width, height] = String(options.size || '1440x1000').split('x').map(Number), theme = options.theme || 'day';
+  const server = await start(options.ref), out = outDir('world'), [width, height] = String(options.size || '1440x1000').split('x').map(Number), theme = options.theme || 'day';
   const browser = await launch({ width, height, scale: Number(options.scale || 1), reducedMotion: false });
   try {
     for (const view of positional.length ? positional : ['window']) {
       await browser.navigate(`${server.url}/checks/world.html?${new URLSearchParams({ view, theme, ...(options.at ? { at: options.at, yaw: options.yaw || 0, pitch: options.pitch || 0 } : {}) })}`);
       for (let attempt = 0; attempt < 600 && !await browser.js(`Boolean(window.__world?.ready())`).catch(() => false); attempt++) await sleep(50);
       if (!await browser.js(`Boolean(window.__world?.ready())`)) throw new Error(`The world view ${view} did not render`);
+      if (options.before) await browser.js(`(() => { const { scene } = window.__world; ${options.before}; })()`);
       await sleep(Number(options.wait || 1500));
       const stats = await browser.js(`(() => {
         const { engine, scene } = window.__world, gl = engine._gl, pixel = new Uint8Array(4), times = [];
