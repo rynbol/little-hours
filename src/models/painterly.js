@@ -2,6 +2,8 @@ import { MaterialPluginBase } from '@babylonjs/core/Materials/materialPluginBase
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { RegisterMaterialPlugin } from '@babylonjs/core/Materials/materialPluginManager.js';
 
+export const PAINTERLY_SOFTNESS = 0.3;
+
 export const PAINTERLY_FRAGMENT = `
 float plHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float plNoise(vec3 p) {
@@ -18,7 +20,7 @@ float plStroke(vec3 p, vec3 n) {
 vec3 plLight(vec3 light, vec3 n, vec3 v, vec3 p) {
   float level = max(max(light.r, light.g), light.b);
   vec3 hue = light / max(level, 0.0001);
-  float lit = smoothstep(plBand.x, plBand.y, level + (plNoise(p * 3.0) - 0.5) * 0.08);
+  float lit = smoothstep(plBand.x - ${PAINTERLY_SOFTNESS.toFixed(3)}, plBand.y + ${PAINTERLY_SOFTNESS.toFixed(3)}, level + (plNoise(p * 0.8) - 0.5) * 0.04);
   vec3 tone = hue * mix(plShadow, vec3(1.0), lit) * (0.66 + 0.38 * lit + 0.1 * smoothstep(0.85, 1.3, level));
   float facing = 1.0 - max(dot(n, v), 0.0);
   tone += plRim * pow(facing, 3.0) * smoothstep(-0.3, 0.7, n.y) * (0.25 + 0.35 * lit);
@@ -65,7 +67,7 @@ export const PAINTERLY_LOOKS = Object.freeze({
   dusk: { ground: [0, 1, 0], band: [0.7, 0.92], shadow: [0.56, 0.54, 0.86], rim: [1, 0.8, 0.62], haze: [0.44, 0.45, 0.66] },
   rain: { ground: [0, 1, 0], band: [0.74, 0.86], shadow: [0.62, 0.7, 0.8], rim: [0.86, 0.92, 0.96], haze: [0.58, 0.68, 0.74] },
   'room-day': { ground: [0.55, 1.3, 0.3], band: [0.96, 1.3], shadow: [1.14, 1.06, 1.16], rim: [1, 0.86, 0.62], haze: [0.3, 0.24, 0.3], depth: [900, 1000, -900, -800] },
-  'room-dusk': { ground: [0.55, 1.3, 0.3], band: [0.5, 0.7], shadow: [0.66, 0.58, 0.84], rim: [1, 0.8, 0.56], haze: [0.3, 0.24, 0.3], depth: [900, 1000, -900, -800] },
+  'room-dusk': { ground: [0.55, 1.3, 0.3], band: [0.5, 0.7], shadow: [0.86, 0.78, 0.76], rim: [1, 0.8, 0.56], haze: [0.3, 0.24, 0.3], depth: [900, 1000, -900, -800] },
   'room-rain': { ground: [0.55, 1.3, 0.18], band: [0.76, 1.02], shadow: [0.88, 0.88, 0.98], rim: [0.9, 0.9, 0.92], haze: [0.3, 0.24, 0.3], depth: [900, 1000, -900, -800] },
 });
 

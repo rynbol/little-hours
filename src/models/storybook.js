@@ -3,12 +3,13 @@ import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js'
 import { RegisterMaterialPlugin } from '@babylonjs/core/Materials/materialPluginManager.js';
 
 export const STORYBOOK = Object.freeze({
-  bands: [0.46, 0.76, 1.0],
-  shadow: [0.76, 0.7, 0.9],
-  rim: [1.0, 0.76, 0.5],
+  floor: [0.62, 0.54, 0.46],
+  lift: 1.0,
+  shadow: [0.94, 0.92, 0.96],
+  rim: [1.0, 0.93, 0.8],
 });
 
-const [low, mid, high] = STORYBOOK.bands, glsl = values => `vec3(${values.map(value => value.toFixed(3)).join(',')})`;
+const glsl = values => `vec3(${values.map(value => value.toFixed(3)).join(',')})`;
 
 export const STORYBOOK_FRAGMENT = `
 float storyHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -19,27 +20,23 @@ float storyNoise(vec3 p) {
 }
 vec3 storySurface(float code, vec3 p) {
   if (code > 9.5) return vec3(1.0);
-  if (code > 8.5) {
-    float streak = storyNoise(vec3(p.x * 1.4, p.y * 34.0, p.z * 34.0)), ring = sin((p.z + p.y) * 70.0 + streak * 10.0);
-    return vec3(0.9 + 0.1 * streak + 0.035 * ring * ring) * mix(vec3(1.0), vec3(1.04, 0.98, 0.93), streak);
-  }
-  if (code > 7.5) return vec3(0.95 + 0.07 * storyNoise(p * 90.0) + 0.03 * storyNoise(p * 23.0));
-  if (code > 6.5) return vec3(0.96 + 0.1 * storyNoise(vec3(p.x * 6.0, p.y * 160.0, p.z * 6.0)));
-  if (code > 5.5) return vec3(0.98 + 0.03 * storyNoise(p * 120.0));
-  if (code > 4.5) return vec3(0.92 + 0.14 * storyNoise(p * 45.0));
-  if (code > 3.5) return vec3(1.0 - 0.14 * step(0.86, storyNoise(p * 150.0)));
-  if (code > 2.5) return vec3(0.84 + 0.22 * storyNoise(p * 11.0) + 0.06 * storyNoise(p * 47.0));
+  if (code > 8.5) return vec3(0.94 + 0.1 * storyNoise(vec3(p.x * 1.5, p.y * 8.0, p.z * 8.0)));
+  if (code > 7.5) return vec3(0.97 + 0.05 * storyNoise(p * 18.0));
+  if (code > 6.5) return vec3(0.98 + 0.04 * storyNoise(vec3(p.x * 4.0, p.y * 40.0, p.z * 4.0)));
+  if (code > 5.5) return vec3(0.99 + 0.02 * storyNoise(p * 30.0));
+  if (code > 4.5) return vec3(0.94 + 0.1 * storyNoise(p * 12.0));
+  if (code > 3.5) return vec3(1.0 - 0.06 * step(0.9, storyNoise(p * 60.0)));
+  if (code > 2.5) return vec3(0.88 + 0.16 * storyNoise(p * 6.0) + 0.04 * storyNoise(p * 20.0));
   return vec3(1.0);
 }
 vec3 storyLight(vec3 light, vec3 n, vec3 v, vec3 p) {
   float level = max(max(light.r, light.g), light.b);
-  vec3 hue = light / max(level, 0.0001);
-  float band = ${low.toFixed(3)} + smoothstep(0.14, 0.24, level) * ${(mid - low).toFixed(3)} + smoothstep(0.5, 0.62, level) * ${(high - mid).toFixed(3)} + smoothstep(1.0, 1.3, level) * 0.18;
-  vec3 toon = hue * band * mix(${glsl(STORYBOOK.shadow)}, vec3(1.0), smoothstep(0.3, 0.9, band));
+  vec3 lifted = light + ${glsl(STORYBOOK.floor)} * (1.0 - smoothstep(0.0, ${STORYBOOK.lift.toFixed(3)}, level));
+  vec3 soft = lifted * mix(${glsl(STORYBOOK.shadow)}, vec3(1.0), smoothstep(0.08, 0.7, level));
   float facing = 1.0 - max(dot(n, v), 0.0);
-  toon += ${glsl(STORYBOOK.rim)} * pow(facing, 3.0) * 0.28 * smoothstep(0.08, 0.4, level);
-  toon *= 0.95 + 0.07 * storyNoise(p * 7.0) + 0.04 * storyNoise(p * 29.0);
-  return mix(light, toon, storyLook);
+  soft += ${glsl(STORYBOOK.rim)} * pow(facing, 4.0) * 0.12 * smoothstep(0.08, 0.5, level);
+  soft *= 0.97 + 0.05 * storyNoise(p * 2.5);
+  return mix(light, soft, storyLook);
 }
 `;
 

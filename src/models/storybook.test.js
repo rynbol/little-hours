@@ -9,7 +9,7 @@ import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { ShaderStore } from '@babylonjs/core/Engines/shaderStore.js';
 import '@babylonjs/core/Shaders/default.fragment.js';
-import { createStorybook, StorybookPlugin, SURFACE_KIND } from './storybook.js';
+import { createStorybook, StorybookPlugin, SURFACE_KIND, STORYBOOK, STORYBOOK_FRAGMENT } from './storybook.js';
 
 test('the storybook light hook finds every place the standard shader mixes its diffuse light', () => {
   const source = ShaderStore.ShadersStore.defaultPixelShader;
@@ -46,4 +46,15 @@ test('only meshes that carry surface codes compile the surface variant', () => {
   assert.equal(keys.filter(key => key.includes('#define STORYSURFACE')).length, 1);
   assert.equal(keys.filter(key => !key.includes('#define STORYSURFACE')).length, 1);
   engine.dispose();
+});
+
+test('the Focus look shades smoothly, without bands, and lifts dim corners with a warm floor that fades as light rises', () => {
+  const [r, g, b] = STORYBOOK.floor;
+  assert.ok(r > g && g > b, 'the floor is warm');
+  assert.ok(b > 0.4, 'dark wood in a dim corner stays readable');
+  assert.ok(r * 1.5 / STORYBOOK.lift < 1, 'brighter light never shades darker');
+  const light = STORYBOOK_FRAGMENT.slice(STORYBOOK_FRAGMENT.indexOf('vec3 storyLight'));
+  assert.equal(light.match(/smoothstep/g).length, 3, 'one floor fade, one shade tint and one rim, no stepped bands');
+  const [sr, sg, sb] = STORYBOOK.shadow;
+  assert.ok(Math.min(sr, sg, sb) > 0.85, 'shade keeps its colour instead of turning purple');
 });

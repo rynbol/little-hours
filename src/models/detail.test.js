@@ -132,6 +132,22 @@ test('the moon tree charms hang on strings that rise into the canopy or loop ove
   disposeDetails(scene); engine.dispose();
 });
 
+test('baked contact shade keeps most of each colour, so crevices stay warm instead of crushing to black', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine), types = ['bookcase', 'study-desk', 'lounge-chair', 'fireplace'];
+  await loadDetails(types);
+  for (const type of types) {
+    const kept = [];
+    for (const mesh of createDetail(type, scene).getChildMeshes().filter(mesh => mesh.material.name !== 'detail-glow')) {
+      const colors = mesh.getVerticesData('color'), { slots, palette } = mesh.metadata;
+      const brightest = palette.map(hex => Math.max(...[1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16) / 255)));
+      slots.forEach((slot, v) => kept.push(Math.max(colors[v * 4], colors[v * 4 + 1], colors[v * 4 + 2]) / brightest[slot]));
+    }
+    kept.sort((a, b) => a - b);
+    assert.ok(kept[Math.floor(kept.length * 0.02)] > 0.5, `${type} crevices keep ${kept[Math.floor(kept.length * 0.02)].toFixed(2)} of their colour`);
+  }
+  disposeDetails(scene); engine.dispose();
+});
+
 test('the bookcase spines vary in style, with raised ribs and title bands in darker shades of their cloth', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['bookcase']);

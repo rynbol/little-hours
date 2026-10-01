@@ -9,7 +9,7 @@ import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import '@babylonjs/core/Shaders/default.fragment.js';
 import '@babylonjs/core/Shaders/default.vertex.js';
-import { PAINTERLY_LOOKS, createPainterly } from './painterly.js';
+import { PAINTERLY_LOOKS, PAINTERLY_SOFTNESS, createPainterly } from './painterly.js';
 import { createStorybook } from './storybook.js';
 import { ISLAND_ATMOSPHERES, ISLAND_SUN } from '../features/house/island-atmosphere.js';
 import { ROOM_LIGHTS } from '../features/room/room-lighting.js';
@@ -63,4 +63,10 @@ test('the painterly and storybook looks compile together on one material', async
     return count;
   };
   assert.equal(await declarations(scene => { createPainterly(scene, 'room-dusk'); createStorybook(scene); }), await declarations(() => {}));
+});
+
+test('light turns to shade over a wide soft ramp, and the dusk room shade stays warm', () => {
+  for (const [theme, { band: [start, end] }] of Object.entries(PAINTERLY_LOOKS)) assert.ok(end - start + 2 * PAINTERLY_SOFTNESS >= 0.5, `${theme} terminator is a hard band`);
+  const [r, g, b] = PAINTERLY_LOOKS['room-dusk'].shadow;
+  assert.ok(r > g && g > b, 'the dusk room shade is amber, not violet');
 });
