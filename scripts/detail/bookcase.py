@@ -126,19 +126,18 @@ def carcass():
         span = 1.77 / boards
         parts.append(rbox([span, 3.16, 0.065], (-1.77 / 2 + span * (i + 0.5), 1.65, -0.23), BACK, bevel=0.012, segments=1, surface='wood'))
     for x in (-0.88, 0.88):
-        parts.append(rbox([0.11, 3.35, 0.54], (x, 1.675, 0), CASE, bevel=0.018, surface='wood', dice=0.6))
-        parts.append(rbox([0.03, 3.17, 0.022], (x, 1.68, 0.283), TRIM, bevel=0.009, surface='wood'))
-        parts.append(rbox([0.02, 2.9, 0.4], (x + (0.056 if x > 0 else -0.056), 1.66, 0), CASE, bevel=0.008, surface='wood'))
-        parts.append(rbox([0.13, 0.12, 0.56], (x, 0.06, 0.005), CROWN, bevel=0.02, surface='wood'))
-    for y in SHELVES:
+        parts.append(rbox([0.11, 3.35, 0.54], (x, 1.675, 0), CASE, bevel=0.04, surface='wood', dice=0.6))
+        side = 0.89 if x > 0 else -0.89
+        parts.append(rbox([0.12, 3.0, 0.06], (side, 1.65, 0.295), CASE, bevel=0.03, surface='wood'))
+        parts.append(rbox([0.1, 0.08, 0.08], (side, 3.19, 0.28), CROWN, bevel=0.03, surface='wood'))
+        parts.append(rbox([0.12, 0.07, 0.1], (side, 3.265, 0.275), CROWN, bevel=0.03, surface='wood'))
+    for y in SHELVES[1:]:
         parts.append(rbox([1.66, 0.09, 0.53], (0, y, -0.01), CASE, bevel=0.012, surface='wood', dice=0.4))
-        parts.append(rbox([1.72, 0.1, 0.05], (0, y, 0.272), CASE, bevel=0.022, surface='wood'))
-    parts.append(rbox([1.66, 0.1, 0.03], (0, 0.06, 0.29), CROWN, bevel=0.012, surface='wood'))
-    parts.append(rbox([1.88, 0.07, 0.61], (0, 3.385, 0), CROWN, bevel=0.024, surface='wood'))
-    parts.append(rbox([1.84, 0.05, 0.585], (0, 3.335, -0.005), CROWN, bevel=0.02, surface='wood'))
-    parts.append(rbox([1.68, 0.025, 0.02], (0, 3.385, 0.307), BRASS, bevel=0.008, surface='metal', layer='metal'))
-    for k in range(17):
-        parts.append(rbox([0.045, 0.035, 0.022], (-0.8 + k * 0.1, 3.3, 0.3), CROWN, bevel=0.006, segments=1, surface='wood'))
+        parts.append(rbox([1.72, 0.13, 0.07], (0, y - 0.02, 0.27), CASE, bevel=0.04, surface='wood'))
+    parts.append(rbox([1.9, 0.125, 0.6], (0, 0.0625, -0.01), CROWN, bevel=0.03, surface='wood'))
+    parts.append(rbox([1.9, 0.18, 0.08], (0, 0.09, 0.285), CROWN, bevel=0.04, surface='wood'))
+    parts.append(rbox([1.9, 0.1, 0.64], (0, 3.37, 0), CROWN, bevel=0.04, surface='wood'))
+    parts.append(rbox([1.8, 0.05, 0.6], (0, 3.295, -0.005), CROWN, bevel=0.02, surface='wood'))
     scallops, top, drop = 5, 3.24, 0.07
     edge = lambda x: top - 0.03 - drop * abs(math.sin((x + 0.825) / 1.65 * scallops * math.pi))
     xs = [-0.825 + 1.65 * k / 40 for k in range(41)]

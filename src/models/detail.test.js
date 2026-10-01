@@ -159,6 +159,22 @@ test('the bookcase spines vary in style, with raised ribs and title bands in dar
   disposeDetails(scene); engine.dispose();
 });
 
+test('the bookcase is chunky: a tall plinth rail, thick rounded shelf fronts, proud corner pilasters and corbels under the crown', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['bookcase']);
+  const paint = createDetail('bookcase', scene).getChildMeshes().find(mesh => mesh.material.name === 'detail-paint');
+  const positions = paint.getVerticesData('position'), { slots, palette } = paint.metadata;
+  const select = hex => { const slot = palette.indexOf(hex), found = []; slots.forEach((s, v) => { if (s === slot) found.push(positions.slice(v * 3, v * 3 + 3)); }); return found; };
+  const casework = select('#936c4e'), crown = select('#73533f'), span = values => Math.max(...values) - Math.min(...values);
+  assert.ok(Math.max(...crown.filter(([, y, z]) => y < 0.3 && z > 0.25).map(([, y]) => y)) > 0.16, 'the plinth rail stands tall in front of the bottom row');
+  assert.ok(span(casework.filter(([, y, z]) => Math.abs(y - 1.56) < 0.1 && z > 0.28).map(([, y]) => y)) > 0.11, 'the shelf front is a thick rounded board');
+  const pilaster = casework.filter(([x, , z]) => x > 0.8 && z > 0.31);
+  assert.ok(pilaster.length > 0 && span(pilaster.map(([, y]) => y)) > 2.8, 'a full-height pilaster stands proud of the shelf fronts');
+  const corbels = crown.filter(([x, y, z]) => Math.abs(x) > 0.8 && y > 3.1 && y < 3.25 && z > 0.3);
+  assert.ok(corbels.some(([x]) => x > 0) && corbels.some(([x]) => x < 0), 'a corbel holds up each end of the crown');
+  disposeDetails(scene); engine.dispose();
+});
+
 test('the laptop keyboard staggers its rows around modifier keys and a wide centred spacebar, keeping its footprint', async () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   await loadDetails(['study-desk']);
