@@ -2,7 +2,7 @@ const sunFrom = (heading, elevation) => Object.freeze([Math.cos(elevation) * Mat
 
 export const WORLD_ATMOSPHERES = Object.freeze({
   day: Object.freeze({
-    sun: sunFrom(0.2, 0.22), sunColor: '#fff4dc', sunStrength: 1,
+    sun: sunFrom(-0.02, 0.19), sunColor: '#fff4dc', sunStrength: 1,
     zenith: '#8fb3c4', high: '#a5c2c8', horizon: '#cfdcd2', horizonAway: '#cfdcd2', glow: '#f4f2dc', glowStrength: 0.7,
     skyAmbient: '#a9c4d6', groundAmbient: '#8a9a5c', shadowTint: '#6f86a8', shadowLift: 0.42,
     fogNear: '#bcd0cc', fogFar: '#7a9eae', fogSun: '#dfe8d0', fogDensity: 0.0005, fogHeight: 300,
@@ -13,7 +13,7 @@ export const WORLD_ATMOSPHERES = Object.freeze({
   }),
   dusk: Object.freeze({
     sun: sunFrom(-0.2, 0.19), sunColor: '#ffb46a', sunStrength: 0.8,
-    zenith: '#7e8a8c', high: '#8e978c', horizon: '#fcbe74', horizonAway: '#a9a496', glow: '#ffe6a8', glowStrength: 0.9,
+    zenith: '#7e8a8c', high: '#84918a', horizon: '#fcbe74', horizonAway: '#a9a496', glow: '#ffe6a8', glowStrength: 0.9,
     skyAmbient: '#8c8a9c', groundAmbient: '#7a5c3c', shadowTint: '#5f6e80', shadowLift: 0.38,
     fogNear: '#91928c', fogFar: '#5f7284', fogSun: '#fcbe74', fogDensity: 0.00042, fogHeight: 220,
     mist: '#91928c', mistStrength: 0.45,

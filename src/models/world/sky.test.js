@@ -6,7 +6,9 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { createWorldSky } from './sky.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
+import { CLOUD_KINDS, cloudCards } from './clouds.js';
 
+const hue = hex => { const { r, g, b } = Color3.FromHexString(hex), max = Math.max(r, g, b), min = Math.min(r, g, b); return ((max === r ? (g - b) / (max - min) : max === g ? 2 + (b - r) / (max - min) : 4 + (r - g) / (max - min)) * 60 + 360) % 360; };
 const hsv = hex => { const { r, g, b } = Color3.FromHexString(hex), max = Math.max(r, g, b), min = Math.min(r, g, b); return { s: max ? (max - min) / max : 0, v: max }; };
 
 test('the day sky is pale and low in saturation, as BotW measures it', () => {
@@ -31,10 +33,28 @@ test('dusk is amber at the horizon over a grey-green zenith, and rain is a dim o
 });
 
 test('far haze is blue-grey in day and dusk, so each ridge steps from green toward blue', () => {
-  const hue = hex => { const { r, g, b } = Color3.FromHexString(hex), max = Math.max(r, g, b), min = Math.min(r, g, b); return ((max === r ? (g - b) / (max - min) : max === g ? 2 + (b - r) / (max - min) : 4 + (r - g) / (max - min)) * 60 + 360) % 360; };
   assert.equal(Math.round(hue(WORLD_ATMOSPHERES.day.fogFar)), 198);
   assert.equal(Math.round(hue(WORLD_ATMOSPHERES.dusk.fogFar)), 209);
   assert.ok(Color3.FromHexString(WORLD_ATMOSPHERES.dusk.fogFar).b < 0.55, 'dusk ridges stay a dark mass');
+});
+
+test('the dusk sky above the window is a calm grey-green, not olive beige', () => {
+  const high = WORLD_ATMOSPHERES.dusk.high;
+  assert.equal(Math.round(hue(high)), 148);
+  assert.ok(hsv(high).s < 0.1);
+});
+
+test('the day and dusk suns sit low in the window and clear of every cloud at rest', () => {
+  const eye = [-2, 2.24, -2.4], clouds = cloudCards().filter(card => card.kind !== CLOUD_KINDS.mist);
+  for (const theme of ['day', 'dusk']) {
+    const [x, y, z] = WORLD_ATMOSPHERES[theme].sun, heading = Math.atan2(x, -z), elevation = Math.asin(y);
+    assert.ok(elevation > 0.15 && elevation < 0.25 && Math.abs(heading) < 0.3, `${theme} sun at ${heading.toFixed(2)}, ${elevation.toFixed(2)}`);
+    for (const card of clouds) {
+      const out = Math.hypot(card.x - eye[0], card.z - eye[2]), bearing = Math.atan2(card.x - eye[0], -(card.z - eye[2])), up = Math.atan2(card.y - eye[1], out);
+      const inside = Math.hypot((bearing - heading) * out / card.halfWidth, (up - elevation) * out / card.halfHeight);
+      assert.ok(inside > 1, `${theme} sun behind a cloud ${out.toFixed(0)} m out`);
+    }
+  }
 });
 
 test('the sky dome takes each theme\'s colours and sun', () => {
