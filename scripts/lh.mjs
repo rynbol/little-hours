@@ -6,7 +6,7 @@ import { openApp } from './lh/app.mjs';
 import { serve } from './lh/server.mjs';
 import { SEEDS } from './lh/seeds.mjs';
 import { cycles, steps, views } from './lh/steps.mjs';
-import { allocations, collectGarbage, focusTrip, heapSnapshot, heapUsed, idle, takeEvents, trace, watchEvents } from './lh/measure.mjs';
+import { allocations, collectGarbage, focusTrip, gpuCosts, heapSnapshot, heapUsed, idle, takeEvents, trace, watchEvents } from './lh/measure.mjs';
 import { commandOf, lhDir, outDir, repoRoot, stopTracked, tracked } from './lh/state.mjs';
 
 const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence.
@@ -47,6 +47,7 @@ Options:
   --probe "<expr>"   shots: print an expression evaluated with the live Babylon scene bound to scene
   --before "<expr>"  shots and world: evaluate an expression with scene bound before the picture is taken
   --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
+  --freeze <ms>      shots: stop the game clock at this many ms after the start, so two shots can be compared pixel for pixel
   --still            prefers-reduced-motion: reduce
   --headed           show the browser window
   --rounds <n>       perf rounds per side (default 1, or 2 with --against)
@@ -238,6 +239,7 @@ async function perfOnce(url, view) {
       const which = view === 'house' || view === 'garden' ? 'house' : 'room';
       const gpu = await app.js(`window.__littleHours.gpuFrame('${which}')`), stats = await app.js(`window.__littleHours.stats('${which}')`);
       Object.assign(result, { gpuFrameMs: gpu.ms, drawCalls: stats.drawCalls, triangles: stats.triangles, renderPixels: gpu.width * gpu.height });
+      if (view === 'focus') Object.assign(result, await gpuCosts(app));
     }
     result.pageErrors = app.errors.length;
     return result;
@@ -253,10 +255,11 @@ async function perf() {
     runs[list.indexOf(side)].push(result);
     console.log(`  round ${round + 1} ${side.label}: idle ${fixed(result.idleMsPerSecond)} ms/s${result.openMs ? `, open ${result.openMs} ms` : ''}${result.gpuFrameMs ? `, gpu ${fixed(result.gpuFrameMs)} ms` : ''}`);
   }
-  const keys = [...new Set(runs.flat().flatMap(Object.keys))];
+  const keys = [...new Set(runs.flat().flatMap(Object.keys))].filter(key => key !== 'passes');
   const rows = keys.map(key => [key, ...runs.map(side => fixed(median(side.map(result => result[key]))))]);
   if (list.length > 1) rows.forEach((row, i) => { const [a, b] = runs.map(side => median(side.map(result => result[keys[i]]))); row.push(a !== null && b !== null ? (a - b >= 0 ? '+' : '') + fixed(a - b) : '—'); });
   console.log('\n' + table(rows, ['metric (median)', ...list.map(side => side.label), ...(list.length > 1 ? ['difference'] : [])]));
+  runs.forEach((side, i) => { const passes = side.find(result => result.passes)?.passes; if (passes) console.log(`\nGPU cost of each part (frame ms saved when hidden), ${list[i].label}:\n${table(Object.entries(passes).slice(0, 24).map(([label, ms]) => [label, fixed(ms)]), ['pass', 'ms'])}`); });
   console.log(`\nClick and open times are Event Timing durations; 16 means "16 ms or less". Lower is better everywhere except rafPerSecond.`);
   writeFileSync(join(out, 'perf.json'), JSON.stringify({ view, sides: list.map(side => side.label), runs }, null, 2));
   console.log(`evidence: ${join(out, 'perf.json')}`);
@@ -283,6 +286,7 @@ async function shots() {
       if (options.turn || options.closed || options.look || options.pitch) await app.settle();
       if (options.backdrop) await app.js(`window.__littleHours.room.diagnostics().seat.world.setBackdrop(true)`);
       if (options.before) await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; ${options.before}; })()`);
+      if (options.freeze) await app.js(`window.__lhFrozenAt = window.__lhStartAt + ${Number(options.freeze)}`);
       await sleep(Number(options.wait || 600));
       const file = await app.shot(join(out, `${name}-${list.length > 1 ? (side === list[0] ? 'this' : String(options.against).replace(/[^\w.-]+/g, '_')) : 'this'}.jpg`));
       console.log(`${side.label} ${name}: ${file}${app.errors.length ? `  page errors: ${app.errors.join(' | ').slice(0, 200)}` : ''}`);
@@ -291,7 +295,7 @@ async function shots() {
         const hit = await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene, hit = scene.pick(${x}, ${y}, mesh => mesh.isEnabled() && mesh.isVisible); const mesh = hit?.pickedMesh; return mesh ? [mesh.name, mesh.material?.name, mesh.parent?.name].join(' | ') : 'nothing'; })()`);
         console.log(`  pick ${x},${y}: ${hit}`);
       }
-      if (options.probe) console.log(`  probe: ${await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; return JSON.stringify(${options.probe}); })()`)}`);
+      if (options.probe) console.log(`  probe: ${await app.js(`(async () => { const scene = window.__littleHours.room.diagnostics().scene; return JSON.stringify(await (${options.probe})); })()`)}`);
     } finally { await app.close(); }
   }
   return 0;

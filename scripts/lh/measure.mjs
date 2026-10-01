@@ -125,3 +125,26 @@ export async function allocations(app, action, { top = 15 } = {}) {
   const total = [...bytes.values()].reduce((sum, size) => sum + size, 0);
   return { seconds, mbPerSecond: total / 1e6 / seconds, top: [...bytes].sort((a, b) => b[1] - a[1]).slice(0, top).map(([where, size]) => ({ where, kbPerSecond: Math.round(size / 1e3 / seconds) })) };
 }
+
+export async function gpuCosts(app, pairs = 40) {
+  return app.js(`(() => {
+    const view = ${SEAT}, engine = view.engine, gl = engine._gl, pixel = new Uint8Array(4), outdoor = view.seat?.world?.outdoorScene, room = view.scene, draw = view.draw ?? (() => room.render());
+    const frame = () => { const start = performance.now(); engine.beginFrame(); draw(); engine.endFrame(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); return performance.now() - start; };
+    const middle = values => values.sort((a, b) => a - b)[values.length >> 1];
+    const cost = (hide, show) => { const deltas = []; for (let i = 0; i < ${pairs}; i++) { const shown = frame(); hide(); const hidden = frame(); show(); deltas.push(shown - hidden); } return Number(middle(deltas).toFixed(2)); };
+    const visible = meshes => meshes.filter(mesh => mesh.isVisible && mesh.isEnabled());
+    const toggle = meshes => [() => meshes.forEach(mesh => { mesh.isVisible = false; }), () => meshes.forEach(mesh => { mesh.isVisible = true; })];
+    for (let i = 0; i < 10; i++) frame();
+    const result = {}, outdoorMeshes = outdoor ? visible(outdoor.meshes) : [], roomMeshes = visible(room.meshes);
+    if (outdoor) result['outdoor all'] = cost(...toggle(outdoorMeshes));
+    result['room all'] = cost(...toggle(roomMeshes));
+    const [hideAll, showAll] = toggle([...outdoorMeshes, ...roomMeshes]);
+    hideAll(); room.effectLayers.forEach(layer => { layer.isEnabled = false; }); result['bare frame'] = Number(middle(Array.from({ length: ${pairs} }, frame)).toFixed(2)); room.effectLayers.forEach(layer => { layer.isEnabled = true; }); showAll();
+    for (const layer of room.effectLayers) result['room ' + layer.name] = cost(() => { layer.isEnabled = false; }, () => { layer.isEnabled = true; });
+    for (const mesh of outdoorMeshes) result['outdoor ' + mesh.name] = cost(...toggle([mesh]));
+    const byMaterial = new Map();
+    for (const mesh of roomMeshes) { const key = mesh.material?.name ?? 'none'; byMaterial.set(key, [...(byMaterial.get(key) ?? []), mesh]); }
+    for (const [name, meshes] of byMaterial) result['room ' + name + ' x' + meshes.length] = cost(...toggle(meshes));
+    return { gpuOutdoorMs: result['outdoor all'] ?? null, gpuRoomMs: result['room all'], passes: Object.fromEntries(Object.entries(result).sort((a, b) => b[1] - a[1])) };
+  })()`);
+}
