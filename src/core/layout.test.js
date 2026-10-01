@@ -332,23 +332,35 @@ test('plant canopies sway while paused, keep their trunks planted, and reset the
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
 
-test('the moon tree canopy is clumps of leaf cards, each card one tone on its clump normal, lit lighter on top than underneath, with no near-black', () => {
+test('the moon tree canopy is clumps of rounded five-sided leaf cards shaded as one smooth mass, warm on top and blue-green underneath, with no near-black', () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   try {
     const tree = createFurniture('moon-tree', scene), canopy = tree.getChildMeshes().find(mesh => mesh.metadata?.effect === 'leaf-sway');
     const normals = canopy.getVerticesData('normal'), colors = canopy.getVerticesData('color'), count = canopy.getTotalVertices();
-    assert.ok(count >= 12000 && count <= 14500, `${count} canopy vertices`);
-    const same = (data, size, a, b) => Array.from({ length: size }, (_, k) => data[a * size + k] === data[b * size + k]).every(Boolean);
-    let cards = 0;
-    for (let i = 0; i + 3 < count; i++) if ([1, 2, 3].every(k => same(colors, 4, i, i + k) && same(normals, 3, i, i + k))) { cards++; i += 3; }
-    assert.ok(cards >= 2500, `${cards} leaf cards`);
+    assert.ok(count >= 10000 && count <= 12500, `${count} canopy vertices`);
+    assert.ok(canopy.getTotalIndices() / 3 <= 14400, `${canopy.getTotalIndices() / 3} canopy triangles`);
     const luminance = i => 0.3 * colors[i * 4] + 0.59 * colors[i * 4 + 1] + 0.11 * colors[i * 4 + 2], mean = list => list.reduce((sum, value) => sum + value, 0) / list.length;
+    const indices = canopy.getIndices(), faces = new Set(), spreads = [];
+    for (let i = 0; i < indices.length; i += 3) faces.add(`${indices[i]},${indices[i + 1]},${indices[i + 2]}`);
+    for (let i = 0; i < indices.length; i += 3) {
+      const [a, b, c] = [indices[i], indices[i + 1], indices[i + 2]];
+      if (faces.has(`${a},${c},${b}`)) spreads.push(Math.max(...[a, b, c].map(luminance)) - Math.min(...[a, b, c].map(luminance)));
+    }
+    assert.ok(spreads.length >= 10000, `${spreads.length} double-sided leaf faces`);
+    const fans = new Map();
+    for (let i = 0; i < indices.length; i += 3) if (faces.has(`${indices[i]},${indices[i + 2]},${indices[i + 1]}`)) fans.set(indices[i], (fans.get(indices[i]) ?? 0) + 1);
+    assert.ok([...fans.values()].filter(faceCount => faceCount === 6).length >= 1900, 'leaf cards fan three faces a side from their stem, so their tips are blunt');
+    assert.ok(spreads.filter(spread => spread > 0.002).length > spreads.length * 0.6, 'each card shades across its clump rather than one flat tone');
+    assert.ok(Math.max(...spreads) < 0.2, 'no card jumps abruptly in tone');
     const tops = [], undersides = [];
     for (let i = 0; i < count; i++) { if (normals[i * 3 + 1] > 0.6) tops.push(luminance(i)); if (normals[i * 3 + 1] < -0.6) undersides.push(luminance(i)); }
     assert.ok(mean(tops) > mean(undersides) * 1.3, `tops ${mean(tops)} against undersides ${mean(undersides)}`);
     const coolness = i => colors[i * 4 + 2] / colors[i * 4 + 1], cool = [];
     for (let i = 0; i < count; i++) if (normals[i * 3 + 1] < -0.6) cool.push(coolness(i));
     assert.ok(mean(cool) > 0.76, `undersides lean blue: ${mean(cool)}`);
+    const hue = i => Color3.FromArray([colors[i * 4], colors[i * 4 + 1], colors[i * 4 + 2]]).toHSV().r, topHues = [], underHues = [];
+    for (let i = 0; i < count; i++) { if (normals[i * 3 + 1] > 0.6) topHues.push(hue(i)); if (normals[i * 3 + 1] < -0.6) underHues.push(hue(i)); }
+    assert.ok(mean(underHues) - mean(topHues) > 88, `underside hue ${mean(underHues)} against top ${mean(topHues)}`);
     assert.ok(Math.min(...Array.from({ length: count }, (_, i) => luminance(i))) > 0.3);
     tree.dispose();
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
