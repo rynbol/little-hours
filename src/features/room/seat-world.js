@@ -110,7 +110,7 @@ const SUN_TOWARD = [-0.3, 0.81, -0.49];
 function sunFacing(x, z) {
   const step = 1.5, dx = (terrainHeight(x + step, z) - terrainHeight(x - step, z)) / (2 * step), dz = (terrainHeight(x, z + step) - terrainHeight(x, z - step)) / (2 * step);
   const length = Math.hypot(dx, 1, dz), lit = (-dx * SUN_TOWARD[0] + SUN_TOWARD[1] - dz * SUN_TOWARD[2]) / length;
-  return 0.62 + Math.max(0, lit) * 0.55;
+  return 0.64 + smooth(0.48, 0.64, lit) * 0.5;
 }
 
 const riverAt = t => { const a = -Math.PI * 1.05 + t * Math.PI * 1.1; const r = 58 + Math.sin(t * 9) * 7; return [Math.cos(a) * r, Math.sin(a) * r]; };
@@ -352,7 +352,7 @@ function buildClouds(shape) {
   const bearings = [-1.25, -0.95, -0.62, -0.3, 0.02, 0.3, 0.55, 0.9, 1.6, 2.3, 3, -2.2, -3];
   for (const b of bearings) {
     const a = b + (random() - 0.5) * 0.12, r = 120 + random() * 38, x = Math.sin(a) * r, z = -Math.cos(a) * r, y = 19 + random() * 11, size = 6 + random() * 4;
-    const along = [Math.cos(a), Math.sin(a)], puff = (u, lift, s, stretch = 1) => shape.blob(x + along[0] * u, y + lift, z + along[1] * u, s * stretch, s * 0.62, s * 0.8, 'cloudShade', 'cloud', 0.7, 5, 10);
+    const along = [Math.cos(a), Math.sin(a)], puff = (u, lift, s, stretch = 1) => shape.blob(x + along[0] * u, y + lift, z + along[1] * u, s * stretch, s * 0.62, s * 0.8, 'cloudShade', 'cloud', 0.7, 7, 14);
     for (let k = -2; k <= 2; k++) puff(k * size * 0.9, 0, size * (0.9 + random() * 0.3), 1.35);
     for (let k = -1; k <= 1; k++) puff(k * size * 0.95 + (random() - 0.5) * 2, size * 0.75, size * (1 + random() * 0.35));
     puff((random() - 0.5) * size, size * 1.45, size * (0.8 + random() * 0.3));

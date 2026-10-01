@@ -396,3 +396,16 @@ test('the volcano foot melts into the valley haze while its upper slopes stay cr
   assert.ok(mean(slope) < mean(foot) * 0.7, `slope haze ${mean(slope).toFixed(2)} against the foot ${mean(foot).toFixed(2)}`);
   engine.dispose();
 });
+
+test('the far ranges split into a sunlit band and a shaded band, and cloud puffs are round', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-land').metadata;
+  const ranges = shape.roles.map((role, i) => role === 'mid' || role === 'far' ? shape.shades[i] : null).filter(shade => shade !== null);
+  const share = test => ranges.filter(test).length / ranges.length;
+  assert.ok(share(shade => shade > 0.75 && shade < 1.05) < 0.15, 'few range faces sit between light and shade');
+  assert.ok(share(shade => shade <= 0.75) > 0.15 && share(shade => shade >= 1.05) > 0.4, 'both bands carry the ranges');
+  const clouds = world.meshes.find(mesh => mesh.name === 'seat-world-clouds').metadata.shape;
+  assert.ok(clouds.roles.length >= 13 * 9 * 8 * 14, `${clouds.roles.length} cloud vertices`);
+  engine.dispose();
+});
