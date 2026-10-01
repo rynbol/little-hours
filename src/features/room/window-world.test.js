@@ -6,6 +6,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { TargetCamera } from '@babylonjs/core/Cameras/targetCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { createWindowWorld, WINDOW_WORLD_DEPTH } from './window-world.js';
+import { WORLD_ATMOSPHERES } from '../../models/world/atmosphere.js';
 
 function uploadingEngine() {
   const engine = new NullEngine(), createRawTexture = engine.createRawTexture.bind(engine);
@@ -33,4 +34,31 @@ test('the window world draws nothing until built, then sees the outdoors from wh
   assert.ok(windowWorld.scene.meshes.some(mesh => mesh.name === 'world-terrain-0'));
   windowWorld.dispose();
   assert.equal(room.isDisposed, false);
+});
+
+test('the window world builds its terrain, landmarks, trees and grass in separate turns of the event loop, so the dollhouse keeps drawing frames while it builds', { timeout: 30000 }, async t => {
+  const engine = uploadingEngine(), room = new Scene(engine), anchor = new TransformNode('seat-world', room);
+  const windowWorld = createWindowWorld(engine, anchor, { workers: false });
+  t.after(() => windowWorld.scene.isDisposed || windowWorld.dispose());
+  const firstTurn = new Map();
+  let turn = 0, building = true;
+  const look = () => { for (const mesh of windowWorld.scene.meshes) if (!firstTurn.has(mesh.name)) firstTurn.set(mesh.name, turn); turn++; };
+  const watch = () => { look(); if (turn === 2) windowWorld.setTheme('dusk'); if (building) setTimeout(watch, 0); };
+  setTimeout(watch, 0);
+  await windowWorld.prepare({ theme: 'day' });
+  building = false; look();
+  const turns = ['world-terrain-0', 'world-landmarks', 'world-trees-broadleaf-near', 'world-grass'].map(name => firstTurn.get(name));
+  assert.deepEqual(turns.map((at, i) => i === 0 || at > turns[i - 1]), [true, true, true, true], `first seen on turns ${turns.join(', ')}`);
+  assert.equal(windowWorld.scene.getMeshByName('world-terrain-0').material._colors3.grass.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.grass, 'a theme picked while the world builds still reaches it');
+  windowWorld.dispose();
+});
+
+test('closing the room while the window world builds stops the build and leaves nothing behind', { timeout: 30000 }, async () => {
+  const engine = uploadingEngine(), room = new Scene(engine), anchor = new TransformNode('seat-world', room);
+  const windowWorld = createWindowWorld(engine, anchor, { workers: false });
+  const building = windowWorld.prepare({ theme: 'day' });
+  setTimeout(() => windowWorld.dispose(), 0);
+  assert.equal(await building, null);
+  assert.equal(windowWorld.ready, false);
+  assert.equal(windowWorld.scene.meshes.length, 0);
 });

@@ -1,6 +1,9 @@
 import { terrainRing } from './terrain-mesh.js';
+import { grassBlades } from './grass-blades.js';
 
-self.onmessage = ({ data: { index } }) => {
-  const ring = terrainRing(index);
-  self.postMessage({ index, ring }, [ring.positions.buffer, ring.normals.buffer, ring.colors.buffer, ring.indices.buffer]);
+const JOBS = { ring: ({ index }) => terrainRing(index), grass: () => grassBlades() };
+
+self.onmessage = ({ data }) => {
+  const result = JOBS[data.job](data);
+  self.postMessage(result, Object.values(result).map(array => array.buffer));
 };

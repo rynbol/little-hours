@@ -3,6 +3,7 @@ import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { TERRAIN_RINGS, terrainRing } from './terrain-mesh.js';
 export { buildTerrainRings } from './terrain-mesh.js';
+export { buildGrassBlades } from './grass-blades.js';
 import { createTerrainPaint } from './terrain-paint.js';
 import { createWorldSky } from './sky.js';
 import { createWorldClouds } from './clouds.js';
@@ -14,7 +15,7 @@ import { worldAtmosphere } from './atmosphere.js';
 
 export { WORLD_GLSL } from './world-glsl.js';
 
-export function createOutdoorWorld(scene, { theme = 'day', parent = null, still = false, rings = TERRAIN_RINGS.map((_, index) => terrainRing(index)) } = {}) {
+export function* buildOutdoorWorld(scene, { theme = 'day', parent = null, still = false, rings = TERRAIN_RINGS.map((_, index) => terrainRing(index)), blades } = {}) {
   const root = new TransformNode('world', scene); if (parent) root.parent = parent;
   const ground = createTerrainPaint(scene, { still });
   const terrain = rings.map((ring, index) => {
@@ -26,8 +27,9 @@ export function createOutdoorWorld(scene, { theme = 'day', parent = null, still 
   });
   const { sky, setTheme: paintSky } = createWorldSky(scene, root);
   let current = worldAtmosphere(theme);
-  const context = { root, atmosphere: current, still, rings };
-  const layers = [ground, { setTheme: paintSky }, ...[createWorldClouds, createWorldWater, createWorldLandmarks, createWorldTrees, createWorldGrass].map(create => create(scene, context))];
+  const context = { root, atmosphere: current, still, rings, blades };
+  const layers = [ground, { setTheme: paintSky }];
+  for (const create of [createWorldClouds, createWorldWater, createWorldLandmarks, createWorldTrees, createWorldGrass]) { yield; layers.push(create(scene, context)); }
   function setTheme(next) {
     current = worldAtmosphere(next);
     for (const layer of layers) layer.setTheme(current);
@@ -38,4 +40,9 @@ export function createOutdoorWorld(scene, { theme = 'day', parent = null, still 
     get atmosphere() { return current; },
     dispose() { root.dispose(false, true); },
   };
+}
+
+export function createOutdoorWorld(scene, options) {
+  const steps = buildOutdoorWorld(scene, options);
+  for (;;) { const step = steps.next(); if (step.done) return step.value; }
 }

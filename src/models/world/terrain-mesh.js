@@ -33,12 +33,16 @@ export function terrainRing(index, rings = TERRAIN_RINGS) {
   return { positions, normals, colors, indices: n * n > 65535 ? new Uint32Array(indices) : new Uint16Array(indices) };
 }
 
+export function inWorker(job) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./terrain-worker.js', import.meta.url), { type: 'module' });
+    worker.onmessage = ({ data }) => { worker.terminate(); resolve(data); };
+    worker.onerror = error => { worker.terminate(); reject(error); };
+    worker.postMessage(job);
+  });
+}
+
 export function buildTerrainRings({ workers = typeof Worker === 'function' } = {}) {
   if (!workers) return Promise.resolve(TERRAIN_RINGS.map((_, index) => terrainRing(index)));
-  return Promise.all(TERRAIN_RINGS.map((_, index) => new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./terrain-worker.js', import.meta.url), { type: 'module' });
-    worker.onmessage = ({ data }) => { worker.terminate(); resolve(data.ring); };
-    worker.onerror = error => { worker.terminate(); reject(error); };
-    worker.postMessage({ index });
-  })));
+  return Promise.all(TERRAIN_RINGS.map((_, index) => inWorker({ job: 'ring', index })));
 }

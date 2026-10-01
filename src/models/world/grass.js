@@ -9,16 +9,9 @@ import { TERRAIN_RINGS } from './terrain-mesh.js';
 import { GROUND_GLSL, GROUND_UNIFORMS, applyGround } from './terrain-paint.js';
 import { followEye } from './world-glsl.js';
 import { createWorldRocks, MEADOW_ROCKS, rockClearings } from './rocks.js';
+import { GRASS, grassBlades } from './grass-blades.js';
 
-export const GRASS = Object.freeze({
-  layers: Object.freeze([
-    Object.freeze({ period: 16, blades: 12000, reach: 8, width: 0.022, height: 0.55 }),
-    Object.freeze({ period: 48, blades: 20000, reach: 24, width: 0.04, height: 0.52 }),
-    Object.freeze({ period: 160, blades: 56000, reach: 80, width: 0.11, height: 0.6 }),
-  ]),
-  step: 2, texels: 89, recentre: 8,
-  clearing: Object.freeze({ halfWidth: 6.6, halfDepth: 5.2 }),
-});
+export { GRASS, grassBlades } from './grass-blades.js';
 
 export function surfaceAt(x, z, rings = TERRAIN_RINGS) {
   const ring = rings.find(({ radius }) => Math.abs(x) <= radius && Math.abs(z) <= radius) ?? rings[rings.length - 1], s = ring.step;
@@ -48,28 +41,6 @@ export function createGroundGrid({ texels, step }) {
     return true;
   }
   return { data, centre, get origin() { return [originX * step, originZ * step]; } };
-}
-
-function seeded(seed) {
-  let state = seed >>> 0;
-  return () => { state = (state + 0x6d2b79f5) >>> 0; let t = Math.imul(state ^ (state >>> 15), 1 | state); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-}
-
-const BLADE_ROWS = Object.freeze([[-1, 0], [1, 0], [-0.62, 0.5], [0.62, 0.5], [0, 1]]);
-
-export function grassBlades(layers = GRASS.layers) {
-  const total = layers.reduce((sum, layer) => sum + layer.blades, 0), random = seeded(29);
-  const positions = new Float32Array(total * 15), blade = new Float32Array(total * 20), indices = new Uint32Array(total * 9);
-  let b = 0;
-  layers.forEach(({ period, blades }, layer) => {
-    const spots = Array.from({ length: blades }, () => [random() * period, random() * period, random(), random()]).sort((p, q) => (Math.floor(p[1] / 2) - Math.floor(q[1] / 2)) || (p[0] - q[0]));
-    for (const [x, z, rank, seed] of spots) {
-      BLADE_ROWS.forEach(([side, t], r) => { positions.set([x, t, z], (b * 5 + r) * 3); blade.set([side, rank, seed, layer], (b * 5 + r) * 4); });
-      const v = b * 5; indices.set([v, v + 1, v + 2, v + 2, v + 1, v + 3, v + 2, v + 3, v + 4], b * 9);
-      b++;
-    }
-  });
-  return { positions, blade, indices };
 }
 
 const perLayer = key => `(blade.w < .5 ? ${GRASS.layers[0][key].toFixed(3)} : blade.w < 1.5 ? ${GRASS.layers[1][key].toFixed(3)} : ${GRASS.layers[2][key].toFixed(3)})`;
@@ -129,7 +100,7 @@ const GRASS_FRAGMENT = `precision highp float;
 varying vec3 vColor;
 void main() { gl_FragColor = vec4(vColor, 1.); }`;
 
-export function createWorldGrass(scene, { root, atmosphere, still }) {
+export function createWorldGrass(scene, { root, atmosphere, still, blades = grassBlades() }) {
   const paint = new ShaderMaterial('world-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'blade'], uniforms: ['world', 'viewProjection', 'groundGrid', 'stones', ...GROUND_UNIFORMS], samplers: ['ground'] });
   paint.backFaceCulling = false;
   paint.setFloat('gusts', still ? 0 : 1);
@@ -146,7 +117,7 @@ export function createWorldGrass(scene, { root, atmosphere, still }) {
     [gridUniform.x, gridUniform.y] = grid.origin; paint.setVector4('groundGrid', gridUniform);
     return true;
   }
-  const { positions, blade, indices } = grassBlades();
+  const { positions, blade, indices } = blades;
   const mesh = new Mesh('world-grass', scene);
   Object.assign(new VertexData(), { positions, indices }).applyToMesh(mesh);
   mesh.setVerticesData('blade', blade, false, 4);

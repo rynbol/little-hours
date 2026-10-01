@@ -72,6 +72,12 @@ test('world grass follows the camera in steps, takes the theme and stays still w
   assert.deepEqual(grass.origin, [-28, -148]);
 });
 
+test('world grass draws the blades it is handed, so the window world can build them in a worker', () => {
+  const scene = new Scene(new NullEngine()), blades = grassBlades([{ period: 16, blades: 3, reach: 8, width: 0.022, height: 0.55 }]);
+  const grass = createWorldGrass(scene, { root: new TransformNode('world', scene), atmosphere: WORLD_ATMOSPHERES.day, still: true, blades });
+  assert.equal(grass.mesh.getTotalVertices(), 15);
+});
+
 test('the height grid covers the outermost blades however far the camera drifts before it recentres', () => {
   const scene = new Scene(new NullEngine()), grass = createWorldGrass(scene, { root: new TransformNode('world', scene), atmosphere: WORLD_ATMOSPHERES.day, still: true });
   const reach = Math.max(...GRASS.layers.map(layer => layer.reach)), span = (GRASS.texels - 1) * GRASS.step;

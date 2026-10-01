@@ -2,8 +2,9 @@ import { Scene } from '@babylonjs/core/scene.js';
 import { TargetCamera } from '@babylonjs/core/Cameras/targetCamera.js';
 import { Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
-import { createOutdoorWorld, buildTerrainRings } from '../../models/world/world.js';
+import { buildOutdoorWorld, buildGrassBlades, buildTerrainRings } from '../../models/world/world.js';
 
+export const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
 export const WINDOW_WORLD_DEPTH = Object.freeze({ near: 0.5, far: 20000 });
 
 export function createWindowWorld(engine, anchor, { workers } = {}) {
@@ -17,10 +18,14 @@ export function createWindowWorld(engine, anchor, { workers } = {}) {
 
   function prepare(options = {}) {
     theme = options.theme ?? theme; still = options.still ?? still;
-    building ??= buildTerrainRings({ workers }).then(rings => {
-      if (disposed) return null;
-      world = createOutdoorWorld(scene, { theme, still, rings });
-      return scene.whenReadyAsync();
+    building ??= Promise.all([buildTerrainRings({ workers }), buildGrassBlades({ workers })]).then(async ([rings, blades]) => {
+      const steps = buildOutdoorWorld(scene, { theme, still, rings, blades });
+      while (!disposed) {
+        const step = steps.next();
+        if (step.done) { world = step.value; world.setTheme(theme); return scene.whenReadyAsync(); }
+        await yieldToBrowser();
+      }
+      return null;
     });
     return building;
   }

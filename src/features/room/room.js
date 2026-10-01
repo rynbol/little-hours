@@ -53,7 +53,7 @@ import { moulding, sillNosing } from './window-trim.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
 import { createStorybook } from '../../models/storybook.js';
 import { createSeatWorld } from './seat-world.js';
-import { createWindowWorld } from './window-world.js';
+import { createWindowWorld, yieldToBrowser } from './window-world.js';
 
 // A real Babylon.js game scene. Every visible object is built with JavaScript;
 // no generated bitmap furniture, downloaded models, or texture packs are used.
@@ -1688,7 +1688,6 @@ export function createRoom(container, options = {}) {
       detail.setEnabled(seatView.inside); object.metadata.body.setEnabled(!seatView.inside);
     }
   }
-  const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
   function prepareWindowWorld() {
     return windowWorld?.prepare({ theme, still: reducedMotion }).then(() => { if (!disposed) { seatWorld.setBackdrop(!windowWorld.ready); requestRender(); } });
   }
