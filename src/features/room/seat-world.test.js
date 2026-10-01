@@ -457,3 +457,19 @@ test('the meadow ruin stumps wear thick moss caps as wide as the stone, in warm 
   assert.ok(r - b > 40, `day ruin ${ruin} reads warm`);
   engine.dispose();
 });
+
+test('no cloud hangs in front of the volcano plume, and the smoke stands tall and dark enough to read by day', () => {
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const clouds = world.meshes.find(mesh => mesh.name === 'seat-world-clouds').metadata.shape, bearing = Math.atan2(-82, 96);
+  for (let i = 0; i < clouds.roles.length; i++) {
+    const x = clouds.positions[i * 3], z = clouds.positions[i * 3 + 2];
+    if (Math.abs(Math.atan2(x, -z) - bearing) < 0.25) assert.ok(Math.hypot(x, z) > 132, `a cloud ${Math.hypot(x, z).toFixed(0)} away in front of the plume`);
+  }
+  const { positions } = plumeShape(), ys = [];
+  for (let i = 1; i < positions.length; i += 3) ys.push(positions[i]);
+  assert.ok(Math.max(...ys) - Math.min(...ys) >= 11, 'the plume stands tall');
+  const [r, g, b] = [1, 3, 5].map(k => parseInt(VISTA_THEMES.day.smoke.slice(k, k + 2), 16));
+  assert.ok((r + g + b) / 3 < 150, `day smoke ${VISTA_THEMES.day.smoke} reads against the pale sky`);
+  engine.dispose();
+});

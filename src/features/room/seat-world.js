@@ -24,7 +24,7 @@ export const VISTA_THEMES = Object.freeze({
     trunk: '#5e4634', leaf: '#2f6436', leafLight: '#8cbc4c', walls: ['#efe6cf', '#e4d4b4', '#d8d2c4', '#f0dcb0'], roofs: ['#9c5a3c', '#6d4a36', '#b86b44', '#4f6a7a'],
     stone: '#a7a18f', water: '#5fa6d4', glint: '#f4fbff', window: '#44566a', windowWarm: '#44566a', windowDark: '#44566a', lamp: '#f4e2b8',
     star: '#6fa9e0', moon: '#f6f3ea', cloud: '#ffffff', cloudShade: '#c4d3e6',
-    castle: '#687088', castleRoof: '#3a5a74', rock: '#5c3e38', ember: '#e2683c', smoke: '#d0cac6', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
+    castle: '#687088', castleRoof: '#3a5a74', rock: '#5c3e38', ember: '#e2683c', smoke: '#8c827e', ruin: '#c4b08e', moss: '#7fa848', rune: '#8fd8e8', bird: '#3a3a44', spirit: '#f4c64e', snow: '#f4f6fa',
     light: 0, night: null,
   },
   rain: {
@@ -56,6 +56,7 @@ const bearing = (x, z) => Math.atan2(x, -z);
 export const CASTLE_AT = Object.freeze(ahead(-22, 100));
 const VOLCANO_AT = ahead(-82, 96), TOWER_AT = ahead(13, 56);
 export const VOLCANO = Object.freeze({ base: 2, height: 34 });
+const VOLCANO_BEARING = Math.atan2(VOLCANO_AT[0], -VOLCANO_AT[1]);
 
 const seeded = seed => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const hex = value => Color3.FromHexString(value);
@@ -352,7 +353,7 @@ function buildClouds(shape) {
   const random = seeded(19);
   const bearings = [-1.25, -0.95, -0.62, -0.3, 0.02, 0.3, 0.55, 0.9, 1.6, 2.3, 3, -2.2, -3];
   for (const b of bearings) {
-    const a = b + (random() - 0.5) * 0.12, r = 120 + random() * 38, x = Math.sin(a) * r, z = -Math.cos(a) * r, y = 19 + random() * 11, size = 6 + random() * 4;
+    const a = b + (random() - 0.5) * 0.12, r = Math.max(120 + random() * 38, Math.abs(a - VOLCANO_BEARING) < 0.45 ? 152 : 0), x = Math.sin(a) * r, z = -Math.cos(a) * r, y = 19 + random() * 11, size = 6 + random() * 4;
     const along = [Math.cos(a), Math.sin(a)], puff = (u, lift, s, stretch = 1) => {
       const cx = x + along[0] * u, cy = y + lift, cz = z + along[1] * u, rx = s * stretch, ry = s * 0.62, rz = s * 0.8, start = shape.roles.length;
       shape.blob(cx, cy, cz, rx, ry, rz, 'cloudShade', 'cloud', 0.7, 7, 14);
@@ -455,7 +456,7 @@ void main() {
   vec3 c = mix(mix(smoke, ember, pow(1. - vUv.y, 5.) * glow), haze, .25);
   gl_FragColor = vec4(c * a, a);
 }`;
-export const PLUME = Object.freeze({ segments: 12, height: 9, lean: 30, base: 3.2, top: 8 });
+export const PLUME = Object.freeze({ segments: 12, height: 12, lean: 26, base: 3.6, top: 11 });
 export function plumeShape() {
   const [vx, vz] = VOLCANO_AT, positions = [], uvs = [], uv2s = [], indices = [], side = new Vector3(0, 1, 0).cross(new Vector3(vx, 0, vz)).normalize();
   for (let k = 0; k <= PLUME.segments; k++) {
@@ -641,7 +642,7 @@ export function createSeatWorld(scene, parent) {
     const blade = (key, scale) => hex(palette[key]).scale(scale);
     grassPaint.setColor3('root', blade('grass', 0.62)); grassPaint.setColor3('tip', Color3.Lerp(blade('meadow', 1.08), hex(palette.glow), 0.12)); grassPaint.setColor3('shine', Color3.Lerp(blade('meadow', 1.28), hex(palette.glow), 0.3)); grassPaint.setColor3('haze', hex(palette.haze)); grassPaint.setColor3('warm', blade('meadowWarm', 1)); grassPaint.setColor3('petal', blade('petal', 1)); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
     skyEffectPaint.setFloat('rays', SUN_RAY_STRENGTH[theme] ?? 0); skyEffectPaint.setColor3('tint', Color3.Lerp(Color3.White(), hex(palette.glow), 0.6));
-    skyEffectPaint.setColor3('smoke', hex(palette.smoke)); skyEffectPaint.setColor3('ember', hex(palette.ember)); skyEffectPaint.setColor3('haze', hex(palette.haze)); skyEffectPaint.setFloat('glow', theme === 'day' ? 0.2 : 1);
+    skyEffectPaint.setColor3('smoke', hex(palette.smoke)); skyEffectPaint.setColor3('ember', hex(palette.ember)); skyEffectPaint.setColor3('haze', hex(palette.haze)); skyEffectPaint.setFloat('glow', theme === 'day' ? 0.55 : 1);
   }
   function setShell(style, wallPaint = {}, doors = []) {
     const base = SHELL_PAINT[style] || SHELL_PAINT.retreat, key = JSON.stringify([style, wallPaint, doors]);
