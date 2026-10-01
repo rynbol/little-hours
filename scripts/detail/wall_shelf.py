@@ -88,8 +88,8 @@ def build():
     shelf = Y - 0.28
     heights = [0.30 + (i * 7 % 5) * 0.025 for i in range(5)]
     for i, h in enumerate(heights):
-        parts += spine_book(-0.66 + i * 0.095, shelf, 0.19, 0.085, h, 0.26, BOOKS[i], (i - 2) * 0.008, (i * 3) % 4)
-    parts += spine_book(-0.143, shelf, 0.19, 0.085, 0.34, 0.26, BOOKS[5], 0.32, 3)
+        parts += spine_book(-0.66 + i * 0.095, shelf, 0.19, 0.085, h, 0.26, BOOKS[i], (i - 2) * 0.008, ('diamond', 'gilt', 'label', 'gilt-label')[(i * 3) % 4])
+    parts += spine_book(-0.143, shelf, 0.19, 0.085, 0.34, 0.26, BOOKS[5], 0.32, 'gilt-label')
     parts += candle(0.12, shelf, 0.2)
     parts += trailing_pot(0.52, shelf, 0.2)
     return parts
