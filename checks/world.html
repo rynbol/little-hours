@@ -24,10 +24,10 @@ const custom = params.get('at') && { at: params.get('at').split(',').map(Number)
 const view = custom || VIEWS[params.get('view')] || VIEWS.window;
 const canvas = document.getElementById('stage'), engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: false });
 engine.setHardwareScalingLevel(1 / Math.min(2, devicePixelRatio));
-const scene = new Scene(engine); scene.clearColor = new Color4(0.6, 0.75, 0.83, 1); scene.skipPointerMovePicking = true;
+const scene = new Scene(engine); scene.useRightHandedSystem = true; scene.clearColor = new Color4(0.6, 0.75, 0.83, 1); scene.skipPointerMovePicking = true;
 const [x, y, z] = view.at, start = new Vector3(x, view.ground ? heightAt(x, z) + view.ground : y, z);
 const camera = new UniversalCamera('explorer', start, scene);
-camera.fov = 1.22; camera.minZ = 0.1; camera.maxZ = 16000; camera.rotation.set(-view.pitch, view.yaw + Math.PI, 0);
+camera.fov = 1.22; camera.minZ = 0.1; camera.maxZ = 16000; camera.rotation.set(view.pitch, -view.yaw, 0);
 camera.speed = Number(params.get('speed') || 1.5); camera.angularSensibility = 2400; camera.keysUp = [87]; camera.keysDown = [83]; camera.keysLeft = [65]; camera.keysRight = [68]; camera.keysUpward = [69]; camera.keysDownward = [81];
 camera.attachControl(canvas, true);
 const built = performance.now(), world = createOutdoorWorld(scene, { theme, still: matchMedia('(prefers-reduced-motion: reduce)').matches }), buildMs = Math.round(performance.now() - built);

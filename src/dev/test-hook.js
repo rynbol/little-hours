@@ -113,10 +113,10 @@ export function installTestHook(app) {
   }
 
   function gpuFrame(name = 'room', samples = 30) {
-    const { engine, scene } = view(name), gl = engine._gl, pixel = new Uint8Array(4);
+    const { engine, scene, draw = () => scene.render() } = view(name), gl = engine._gl, pixel = new Uint8Array(4);
     const once = () => {
       const start = performance.now();
-      engine.beginFrame(); scene.render(); engine.endFrame();
+      engine.beginFrame(); draw(); engine.endFrame();
       gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
       return performance.now() - start;
     };

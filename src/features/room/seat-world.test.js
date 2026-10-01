@@ -663,3 +663,22 @@ test('from the desk chair the valley falls away below the eye, and the castle, v
   assert.ok(highest((role, r, x, z) => fromVolcano(x, z) < VOLCANO.radius) < 12, 'the volcano rises low on the far side of the valley');
   engine.dispose();
 });
+
+test('when the outdoor world shows through the window, the painted backdrop steps aside but the house shell, birds and motes stay', () => {
+  const { world } = setup();
+  world.setTheme('day'); world.setEnabled(true);
+  const shown = () => Object.fromEntries(world.meshes.map(mesh => [mesh.name.replace('seat-world-', ''), mesh.isEnabled(false)]));
+  assert.equal(world.backdrop, true);
+  assert.equal(shown().land, true);
+  world.setBackdrop(false);
+  const day = shown();
+  assert.deepEqual([day.sky, day.land, day.grass, day.clouds, day.moon], [false, false, false, false, false]);
+  assert.deepEqual([day.spirits, day.flock, day['sky-effects']], [true, true, true]);
+  const effects = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects').material;
+  assert.equal(effects._floats.plume, 0);
+  world.setTheme('dusk');
+  assert.equal(shown().moon, true);
+  world.setBackdrop(true);
+  assert.equal(shown().land, true);
+  assert.equal(effects._floats.plume, 1);
+});
