@@ -539,3 +539,17 @@ test('cloud puffs shade from sunlit to shadowed gradually, with no hard colour s
   assert.ok(step < 0.26, `largest step ${step.toFixed(3)}`);
   engine.dispose();
 });
+
+test('the seated room baseboards sit on the floor so no wall shows beneath them', () => {
+  const { engine, world } = setup();
+  world.setShell('retreat', {}, []);
+  const { shape } = world.meshes.find(mesh => mesh.name === 'seat-world-shell').metadata, low = { front: Infinity, side: Infinity };
+  shape.roles.forEach((role, i) => {
+    if (role !== 'trim') return;
+    const [x, y, z] = shape.positions.slice(i * 3, i * 3 + 3);
+    if (z > 4.4 && x < 5.8) low.front = Math.min(low.front, y);
+    if (x > 5.8 && z < 4.4) low.side = Math.min(low.side, y);
+  });
+  assert.ok(low.front <= 0.2 && low.side <= 0.2, `baseboards reach down to ${low.front.toFixed(3)} and ${low.side.toFixed(3)}`);
+  engine.dispose();
+});

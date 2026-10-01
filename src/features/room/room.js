@@ -2,7 +2,7 @@ import { Engine } from '@babylonjs/core/Engines/engine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
-import { Vector3, Matrix, Quaternion } from '@babylonjs/core/Maths/math.vector.js';
+import { Vector3, Vector4, Matrix, Quaternion } from '@babylonjs/core/Maths/math.vector.js';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
@@ -38,6 +38,7 @@ import { ARTWORKS, SLEEVES } from '../../core/art.js';
 import { tintPaint } from '../../core/tints.js';
 import { surfacePaint } from '../../core/surfaces.js';
 import { createRoomPassages } from './room-passages.js';
+import { floorBoards, woodGrain } from './floorboards.js';
 import { createRoomRoof } from '../../models/room-roofs.js';
 import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
@@ -201,7 +202,13 @@ export function createRoom(container, options = {}) {
   box([12.15, 0.40, 9.4], [0, -0.09, 0], palette.darkWood, 0.14);
   box([12.08, 0.16, 9.33], [0, 0.10, 0], palette.edge, 0.06);
   const boardColors = ['#855b43', '#92654a', '#9c6e50', '#805640', '#8c6249', '#a27352'];
-  for (let row = 0; row < 24; row++) for (let section = 0; section < 3; section++) box([0.487, 0.052, 3.025], [row * 0.498 - 5.727, 0.193, (section - 1) * 3.045], material(boardColors[(row + section * 3) % 6]));
+  box([11.94, 0.012, 9.1], [0, 0.172, 0], palette.darkWood);
+  const grain = drawing(256, 1024, woodGrain, 'floor-grain');
+  const boardPaint = new Map(boardColors.map(hex => { const mat = material(hex); mat.diffuseTexture = grain; return [hex, mat]; }));
+  for (const board of floorBoards({ left: -5.97, right: 5.97, back: -4.55, front: 4.55 }, boardColors)) {
+    const [u, v] = board.grain, uv = new Vector4(u * 0.75, v, u * 0.75 + board.width, v + board.length / 4);
+    finish(MeshBuilder.CreateBox(`plank-${meshId++}`, { width: board.width, height: 0.052, depth: board.length, faceUV: Array(6).fill(uv) }, scene), boardPaint.get(board.tone), [board.x, 0.193, board.z]);
+  }
   // The cream side wall and the sage back wall are meshes of their own (see
   // syncOpenings), so that windows can cut them. They keep their own paint
   // materials: lit paint differs from vertex colors where bright light clamps.
@@ -217,7 +224,7 @@ export function createRoom(container, options = {}) {
   }
   const panel = material('#52695c'), inset = material('#647869'), carved = material('#a78053');
   // The retreat's wall and floor paint, by design color, for a room's choices.
-  const retreatSurfaces = { walls: [['#80917d', palette.sage], ['#c9bba2', palette.cream], ['#52695c', panel], ['#647869', inset]], floor: boardColors.map(hex => [hex, material(hex)]) };
+  const retreatSurfaces = { walls: [['#80917d', palette.sage], ['#c9bba2', palette.cream], ['#52695c', panel], ['#647869', inset]], floor: [...boardPaint] };
   box([0.14, 1.1, 9.02], [-5.76, 0.80, 0], panel);
   box([11.72, 1.1, 0.14], [0.04, 0.80, -4.42], panel);
   for (let i = 0; i < 14; i++) {
