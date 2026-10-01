@@ -254,7 +254,11 @@ float leaves(vec2 uv, float seed) {
   return best;
 }
 void clump(vec2 c, vec2 centre, float radius, float seed, inout vec4 best) {
-  vec2 d = (c - centre - (vec2(worldHash(centre + seed), worldHash(centre.yx + seed)) - .5) * .9) / (radius * (.9 + .25 * worldNoise(c * 1.7 + seed * 19. + centre)));
+  float reach = radius * (.9 + .25) * sqrt(1. - max(best.x, 0.));
+  if (length(c - centre) >= reach + length(vec2(.45))) return;
+  vec2 off = c - centre - (vec2(worldHash(centre + seed), worldHash(centre.yx + seed)) - .5) * .9;
+  if (dot(off, off) >= reach * reach) return;
+  vec2 d = off / (radius * (.9 + .25 * worldNoise(c * 1.7 + seed * 19. + centre)));
   float h = 1. - dot(d, d);
   if (h > best.x) best = vec4(h, d, 0.);
 }
@@ -307,7 +311,7 @@ void main() {
       ao = clamp(.16 + .64 * smoothstep(3.5, 9.8, c.y) + .28 * sqrt(h), 0., 1.);
     }
     vec2 turned = mat2(.8, -.6, .6, .8) * c;
-    float mottle = mix(.86 + .2 * worldNoise(turned * 1.7 + seed * 7.) + .1 * worldNoise(turned * 4.1 - seed * 3.), 1., smoothstep(350., 1100., dist));
+    float mottle = dist < 1100. ? mix(.86 + .2 * worldNoise(turned * 1.7 + seed * 7.) + .1 * worldNoise(turned * 4.1 - seed * 3.), 1., smoothstep(350., 1100., dist)) : 1.;
     color = foliage(n, v, ao, needle, vSeed, mottle);
     float back = pow(clamp(dot(-v, sun), 0., 1.), 2.), band = smoothstep(40., 180., dist) * (1. - smoothstep(900., 1600., dist));
     color = mix(color, leafBack * lit, back * band * .7 * (1. - sqrt(max(h, 0.))) * clamp(n.y + .4, 0., 1.));

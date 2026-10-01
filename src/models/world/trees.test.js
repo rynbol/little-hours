@@ -171,6 +171,19 @@ test('every near broadleaf clump hides a darker solid leaf mass under its leaf c
   scene.dispose();
 });
 
+test('a far grove pixel pays for clump noise only inside a clump reach, and for leaf mottle only nearer than 1100 m', () => {
+  const { scene, trees } = forestScene(true);
+  scene.render();
+  const fragment = trees.paint.getEffect()._fragmentSourceCode, clump = fragment.match(/void clump\([^)]*\) \{\n([\s\S]*?)\n\}/)[1].split('\n');
+  const noiseAt = clump.findIndex(line => line.includes('worldNoise(')), guards = clump.slice(0, noiseAt).filter(line => /^\s*if \(.*reach.*\) return;$/.test(line));
+  assert.deepEqual({
+    noiseCalls: clump.filter(line => line.includes('worldNoise(')).length,
+    guardsBeforeNoise: guards.length,
+    mottle: fragment.match(/float mottle = (.*?) \?/)?.[1],
+  }, { noiseCalls: 1, guardsBeforeNoise: 2, mottle: 'dist < 1100.' });
+  scene.dispose();
+});
+
 test('dusk swaps in its own foliage and a still world never advances the wind', () => {
   const { scene, trees } = forestScene(true);
   trees.setTheme(WORLD_ATMOSPHERES.dusk);
