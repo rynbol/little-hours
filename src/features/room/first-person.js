@@ -126,24 +126,27 @@ export function createFirstPersonView(scene, canvas, { roomCamera, seat, roomFra
 
   function prepareShaders() {
     if (state !== 'room') return [];
+    return scene.meshes.filter(mesh => !mesh.isAnInstance).flatMap(mesh => (mesh.subMeshes ?? []).map(subMesh => [mesh, subMesh]));
+  }
+  function warmShaders() {
+    if (state !== 'room') return;
     const engine = scene.getEngine(), previous = scene.activeCamera;
     apply(farRoomFrame());
     engine.beginFrame();
     scene.activeCamera = camera; scene.render();
     scene.activeCamera = previous; scene.render();
     engine.endFrame();
-    return scene.meshes.filter(mesh => !mesh.isAnInstance && !mesh.isEnabled()).flatMap(mesh => (mesh.subMeshes ?? []).map(subMesh => [mesh, subMesh]));
   }
   function compileShaders(pending, budget) {
-    const previous = scene.activeCamera, until = performance.now() + budget;
-    scene.activeCamera = camera;
+    const engine = scene.getEngine(), previous = scene.activeCamera, previousPass = engine.currentRenderPassId, until = performance.now() + budget;
+    scene.activeCamera = camera; engine.currentRenderPassId = camera.renderPassId;
     while (pending.length) { const [mesh, subMesh] = pending.pop(); if (!mesh.isDisposed()) { subMesh.materialDefines?.markAsUnprocessed(); subMesh.getMaterial()?.isReadyForSubMesh(mesh, subMesh, mesh.hasInstances || mesh.hasThinInstances); } if (performance.now() >= until) break; }
-    scene.activeCamera = previous;
+    engine.currentRenderPassId = previousPass; scene.activeCamera = previous;
     return pending.length;
   }
 
   return {
-    camera, enter, leave, update, prepareShaders, compileShaders,
+    camera, enter, leave, update, prepareShaders, compileShaders, warmShaders,
     get state() { return state; },
     get inside() { return inside; },
     get blend() { return blend; },

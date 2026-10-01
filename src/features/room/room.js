@@ -1706,9 +1706,11 @@ export function createRoom(container, options = {}) {
     }
     syncDetails();
     if (!seatShadersStale) return;
+    await yieldToBrowser(); if (disposed || seatSitting !== sitting) return;
     seatWorld.prepare(); shapeSeatShell(); seatShadersStale = false; scene.materials.forEach(moreLights);
     const pending = seatView.prepareShaders();
     while (seatView.compileShaders(pending, 12) > 0) { await yieldToBrowser(); if (disposed || seatSitting !== sitting) return; }
+    seatView.warmShaders();
   }
   function sit() {
     const sitting = {};

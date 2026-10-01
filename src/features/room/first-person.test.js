@@ -159,20 +159,29 @@ test('leaving before the first frame of the fly-in starts from the dollhouse vie
   engine.dispose();
 });
 
-test('preparing the seat shaders also covers hidden effects that appear later, one small step at a time, and leaves the dollhouse camera in charge', () => {
+test('preparing the seat compiles what the chair camera needs, shown or hidden, one small step at a time, so warming the chair view compiles nothing and leaves the dollhouse camera in charge', () => {
   const { scene, room, view, engine } = stage();
   const rendered = [];
   scene.onBeforeCameraRenderObservable.add(camera => rendered.push(camera.name));
+  const desk = MeshBuilder.CreateBox('desk', { size: 0.5 }, scene);
+  desk.material = new StandardMaterial('desk-paint', scene);
+  desk.material.disableLighting = true;
   const sparkles = MeshBuilder.CreatePlane('sparkles', { size: 0.1 }, scene);
   sparkles.material = new StandardMaterial('sparkle-glow', scene);
   sparkles.setEnabled(false);
-  const perspectiveSparkles = () => Object.keys(engine._compiledEffects).filter(key => key.includes('#define CAMERA_PERSPECTIVE')).length;
-  assert.equal(perspectiveSparkles(), 0);
+  scene.render();
+  rendered.length = 0;
+  const compiled = () => Object.keys(engine._compiledEffects);
+  const perspective = () => compiled().filter(key => key.includes('#define CAMERA_PERSPECTIVE')).length;
   const pending = view.prepareShaders();
-  assert.equal(perspectiveSparkles(), 0, 'hidden effects wait to be compiled in small steps');
-  assert.ok(pending.some(([mesh]) => mesh === sparkles));
+  assert.deepEqual(rendered, [], 'preparing draws nothing, so it cannot stall a frame');
+  assert.equal(perspective(), 0, 'effects wait to be compiled in small steps');
+  assert.ok(pending.some(([mesh]) => mesh === sparkles) && pending.some(([mesh]) => mesh === desk));
   while (view.compileShaders(pending, 0) > 0);
-  assert.equal(perspectiveSparkles(), 1);
+  for (const mesh of [desk, sparkles]) assert.match(mesh.subMeshes[0]._getDrawWrapper(view.camera.renderPassId)?.defines?.toString() ?? '', /#define CAMERA_PERSPECTIVE/, `${mesh.name} is compiled for the chair camera's own render pass`);
+  const ready = compiled();
+  view.warmShaders();
+  assert.deepEqual(compiled(), ready, 'the chair view finds every shader it draws already compiled');
   assert.deepEqual(rendered, ['seat-camera', 'room']);
   assert.equal(scene.activeCamera, room);
   assert.equal(view.state, 'room');
