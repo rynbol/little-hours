@@ -59,7 +59,7 @@ test('the Focus look shades smoothly, without bands, and lifts dim corners with 
   assert.ok(Math.min(sr, sg, sb) > 0.85, 'shade keeps its colour instead of turning purple');
 });
 
-test('the Focus look fills the room air with warm haze but leaves the valley outside the window clear', () => {
+test('the Focus look fills the room air with amber haze from arm\'s length, as BotW interiors do, but leaves the valley outside the window clear', () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   new FreeCamera('eye', new Vector3(0, 1, -4), scene); new HemisphericLight('sky', new Vector3(0, 1, 0), scene);
   createStorybook(scene);
@@ -69,6 +69,8 @@ test('the Focus look fills the room air with warm haze but leaves the valley out
   const keys = Object.keys(engine._compiledEffects);
   assert.equal(keys.filter(key => key.includes('#define STORYHAZE')).length, 1);
   const [r, g, b] = STORYBOOK.haze.color;
-  assert.ok(r > g && g > b && STORYBOOK.haze.amount < 0.35, 'the haze is a light amber veil');
+  const { amount, near } = STORYBOOK.haze;
+  assert.ok(r > g && g > b, 'the haze is amber');
+  assert.ok(amount >= 0.4 && amount <= 0.5 && near <= 0.5, `the haze veils the room at ${amount} from ${near} m without becoming fog`);
   engine.dispose();
 });

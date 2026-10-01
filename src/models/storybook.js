@@ -7,7 +7,7 @@ export const STORYBOOK = Object.freeze({
   lift: 1.0,
   shadow: [0.94, 0.92, 0.96],
   rim: [1.0, 0.93, 0.8],
-  haze: Object.freeze({ color: [0.68, 0.56, 0.34], amount: 0.3, near: 0.8, far: 5.0 }),
+  haze: Object.freeze({ color: [0.62, 0.52, 0.34], amount: 0.42, near: 0.5, far: 4.0 }),
 });
 
 const glsl = values => `vec3(${values.map(value => value.toFixed(3)).join(',')})`;
