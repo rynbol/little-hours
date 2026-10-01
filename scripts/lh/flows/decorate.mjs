@@ -65,11 +65,12 @@ export default {
     const where = await app.point({ item: id });
     check('the new piece is on screen', where?.visible, where);
     await app.click(where.x, where.y); await frames(app);
-    check('clicking the piece in the room selects it', (await app.room()).selectedId === id);
+    const pointed = async () => ({ where, now: await app.point({ item: id }), page: await app.js(`(() => { const d = window.__littleHours.room.diagnostics(), e = d.engine, r = e.getRenderingCanvas().getBoundingClientRect(), under = document.elementFromPoint(${where.x}, ${where.y}); return { under: under?.id || under?.tagName, selectedId: d.selectedId, dragging: d.dragging?.id, render: [e.getRenderWidth(), e.getRenderHeight(), e.getHardwareScalingLevel()], rect: [r.left, r.top, r.width, r.height], fps: e.getFps(), busy: window.__littleHours.busy() }; })()`) });
+    check('clicking the piece in the room selects it', (await app.room()).selectedId === id, await pointed());
 
     const target = spots.slice(1).sort((a, b) => Math.hypot(b.fx - spot.fx, b.fz - spot.fz) - Math.hypot(a.fx - spot.fx, a.fz - spot.fz))[0];
     const held = await press(app, where, { x: where.x + (target.x - spot.x), y: where.y + (target.y - spot.y) });
-    check('dragging the piece lifts it', (await app.room()).dragging?.id === id);
+    check('dragging the piece lifts it', (await app.room()).dragging?.id === id, await pointed());
     await app.key('Escape'); await frames(app);
     await held.release(); await app.settle();
     room = await app.room();

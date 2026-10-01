@@ -1,6 +1,6 @@
 const backdrop = app => app.js(`(() => {
   const body = getComputedStyle(document.body), stage = document.querySelector('#stage');
-  return { sky: body.backgroundImage, ink: getComputedStyle(document.querySelector('#room-title')).color, layer: getComputedStyle(stage, '::before').pointerEvents, overflow: document.documentElement.scrollWidth > innerWidth };
+  return { sky: body.backgroundImage, ink: getComputedStyle(document.querySelector('#room-title')).color, layer: getComputedStyle(stage, '::before').pointerEvents, overflow: document.documentElement.scrollWidth > innerWidth, theme: document.body.dataset.theme, saved: window.__littleHours.state.theme, pressed: document.querySelector('[data-theme-choice][aria-pressed="true"]')?.dataset.themeChoice, panel: document.querySelector('#room-panel')?.dataset.panelKind, menuOpen: document.querySelector('#room-more')?.matches(':popover-open') };
 })()`);
 
 export default {
@@ -11,14 +11,14 @@ export default {
     const dusk = await backdrop(app);
     t.check('dusk surrounds the miniature with a gradient and non-interactive atmosphere', dusk.sky.includes('gradient') && dusk.layer === 'none' && !dusk.overflow, dusk);
     await t.steps.openMore(app); await app.clickSel('[data-panel="atmosphere"]');
-    const skies = [dusk.sky];
+    const skies = [dusk.sky], views = [dusk];
     for (const theme of ['day', 'rain']) {
       await app.clickSel(`[data-theme-choice="${theme}"]`); await app.settle();
-      const view = await backdrop(app); skies.push(view.sky);
+      const view = await backdrop(app); skies.push(view.sky); views.push(view);
       t.check(`${theme} has its own scenery without horizontal scrolling`, view.sky.includes('gradient') && !view.overflow, view);
       if (theme === 'day') t.check('daylight keeps the light heading ink on its glass pill', view.ink === 'rgb(243, 234, 225)', view.ink);
     }
-    t.check('all three themes use different skies', new Set(skies).size === 3);
+    t.check('all three themes use different skies', new Set(skies).size === 3, views);
     await app.clickSel('[data-theme-choice="day"]'); await app.key('Escape');
     await t.steps.openFocus(app);
     const focus = await app.js(`({ sky: getComputedStyle(document.querySelector('#stage')).backgroundImage, width: document.querySelector('#stage').getBoundingClientRect().width, ink: getComputedStyle(document.querySelector('#focus-mode-timer')).color, viewport: innerWidth })`);
@@ -27,7 +27,7 @@ export default {
     for (const width of [1440, 900, 390]) {
       const view = await t.open({ seed: 'three-rooms', width, height: 900, reducedMotion: true, theme: 'day' });
       await t.steps.openHouse(view);
-      const layout = await view.js(`(() => { const canvas = document.querySelector('#house-canvas').getBoundingClientRect(), detail = document.querySelector('#house-detail').getBoundingClientRect(), page = document.querySelector('#house-page').getBoundingClientRect(), workspace = document.querySelector('.workspace').getBoundingClientRect(); return { width: canvas.width, available: page.width, workspace: workspace.width, detailHidden: document.querySelector('#house-detail').hidden, overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
+      const layout = await view.js(`(() => { const canvas = document.querySelector('#house-canvas').getBoundingClientRect(), detail = document.querySelector('#house-detail').getBoundingClientRect(), page = document.querySelector('#house-page').getBoundingClientRect(), workspace = document.querySelector('.workspace').getBoundingClientRect(); return { width: canvas.width, available: page.width, workspace: workspace.width, detailHidden: document.querySelector('#house-detail').hidden, overflow: document.documentElement.scrollWidth > innerWidth, theme: document.body.dataset.theme, saved: window.__littleHours.state.theme, pressed: document.querySelector('[data-theme-choice][aria-pressed="true"]')?.dataset.themeChoice, panel: document.querySelector('#room-panel')?.dataset.panelKind, menuOpen: document.querySelector('#room-more')?.matches(':popover-open') }; })()`);
       t.check(`${width}px island has room to breathe and no page overflow`, !layout.overflow && layout.available / layout.workspace > .98 && layout.width / layout.available > (width < 1200 ? .92 : .7) && layout.detailHidden, layout);
       await t.steps.houseRooms(view); await view.clickSel('#house-slot-loft');
       t.check(`${width}px room selection remains available`, await view.text('#house-detail h2') === 'Upstairs hideaway');
