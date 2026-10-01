@@ -4,14 +4,14 @@ import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { heightAt, riverCenter, smooth, WORLD } from '../../core/world-terrain.js';
-import { TERRAIN_RINGS } from './terrain-mesh.js';
+import { TERRAIN_RINGS, ringAt } from './terrain-mesh.js';
 import { WORLD_GLSL, AIR_UNIFORMS, applyAir, followEye } from './world-glsl.js';
 import { SKY_GLSL, SKY_UNIFORMS, applySkyTheme } from './sky.js';
 
 export const RIVER = Object.freeze({ step: 8, across: 13, halfWidth: 44, bedHalfWidth: 18, depth: 1.6, smoothing: 5, reach: 2400, highest: WORLD.valleyFloor + 30, fade: 160 });
 
 export function terrainMeshHeight(x, z, rings = TERRAIN_RINGS, cache = new Map()) {
-  const reach = Math.max(Math.abs(x), Math.abs(z)), { step } = rings.find(ring => reach < ring.radius) ?? rings[rings.length - 1];
+  const { step } = ringAt(x, z, rings);
   const i = Math.floor(x / step), j = Math.floor(z / step), fx = x / step - i, fz = z / step - j;
   const at = (a, b) => { const key = `${step}:${a}:${b}`; let h = cache.get(key); if (h === undefined) { h = heightAt(a * step, b * step); cache.set(key, h); } return h; };
   if (fx + fz <= 1) { const h = at(i, j); return h + fx * (at(i + 1, j) - h) + fz * (at(i, j + 1) - h); }

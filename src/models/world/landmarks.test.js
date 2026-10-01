@@ -6,7 +6,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { heightAt } from '../../core/world-terrain.js';
-import { LANDMARKS, PLUME, MIST, SAIL_TURN, createWorldLandmarks, landmarkGeometry } from './landmarks.js';
+import { LANDMARKS, PLUME, MIST, MIST_RIBBONS, RIBBON_SEGMENTS, SAIL_TURN, createWorldLandmarks, landmarkGeometry, veilGeometry } from './landmarks.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -102,7 +102,7 @@ test('the landmarks are two draws that take the theme, wet in rain and rimmed at
   const moving = createWorldLandmarks(scene, { root: new TransformNode('root', scene), still: false });
   const resting = createWorldLandmarks(scene, { root: new TransformNode('rest', scene), still: true });
   assert.deepEqual(moving.meshes.map(mesh => mesh.name), ['world-landmarks', 'world-landmark-veils']);
-  assert.equal(moving.meshes[1].getTotalIndices(), (PLUME.puffs + MIST.puffs) * 6 + 12 * 6);
+  assert.equal(moving.meshes[1].getTotalIndices(), (PLUME.puffs + MIST.puffs) * 6 + 12 * 6 + 3 * 64 * 6);
   const [solid, veil] = moving.meshes.map(mesh => mesh.material);
   moving.setTheme(WORLD_ATMOSPHERES.day);
   const dayGlow = solid._floats.lampGain;
@@ -114,6 +114,7 @@ test('the landmarks are two draws that take the theme, wet in rain and rimmed at
   assert.equal(solid._floats.sunRim, 1);
   moving.setTheme(WORLD_ATMOSPHERES.rain);
   assert.deepEqual([solid._floats.wet, veil._floats.wet, solid._floats.sunRim], [1, 1, 0]);
+  assert.ok(solid._floats.lampGain < dayGlow, 'the observatory windows stay unlit in the rain instead of floating in the grey');
   moving.setTheme(WORLD_ATMOSPHERES.day);
   assert.deepEqual([solid._floats.wet, veil._floats.wet, solid._floats.sunRim], [0, 0, 0]);
   moving.setTheme(WORLD_ATMOSPHERES.dusk);
@@ -121,5 +122,32 @@ test('the landmarks are two draws that take the theme, wet in rain and rimmed at
   assert.ok(solid._floats.time > 0 && veil._floats.time > 0);
   for (const mesh of resting.meshes) assert.equal(mesh.material._floats.time, 0);
   assert.equal(resting.meshes[0].material._vectors3.eye.y, 60);
+  scene.dispose();
+});
+
+function ribbonFit({ reach, low, high }) {
+  const eye = [-2, 2.24, -2.4];
+  let shows = 0, touches = 0, bearings = 0;
+  for (let bearing = -45; bearing <= 35; bearing += 2.5) {
+    const a = bearing * Math.PI / 180, along = r => heightAt(eye[0] + Math.sin(a) * r, eye[2] - Math.cos(a) * r);
+    let steepest = -1;
+    for (let r = 20; r < reach; r += 10) steepest = Math.max(steepest, (along(r) - eye[1]) / r);
+    const seenFrom = Math.max(eye[1] + steepest * reach, along(reach));
+    bearings++; if (high > seenFrom + 10) shows++; if (low < seenFrom) touches++;
+  }
+  return [reach, Math.round(shows / bearings * 10) / 10, Math.round(touches / bearings * 10) / 10];
+}
+
+test('three mist ribbons rise from the valleys into view from the window in the same veil draw, nearest last, tinted by the theme', () => {
+  const veil = veilGeometry(geometry.falls), ribbons = [];
+  for (let v = 0; v < veil.uvs2.length / 2; v++) if (veil.uvs2[v * 2] === 3) ribbons.push(v);
+  assert.equal(ribbons.length, MIST_RIBBONS.length * (RIBBON_SEGMENTS + 1) * 2);
+  const reach = v => Math.round(Math.hypot(veil.positions[v * 3] + 2, veil.positions[v * 3 + 2] + 2.4));
+  assert.deepEqual([...new Set(ribbons.map(reach))], MIST_RIBBONS.map(ribbon => ribbon.reach));
+  assert.deepEqual(MIST_RIBBONS.map(ribbonFit), [[2300, 0.9, 0.7], [1500, 1, 1], [950, 1, 0.7]]);
+  const scene = new Scene(new NullEngine()); new FreeCamera('eye', new Vector3(-2, 2, -2.4), scene);
+  const landmarks = createWorldLandmarks(scene, { root: new TransformNode('root', scene), still: true }), paint = landmarks.meshes[1].material;
+  const misted = theme => { landmarks.setTheme(WORLD_ATMOSPHERES[theme]); return [paint._colors3.mist.toHexString().toLowerCase(), paint._floats.mistStrength]; };
+  assert.deepEqual(['day', 'dusk', 'rain'].map(misted), [['#bcd0cc', 0.42], ['#91928c', 0.45], ['#5c6252', 0.6]]);
   scene.dispose();
 });

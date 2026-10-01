@@ -8,6 +8,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { createWorldTrees, plantTrees, NEAR_TREES, HERO_TREES, WINDOW_EYE, VISTA } from './trees.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 import { WORLD, riverDistance } from '../../core/world-terrain.js';
+import { TERRAIN_RINGS, terrainRing, ringAt } from './terrain-mesh.js';
 
 function flatRing(radius, step, at) {
   const n = Math.round(radius * 2 / step) + 1, positions = new Float32Array(n * n * 3), normals = new Float32Array(n * n * 3), colors = new Float32Array(n * n * 4);
@@ -85,6 +86,25 @@ test('hero trees frame the window vista below the far ridge and leave its cleari
     const inCone = dz > 0 && Math.abs(Math.atan2(dx, dz) - VISTA.bearing) < VISTA.halfAngle;
     assert.ok(!(inCone && Math.hypot(dx, dz) < VISTA.clearing), `tree ${i} blocks the window vista`);
   }
+});
+
+function drawnSurface(meshes) {
+  return (x, z) => {
+    const ring = ringAt(x, z), { positions } = meshes[TERRAIN_RINGS.indexOf(ring)], nz = Math.round((ring.maxZ - ring.minZ) / ring.step) + 1;
+    const u = (x - ring.minX) / ring.step, w = (z - ring.minZ) / ring.step, i = Math.floor(u), j = Math.floor(w), fu = u - i, fw = w - j;
+    const y = (di, dj) => positions[((i + di) * nz + j + dj) * 3 + 1];
+    return fu + fw <= 1 ? y(0, 0) + (y(1, 0) - y(0, 0)) * fu + (y(0, 1) - y(0, 0)) * fw : y(1, 1) + (y(0, 1) - y(1, 1)) * (1 - fu) + (y(1, 0) - y(1, 1)) * (1 - fw);
+  };
+}
+
+test('every tree stands on the terrain the rings draw, in every ring that holds trees', () => {
+  const meshes = TERRAIN_RINGS.map((_, index) => terrainRing(index)), surface = drawnSurface(meshes), trees = plantTrees(meshes), holding = new Set(), floating = [];
+  for (let i = 0; i < trees.count; i++) {
+    holding.add(TERRAIN_RINGS.indexOf(ringAt(trees.x[i], trees.z[i])));
+    const above = trees.y[i] - surface(trees.x[i], trees.z[i]);
+    if (above > 0.01) floating.push(`${Math.round(trees.x[i])},${Math.round(trees.z[i])} +${above.toFixed(1)} m`);
+  }
+  assert.deepEqual({ rings: [...holding].sort(), floating: floating.slice(0, 5) }, { rings: [0, 1, 2, 3], floating: [] });
 });
 
 function forestScene(still) {

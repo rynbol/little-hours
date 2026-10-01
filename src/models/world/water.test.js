@@ -5,14 +5,14 @@ import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { heightAt, riverCenter } from '../../core/world-terrain.js';
 import { RIVER, createWorldWater, riverLevels, riverShape, terrainMeshHeight } from './water.js';
-import { TERRAIN_RINGS } from './terrain-mesh.js';
+import { ringAt } from './terrain-mesh.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 
 test('the water reads the terrain mesh height, exact at grid points and linear along an edge', () => {
   assert.equal(terrainMeshHeight(200, -480), heightAt(200, -480));
   assert.ok(Math.abs(terrainMeshHeight(204, -480) - (heightAt(200, -480) + heightAt(208, -480)) / 2) < 1e-9);
   assert.equal(terrainMeshHeight(1024, -480), heightAt(1024, -480));
-  assert.equal(TERRAIN_RINGS.find(ring => 1028 < ring.radius).step, 32);
+  assert.equal(ringAt(1028, -480).step, 32);
   assert.ok(Math.abs(terrainMeshHeight(1040, -480) - (heightAt(1024, -480) + heightAt(1056, -480)) / 2) < 1e-9);
 });
 

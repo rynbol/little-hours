@@ -45,15 +45,15 @@ function seeded(seed) {
 
 function groundOf(rings) {
   const grids = rings.map(({ positions, normals, colors }) => {
-    const n = Math.round(Math.sqrt(positions.length / 3));
-    return { n, radius: -positions[0], step: positions[n * 3] - positions[0], positions, normals, colors };
+    const last = positions.length - 3, minX = positions[0], minZ = positions[2], step = positions[5] - minZ, nz = Math.round((positions[last + 2] - minZ) / step) + 1;
+    return { minX, minZ, maxX: positions[last], maxZ: positions[last + 2], step, nx: positions.length / 3 / nz, nz, positions, normals, colors };
   });
   const at = { y: 0, cover: 0, up: 1, wet: 0 };
   return (x, z) => {
     let g = null;
-    for (const grid of grids) if (Math.abs(x) < grid.radius && Math.abs(z) < grid.radius) { g = grid; break; }
+    for (const grid of grids) if (x > grid.minX && x < grid.maxX && z > grid.minZ && z < grid.maxZ) { g = grid; break; }
     if (!g) return null;
-    const u = (x + g.radius) / g.step, w = (z + g.radius) / g.step, i = Math.min(g.n - 2, Math.floor(u)), j = Math.min(g.n - 2, Math.floor(w)), fu = u - i, fw = w - j, a = i * g.n + j, b = a + g.n;
+    const u = (x - g.minX) / g.step, w = (z - g.minZ) / g.step, i = Math.min(g.nx - 2, Math.floor(u)), j = Math.min(g.nz - 2, Math.floor(w)), fu = u - i, fw = w - j, a = i * g.nz + j, b = a + g.nz;
     const lower = fu + fw <= 1, p = lower ? a : b + 1, q = lower ? b : a + 1, r = lower ? a + 1 : b;
     const wq = lower ? fu : 1 - fu, wr = lower ? fw : 1 - fw, wp = 1 - wq - wr;
     const blend = (data, stride, offset) => data[p * stride + offset] * wp + data[q * stride + offset] * wq + data[r * stride + offset] * wr;
