@@ -474,10 +474,10 @@ test('no cloud hangs in front of the volcano plume, and the smoke stands tall an
   engine.dispose();
 });
 
-test('the daytime field reads as bright gold-green, with sunlit blade roots and tips brighter still', () => {
+test('the daytime field reads as soft bright gold-green, with blade roots within a fifth of the tip brightness', () => {
   const luma = color => 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b, day = grassTones(vistaPalette('day'));
-  assert.ok(luma(day.root) > 0.4);
-  assert.ok(luma(day.tip) > luma(day.root) + 0.15);
+  assert.ok(luma(day.root) > 0.5);
+  assert.ok(luma(day.tip) < luma(day.root) * 1.2);
   for (const theme of Object.keys(VISTA_THEMES)) assert.ok(luma(grassTones(vistaPalette(theme)).root) < luma(grassTones(vistaPalette(theme)).tip), theme);
 });
 

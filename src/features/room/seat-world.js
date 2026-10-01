@@ -491,7 +491,7 @@ void main() {
   float wave = sin(p.x * .045 + p.z * .03 - time * .9) * .5 + .5 + sin(p.x * .11 - p.z * .07 - time * 1.7) * .15;
   float gust = smoothstep(.55, 1., wave), sway = sin(time * 2.1 + p.x * .35 + p.z * .25 + uv.y * 6.28) * .22 + gust * .9;
   p.xz += vec2(.92, .38) * sway * uv.x * .55; p.y -= uv.x * gust * .18;
-  vTip = step(.001, uv.x); vGust = gust * vTip; vFlower = step(1.5, uv.y); vPetal = petal * (uv.y < 2.5 ? vec3(1.) : uv.y < 3.5 ? vec3(1., .88, .3) : vec3(.86, .74, 1.)); vShade = .82 + .36 * min(uv.y, 1.);
+  vTip = step(.001, uv.x); vGust = gust * vTip; vFlower = step(1.5, uv.y); vPetal = petal * (uv.y < 2.5 ? vec3(1.) : uv.y < 3.5 ? vec3(1., .88, .3) : vec3(.86, .74, 1.)); vShade = .9 + .2 * min(uv.y, 1.);
   vFog = smoothstep(20., 175., length(p.xz)) * .82;
   gl_Position = viewProjection * p;
 }`;
@@ -509,8 +509,8 @@ void main() {
 const flowerField = (x, z) => Math.sin(x * 0.31 + 1.3) * Math.sin(z * 0.27 - 0.7) + Math.sin(x * 0.12 - z * 0.15) * 0.6;
 
 export function grassTones(palette) {
-  const blade = (key, scale) => hex(palette[key]).scale(scale);
-  return { root: blade('grass', 0.74), tip: Color3.Lerp(blade('meadow', 1.14), hex(palette.glow), 0.12), shine: Color3.Lerp(blade('meadow', 1.28), hex(palette.glow), 0.3), haze: hex(palette.haze), warm: blade('meadowWarm', 1), petal: blade('petal', 1) };
+  const blade = (key, scale) => hex(palette[key]).scale(scale), tip = Color3.Lerp(blade('meadow', 1.14), hex(palette.glow), 0.12);
+  return { root: Color3.Lerp(blade('grass', 0.74), tip, 0.65), tip, shine: Color3.Lerp(blade('meadow', 1.28), hex(palette.glow), 0.3), haze: hex(palette.haze), warm: blade('meadowWarm', 1), petal: blade('petal', 1) };
 }
 
 export function grassBlades() {
