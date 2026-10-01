@@ -422,7 +422,7 @@ export function createRoom(container, options = {}) {
   const scatter = (i, salt) => { const v = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453; return v - Math.floor(v); };
   const rainSeeds = Array.from({ length: 72 }, (_, i) => { const x = -4.7 + (i + 0.5 + (scatter(i, 1) - 0.5) * 0.9) / 72 * 3.98; return { x, y: scatter(i, 2), speed: 0.5 + scatter(i, 3) * 0.4, length: 0.06 + scatter(i, 4) * 0.06, top: archSpring + Math.sqrt(Math.max(0, archRadius ** 2 - (x - archCenter) ** 2)) - 0.12 }; });
   const rainLines = rainSeeds.map(seed => [new Vector3(seed.x, 2, -4.52), new Vector3(seed.x - seed.length * 0.13, 2 + seed.length, -4.52)]);
-  const rain = MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, updatable: true }, scene); rain.color = color('#dbe4ec'); rain.alpha = 0.32; rain.isPickable = false; rain.setEnabled(false);
+  const rain = MeshBuilder.CreateLineSystem('window-rain', { lines: rainLines, updatable: true }, scene); rain.color = color('#dbe4ec'); const windowRainAlpha = 0.32; rain.alpha = windowRainAlpha; rain.isPickable = false; rain.setEnabled(false);
   const rainPositions = Float32Array.from(rain.getVerticesData('position'));
   rain.setBoundingInfo(new BoundingInfo(new Vector3(-4.75, 1.55, -4.53), new Vector3(-0.65, 5.28, -4.51)));
   // Forty-eight drifting motes share one draw; size and tint vary per instance.
@@ -1827,7 +1827,7 @@ export function createRoom(container, options = {}) {
     companionTime = now;
     animateAvatarCamera(companionDelta);
     if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
-    storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = ROOM_LIGHTS[theme].sun * seatedDim(theme, seatView.blend); aimDeskLamp(seatView.blend);
+    storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ROOM_LIGHTS[theme].ambient * seatedDim(theme, seatView.blend); sun.intensity = ROOM_LIGHTS[theme].sun * seatedDim(theme, seatView.blend); aimDeskLamp(seatView.blend); rain.alpha = windowRainAlpha * (1 - seatView.blend);
     sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend);
     seatWorld.animate(companionDelta, reducedMotion);
     passages?.animate(companionDelta, houseHover, reducedMotion, lockedDoor, openingDoor);

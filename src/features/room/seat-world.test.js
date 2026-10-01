@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
-import { createSeatWorld, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, VOLCANO } from './seat-world.js';
+import { createSeatWorld, butterfliesOut, grassBlades, grassTones, spiritsAloft, moonRise, vistaPalette, windowsLit, FLOCK_SECONDS, SNOW_LINE, SUN_POINT, VISTA_THEMES, plumeShape, sunRayShape, rainShape, RAIN_SHEETS, VOLCANO } from './seat-world.js';
 
 const PEAK = VOLCANO.base + VOLCANO.height;
 
@@ -573,5 +573,25 @@ test('hamlet roofs read as tiled gables, with a lit and a shaded slope, courses 
   const max = Math.max(...shades), min = Math.min(...shades);
   assert.ok(max >= 1.2 && min <= 0.45, `roof shades run ${min.toFixed(2)} to ${max.toFixed(2)}`);
   assert.ok(new Set(shades.map(shade => shade.toFixed(2))).size >= 6, 'slopes, courses, ridge and fascia each have their own value');
+  engine.dispose();
+});
+
+test('rain falls in sheets at three depths outside the room, denser and fainter with distance, and only in rain', () => {
+  const { positions, uvs2 } = rainShape(), sheets = new Map();
+  for (let v = 0; v < positions.length / 3; v++) {
+    const x = positions[v * 3], z = positions[v * 3 + 2], [columns, kind] = [uvs2[v * 2], uvs2[v * 2 + 1]];
+    assert.ok(kind > 2 && kind < 3, 'every rain vertex is marked as rain');
+    assert.ok(z < -4.9 || Math.abs(x) > 6.4, `rain at ${x.toFixed(1)}, ${z.toFixed(1)} stays outside the room`);
+    sheets.set(columns, Math.max(sheets.get(columns) ?? 0, Math.hypot(x, z + 3.5)));
+  }
+  const reach = [...sheets.entries()].sort((a, b) => a[1] - b[1]);
+  assert.equal(reach.length, 3);
+  assert.ok(reach[2][1] > reach[0][1] * 4, 'the far sheet hangs well beyond the near one');
+  assert.ok(reach.every(([columns], i) => i === 0 || columns > reach[i - 1][0]), 'farther sheets carry more, finer streaks');
+  assert.ok(RAIN_SHEETS.every((sheet, i) => i === 0 || sheet.alpha < RAIN_SHEETS[i - 1].alpha), 'farther sheets are fainter');
+  const { engine, world } = setup();
+  world.setEnabled(true);
+  const paint = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects').material;
+  for (const [theme, rain] of [['rain', 1], ['day', 0], ['dusk', 0]]) { world.setTheme(theme); assert.equal(paint._floats.rain, rain, theme); }
   engine.dispose();
 });

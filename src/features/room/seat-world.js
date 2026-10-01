@@ -445,12 +445,20 @@ const LAND_FRAGMENT = `precision highp float;
 varying vec3 vColor; varying float vCloud;
 void main() { gl_FragColor = vec4(vColor * (1. - vCloud * .4), 1.); }`;
 const SKY_EFFECT_VERTEX = `precision highp float;
-attribute vec3 position; attribute vec2 uv, uv2; uniform mat4 world, viewProjection; varying vec2 vUv, vKind;
-void main() { vUv = uv; vKind = uv2; gl_Position = viewProjection * world * vec4(position, 1.); }`;
+attribute vec3 position; attribute vec2 uv, uv2; uniform mat4 world, viewProjection; uniform float rain; varying vec2 vUv, vKind;
+void main() { vUv = uv; vKind = uv2; gl_Position = uv2.y > 1.5 && rain < .01 ? vec4(0.) : viewProjection * world * vec4(position, 1.); }`;
 const SKY_EFFECT_FRAGMENT = `precision highp float;
-varying vec2 vUv, vKind; uniform float time, rays, glow; uniform vec3 tint, smoke, ember, haze;
+varying vec2 vUv, vKind; uniform float time, rays, glow, rain; uniform vec3 tint, smoke, ember, haze;
 ${CLOUD_SHADE}
 void main() {
+  if (vKind.y > 1.5) {
+    float column = vUv.x * vKind.x + vUv.y * vKind.x * .012, h = hash(vec2(floor(column), vKind.x));
+    float fall = fract(vUv.y * (5. + h * 4.) + time * (1.4 + h * .8) + h * 9.), dash = smoothstep(0., .06, fall) * (1. - smoothstep(.06, .3, fall));
+    float thin = 1. - smoothstep(.04, .12, abs(fract(column) - .5)), mist = (1. - smoothstep(0., .45, vUv.y)) * .35 * (1. - smoothstep(.8, 1., abs(vUv.x * 2. - 1.)));
+    float a = (dash * thin * step(.35, h) * .9 + mist) * (vKind.y - 2.) * rain;
+    gl_FragColor = vec4(mix(haze, vec3(1.), .5) * a, a);
+    return;
+  }
   if (vKind.y < .5) {
     float across = 1. - smoothstep(0., 1., abs(vUv.x)), along = smoothstep(0., .08, vUv.y) * (1. - smoothstep(.4, .95, vUv.y));
     float breathe = .7 + .3 * sin(time * .23 + vUv.y * 2. + vKind.x);
@@ -484,9 +492,27 @@ export function sunRayShape() {
   });
   return { positions, uvs, uvs2: uv2s, indices };
 }
+export const RAIN_SHEETS = Object.freeze([{ radius: 6.5, arc: 1.1, low: -1, high: 12, columns: 90, alpha: 0.4 }, { radius: 17, arc: 1.3, low: -2, high: 24, columns: 260, alpha: 0.3 }, { radius: 42, arc: 1.3, low: -3, high: 40, columns: 620, alpha: 0.24 }]);
+const RAIN_CENTER = [0, -3.5], RAIN_STEPS = 10;
+export function rainShape() {
+  const positions = [], uvs = [], uv2s = [], indices = [];
+  for (const { radius, arc, low, high, columns, alpha } of RAIN_SHEETS) {
+    const start = positions.length / 3;
+    for (let k = 0; k <= RAIN_STEPS; k++) {
+      const u = k / RAIN_STEPS, a = (u * 2 - 1) * arc, x = RAIN_CENTER[0] + Math.sin(a) * radius, z = RAIN_CENTER[1] - Math.cos(a) * radius;
+      for (const [y, v] of [[low, 0], [high, 1]]) positions.push(x, y, z), uvs.push(u, v), uv2s.push(columns, 2 + alpha);
+      if (k) indices.push(start + k * 2 - 2, start + k * 2 - 1, start + k * 2 + 1, start + k * 2 - 2, start + k * 2 + 1, start + k * 2);
+    }
+  }
+  return { positions, uvs, uvs2: uv2s, indices };
+}
 function skyEffectShape() {
-  const rays = sunRayShape(), plume = plumeShape(), offset = rays.positions.length / 3;
-  return { positions: [...rays.positions, ...plume.positions], uvs: [...rays.uvs, ...plume.uvs], uvs2: [...rays.uvs2, ...plume.uvs2], indices: [...rays.indices, ...plume.indices.map(i => i + offset)] };
+  const parts = [sunRayShape(), plumeShape(), rainShape()], merged = { positions: [], uvs: [], uvs2: [], indices: [] };
+  for (const part of parts) {
+    const offset = merged.positions.length / 3;
+    merged.positions.push(...part.positions); merged.uvs.push(...part.uvs); merged.uvs2.push(...part.uvs2); merged.indices.push(...part.indices.map(i => i + offset));
+  }
+  return merged;
 }
 const GRASS_VERTEX = `precision highp float;
 attribute vec3 position; attribute vec2 uv; uniform mat4 world, viewProjection; uniform float time;
@@ -611,7 +637,7 @@ export function createSeatWorld(scene, parent) {
   const landPaint = new ShaderMaterial('seat-world-land-paint', scene, { vertexSource: LAND_VERTEX, fragmentSource: LAND_FRAGMENT }, { attributes: ['position', 'color'], uniforms: ['world', 'viewProjection', 'time', 'shadow'] });
   landPaint.backFaceCulling = false; landPaint.setFloat('time', 0); landPaint.setFloat('shadow', 0);
   grassPaint.backFaceCulling = false; grassPaint.setFloat('time', 0); grassPaint.setFloat('shadow', 0);
-  const skyEffectPaint = new ShaderMaterial('seat-world-sky-effects-paint', scene, { vertexSource: SKY_EFFECT_VERTEX, fragmentSource: SKY_EFFECT_FRAGMENT }, { attributes: ['position', 'uv', 'uv2'], uniforms: ['world', 'viewProjection', 'time', 'rays', 'glow', 'tint', 'smoke', 'ember', 'haze'], needAlphaBlending: true });
+  const skyEffectPaint = new ShaderMaterial('seat-world-sky-effects-paint', scene, { vertexSource: SKY_EFFECT_VERTEX, fragmentSource: SKY_EFFECT_FRAGMENT }, { attributes: ['position', 'uv', 'uv2'], uniforms: ['world', 'viewProjection', 'time', 'rays', 'glow', 'rain', 'tint', 'smoke', 'ember', 'haze'], needAlphaBlending: true });
   skyEffectPaint.backFaceCulling = false; skyEffectPaint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF; skyEffectPaint.disableDepthWrite = true; skyEffectPaint.setFloat('time', 0); skyEffectPaint.setFloat('rays', 0); skyEffectPaint.setFloat('glow', 0);
   let sky = null, land, grass, skyEffects, cloudRoot, clouds, flockRoot, flock, moon, shooting, spirits;
   function build() {
@@ -657,7 +683,7 @@ export function createSeatWorld(scene, parent) {
     const tones = grassTones(palette);
     for (const [name, value] of Object.entries(tones)) grassPaint.setColor3(name, value); for (const each of [grassPaint, landPaint]) each.setFloat('shadow', CLOUD_SHADOW[theme] ?? 0);
     skyEffectPaint.setFloat('rays', SUN_RAY_STRENGTH[theme] ?? 0); skyEffectPaint.setColor3('tint', Color3.Lerp(Color3.White(), hex(palette.glow), 0.6));
-    skyEffectPaint.setColor3('smoke', hex(palette.smoke)); skyEffectPaint.setColor3('ember', hex(palette.ember)); skyEffectPaint.setColor3('haze', hex(palette.haze)); skyEffectPaint.setFloat('glow', theme === 'day' ? 0.8 : 1);
+    skyEffectPaint.setColor3('smoke', hex(palette.smoke)); skyEffectPaint.setColor3('ember', hex(palette.ember)); skyEffectPaint.setColor3('haze', hex(palette.haze)); skyEffectPaint.setFloat('glow', theme === 'day' ? 0.8 : 1); skyEffectPaint.setFloat('rain', theme === 'rain' ? 1 : 0);
   }
   function setShell(style, wallPaint = {}, doors = []) {
     const base = SHELL_PAINT[style] || SHELL_PAINT.retreat, key = JSON.stringify([style, wallPaint, doors]);
