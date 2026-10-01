@@ -43,7 +43,7 @@ import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
-import { ROOM_LIGHTS } from './room-lighting.js';
+import { ROOM_LIGHTS, ambientAt } from './room-lighting.js';
 import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
 import { createLanternGlow } from './room-lantern-glow.js';
 import { createFirstPersonView, seatEye } from './first-person.js';
@@ -1771,7 +1771,7 @@ export function createRoom(container, options = {}) {
     companionTime = now;
     animateAvatarCamera(companionDelta);
     if (seatView.update(companionDelta, reducedMotion, canvasAspect)) requestRender();
-    storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend;
+    storybook.amount = seatView.blend; painterly.state.look = 1 - seatView.blend; hemisphere.intensity = ambientAt(theme, seatView.blend);
     sunbeam.animate(reducedMotion ? 0 : seconds, 1 - seatView.blend);
     seatWorld.animate(companionDelta, reducedMotion);
     passages?.animate(companionDelta, houseHover, reducedMotion, lockedDoor, openingDoor);
