@@ -7,6 +7,7 @@ export const STORYBOOK = Object.freeze({
   lift: 1.0,
   shadow: [0.94, 0.92, 0.96],
   rim: [1.0, 0.93, 0.8],
+  haze: Object.freeze({ color: [0.68, 0.56, 0.34], amount: 0.3, near: 0.8, far: 5.0 }),
 });
 
 const glsl = values => `vec3(${values.map(value => value.toFixed(3)).join(',')})`;
@@ -41,16 +42,18 @@ vec3 storyLight(vec3 light, vec3 n, vec3 v, vec3 p) {
 `;
 
 const LIGHT_HOOK = /vec3 finalDiffuse=/g;
+const OUTDOOR_PREFIX = 'seat-world';
+const { haze } = STORYBOOK;
 export const SURFACE_KIND = 'storySurface';
 
 export class StorybookPlugin extends MaterialPluginBase {
   constructor(material, state) {
-    super(material, 'Storybook', 150, { STORYSURFACE: false }, true, true);
+    super(material, 'Storybook', 150, { STORYSURFACE: false, STORYHAZE: false }, true, true);
     this.state = state;
   }
   getClassName() { return 'StorybookPlugin'; }
   isCompatible(shaderLanguage) { return shaderLanguage === 0; }
-  prepareDefines(defines, scene, mesh) { defines.STORYSURFACE = mesh.isVerticesDataPresent(SURFACE_KIND); }
+  prepareDefines(defines, scene, mesh) { defines.STORYSURFACE = mesh.isVerticesDataPresent(SURFACE_KIND); defines.STORYHAZE = !this._material.name.startsWith(OUTDOOR_PREFIX); }
   getAttributes(attributes, scene, mesh) { if (mesh.isVerticesDataPresent(SURFACE_KIND)) attributes.push(SURFACE_KIND); }
   getUniforms() { return { ubo: [{ name: 'storyLook', size: 1, type: 'float' }], fragment: 'uniform float storyLook;' }; }
   bindForSubMesh(uniformBuffer) { uniformBuffer.updateFloat('storyLook', this.state.amount); }
@@ -62,6 +65,7 @@ export class StorybookPlugin extends MaterialPluginBase {
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: `#ifdef STORYSURFACE\nvarying float vStorySurface;\n#endif\n${STORYBOOK_FRAGMENT}`,
       [`!${LIGHT_HOOK.source}`]: '\n#ifdef LIGHT0\ndiffuseBase=storyLight(diffuseBase,normalW,viewDirectionW,vPositionW);\n#endif\n#ifdef STORYSURFACE\nbaseColor.rgb*=mix(vec3(1.0),storySurface(vStorySurface,vPositionW),storyLook);\n#endif\nvec3 finalDiffuse=',
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `#ifdef STORYHAZE\ncolor.rgb=mix(color.rgb,${glsl(haze.color)},storyLook*${haze.amount.toFixed(3)}*smoothstep(${haze.near.toFixed(3)},${haze.far.toFixed(3)},length(vEyePosition.xyz-vPositionW)));\n#endif`,
     };
   }
 }

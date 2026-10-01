@@ -58,3 +58,17 @@ test('the Focus look shades smoothly, without bands, and lifts dim corners with 
   const [sr, sg, sb] = STORYBOOK.shadow;
   assert.ok(Math.min(sr, sg, sb) > 0.85, 'shade keeps its colour instead of turning purple');
 });
+
+test('the Focus look fills the room air with warm haze but leaves the valley outside the window clear', () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  new FreeCamera('eye', new Vector3(0, 1, -4), scene); new HemisphericLight('sky', new Vector3(0, 1, 0), scene);
+  createStorybook(scene);
+  const room = MeshBuilder.CreateBox('room', { size: 1 }, scene); room.material = new StandardMaterial('wall-paint', scene);
+  const valley = MeshBuilder.CreateBox('valley', { size: 1 }, scene); valley.material = new StandardMaterial('seat-world-shell', scene);
+  scene.render();
+  const keys = Object.keys(engine._compiledEffects);
+  assert.equal(keys.filter(key => key.includes('#define STORYHAZE')).length, 1);
+  const [r, g, b] = STORYBOOK.haze.color;
+  assert.ok(r > g && g > b && STORYBOOK.haze.amount < 0.35, 'the haze is a light amber veil');
+  engine.dispose();
+});
