@@ -80,3 +80,12 @@ test('the study laptop is warm champagne with a sepia screen, in both the detail
   assert.ok(shell, 'the dollhouse laptop shares the champagne shell');
   disposeDetails(scene); engine.dispose();
 });
+
+test('the desk lamp shade glows evenly from within instead of being lit across its pleats', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  await loadDetails(['study-desk']);
+  const layers = Object.fromEntries(createDetail('study-desk', scene).getChildMeshes().map(mesh => [mesh.material.name, mesh.metadata.palette]));
+  assert.ok(layers['detail-glow'].includes('#ffd08a'), 'the shade glows');
+  assert.ok(!layers['detail-paint'].includes('#d6a766'), 'no lit cloth shade is left to catch the bulb light across its pleats');
+  disposeDetails(scene); engine.dispose();
+});

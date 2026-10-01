@@ -98,7 +98,7 @@ def lamp(x, y, z):
              rod((0, 0.53, 0), (-0.14, 0.66, 0), 0.016, BRASS, surface='metal', layer='metal', frame=f),
              cylinder(0.03, 0.03, 0.04, (-0.14, 0.71, 0), BRASS, segments=16, surface='metal', layer='metal', frame=f)]
     pleats = lambda a, h: 0.035 * abs(math.sin(a * 12))
-    parts.append(lathe([(0.1, 0.73), (0.105, 0.735), (0.245, 0.525), (0.24, 0.52)], (-0.14, 0, 0), '#d6a766', segments=72, surface='cloth', frame=f, wobble=pleats))
+    parts.append(lathe([(0.1, 0.73), (0.105, 0.735), (0.245, 0.525), (0.24, 0.52)], (-0.14, 0, 0), '#ffd08a', segments=72, layer='glow', frame=f, wobble=pleats))
     parts.append(lathe([(0.0, 0.54), (0.21, 0.54), (0.1, 0.72), (0.0, 0.72)], (-0.14, 0, 0), '#ffe0a6', segments=32, layer='glow', frame=f))
     parts.append(tube([(-0.05, 0.6, 0.12), (-0.05, 0.48, 0.13), (-0.05, 0.38, 0.13)], 0.003, BRASS, frame=f, resolution=3))
     parts.append(sphere((0.012, 0.018, 0.012), (-0.05, 0.37, 0.13), BRASS, subdivisions=2, surface='metal', layer='metal', frame=f))
