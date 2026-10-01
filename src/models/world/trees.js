@@ -32,7 +32,7 @@ const RIVER_CLEARANCE = WORLD.river.width * 1.4;
 export const PATH_CLEARANCE = 2;
 const FRAY_REACH = 50;
 
-const FOLIAGE_COLORS = Object.freeze(['leafTop', 'leafUnder', 'leafHaze', 'leafBack', 'leafCrown', 'needleTop', 'needleUnder', 'bark']);
+const FOLIAGE_COLORS = Object.freeze(['leafTop', 'leafUnder', 'leafMid', 'leafHaze', 'leafBack', 'leafCrown', 'needleTop', 'needleUnder', 'bark']);
 const LIGHT_COLORS = ['sunColor', 'skyAmbient', 'groundAmbient', 'shadowTint'];
 
 const PART = Object.freeze({ bark: 0, mass: 0.16, leaf: 0.25, needle: 0.5, farLeaf: 0.75, farSpreading: 0.81, farNeedle: 1 });
@@ -263,10 +263,11 @@ void main() {
   gl_Position = viewProjection * p;
 }`;
 
-const TREE_FRAGMENT = `precision highp float;
+const TREE_FRAGMENT = `#extension GL_OES_standard_derivatives : enable
+precision highp float;
 varying vec3 vWorld, vNormal, vRight; varying vec4 vPart; varying vec2 vUv; varying float vSeed, vSpread;
 uniform vec3 eye, sun, sunColor, skyAmbient, groundAmbient, shadowTint, fogNear, fogFar, fogSun;
-uniform vec3 leafTop, leafUnder, leafHaze, leafBack, leafCrown, needleTop, needleUnder, bark;
+uniform vec3 leafTop, leafUnder, leafMid, leafHaze, leafBack, leafCrown, needleTop, needleUnder, bark;
 vec3 leafShade;
 uniform float sunStrength, shadowLift, fogDensity, fogHeight, time, goldenHour;
 ${WORLD_GLSL}
@@ -291,26 +292,27 @@ void clump(vec2 c, vec2 centre, float radius, float seed, inout vec4 best) {
   float h = 1. - dot(d, d);
   if (h > best.x) best = vec4(h, d, 0.);
 }
-vec3 foliage(vec3 n, vec3 v, float ao, float needle, float tint, float leaf) {
+vec3 foliage(vec3 n, vec3 v, float ao, float needle, float tint, float leaf, float facing, float card) {
   vec3 ambient = mix(groundAmbient, skyAmbient, n.y * .5 + .5), shade = shadowTint * shadowLift + ambient * .35, lit = sunColor * sunStrength;
   float soft = .45 - .3 * goldenHour, wrap = clamp((dot(n, sun) + soft) / (1. + soft), 0., 1.), light = wrap * mix(.4, 1., ao);
   vec3 top = mix(leafTop, needleTop, needle), under = mix(leafShade, needleUnder, needle);
   top = mix(top, top * vec3(1.12, 1.06, .78), tint * (1. - needle) * .6);
   top = mix(top, top * vec3(.8, .92, 1.04), smoothstep(.5, 1., fract(tint * 7.31)) * (1. - needle) * .8);
-  top = mix(top, leafBack, goldenHour * light * sqrt(light) * (1. - needle * .5) * .75);
+  float silhouette = max(pow(1. - abs(dot(v, n)), 1.2), smoothstep(.3, .9, n.y));
+  top = mix(top, leafBack, goldenHour * light * sqrt(light) * (1. - needle * .5) * .75 * mix(1., silhouette, card));
   vec3 color = mix(under * (shade * 1.5 + .32), top * lit, light) * mix(.84, 1., clamp(n.y * .5 + .5, 0., 1.)) * mix(.78, 1., ao) * leaf;
   vec3 crown = mix(leafCrown, top * lit, needle * .5) * (top / max(mix(leafTop, needleTop, needle), vec3(.01)));
   color = mix(color, crown * leaf, smoothstep(.12, .75, n.y) * mix(.5, 1., ao) * (1. - light * (.6 + .3 * goldenHour)) * .9);
   float edge = pow(1. - abs(dot(v, n)), 3.);
   float through = pow(clamp(dot(-v, sun), 0., 1.), 4.) * (.3 + .7 * edge) * (1. - wrap * .5) * .6 * mix(.5, 1., ao);
-  float rim = pow(1. - abs(dot(v, n)), 1.6) * smoothstep(.4, .9, dot(n, normalize(sun + vec3(0., 1., 0.)))) * .8;
-  color = mix(color, leafBack * lit * leaf, rim) + leafBack * sunStrength * through * leaf;
-  return mix(color, leafBack * lit * leaf, goldenHour * clamp(through * edge * 3., 0., .7));
+  float rim = pow(1. - abs(dot(v, n)), 1.6) * smoothstep(.4, .9, dot(n, normalize(sun + vec3(0., 1., 0.)))) * .8 * facing;
+  color = mix(color, leafBack * lit * leaf, rim) + leafBack * sunStrength * through * leaf * facing;
+  return mix(color, leafBack * lit * leaf, goldenHour * clamp(through * edge * 3., 0., .7) * facing);
 }
 void main() {
   float part = vPart.b, needle = step(.37, part) * (1. - step(.62, part)) + step(.87, part);
   vec3 toEye = eye - vWorld; float dist = length(toEye); vec3 v = toEye / dist;
-  leafShade = mix(leafUnder, leafHaze, smoothstep(300., 500., dist));
+  leafShade = mix(mix(leafUnder, leafMid, smoothstep(130., 200., dist)), leafHaze, smoothstep(300., 500., dist));
   vec3 ambient = mix(groundAmbient, skyAmbient, .6), shade = shadowTint * shadowLift + ambient * .35, lit = sunColor * sunStrength;
   vec3 color;
   if (part < .12) {
@@ -351,7 +353,7 @@ void main() {
     }
     vec2 turned = mat2(.8, -.6, .6, .8) * c;
     float mottle = dist < 1100. ? mix(.86 + .2 * worldNoise(turned * 1.7 + seed * 7.) + .1 * worldNoise(turned * 4.1 - seed * 3.), 1., smoothstep(350., 1100., dist)) : 1.;
-    color = foliage(n, v, ao, needle, vSeed, mottle);
+    color = foliage(n, v, ao, needle, vSeed, mottle, 1., 0.);
     float back = pow(clamp(dot(-v, sun), 0., 1.), 2.), band = smoothstep(40., 180., dist) * (1. - smoothstep(900., 1600., dist));
     color = mix(color, leafBack * lit, back * band * .7 * (1. - sqrt(max(h, 0.))) * clamp(n.y + .4, 0., 1.));
     color *= mix(.6, 1., underside);
@@ -359,22 +361,27 @@ void main() {
     color = mix(color, field, smoothstep(300., 1500., dist) * .8);
     color = mix(color, leafBack * lit, goldenHour * back * smoothstep(.2, .9, n.y) * (1. - sqrt(max(h, 0.))) * .9);
   } else {
-    vec2 q = vUv * 2. - 1.; float body = 1. - dot(q, q), seed = vPart.a, leaf;
+    vec2 q = vUv * 2. - 1.; float body = 1. - dot(q, q), seed = vPart.a, leaf, facing = 1.;
     if (needle > .5) {
       float tooth = abs(fract(vUv.x * 3. + seed * 7.) - .5) * 2., ragged = worldNoise(vec2(vUv.x * 9., seed * 11.));
       if (vUv.y > .72 + .28 * (1. - tooth) * (.6 + .4 * ragged)) discard;
       leaf = .76 + .24 * worldNoise(vec2(vUv.x * 30., vUv.y * 5. + seed * 3.));
     } else if (part < .2) {
       leaf = .72 + .2 * worldNoise(vWorld.xz * 1.1 + vWorld.y * .7);
-    } else if (dist > mix(75., 110., seed)) {
-      if (body + (worldNoise(vUv * 3.5 + seed * 17.) - .5) * .8 + (worldNoise(vUv * 9. + seed * 5.) - .5) * .3 < .3) discard;
-      leaf = .92;
     } else {
-      leaf = leaves(vUv, seed);
-      if (leaf <= 0. && body < .62) discard;
-      if (leaf <= 0.) leaf = .84;
+      facing = abs(dot(normalize(cross(dFdx(vWorld), dFdy(vWorld))), v));
+      if (facing < .18) discard;
+      facing = smoothstep(.18, .5, facing);
+      if (dist > mix(75., 110., seed)) {
+        if (body + (worldNoise(vUv * 3.5 + seed * 17.) - .5) * .8 + (worldNoise(vUv * 9. + seed * 5.) - .5) * .3 < .3) discard;
+        leaf = .92;
+      } else {
+        leaf = leaves(vUv, seed);
+        if (leaf <= 0. && body < .62) discard;
+        if (leaf <= 0.) leaf = .84;
+      }
     }
-    color = foliage(normalize(vNormal), v, vPart.r, needle, vSeed, leaf);
+    color = foliage(normalize(vNormal), v, vPart.r, needle, vSeed, leaf, facing, step(.2, part) * (1. - needle));
   }
   gl_FragColor = vec4(treeAir(color), 1.);
 }`;

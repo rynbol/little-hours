@@ -126,18 +126,33 @@ test('a spreading tree holds a wide flat canopy lower than a round crown, and it
   scene.dispose();
 });
 
-test('day canopy shade leans teal under warm lit tops and settles back to the old haze green past the valley', () => {
+test('near trees keep a green shade, teal shade starts past every near tree and hero oak, and the far shade settles to haze green', () => {
   const hue = hex => {
     const [r, g, b] = [1, 3, 5].map(k => parseInt(hex.slice(k, k + 2), 16) / 255), max = Math.max(r, g, b), d = max - Math.min(r, g, b);
     return Math.round(60 * (max === g ? (b - r) / d + 2 : max === r ? ((g - b) / d + 6) % 6 : (r - g) / d + 4));
   };
   const { day } = WORLD_ATMOSPHERES;
-  assert.deepEqual({ under: hue(day.leafUnder), top: hue(day.leafTop), haze: day.leafHaze }, { under: 158, top: 80, haze: '#2f5a2e' });
+  assert.deepEqual({ near: hue(day.leafUnder), mid: hue(day.leafMid), top: hue(day.leafTop), haze: day.leafHaze }, { near: 116, mid: 158, top: 80, haze: '#2f5a2e' });
   const { scene, trees } = forestScene(true);
   scene.render();
   const fragment = trees.paint.getEffect()._fragmentSourceCode;
-  assert.match(fragment, /leafShade = mix\(leafUnder, leafHaze, smoothstep\(300\., 500\., dist\)\);/);
+  const ramps = fragment.match(/leafShade = mix\(mix\(leafUnder, leafMid, smoothstep\(([\d.]+), ([\d.]+), dist\)\), leafHaze, smoothstep\(([\d.]+), ([\d.]+), dist\)\);/)?.slice(1).map(Number);
+  const farthestNear = Math.max(NEAR_TREES, ...HERO_TREES.map(hero => hero.distance));
+  assert.ok(ramps && ramps[0] > farthestNear, `teal shade starts at ${ramps?.[0]} m, inside the ${farthestNear} m near band`);
+  assert.ok(ramps[1] < ramps[2], `teal shade never reaches full strength before the haze takes over: ${ramps}`);
   assert.match(fragment, /vec3 field = mix\(mix\(leafHaze, needleUnder, needle\)/);
+  scene.dispose();
+});
+
+test('near leaf cards drop out edge-on and take their dusk glow from the clump silhouette, not from each card', () => {
+  const { scene, trees } = forestScene(true);
+  scene.render();
+  const fragment = trees.paint.getEffect()._fragmentSourceCode, foliage = fragment.match(/vec3 foliage\([^)]*\) \{\n([\s\S]*?)\n\}/)[1];
+  assert.match(fragment, /facing = abs\(dot\(normalize\(cross\(dFdx\(vWorld\), dFdy\(vWorld\)\)\), v\)\);\n\s*if \(facing < \.18\) discard;/);
+  assert.match(foliage, /top = mix\(top, leafBack, goldenHour \*.*\* mix\(1\., silhouette, card\)\);/);
+  assert.match(foliage, /float silhouette = max\(pow\(1\. - abs\(dot\(v, n\)\), 1\.2\), smoothstep\(\.3, \.9, n\.y\)\);/);
+  assert.equal(foliage.match(/\* facing/g)?.length, 3);
+  assert.match(fragment, /foliage\(normalize\(vNormal\), v, vPart\.r, needle, vSeed, leaf, facing, step\(\.2, part\) \* \(1\. - needle\)\);/);
   scene.dispose();
 });
 
