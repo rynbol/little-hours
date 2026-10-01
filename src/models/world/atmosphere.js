@@ -25,14 +25,14 @@ export const WORLD_ATMOSPHERES = Object.freeze({
   }),
   rain: Object.freeze({
     sun: sunFrom(0.5, 0.6), sunColor: '#c8ccc0', sunStrength: 0.4,
-    zenith: '#3e443c', high: '#474d42', horizon: '#555c4c', horizonAway: '#555c4c', glow: '#6a6e5e', glowStrength: 0.15, sunGlow: '#6a6e5e', sunGlowStrength: 0, goldenHour: 0,
+    zenith: '#3e443c', high: '#4f5649', horizon: '#555c4c', horizonAway: '#555c4c', glow: '#6a6e5e', glowStrength: 0.15, sunGlow: '#6a6e5e', sunGlowStrength: 0, goldenHour: 0,
     skyAmbient: '#7a8272', groundAmbient: '#4e5642', shadowTint: '#5e665c', shadowLift: 0.7,
-    fogNear: '#5c6252', fogFar: '#4a5045', fogSun: '#6a6e5e', fogDensity: 0.00105, fogHeight: 200, sunFocus: 10, sunScatter: 0, glareFloor: 0.2, glareHeight: 300,
-    mist: '#5c6252', mistStrength: 0.6, ridgeLift: 0.45, ridgeFog: 0.8, ridgeLight: '#666e5e',
+    fogNear: '#4e5547', fogFar: '#4c5446', fogSun: '#6a6e5e', fogDensity: 0.00105, fogHeight: 200, sunFocus: 10, sunScatter: 0, glareFloor: 0.2, glareHeight: 300,
+    mist: '#5c6252', mistStrength: 0.6, ridgeLift: 0.65, ridgeFog: 0.3, ridgeLight: '#363d31',
     cloudLit: '#4c5246', cloudShade: '#3e443a', cloudRim: '#6a6e5e', cloudCover: 0.95,
     water: '#4a5448', waterShallow: '#32382e',
     leafTop: '#64804a', leafUnder: '#3c4c36', leafBack: '#7a8458', leafCrown: '#62784a', needleTop: '#4a6040', needleUnder: '#33402f', bark: '#4a5038',
-    grass: '#7f9a5a', grassLight: '#93a865', grassWarm: '#9ea05e', grassTip: '#94a274', grassFar: '#7a9050', flowerWhite: '#c8ccc4', flowerYellow: '#c8bc78', flowerLilac: '#9c94b0', forestFloor: '#5a7445', rock: '#8a9088', rockDark: '#6c7470', dirt: '#8a8064', sand: '#a8a084', snow: '#e0e4e2', crestGlow: 0,
+    grass: '#7f9a5a', grassLight: '#93a865', grassWarm: '#9ea05e', grassTip: '#94a274', grassFar: '#36442a', flowerWhite: '#c8ccc4', flowerYellow: '#c8bc78', flowerLilac: '#9c94b0', forestFloor: '#5a7445', rock: '#8a9088', rockDark: '#6c7470', dirt: '#8a8064', sand: '#a8a084', snow: '#e0e4e2', crestGlow: 0,
   }),
 });
 

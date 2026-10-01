@@ -440,10 +440,10 @@ ${CLOUD_SHADE}
 void main() {
   if (vKind.y > 1.5) {
     float column = vUv.x * vKind.x, lane = floor(column), h = hash(vec2(lane, vKind.x));
-    float drift = vUv.y * (8. + vKind.x * .02) + time * (1.6 + h * .9) + h * 9., g = hash(vec2(lane, floor(drift))), fall = fract(drift), span = .12 + g * .26;
+    float drift = vUv.y * floor(vKind.y) + time * (1.6 + h * .9) + h * 9., g = hash(vec2(lane, floor(drift))), fall = fract(drift), span = .12 + g * .26;
     float dash = smoothstep(0., .03, fall) * (1. - smoothstep(span * .4, span, fall)) * step(.3, g);
     float thin = 1. - smoothstep(.05, .2, abs(fract(column) - .5)), mist = (1. - smoothstep(0., .45, vUv.y)) * .35 * (1. - smoothstep(.8, 1., abs(vUv.x * 2. - 1.)));
-    float a = (dash * thin * step(.2, h) * .55 + mist) * (vKind.y - 2.) * rain;
+    float a = (dash * thin * step(.2, h) * .55 + mist) * fract(vKind.y) * rain;
     gl_FragColor = vec4(mix(haze, vec3(1.), .5) * a, a);
     return;
   }
@@ -462,16 +462,16 @@ export function sunRayShape() {
   });
   return { positions, uvs, uvs2: uv2s, indices };
 }
-export const RAIN_SHEETS = Object.freeze([{ radius: 6.5, arc: 1.1, low: -1, high: 12, columns: 170, alpha: 0.4 }, { radius: 17, arc: 1.3, low: -2, high: 24, columns: 460, alpha: 0.3 }, { radius: 42, arc: 1.3, low: -3, high: 40, columns: 960, alpha: 0.24 }]);
+export const RAIN_SHEETS = Object.freeze([{ radius: 7, arc: 1.1, low: -1, high: 13, columns: 170, streaks: 6, alpha: 0.3 }, { radius: 30, arc: 1.3, low: -3, high: 34, columns: 560, streaks: 30, alpha: 0.15 }]);
 export const RAIN_SLANT = 14;
 const RAIN_CENTER = [0, -3.5], RAIN_STEPS = 10;
 export function rainShape() {
   const positions = [], uvs = [], uv2s = [], indices = [];
-  for (const { radius, arc, low, high, columns, alpha } of RAIN_SHEETS) {
+  for (const { radius, arc, low, high, columns, streaks, alpha } of RAIN_SHEETS) {
     const start = positions.length / 3, lean = Math.tan(RAIN_SLANT * Math.PI / 180) * (high - low) / 2;
     for (let k = 0; k <= RAIN_STEPS; k++) {
       const u = k / RAIN_STEPS, a = (u * 2 - 1) * arc, x = RAIN_CENTER[0] + Math.sin(a) * radius, z = RAIN_CENTER[1] - Math.cos(a) * radius;
-      for (const [y, v, shift] of [[low, 0, lean], [high, 1, -lean]]) positions.push(x + shift, y, z), uvs.push(u, v), uv2s.push(columns, 2 + alpha);
+      for (const [y, v, shift] of [[low, 0, lean], [high, 1, -lean]]) positions.push(x + shift, y, z), uvs.push(u, v), uv2s.push(columns, streaks + alpha);
       if (k) indices.push(start + k * 2 - 2, start + k * 2 - 1, start + k * 2 + 1, start + k * 2 - 2, start + k * 2 + 1, start + k * 2);
     }
   }

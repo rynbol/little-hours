@@ -95,8 +95,8 @@ test('the fallback valley is calm hills, hamlet, woods and ruins, with no castle
   world.setEnabled(true);
   const land = world.meshes.find(mesh => mesh.name === 'seat-world-land'), effects = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects');
   assert.deepEqual([...new Set(land.metadata.shape.roles)].sort(), ['cliff', 'far', 'field', 'glint', 'grass', 'leaf', 'leafLight', 'meadow', 'mid', 'moss', 'roofs0', 'roofs1', 'roofs2', 'roofs3', 'ruin', 'snow', 'stone', 'trunk', 'valley', 'walls0', 'walls1', 'walls2', 'walls3', 'water', 'window', 'windowWarm']);
-  const kinds = effects.getVerticesData('uv2').filter((_, k) => k % 2 === 1).map(Math.floor);
-  assert.deepEqual([...new Set(kinds)].sort(), [0, 2], 'the sky effects are sunbeams and rain only');
+  const kinds = effects.getVerticesData('uv2').filter((_, k) => k % 2 === 1).map(kind => kind > 1.5 ? 'rain' : kind);
+  assert.deepEqual([...new Set(kinds)].sort(), [0, 'rain'], 'the sky effects are sunbeams and rain only');
   engine.dispose();
 });
 
@@ -509,19 +509,25 @@ test('hamlet roofs read as tiled gables, with a lit and a shaded slope, courses 
   engine.dispose();
 });
 
-test('rain falls in sheets at three depths outside the room, denser and fainter with distance, and only in rain', () => {
+test('rain falls outside the room in two depths, sparse long streaks near and fine faint ones far, at half the old density, and only in rain', () => {
   const { positions, uvs2 } = rainShape(), sheets = new Map();
   for (let v = 0; v < positions.length / 3; v++) {
     const x = positions[v * 3], z = positions[v * 3 + 2], [columns, kind] = [uvs2[v * 2], uvs2[v * 2 + 1]];
-    assert.ok(kind > 2 && kind < 3, 'every rain vertex is marked as rain');
+    assert.ok(kind > 2, 'every rain vertex is marked as rain');
     assert.ok(z < -4.9 || Math.abs(x) > 6.4, `rain at ${x.toFixed(1)}, ${z.toFixed(1)} stays outside the room`);
-    sheets.set(columns, Math.max(sheets.get(columns) ?? 0, Math.hypot(x, z + 3.5)));
+    sheets.set(columns, { reach: Math.max(sheets.get(columns)?.reach ?? 0, Math.hypot(x, z + 3.5)), kind });
   }
-  const reach = [...sheets.entries()].sort((a, b) => a[1] - b[1]);
-  assert.equal(reach.length, 3);
-  assert.ok(reach[2][1] > reach[0][1] * 4, 'the far sheet hangs well beyond the near one');
-  assert.ok(reach.every(([columns], i) => i === 0 || columns > reach[i - 1][0]), 'farther sheets carry more, finer streaks');
-  assert.ok(RAIN_SHEETS.every((sheet, i) => i === 0 || sheet.alpha < RAIN_SHEETS[i - 1].alpha), 'farther sheets are fainter');
+  assert.equal(sheets.size, 2, 'one near layer and one far layer');
+  const [near, far] = RAIN_SHEETS, slots = sheet => sheet.columns * sheet.streaks, streak = sheet => (sheet.high - sheet.low) / sheet.streaks;
+  assert.ok(far.radius > near.radius * 4, 'the far layer hangs well beyond the near one');
+  assert.ok(slots(near) * 10 < slots(far) && streak(near) > streak(far) * 1.5, `near: ${slots(near)} streaks ${streak(near).toFixed(2)} m long; far: ${slots(far)} streaks ${streak(far).toFixed(2)} m long`);
+  assert.ok(far.alpha <= near.alpha * 0.5, 'the far layer is faint');
+  const streaks = RAIN_SHEETS.reduce((sum, sheet) => sum + sheet.columns * sheet.streaks, 0);
+  assert.ok(streaks <= 19000, `${streaks} streak slots, about half the 36000 of the three-sheet rain`);
+  for (const sheet of RAIN_SHEETS) {
+    const { kind } = sheets.get(sheet.columns);
+    assert.equal(Math.floor(kind), sheet.streaks); assert.ok(Math.abs(kind % 1 - sheet.alpha) < 1e-9, 'each vertex carries its layer streak count and strength');
+  }
   const { engine, world } = setup();
   world.setEnabled(true);
   const paint = world.meshes.find(mesh => mesh.name === 'seat-world-sky-effects').material;
@@ -538,7 +544,7 @@ test('rain streaks lean 10 to 15 degrees with the wind, falling toward the side 
     assert.ok(across > 0, 'the foot of each streak lies downwind of its head');
     leans.push(Math.atan2(across, drop) * 180 / Math.PI);
   }
-  assert.equal(leans.length, 33);
+  assert.equal(leans.length, 22);
   assert.ok(leans.every(lean => lean >= 10 && lean <= 15), `streaks lean ${Math.min(...leans).toFixed(1)} to ${Math.max(...leans).toFixed(1)} degrees`);
 });
 

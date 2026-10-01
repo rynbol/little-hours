@@ -11,16 +11,16 @@ const RAIN_RIDGES = `(() => {
   const rowOf = e => V.Project(camera.position.add(new V(0, Math.sin(e * Math.PI / 180), -Math.cos(e * Math.PI / 180)).scale(1000)), identity, transform, screen).y;
   for (let e = 16; e > 0.5; e -= 0.05) { const y = Math.round(rowOf(e)); if (!rows.length || rows[rows.length - 1].y !== y) rows.push({ y, e }); }
   const median = list => [...list].sort((a, b) => a - b)[Math.floor(list.length / 2)];
-  const steps = [], body = [], sky = [];
+  const steps = [], body = [], middle = [], sky = [];
   for (let x = Math.round(width * 0.1); x < width * 0.9; x += 8) {
     const profile = rows.map(({ y }) => median([0, 1, 2, 3, 4].map(k => luma(Math.min(width - 1, x + k), y))));
     let step = 0;
     for (let k = 0; k + 6 < rows.length; k++) if (rows[k].e < 12) step = Math.max(step, profile[k + 6] - profile[k]);
     steps.push(step);
-    rows.forEach(({ e }, k) => { if (e > 1 && e < 3) body.push(profile[k]); if (e > 13.5) sky.push(profile[k]); });
+    rows.forEach(({ e }, k) => { if (e > 1 && e < 3) body.push(profile[k]); if (e > 4 && e < 8) middle.push(profile[k]); if (e > 13.5) sky.push(profile[k]); });
   }
   const mean = list => list.reduce((sum, value) => sum + value, 0) / list.length;
-  return { topStep: Number(median(steps).toFixed(4)), worstStep: Number(Math.max(...steps).toFixed(4)), body: Number(mean(body).toFixed(4)), sky: Number(mean(sky).toFixed(4)), columns: steps.length };
+  return { topStep: Number(median(steps).toFixed(4)), worstStep: Number(Math.max(...steps).toFixed(4)), body: Number(mean(body).toFixed(4)), middle: Number(mean(middle).toFixed(4)), sky: Number(mean(sky).toFixed(4)), columns: steps.length };
 })()`;
 
 const TREES = `(() => {
@@ -92,7 +92,7 @@ async function openWorld(t, theme) {
 }
 
 export default {
-  about: 'valley air: valley trees stay green by day and turn olive with a gold rim at dusk, with gold canopy tops and meadow grass on the sun side; in rain the far ridge layers stand lighter than the sky in their bodies but their tops melt into it with no hard step',
+  about: 'valley air: valley trees stay green by day and turn olive with a gold rim at dusk, with gold canopy tops and meadow grass on the sun side; in rain the near hills stand darker than the sky and the farther ridges recede in lighter layers between them, with soft tops',
   async run(t) {
     const { check } = t;
     for (const theme of ['day', 'dusk']) {
@@ -115,8 +115,9 @@ export default {
     try {
       const ridges = await browser.js(RAIN_RIDGES);
       await browser.shot(join(t.out, 'valley-air-rain.jpg'));
-      check('rain: the ridge bodies stand lighter than the clouds above them', ridges.body > ridges.sky + 0.03, ridges);
-      check('rain: the ridge tops melt into the sky with no hard brightening step', ridges.topStep < 0.03, ridges);
+      check('rain: the near hills stand 6 to 20 percent darker than the sky, so they read as a mass instead of melting into one grey sheet', ridges.body < ridges.sky * 0.94 && ridges.body > ridges.sky * 0.8, ridges);
+      check('rain: the farther ridges step up between the near hills and the sky, so the ranges recede in layers', ridges.middle > ridges.body + 0.005 && ridges.middle < ridges.sky - 0.005, ridges);
+      check('rain: the ridge tops meet the sky as a soft silhouette, not a hard cut', ridges.topStep < 0.06, ridges);
       check('no page errors (world rain)', browser.errors.length === 0, browser.errors.join(' | ').slice(0, 400));
     } finally { await browser.close(); }
   },
