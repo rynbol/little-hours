@@ -37,7 +37,7 @@ export function createTimerUI(app) {
   }
 
   const focusRoomSignature = () => JSON.stringify([app.state.house.activeId, app.state.layout, app.state.theme, app.state.pet, app.state.avatar, app.state.decor]);
-  const focusUnavailable = () => !app.roomReady || app.nav.travelling || app.avatar.active || app.decorate.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.lake.isOpen || $('#session-celebration').open;
+  const focusUnavailable = () => !app.roomReady || app.nav.travelling || app.avatar.active || app.decorate.active || app.nav.houseOpen || app.lake.isOpen || $('#session-celebration').open;
 
   function finishLeavingFocus() {
     if (focusMode !== 'leaving') return;
@@ -212,7 +212,7 @@ export function createTimerUI(app) {
 
   function syncDock() {
     syncFocusMode();
-    if (app.nav.houseOpen || app.nav.connected || app.decorate.active) pill.closeSheet();
+    if (app.nav.houseOpen || app.decorate.active) pill.closeSheet();
   }
 
   function expand() { if (app.panels.current === 'pet') app.panels.close(); syncDock(); }
@@ -301,7 +301,6 @@ export function createTimerUI(app) {
   $('.skip-link').addEventListener('click', async event => {
     event.preventDefault();
     if (app.nav.houseOpen) await app.nav.setHouseOpen(false);
-    if (app.nav.connected) app.nav.setConnectedView(false);
     if (app.decorate.active) app.decorate.setEditMode(false);
     if (app.panels.current) app.panels.close();
     expand();

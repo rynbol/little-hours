@@ -150,7 +150,6 @@ export function installTestHook(app) {
     get speech() { return app.speech; },
     get house() { return app.house; },
     get lake() { return app.lake; },
-    get connected() { return app.connected; },
     ready: (timeout = 30000) => until(() => app.room && document.getElementById('loading-note')?.hidden, timeout, 'the room to be ready').then(() => true),
     busy,
     async settled(timeout = 10000) {

@@ -59,7 +59,6 @@ export function createPanels(app) {
     if (app.nav.travelling && ['avatar', 'pet'].includes(button.dataset.panel) && current !== button.dataset.panel) return;
     if (['avatar', 'pet'].includes(button.dataset.panel) && current !== button.dataset.panel) {
       if (app.decorate.active) app.decorate.setEditMode(false);
-      if (app.nav.connected) app.nav.setConnectedView(false);
       app.roomUI.leaveMini();
     }
     open(current === button.dataset.panel ? null : button.dataset.panel);
