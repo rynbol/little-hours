@@ -653,6 +653,19 @@ try {
         assert.ok(height > 0.085 && height / width > 1.8, `the sill candle flame at ${x} is a tall teardrop`);
       }
       assert.ok(sillX.filter(x => waxPoints.some(p => p.y < 1.562 && Math.hypot(p.x - x, p.z + 4.05) > 0.085 && Math.hypot(p.x - x, p.z + 4.05) < 0.13)).length >= 4, 'wax runs down the sill candles and pools in their dishes');
+      const embers = points('paint-#ff9a4a:{"emissive":"#ff8a2e","emissiveIntensity":1.25,"flame":"tip"}'), wick = points('paint-#4d5148:{}'), shadeMesh = lights.getChildMeshes().find(mesh => mesh.name === 'sill-dish-shade');
+      assert.ok(shadeMesh?.hasVertexAlpha, 'the sill candle dishes settle into a soft shade on the sill');
+      const shadePositions = shadeMesh.getVerticesData('position'), shadeColors = shadeMesh.getVerticesData('color'), shadeWorld = shadeMesh.computeWorldMatrix(true);
+      sillX.forEach((x, i) => {
+        const top = 1.555 + 0.20 + (i % 3) * 0.11, ring = waxPoints.filter(p => Math.abs(Math.hypot(p.x - x, p.z + 4.05) - 0.064) < 0.01 && p.y > top - 0.03 && p.y < top + 0.01).map(p => p.y);
+        assert.ok(Math.max(...ring) - Math.min(...ring) > 0.009, `the sill candle at ${x} has a slumped, uneven melted rim`);
+        assert.ok(waxPoints.some(p => Math.hypot(p.x - x, p.z + 4.05) < 0.03 && p.y < top - 0.022 && p.y > top - 0.03), `the sill candle at ${x} has a deep melted crater`);
+        assert.ok(wick.some(p => Math.abs(p.x - x) < 0.008 && p.y > top) && embers.some(p => Math.abs(p.x - x - 0.003) < 0.01 && Math.abs(p.y - top - 0.012) < 0.009), `the sill candle wick at ${x} chars dark and glows at its tip`);
+        let inner = 0; for (let v = 0; v < shadePositions.length / 3; v++) { const point = Vector3.TransformCoordinates(new Vector3(shadePositions[v * 3], shadePositions[v * 3 + 1], shadePositions[v * 3 + 2]), shadeWorld); if (Math.abs(Math.hypot(point.x - x, point.z + 4.05) - 0.1) < 0.005) inner = Math.max(inner, shadeColors[v * 4 + 3]); }
+        const below = scene.pickWithRay(new Ray(new Vector3(x + 0.16, 3, -4.05), new Vector3(0, -1, 0), 3), mesh => mesh.isEnabled() && mesh.isVisible && !mesh.isDescendantOf(lights) && !mesh.metadata?.effect);
+        const lift = Vector3.TransformCoordinates(Vector3.Zero(), shadeWorld).y - below.pickedPoint.y;
+        assert.ok(inner > 0.35 && lift > 0.0015 && lift < 0.004, `the shade under the sill candle dish at ${x} lies just above the sill (alpha ${inner.toFixed(2)}, lift ${lift.toFixed(4)})`);
+      });
       const drape = name => shell.getChildMeshes().filter(mesh => mesh.material?.name === name).flatMap(mesh => { mesh.computeWorldMatrix(true); const p = mesh.getVerticesData('position'), out = []; for (let i = 0; i < p.length; i += 3) out.push(Vector3.TransformCoordinates(new Vector3(p[i], p[i + 1], p[i + 2]), mesh.getWorldMatrix())); return out; });
       const cloth = drape('paint-#a88380:{}'), shade = drape('paint-#8c686d:{}');
       for (const side of [-1, 1]) {
