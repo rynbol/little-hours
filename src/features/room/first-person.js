@@ -137,7 +137,7 @@ export function createFirstPersonView(scene, canvas, { roomCamera, seat, roomFra
   function compileShaders(pending, budget) {
     const previous = scene.activeCamera, until = performance.now() + budget;
     scene.activeCamera = camera;
-    while (pending.length) { const [mesh, subMesh] = pending.pop(); if (!mesh.isDisposed()) subMesh.getMaterial()?.isReadyForSubMesh(mesh, subMesh, mesh.hasInstances || mesh.hasThinInstances); if (performance.now() >= until) break; }
+    while (pending.length) { const [mesh, subMesh] = pending.pop(); if (!mesh.isDisposed()) { subMesh.materialDefines?.markAsUnprocessed(); subMesh.getMaterial()?.isReadyForSubMesh(mesh, subMesh, mesh.hasInstances || mesh.hasThinInstances); } if (performance.now() >= until) break; }
     scene.activeCamera = previous;
     return pending.length;
   }
