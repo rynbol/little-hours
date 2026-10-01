@@ -4,16 +4,18 @@ import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 
-export const SKY_COLORS = Object.freeze(['zenith', 'high', 'horizon', 'glow', 'fogFar', 'fogSun']);
+export const SKY_COLORS = Object.freeze(['zenith', 'high', 'horizon', 'horizonAway', 'glow', 'fogFar', 'fogSun']);
 export const SKY_UNIFORMS = Object.freeze(['sun', 'glowStrength', ...SKY_COLORS]);
 
 export const SKY_GLSL = `
-uniform vec3 sun, zenith, high, horizon, glow, fogFar, fogSun; uniform float glowStrength;
+uniform vec3 sun, zenith, high, horizon, horizonAway, glow, fogFar, fogSun; uniform float glowStrength;
 vec3 worldSky(vec3 d) {
   float up = d.y, toward = max(dot(d, sun), 0.), lift = smoothstep(0., .62, up);
-  vec3 color = mix(horizon, high, smoothstep(0., .3, lift));
+  float sunward = dot(normalize(d.xz + vec2(1e-4)), normalize(sun.xz + vec2(1e-4))) * .5 + .5;
+  vec3 color = mix(mix(horizonAway, horizon, sunward * sunward), high, smoothstep(0., .3, lift));
   color = mix(color, zenith, smoothstep(.3, 1., lift));
-  color = mix(color, glow, pow(toward, 5.) * glowStrength * (1. - .45 * lift));
+  color = mix(color, horizon, clamp(pow(toward, 10.) * .5 * glowStrength * (1. - .5 * lift), 0., 1.));
+  color = mix(color, glow, clamp(pow(toward, 56.) * .6 * glowStrength, 0., 1.));
   vec3 air = mix(fogFar, fogSun, pow(toward, 8.) * .9);
   return mix(air, color, smoothstep(-.025, .09, up));
 }`;
@@ -28,8 +30,8 @@ ${SKY_GLSL}
 void main() {
   vec3 d = normalize(vDir); float toward = max(dot(d, sun), 0.);
   vec3 color = worldSky(d);
-  color = min(color + glow * (pow(toward, 60.) * .12 + pow(toward, 900.) * .2) * glowStrength, vec3(.96));
-  color = mix(color, vec3(1.), smoothstep(.99985, .99991, toward) * smoothstep(.2, .5, glowStrength));
+  color += glow * (pow(toward, 220.) * .4 + pow(toward, 2400.) * .8) * glowStrength;
+  color = mix(min(color, vec3(1.)), vec3(1.), smoothstep(.99988, .99993, toward) * smoothstep(.2, .5, glowStrength));
   gl_FragColor = vec4(color, 1.);
 }`;
 

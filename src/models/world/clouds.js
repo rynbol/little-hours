@@ -3,8 +3,11 @@ import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
 import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
+import { Vector4 } from '@babylonjs/core/Maths/math.vector.js';
 import { heightAt, WORLD } from '../../core/world-terrain.js';
 import { WORLD_GLSL, AIR_UNIFORMS, applyAir, followEye } from './world-glsl.js';
+import { SKY_GLSL, SKY_UNIFORMS, applySkyTheme } from './sky.js';
+import { LANDMARKS, PLUME } from './landmarks.js';
 
 export const CLOUD_KINDS = Object.freeze({ cumulus: 0, wisp: 1, mist: 2 });
 export const CLOUD_BANKS = Object.freeze([
@@ -13,6 +16,14 @@ export const CLOUD_BANKS = Object.freeze([
   Object.freeze({ kind: 'mist', count: 24, distance: [260, 1900], base: [-6, -3], width: [160, 420], tall: [0.07, 0.12], spin: 0 }),
 ]);
 const CLOUD_COLORS = ['cloudLit', 'cloudShade', 'cloudRim'];
+export const PLUME_COLUMN = Object.freeze({ x: LANDMARKS.volcano.x, z: LANDMARKS.volcano.z, reach: 0.1, summit: LANDMARKS.volcano.summit + PLUME.rise * 0.1 });
+
+export function clearsPlume({ x, y, z, halfWidth, halfHeight }, eye = [0, 0]) {
+  const cardX = x - eye[0], cardZ = z - eye[1], plumeX = PLUME_COLUMN.x - eye[0], plumeZ = PLUME_COLUMN.z - eye[1], out = Math.hypot(cardX, cardZ);
+  const apart = Math.acos(Math.max(-1, Math.min(1, (cardX * plumeX + cardZ * plumeZ) / (out * Math.hypot(plumeX, plumeZ)))));
+  const reach = halfWidth / out + PLUME_COLUMN.reach, above = y / out > PLUME_COLUMN.summit / Math.hypot(plumeX, plumeZ);
+  return !above || apart > reach * 1.25 + 0.03;
+}
 
 const seeded = seed => () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const span = ([low, high], t) => low + (high - low) * t;
@@ -28,7 +39,9 @@ export function cloudCards(seed = WORLD.seed) {
       let base = span(bank.base, random());
       if (bank.kind === 'mist') { if (ground > WORLD.valleyFloor + 2) continue; base += ground; }
       else if (base < ground + 120) continue;
-      cards.push({ kind: CLOUD_KINDS[bank.kind], x, y: base + halfHeight * 0.6, z, halfWidth, halfHeight, spin: bank.spin, seed: random() * 97 });
+      const card = { kind: CLOUD_KINDS[bank.kind], x, y: base + halfHeight * 0.6, z, halfWidth, halfHeight, spin: bank.spin, seed: random() * 97 };
+      if (bank.kind !== 'mist' && !clearsPlume(card)) continue;
+      cards.push(card);
       placed++;
     }
   }
@@ -50,22 +63,27 @@ export function cloudShape(cards) {
 
 const CLOUD_VERTEX = `precision highp float;
 attribute vec3 position; attribute vec2 uv, uv2; attribute vec4 color;
-uniform mat4 world, viewProjection; uniform vec3 eye; uniform float time;
-varying vec3 vWorld; varying vec2 vUv, vSeed; varying float vAspect;
+uniform mat4 world, viewProjection; uniform vec3 eye; uniform vec4 plume; uniform float time;
+varying vec3 vWorld; varying vec2 vUv, vSeed; varying float vAspect, vClear;
 void main() {
   float spin = time * color.z, s = sin(spin), c = cos(spin);
   vec3 center = (world * vec4(c * position.x - s * position.z, position.y, s * position.x + c * position.z, 1.)).xyz;
   vec3 view = center - eye; vec3 side = normalize(vec3(-view.z, 0., view.x));
   vWorld = center + side * uv.x * color.x + vec3(0., uv.y * color.y, 0.);
+  vec2 toCard = center.xz - eye.xz, toPlume = plume.xy - eye.xz; float range = length(toCard);
+  float apart = acos(clamp(dot(toCard / range, normalize(toPlume)), -1., 1.)), reach = color.x / range + plume.z;
+  float above = step(plume.w / length(toPlume), (center.y - eye.y) / range);
+  vClear = uv2.y > 1.5 ? 1. : 1. - above * (1. - smoothstep(reach, reach * 1.25 + .03, apart));
   vAspect = color.x / color.y; vUv = vec2(uv.x * vAspect, uv.y); vSeed = uv2;
   gl_Position = viewProjection * vec4(vWorld, 1.);
 }`;
 
 const CLOUD_FRAGMENT = `precision highp float;
-varying vec3 vWorld; varying vec2 vUv, vSeed; varying float vAspect;
-uniform vec3 eye, sun, fogNear, fogFar, fogSun, cloudLit, cloudShade, cloudRim;
+varying vec3 vWorld; varying vec2 vUv, vSeed; varying float vAspect, vClear;
+uniform vec3 eye, fogNear, cloudLit, cloudShade, cloudRim;
 uniform float time, fogDensity, fogHeight, cloudCover, sunStrength;
 ${WORLD_GLSL}
+${SKY_GLSL}
 void main() {
   vec2 p = vUv; float seed = vSeed.x, kind = vSeed.y, a;
   float toward = pow(max(dot(normalize(vWorld - eye), sun), 0.), 6.);
@@ -84,8 +102,8 @@ void main() {
     float lit = smoothstep(-.55, .55, p.y + (n - .5) * .8 + lump * .25);
     color = mix(cloudShade, cloudLit, lit);
     color = mix(color, cloudLit, toward * .5 * (1. - lit));
-    color = mix(color, cloudShade, toward * .3 * smoothstep(.1, .6, body));
-    color += cloudRim * smoothstep(0., .12, body) * pow(1. - smoothstep(0., .5, body), 2.) * pow(toward, 4.) * sunStrength * .6;
+    color = mix(color, cloudShade, toward * .2 * smoothstep(.1, 1.2, body));
+    color += cloudRim * smoothstep(0., .15, body) * pow(1. - smoothstep(0., .4, lump), 2.) * pow(toward, 4.) * sunStrength * .6;
   } else if (kind < 1.5) {
     float streak = worldNoise(vec2(p.x * 1.3 + seed, p.y * 5. + time * .004)) * .6 + worldNoise(vec2(p.x * 3.2 - seed, p.y * 12.)) * .4;
     a = smoothstep(.45, .8, streak + (cloudCover - .55) * .3) * (1. - smoothstep(.45, 1., abs(p.x) / vAspect)) * (1. - smoothstep(.1, 1., abs(p.y))) * .55;
@@ -95,21 +113,24 @@ void main() {
     a = smoothstep(.25, .8, veil) * (1. - smoothstep(.3, 1., abs(p.x) / vAspect)) * smoothstep(-1., -.4, p.y) * (1. - smoothstep(-.3, 1., p.y)) * clamp(fogDensity * 1100., .25, .6);
     color = mix(fogNear, fogSun, toward * .6) * (.92 + .16 * smoothstep(-.5, .8, p.y));
   }
-  color = mix(color, worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight), kind > 1.5 ? 1. : .6);
+  vec3 ray = vWorld - eye;
+  color = kind > 1.5 ? worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight) : mix(color, worldSky(normalize(ray)), (1. - exp(-length(ray) * fogDensity * .3)) * .7);
+  a *= vClear;
   gl_FragColor = vec4(color * a, a);
 }`;
 
 export function createWorldClouds(scene, { root, still }) {
-  const paint = new ShaderMaterial('world-cloud-paint', scene, { vertexSource: CLOUD_VERTEX, fragmentSource: CLOUD_FRAGMENT }, { attributes: ['position', 'uv', 'uv2', 'color'], uniforms: ['world', 'viewProjection', 'cloudCover', 'sunStrength', ...CLOUD_COLORS, ...AIR_UNIFORMS], needAlphaBlending: true });
+  const paint = new ShaderMaterial('world-cloud-paint', scene, { vertexSource: CLOUD_VERTEX, fragmentSource: CLOUD_FRAGMENT }, { attributes: ['position', 'uv', 'uv2', 'color'], uniforms: [...new Set(['world', 'viewProjection', 'plume', 'cloudCover', 'sunStrength', ...CLOUD_COLORS, ...SKY_UNIFORMS, ...AIR_UNIFORMS])], needAlphaBlending: true });
   paint.backFaceCulling = false; paint.disableDepthWrite = true; paint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF;
   followEye(scene, paint, still);
+  paint.setVector4('plume', new Vector4(PLUME_COLUMN.x, PLUME_COLUMN.z, PLUME_COLUMN.reach, PLUME_COLUMN.summit));
   const cards = cloudCards(), clouds = new Mesh('world-clouds', scene);
   Object.assign(new VertexData(), cloudShape(cards)).applyToMesh(clouds);
   clouds.material = paint; clouds.parent = root; clouds.isPickable = false; clouds.alwaysSelectAsActiveMesh = true; clouds.metadata = { castShadow: false, world: true };
   return {
     clouds, cards,
     setTheme(atmosphere) {
-      applyAir(paint, atmosphere);
+      applySkyTheme(paint, atmosphere); applyAir(paint, atmosphere);
       paint.setFloat('cloudCover', atmosphere.cloudCover); paint.setFloat('sunStrength', atmosphere.sunStrength);
       for (const key of CLOUD_COLORS) paint.setColor3(key, Color3.FromHexString(atmosphere[key]));
     },

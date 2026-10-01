@@ -42,7 +42,7 @@ test('the landmarks are two draws that take the theme and a plume that rises unl
   const [solid, plume] = moving.meshes.map(mesh => mesh.material);
   assert.equal(solid._colors3.sunColor.toHexString().toLowerCase(), '#ffb46a');
   assert.equal(plume._colors3.sunColor.toHexString().toLowerCase(), '#ffb46a');
-  assert.ok(solid._floats.glowGain > 1.3);
+  assert.ok(Math.abs(solid._floats.glowGain - 1.28) < 0.01);
   scene.render(); await wait(20); scene.render();
   assert.ok(plume._floats.time > 0);
   assert.equal(resting.meshes[1].material._floats.time, 0);

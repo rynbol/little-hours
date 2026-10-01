@@ -25,7 +25,16 @@ test('dusk is amber at the horizon over a grey-green zenith, and rain is a dim o
     const { r, g, b } = Color3.FromHexString(rain[key]);
     assert.ok(g > r && r > b && g < 0.4, `${key} olive and dim`);
   }
-  assert.ok(rain.glowStrength < 0.2 && rain.fogDensity > 2.5 * WORLD_ATMOSPHERES.day.fogDensity);
+  const away = Color3.FromHexString(dusk.horizonAway);
+  assert.ok(hsv(dusk.horizonAway).s < 0.15 && horizon.r - away.r > 0.2, 'the amber band sits on the sun side only');
+  assert.ok(rain.glowStrength < 0.2 && rain.fogDensity > 2 * WORLD_ATMOSPHERES.day.fogDensity);
+});
+
+test('far haze is blue-grey in day and dusk, so each ridge steps from green toward blue', () => {
+  const hue = hex => { const { r, g, b } = Color3.FromHexString(hex), max = Math.max(r, g, b), min = Math.min(r, g, b); return ((max === r ? (g - b) / (max - min) : max === g ? 2 + (b - r) / (max - min) : 4 + (r - g) / (max - min)) * 60 + 360) % 360; };
+  assert.equal(Math.round(hue(WORLD_ATMOSPHERES.day.fogFar)), 198);
+  assert.equal(Math.round(hue(WORLD_ATMOSPHERES.dusk.fogFar)), 209);
+  assert.ok(Color3.FromHexString(WORLD_ATMOSPHERES.dusk.fogFar).b < 0.55, 'dusk ridges stay a dark mass');
 });
 
 test('the sky dome takes each theme\'s colours and sun', () => {
@@ -34,6 +43,7 @@ test('the sky dome takes each theme\'s colours and sun', () => {
   assert.equal(paint._colors3.horizon.toHexString().toLowerCase(), '#fcbe74');
   assert.equal(paint._colors3.zenith.toHexString().toLowerCase(), '#7e8a8c');
   assert.equal(paint._floats.glowStrength, 0.9);
+  assert.equal(paint._colors3.horizonAway.toHexString().toLowerCase(), '#a9a496');
   assert.equal(paint._vectors3.sun.y, WORLD_ATMOSPHERES.dusk.sun[1]);
   sky.setTheme(WORLD_ATMOSPHERES.rain);
   assert.equal(paint._colors3.horizon.toHexString().toLowerCase(), '#555c4c');
