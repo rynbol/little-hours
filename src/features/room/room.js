@@ -44,7 +44,7 @@ import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
-import { ROOM_LIGHTS, seatedDim, deskLamp, gradeFocus, roomBloom } from './room-lighting.js';
+import { ROOM_LIGHTS, seatedDim, deskLamp, gradeFocus, roomBloom, bloomEmission } from './room-lighting.js';
 import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
 import { createSunbeam, CLASSIC_WINDOW } from './room-sunbeam.js';
 import { createLanternGlow } from './room-lantern-glow.js';
@@ -200,7 +200,7 @@ export function createRoom(container, options = {}) {
     for (const mesh of mobileCompanion.root.getChildMeshes()) mesh.layerMask |= portraitMask;
     mobileCompanion.contact.layerMask |= portraitMask;
   }
-  const bloom = new GlowLayer('candlelight-bloom', scene, { mainTextureFixedSize: 512, blurKernelSize: 48 }); bloom.intensity = 0.34;
+  const bloom = new GlowLayer('candlelight-bloom', scene, { mainTextureFixedSize: 512, blurKernelSize: 48 }); bloom.intensity = 0.34; bloom.customEmissiveColorSelector = (mesh, subMesh, material, result) => bloomEmission(material, storybook.amount, result);
   const glowingMeshes = new Set();
 
   // A generous timber retreat: deep floorboards, paneled walls and exposed beams.

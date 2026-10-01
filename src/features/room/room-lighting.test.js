@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ColorCurves } from '@babylonjs/core/Materials/colorCurves.js';
-import { seatedDim, deskLamp, LAMP_AT, gradeFocus, roomBloom } from './room-lighting.js';
+import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
+import { seatedDim, deskLamp, LAMP_AT, gradeFocus, roomBloom, bloomEmission } from './room-lighting.js';
 
 test('seated at dusk or in rain, the room ambient and key light dim so the lamp and candles lead', () => {
   assert.equal(seatedDim('day', 1), 1);
@@ -46,4 +47,12 @@ test('seated, candle and lamp bloom roughly doubles so flames carry soft halos, 
   assert.equal(roomBloom('dusk', 0), 0.4);
   assert.ok(roomBloom('dusk', 1) > roomBloom('rain', 1) && roomBloom('rain', 1) > roomBloom('day', 1));
   assert.ok(roomBloom('dusk', 1) <= 1.4, 'halos stay soft, not a wash');
+});
+
+test('seated, glowing paint like the laptop screen blooms faintly so it keeps its page, while flames keep full halos', () => {
+  const paint = { name: 'detail-glow', emissiveColor: new Color3(0.66, 0.64, 0.58), alpha: 1 }, flame = { name: 'candle-flame', emissiveColor: new Color3(1, 0.8, 0.5), alpha: 1 };
+  assert.deepEqual(bloomEmission(paint, 0, new Color4()).asArray(), [0.66, 0.64, 0.58, 1]);
+  const seated = bloomEmission(paint, 1, new Color4());
+  assert.ok(seated.r * roomBloom('dusk', 1) < 0.3, `screen glow ${seated.r * roomBloom('dusk', 1)} at dusk would wash the page out`);
+  assert.deepEqual(bloomEmission(flame, 1, new Color4()).asArray(), [1, 0.8, 0.5, 1]);
 });

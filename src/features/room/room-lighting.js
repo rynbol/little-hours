@@ -8,6 +8,12 @@ export const seatedDim = (theme, blend) => 1 - blend * (1 - ROOM_LIGHTS[theme].s
 
 export const roomBloom = (theme, blend) => { const [room, seated] = ROOM_LIGHTS[theme].bloom; return room + (seated - room) * blend; };
 
+export const SEATED_PAINT_BLOOM = 0.3;
+export function bloomEmission(material, blend, result) {
+  const share = material.name.startsWith('detail-glow') ? 1 - (1 - SEATED_PAINT_BLOOM) * blend : 1, { r, g, b } = material.emissiveColor;
+  return result.set(r * share, g * share, b * share, material.alpha);
+}
+
 export const LAMP_AT = Object.freeze({ room: [0.85, 2.08, -0.35], seated: [0.96, 1.98, -0.69] });
 
 export function deskLamp(theme, blend) {
