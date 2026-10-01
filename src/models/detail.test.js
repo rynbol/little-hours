@@ -154,7 +154,7 @@ test('the laptop keyboard staggers its rows around modifier keys and a wide cent
   const bottom = row(-0.17 + 4 * 0.048), home = row(-0.17 + 2 * 0.048), numbers = row(-0.17);
   assert.ok(bottom.length && !bottom.some(x => Math.abs(x) < 0.14) && bottom.some(x => x < -0.145) && bottom.some(x => x > 0.145), 'one spacebar spans the middle of the bottom row');
   assert.ok(Math.max(...home.map(x => Math.min(...numbers.map(n => Math.abs(n - x))))) > 0.006, 'the home row is staggered against the number row');
-  assert.ok(shadows.length > 100 && Math.min(...shadows) > -0.335 && Math.max(...shadows) < 0.335 && Math.max(...tops.map(([x]) => Math.abs(x))) < 0.33, 'the keys sit in shaded seats inside the original keyboard width');
+  assert.ok(shadows.length >= 40 && shadows.length <= 200 && Math.min(...shadows) > -0.335 && Math.max(...shadows) < 0.335 && Math.max(...tops.map(([x]) => Math.abs(x))) < 0.33, `the keys sit in one cheap shaded seat per row inside the original keyboard width: ${shadows.length} seat vertices`);
   disposeDetails(scene); engine.dispose();
 });
 

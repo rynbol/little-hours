@@ -85,11 +85,11 @@ def laptop():
     pitch, gap = 0.05, 0.006
     for row, widths in enumerate(KEY_ROWS):
         x, z = -pitch * 6.5, -0.17 + row * 0.048
+        parts.append(rbox([sum(widths) * pitch, 0.002, 0.044], (x + sum(widths) * pitch / 2, 0.0245, z), KEY_SHADOW, bevel=0, frame=f))
         for k, units in enumerate(widths):
             w = units * pitch - gap
             centre = x + units * pitch / 2
             accent = (row, k) == (2, 6)
-            parts.append(rbox([w + 0.006, 0.002, 0.044], (centre, 0.0245, z), KEY_SHADOW, bevel=0.002, frame=f))
             parts.append(rbox([w, 0.009, 0.038], (centre, 0.025, z), '#c9a46c' if accent else KEY_SKIRT, bevel=0.005, segments=2, frame=f))
             parts.append(rbox([w - 0.009, 0.004, 0.028], (centre, 0.0305, z - 0.002), '#e0bb82' if accent else KEY_TOP, bevel=0.003, segments=2, frame=f))
             x += units * pitch
