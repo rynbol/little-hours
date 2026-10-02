@@ -1,3 +1,5 @@
+import { drawnRatio, ratioCeiling } from '../chrome.mjs';
+
 export default {
   about: 'the house page: the dollhouse arrives closed, opens, closes on the toggle, picks a room from the 3D view, comes back fast, grows a tree per study day, lets you stroll the garden when you are not focusing, and turns freely',
   async run(t) {
@@ -89,6 +91,8 @@ export default {
     await app.clickSel('#rooms-button');
     await app.waitFor('Boolean(window.__littleHours.house.diagnostics())', { what: 'the house' });
     check('reduced motion: the house is open at once', (await app.house()).open === 1);
+    const drawn = await app.js(drawnRatio('house'));
+    check('the island draws at the screen pixel ratio, capped at 2, or at 0.6 on a software renderer', Math.abs(drawn.drawn - ratioCeiling(drawn)) < 1e-6, drawn);
     await sleep(1500); const c0 = (await app.house()).renderCount; await sleep(1500); const c1 = (await app.house()).renderCount;
     check('reduced motion: nothing keeps drawing', c1 === c0, `${c0} → ${c1}`);
     await app.clickSel('[data-house-open]'); await sleep(150);

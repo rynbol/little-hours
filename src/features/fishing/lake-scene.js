@@ -26,6 +26,7 @@ import { POND_EXIT, lakeWater } from './lake-ground.js';
 import { placeAsset } from '../../models/assets.js';
 import { POND, POND_PATH, pondRim as rim, createLakeBank, createLakeGrass } from './lake-ground.js';
 import { buildFishModel } from '../../models/fish-model.js';
+import { renderRatioCeiling } from '../../core/render-scale.js';
 
 const cardSide = new Vector3(), DOCK_Y = .42, STAND = new Vector3(0, DOCK_Y, 1.35), HOME_BOBBER = new Vector3(-.15, 0, .2);
 const PALETTES = {
@@ -102,7 +103,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', 'A quiet pond at the end of a little wooden dock');
   container.appendChild(canvas);
   const engine = new Engine(canvas, true, { alpha: true, stencil: false, powerPreference: 'high-performance' });
-  engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, 2));
+  engine.setHardwareScalingLevel(1 / renderRatioCeiling(window.devicePixelRatio, engine.getGlInfo?.()?.renderer));
   const scene = new Scene(engine); scene.useRightHandedSystem = true;
   scene.clearColor = new Color4(0, 0, 0, 0);
   scene.skipPointerMovePicking = true; scene.skipPointerDownPicking = true; scene.skipPointerUpPicking = true;

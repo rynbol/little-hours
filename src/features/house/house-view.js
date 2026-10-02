@@ -32,6 +32,7 @@ import { createIslandRain } from './house-rain.js';
 import { createPainterly } from '../../models/painterly.js';
 import { ISLAND_ATMOSPHERES, ISLAND_SUN, islandSkyArt } from './island-atmosphere.js';
 import { nextExpansion, roomDisplayName } from '../../core/house.js';
+import { renderRatioCeiling } from '../../core/render-scale.js';
 import './whole-house.css';
 
 const PIN_ICONS = {
@@ -50,7 +51,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', 'Your miniature cottage. Choose a room or building site. Use the room navigation to choose with a keyboard.');
   container.appendChild(canvas);
   const engine = new Engine(canvas, true, { alpha: true, stencil: false, powerPreference: 'low-power' });
-  engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, 2));
+  engine.setHardwareScalingLevel(1 / renderRatioCeiling(window.devicePixelRatio, engine.getGlInfo?.()?.renderer));
   const scene = new Scene(engine); scene.useRightHandedSystem = true; scene.clearColor = new Color4(0, 0, 0, 0);
   const painterly = createPainterly(scene, theme);
   scene.imageProcessingConfiguration.toneMappingEnabled = true;

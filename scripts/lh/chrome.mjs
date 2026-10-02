@@ -11,6 +11,8 @@ export const chromePath = process.env.CHROME_PATH || (process.platform === 'darw
   : '/usr/bin/google-chrome');
 
 export const gpuFlag = process.env.LH_ANGLE || (process.platform === 'darwin' ? 'metal' : 'swiftshader');
+export const drawnRatio = view => `(() => { const e = window.__littleHours.${view}.diagnostics().engine; return { drawn: 1 / e.getHardwareScalingLevel(), screen: window.devicePixelRatio }; })()`;
+export const ratioCeiling = ratio => Math.min(ratio.screen, gpuFlag === 'swiftshader' ? 0.6 : 2);
 
 const open = new Set();
 
