@@ -4,6 +4,8 @@ import { grassBlades } from '../world/grass-blades.js';
 import { wildsAtmosphere } from './atmosphere.js';
 import { createWildsTerrainPaint } from './ground.js';
 import { createWildsGrass } from './grass.js';
+import { createWildsShadows } from './light.js';
+import { createWildsPost } from './post.js';
 import { LANDMARKS } from '../world/landmarks.js';
 import { WARDEN_ARENA } from '../../core/wilds/combat.js';
 
@@ -40,6 +42,8 @@ export async function createWildsWorld(scene, { theme = 'day', still = false, wo
   for (const mesh of outdoor.terrain) mesh.material = ground.paint;
   const grass = createWildsGrass(scene, { root: outdoor.root, atmosphere: outdoor.atmosphere, still, surface: outdoor.surfaceAt });
   ground.setTheme(outdoor.atmosphere);
+  const shadows = createWildsShadows(scene, { atmosphere: outdoor.atmosphere, paints: [ground.paint, grass.mesh.material] });
+  const post = createWildsPost(scene, { atmosphere: outdoor.atmosphere });
   const forest = outdoor.layers.find(layer => layer.planted), trees = outdoor.trees;
   const allObstacles = Array.from({ length: trees.count }, (_, index) => ({
     id: `forest-tree-${index}`, x: trees.x[index], z: trees.z[index],
@@ -60,7 +64,7 @@ export async function createWildsWorld(scene, { theme = 'day', still = false, wo
     root: outdoor.root, spawn, obstacles, landmarks, bounds: TERRAIN_RINGS.at(-1), refreshObstacles,
     get atmosphere() { return outdoor.atmosphere; },
     surfaceAt: outdoor.surfaceAt,
-    setTheme(next) { outdoor.setTheme(next); ground.setTheme(outdoor.atmosphere); grass.setTheme(outdoor.atmosphere); },
+    setTheme(next) { outdoor.setTheme(next); ground.setTheme(outdoor.atmosphere); grass.setTheme(outdoor.atmosphere); shadows.setTheme(outdoor.atmosphere); post.setTheme(outdoor.atmosphere); },
     update({ position }) {
       if (disposed || !position) return;
       refreshObstacles(position);
@@ -76,18 +80,19 @@ export async function createWildsWorld(scene, { theme = 'day', still = false, wo
       outdoor.setContactShadow(position.x, position.z, radius, strength);
       ground.setContactShadow(position.x, position.z, radius, strength); grass.setContactShadow(position.x, position.z, radius, strength);
       grass.setWalker(position.x, feetY, position.z, 1);
+      shadows.follow(position.x, feetY, position.z);
     },
     diagnostics() {
       return {
         location: 'Forest trail', scenery: 'forest', lighting: null, center: { x: 0, z: 0 }, pending: false, builds: 1, failures: 0,
         terrainTriangles: outdoor.terrain.reduce((sum, mesh) => sum + mesh.getTotalIndices() / 3, 0),
-        trees: trees.count, grassBlades: grass.blades,
+        trees: trees.count, grassBlades: grass.blades, shadowCasters: shadows.casters(), postCameras: post.cameras(),
         landmarks: landmarks.length, obstacles: obstacles.length, totalObstacles: allObstacles.length, disposed,
       };
     },
     dispose() {
       if (disposed) return;
-      disposed = true; controller.abort(); scene.onDisposeObservable.remove(loading); signal?.removeEventListener('abort', cancel); outdoor.dispose();
+      disposed = true; controller.abort(); scene.onDisposeObservable.remove(loading); signal?.removeEventListener('abort', cancel); post.dispose(); shadows.dispose(); outdoor.dispose();
     },
   };
 }

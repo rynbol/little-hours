@@ -44,13 +44,20 @@ test('the ground field reaches past the farthest ring and carries slope, canopy 
   assert.equal(field.data[4 * 4 + 3], -10000);
 });
 
-test('the Wilds palette changes only ground colours and keeps the Forest sky and light', () => {
+test('the Wilds palette keeps every Forest key and changes only ground, sun and rain air', () => {
+  const ground = ['dirt', 'forestFloor', 'grass', 'grassFar', 'grassLight', 'grassTip', 'grassWarm', 'sand'];
+  const rainAir = ['cloudLit', 'cloudRim', 'cloudShade', 'fogFar', 'fogNear', 'fogSun', 'glow', 'groundAmbient', 'high', 'horizon', 'horizonAway', 'mist', 'skyAmbient', 'zenith'];
+  const allowed = { day: [...ground, 'sun'], dusk: [...ground, 'sun'], rain: [...ground, ...rainAir] };
+  const light = { day: [1, .2], dusk: [.8, .3], rain: [.4, .1] };
   for (const theme of ['day', 'dusk', 'rain']) {
     const wilds = wildsAtmosphere(theme), forest = worldAtmosphere(theme);
+    assert.ok(Object.keys(forest).every(key => key in wilds));
     const changed = Object.keys(forest).filter(key => wilds[key] !== forest[key]);
-    assert.deepEqual(changed.sort(), ['dirt', 'forestFloor', 'grass', 'grassFar', 'grassLight', 'grassTip', 'grassWarm', 'sand'].filter(key => wilds[key] !== forest[key]));
+    assert.deepEqual(changed.filter(key => !allowed[theme].includes(key)), []);
     assert.ok(changed.includes('grass') && changed.includes('grassFar'));
-    assert.deepEqual(Object.keys(wilds), Object.keys(forest));
+    assert.deepEqual([wilds.shadowStrength, wilds.bloom], light[theme]);
   }
+  assert.ok(wildsAtmosphere('day').sun[1] > worldAtmosphere('day').sun[1]);
+  assert.ok(wildsAtmosphere('dusk').sun[1] > worldAtmosphere('dusk').sun[1]);
   assert.equal(wildsAtmosphere('unknown'), wildsAtmosphere('day'));
 });

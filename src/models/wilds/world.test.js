@@ -9,6 +9,8 @@ import { buildTerrainRings, sampleTerrainSurface } from '../world/terrain-mesh.j
 import { plantTrees } from '../world/trees.js';
 import { wildsAtmosphere } from './atmosphere.js';
 import { WILDS_GRASS } from './grass.js';
+import { WILDS_SHADOW } from './light.js';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { createMovementState, stepMovement } from '../../core/wilds/movement.js';
 import { FOREST_WALK } from '../../features/forest/forest-walk.js';
 
@@ -44,6 +46,35 @@ test('Wilds renders the Forest terrain and trees with its own grass, ground pain
     assert.deepEqual(scene.getMeshByName('world-terrain-0').material._vectors4.contactShadow.asArray(), grass.material._vectors4.contactShadow.asArray());
     assert.equal(world.surfaceAt(13000, 13000), null);
   } finally { world.dispose(); camera.dispose(); scene.dispose(); engine.dispose(); }
+});
+
+test('Wilds sun shadows come from nearby trees and characters, follow the player, and post runs on the active camera only', async () => {
+  const engine = new NullEngine(), scene = new Scene(engine), first = new FreeCamera('first-camera', new Vector3(-106.5, -25, -180), scene);
+  const world = await createWildsWorld(scene, { workers: false, still: true });
+  const hero = MeshBuilder.CreateCapsule('test-hero', {}, scene), flash = MeshBuilder.CreatePlane('test-flash', {}, scene), cat = MeshBuilder.CreateSphere('test-cat', {}, scene);
+  flash.metadata = { castShadow: false }; cat.metadata = { pet: 'cat', cat: true, castShadow: false };
+  try {
+    scene.render();
+    const casters = world.diagnostics().shadowCasters;
+    assert.ok(casters.includes('world-trees-broadleaf-near'));
+    assert.ok(casters.includes('test-hero') && casters.includes('test-cat'));
+    assert.deepEqual(casters.filter(name => /^world-terrain|^wilds-grass$|^test-flash$/.test(name)), []);
+    assert.equal(hero.receiveShadows, true);
+    const sun = scene.getLightByName('wilds-sun'), map = sun.getShadowGenerator().getShadowMap(), grass = scene.getMeshByName('wilds-grass'), terrain = scene.getMeshByName('world-terrain-0');
+    for (const paint of [grass.material, terrain.material]) assert.equal(paint._textures.shadowMap, map);
+    world.update({ position: { x: -120, y: world.surfaceAt(-120, -190).height, z: -190 } }); scene.render();
+    for (const paint of [grass.material, terrain.material]) assert.deepEqual(paint._vectors4.shadowField.asArray(), [-120, -190, WILDS_SHADOW.reach - WILDS_SHADOW.fade, WILDS_SHADOW.reach]);
+    const texel = WILDS_SHADOW.reach * 2 / WILDS_SHADOW.size, right = Vector3.Cross(Vector3.Up(), sun.direction).normalize(), up = Vector3.Cross(sun.direction, right);
+    for (const axis of [right, up]) { const steps = Vector3.Dot(sun.position, axis) / texel; assert.ok(Math.abs(steps - Math.round(steps)) < 1e-4); }
+    assert.ok(Math.abs(Vector3.Dot(sun.position, right) - Vector3.Dot(new Vector3(-120, 0, -190), right)) <= texel);
+    world.setTheme('rain');
+    assert.equal(grass.material._vectors3.shadowForm.y, .4);
+    assert.deepEqual(world.diagnostics().postCameras, ['first-camera']);
+    const second = new FreeCamera('second-camera', new Vector3(-100, -20, -170), scene);
+    scene.activeCamera = second;
+    assert.deepEqual(world.diagnostics().postCameras, ['second-camera']);
+    second.dispose();
+  } finally { world.dispose(); hero.dispose(); flash.dispose(); cat.dispose(); first.dispose(); scene.dispose(); engine.dispose(); }
 });
 
 test('Forest tree colliders match rendered trunks and nearby refresh keeps stable objects', async () => {

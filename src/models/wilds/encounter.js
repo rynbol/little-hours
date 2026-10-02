@@ -96,9 +96,9 @@ export function createEncounter(scene, { petId = 'cat', ribbon = 0, arena, surfa
   const pet = createPet(scene, petId, ribbon); pet.root.parent = root;
   pet.animate({ action: 'stand', moving: false, walked: 0, petAge: Infinity, hearts: [], ritual: null, ritualAge: Infinity }, 0, 0, true);
   pet.contact.setEnabled(false);
-  const telegraph = new Mesh('wilds-warden-telegraph', scene); telegraph.parent = root; telegraph.material = warning; telegraph.isPickable = false; telegraph.setEnabled(false);
-  const skill = new Mesh('wilds-pet-skill', scene); skill.parent = root; skill.material = skillPaint; skill.isPickable = false; skill.setEnabled(false);
-  const slash = new Mesh('wilds-sword-strike', scene); slash.parent = root; slash.material = skillPaint; slash.isPickable = false; slash.setEnabled(false);
+  const telegraph = new Mesh('wilds-warden-telegraph', scene); telegraph.parent = root; telegraph.material = warning; telegraph.isPickable = false; telegraph.metadata = { castShadow: false }; telegraph.setEnabled(false);
+  const skill = new Mesh('wilds-pet-skill', scene); skill.parent = root; skill.material = skillPaint; skill.isPickable = false; skill.metadata = { castShadow: false }; skill.setEnabled(false);
+  const slash = new Mesh('wilds-sword-strike', scene); slash.parent = root; slash.material = skillPaint; slash.isPickable = false; slash.metadata = { castShadow: false }; slash.setEnabled(false);
   const ownedMaterials = scene.materials.filter(material => !previousMaterials.has(material)), ownedTextures = scene.textures.filter(texture => !previousTextures.has(texture));
   let disposed = false, lastTelegraph = '', lastSkill = '', lastSlash = '', bossAction = 'idle', petAction = 'idle', telegraphKind = null;
   function positionRoot(node, position, yaw = 0) { node.position.set(position.x, position.y ?? surfaceAt(position.x, position.z)?.height ?? 0, position.z); node.rotation.y = yaw; }

@@ -10,6 +10,7 @@ import { followEye } from '../world/world-glsl.js';
 import { GRASS } from '../world/grass-blades.js';
 import { MEADOW_ROCKS, rockClearings } from '../world/rocks.js';
 import { WILDS_GROUND_GLSL } from './ground.js';
+import { SHADOW_UNIFORMS, SHADOW_SAMPLERS } from './light.js';
 
 export const WILDS_GRASS = Object.freeze({
   rings: Object.freeze([
@@ -121,8 +122,9 @@ void main() {
   color = mix(color, petal, bloom * step(1.5, row));
   color = mix(color, soil * turfDepth(dist), smoothstep(reach * .7, reach, dist) * step(1.5, ring));
   vec4 worldPos = world * vec4(p, 1.);
-  color = wildsLit(color, n, n, worldPos.xyz, canopy, dist);
-  color += sunColor * sunStrength * pow(max(dot(normalize(worldPos.xyz - eye), sun), 0.), 3.) * t * t * (.3 + .9 * goldenHour) * soil * (1. - bloom);
+  float shadow = sunShadow(vec3(base.x, level + .12, base.y), 2.2);
+  color = wildsLit(color, n, n, worldPos.xyz, canopy, dist, shadow);
+  color += sunColor * sunStrength * pow(max(dot(normalize(worldPos.xyz - eye), sun), 0.), 3.) * t * t * (.3 + .9 * goldenHour) * soil * (1. - bloom) * (1. - shadow);
   color *= contactShade(base);
   vColor = worldAir(color, worldPos.xyz, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight);
   vFold = position.x * (1. - bloom) * (1. - smoothstep(6., 18., dist));
@@ -134,7 +136,7 @@ varying vec3 vColor; varying float vFold;
 void main() { gl_FragColor = vec4(vColor * (1. + .07 * clamp(vFold * 6., -1., 1.)), 1.); }`;
 
 export function createWildsGrass(scene, { root, atmosphere, still = false, surface, blades = wildsBlades() }) {
-  const paint = new ShaderMaterial('wilds-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'blade'], uniforms: ['world', 'viewProjection', 'groundGrid', 'walker', 'stones', 'goldenHour', ...GROUND_UNIFORMS], samplers: ['ground'] });
+  const paint = new ShaderMaterial('wilds-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'blade'], uniforms: ['world', 'viewProjection', 'groundGrid', 'walker', 'stones', 'goldenHour', ...GROUND_UNIFORMS, ...SHADOW_UNIFORMS], samplers: ['ground', ...SHADOW_SAMPLERS] });
   paint.backFaceCulling = false;
   paint.setFloat('gusts', still ? 0 : 1);
   const shadow = new Vector4(0, 0, 1, 0), walker = new Vector4(0, -10000, 0, 0);
