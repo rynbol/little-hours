@@ -109,7 +109,7 @@ test('island postcards preserve the rendered house and include only the chosen s
       const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
       let moon = 0, house = 0;
-      for (let y = 220; y < 330; y++) for (let x = 190; x < 295; x++) { const p = (y * canvas.width + x) * 4; if (data[p] > 245 && data[p + 1] > 230 && data[p + 2] < 220) moon++; }
+      for (let y = 339; y < 449; y++) for (let x = 220; x < 325; x++) { const p = (y * canvas.width + x) * 4; if (data[p] > 245 && data[p + 1] > 230 && data[p + 2] < 220) moon++; }
       for (let y = 330; y < 800; y++) for (let x = 380; x < 1200; x++) { const p = (y * canvas.width + x) * 4; if (data[p] > data[p + 2] * 1.15 && data[p + 1] > data[p + 2] * 1.08 && data[p] < 200) house++; }
       return { moon, house, width: canvas.width, height: canvas.height };
     });
