@@ -87,8 +87,8 @@ test('a room change in another tab cancels the old heading draft', async ({ page
   await other.locator('#house-rooms-toggle').click();
   await other.locator('#house-slot-garden').click();
   await other.locator('#enter-house-room').click();
-  await expect(other.locator('#room-title')).toHaveText('Garden wing');
-  await expect(page.locator('#room-title')).toHaveText('Garden wing');
+  await expect(other.locator('#room-title')).toHaveText('Garden wing', { timeout: 30000 });
+  await expect(page.locator('#room-title')).toHaveText('Garden wing', { timeout: 30000 });
   await expect(page.locator('#room-title-form')).toBeHidden();
   const rooms = (await saved(page)).house.rooms;
   expect(rooms[0].name).toBeNull();

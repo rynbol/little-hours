@@ -26,7 +26,8 @@ body.is-house:not(.is-garden)[data-theme='rain'] { --world-top: #344e68; --world
 .island-dock > button:hover { background: var(--chrome-hover); }
 .island-dock svg { width: 17px; height: 17px; }
 .is-living-garden .island-dock { display: none; }
-.house-underworld { position: relative; z-index: 1; justify-content: flex-end; margin: 0; }
+.house-underworld { justify-content: flex-end; margin: 0; }
+.house-page:not(.is-living-garden) .house-underworld { position: relative; z-index: 1; }
 .house-page:not(.is-living-garden) #house-postcard { min-height: 44px; border: 0; background: transparent; color: var(--chrome-muted); }
 #house-room-menu { position: fixed; inset: auto 0 100px; margin-inline: auto; width: min(340px, calc(100% - 32px)); max-height: calc(100svh - 160px); overflow: auto; padding: 18px; border: 1px solid #fff8ed; border-radius: 22px; background: #faf4e9; color: #4b3b40; box-shadow: 0 16px 48px #16102030; }
 #house-room-menu header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 6px 12px; }
