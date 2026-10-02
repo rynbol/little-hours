@@ -85,7 +85,7 @@ test('garden butterflies animate and the selected bed follows real input without
   expect(await page.evaluate(() => {
     const d = window.__littleHours.house.diagnostics(), ring = d.scene.getMeshByName('garden-selected-bed');
     return [ring.position.x, ring.position.z];
-  })).toEqual([-2.25, 2.35]);
+  })).toEqual([-2.25, 2.4]);
   expect(await page.evaluate(() => window.__littleHours.state.garden)).toEqual(before);
   await page.locator('#garden-back').click();
   await expect.poll(async () => (await wings()).visible).toBe(false);

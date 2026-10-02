@@ -18,6 +18,10 @@ import { gardenPlantName } from '../../core/garden-plants.js';
 import { PLANT_SPOTS, gardenPlotAt } from './garden-model.js';
 import { RETREAT_SPOTS, RETREAT_BOUNDS, GARDEN_EXIT_TAG, RETREAT_LIGHT, GARDEN_LAMPS, gardenBlades } from './garden-retreat.js';
 import { createGardenButterflies } from './garden-butterflies.js';
+import { createGardenFlora } from './garden-flora.js';
+import { BEDS, BED, bedMarker } from './garden-bed.js';
+import { FLORA } from '../../models/flora.js';
+import { gardenGrowth } from '../../core/garden-plants.js';
 import { GARDEN_TAG } from './house-garden.js';
 import { POND_TAG } from './house-pond.js';
 import { FOREST_TAG } from './island-forest.js';
@@ -70,8 +74,9 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   sun.position.copyFrom(sun.direction.scale(-16));
   const shadows = new ShadowGenerator(2048, sun); shadows.usePercentageCloserFiltering = true; shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM; shadows.bias = .002; shadows.normalBias = .02; shadows.darkness = ISLAND_SUN.darkness;
   shadows.getShadowMap().refreshRate = 0;
-  const gardenRing = MeshBuilder.CreateTorus('garden-selected-bed', { diameter: 2.27, thickness: .04, tessellation: 64 }, scene);
-  const ringPaint = new StandardMaterial('garden-selected-bed-paint', scene); ringPaint.diffuseColor = Color3.FromHexString('#e7d6a1'); ringPaint.emissiveColor = Color3.FromHexString('#7e7d43'); ringPaint.specularColor.setAll(0); gardenRing.material = ringPaint; gardenRing.scaling.z = .82; gardenRing.isPickable = false; gardenRing.setEnabled(false);
+  const gardenRing = MeshBuilder.CreateTorus('garden-selected-bed', { diameter: 1.1, thickness: .04, tessellation: 64 }, scene);
+  const ringPaint = new StandardMaterial('garden-selected-bed-paint', scene); ringPaint.diffuseColor = Color3.FromHexString('#e7d6a1'); ringPaint.emissiveColor = Color3.FromHexString('#7e7d43'); ringPaint.specularColor.setAll(0); gardenRing.material = ringPaint; gardenRing.isPickable = false; gardenRing.setEnabled(false);
+  const ringBed = index => { const { x, z, width, depth, turn } = BEDS[index]; gardenRing.position.set(x, BED.rim + .04, z); gardenRing.scaling.set(width, 1, depth); gardenRing.rotation.y = -turn; };
   let gardenPlot = null;
   const instrumentation = new SceneInstrumentation(scene);
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -84,7 +89,8 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const water = createIslandWater(scene, theme);
   const grass = createIslandGrass(scene, theme), gardenGrass = createIslandGrass(scene, theme, { name: 'garden-grass', blades: gardenBlades(), lamps: GARDEN_LAMPS });
   const forest = createIslandForest(scene, theme);
-  const butterflies = createGardenButterflies(scene);
+  const butterflies = createGardenButterflies(scene), flora = createGardenFlora(scene);
+  let grown = null, bloomed = null;
   const moteMatrices = new Float32Array(24 * 16);
   for (let i = 0; i < 24; i++) { const n = i * 16; moteMatrices[n] = moteMatrices[n + 5] = moteMatrices[n + 10] = moteMatrices[n + 15] = 1; }
   motes.thinInstanceSetBuffer('matrix', moteMatrices, 16, false); motes.alwaysSelectAsActiveMesh = true;
@@ -129,7 +135,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const seconds = motion.matches ? 0 : now / 1000;
     const wasReacting = roomMotion.activeCount > 0;
     roomMotion.restore();
-    model.animate(seconds, focused, motion.matches); water.animate(seconds, camera); grass.animate(seconds); gardenGrass.animate(seconds); forest.animate(seconds); butterflies.animate(seconds, selectedId === 'orchard' && !motion.matches);
+    model.animate(seconds, focused, motion.matches); water.animate(seconds, camera); grass.animate(seconds); gardenGrass.animate(seconds); flora.animate(seconds); forest.animate(seconds); butterflies.animate(seconds, selectedId === 'orchard' && !motion.matches, flora.blooms);
     for (const root of model.live) root.metadata.avatar?.setEnabled(focused);
     stroll.setVisible(!focused || selectedId === 'orchard');
     if (!focused || selectedId === 'orchard') stroll.animate(seconds, motion.matches, selectedId === 'orchard' ? focused ? 'garden-rest' : 'garden' : 'island');
@@ -145,10 +151,10 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     sparkles.setEnabled(Boolean(burst) && age < 2.8 && !motion.matches);
     if (sparkles.isEnabled()) {
       for (let i = 0; i < 36; i++) {
-        const n = i * 16, a = i * 2.399, spread = .5 + age * (.7 + i % 4 * .17), scale = Math.max(0, 1 - age / 2.8);
+        const n = i * 16, a = i * 2.399, size = burst.size || 1, spread = (.5 + age * (.7 + i % 4 * .17)) * size, scale = Math.max(0, 1 - age / 2.8) * (.55 + .45 * size);
         petals[n] = .6 * scale; petals[n + 5] = 1.4 * scale; petals[n + 10] = scale;
         petals[n + 12] = burst.origin[0] + Math.cos(a) * spread;
-        petals[n + 13] = burst.origin[1] + 2 + age * (2 + i % 3 * .3) - 1.35 * age * age;
+        petals[n + 13] = burst.origin[1] + (2 + age * (2 + i % 3 * .3) - 1.35 * age * age) * size;
         petals[n + 14] = burst.origin[2] + Math.sin(a) * spread;
       }
       sparkles.thinInstanceBufferUpdated('matrix');
@@ -200,7 +206,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       const plot = /^plot-[0-5]$/.test(id) ? Number(id.slice(5)) : null;
       button.hidden = (id === 'garden-exit' || plot !== null) !== (selectedId === 'orchard');
       const base = HOUSE_POSITIONS[id], offset = model.levels[id]?.position;
-      if (plot !== null) { const [x, z] = RETREAT_SPOTS[plot]; tagPoint.set(x + .65, .52, z + .54); }
+      if (plot !== null) { const [x, z] = bedMarker(BEDS[plot]); tagPoint.set(x, BED.soil + .38, z + .03); }
       else if (!base) tagPoint.set(...(id === 'garden-exit' ? GARDEN_EXIT_TAG : id === 'pond' ? POND_TAG : id === 'forest' ? FOREST_TAG : GARDEN_TAG));
       else tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : id === 'loft' ? .7 : 0), base[2] + offset.z + 2.08);
       Vector3.TransformCoordinatesToRef(tagPoint, matrix, tagProjection);
@@ -232,7 +238,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     water.mesh.setEnabled(selectedId !== 'orchard');
     grass.mesh.setEnabled(container.id === 'house-canvas' && selectedId !== 'orchard'); gardenGrass.mesh.setEnabled(selectedId === 'orchard');
     forest.setEnabled(selectedId !== 'orchard');
-    gardenRing.setEnabled(selectedId === 'orchard' && gardenPlot !== null); if (gardenPlot !== null) gardenRing.position.set(RETREAT_SPOTS[gardenPlot][0], .18, RETREAT_SPOTS[gardenPlot][1]);
+    gardenRing.setEnabled(selectedId === 'orchard' && gardenPlot !== null); if (gardenPlot !== null) ringBed(gardenPlot);
     const island = container.id === 'house-canvas' && selectedId !== 'orchard', light = island ? ISLAND_ATMOSPHERES[theme] : selectedId === 'orchard' ? RETREAT_LIGHT[theme]
       : { sky: '#ffffff', ground: '#a0a7a4', sun: theme === 'dusk' ? '#ead2ab' : '#fff3d9', fill: theme === 'dusk' ? .56 : .62, key: theme === 'dusk' ? .8 : .95 };
     sky.intensity = light.fill; sun.intensity = light.key;
@@ -243,6 +249,12 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     builds++;
     model = createHouseModel(scene, house, selectedId, theme, avatar, previous);
     previous?.dispose();
+    const plants = house.plants || [];
+    flora.set(plants, theme); flora.mesh.setEnabled(selectedId === 'orchard' && flora.planted);
+    const growth = new Map(plants.map(plant => [plant.id, gardenGrowth(plant)]));
+    bloomed = plants.find(plant => plant.slot !== null && growth.get(plant.id) >= 1 && grown?.has(plant.id) && grown.get(plant.id) < 1) || bloomed;
+    grown = growth;
+    if (bloomed && selectedId === 'orchard') { bloomAt(bloomed); bloomed = null; }
     roomMotion.bind(model);
     const nextStroll = JSON.stringify([avatar, house.pet]);
     if (nextStroll !== strollKey) { strollKey = nextStroll; stroll?.dispose(); stroll = createStroll(scene, avatar, house.pet || 'cat'); }
@@ -281,9 +293,11 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     for (const mesh of model.meshes) mesh.receiveShadows = true;
     // Babylon removes disposed casters from this list. Keep it separate from
     // model.meshes so disposal cannot skip every other room batch.
-    shadows.getShadowMap().renderList = model.meshes.filter(mesh => mesh.isEnabled());
+    shadows.getShadowMap().renderList = [...model.meshes, flora.mesh].filter(mesh => mesh.isEnabled());
     shadows.getShadowMap().resetRefreshCounter(); resize();
   }
+  function petalBurst(origin, size, hex) { petalPaint.diffuseColor = Color3.FromHexString(hex); burst = { start: performance.now(), origin, size }; requestRender(); }
+  function bloomAt(plant) { const { x, z } = BEDS[plant.slot]; petalBurst([x, BED.soil - .5, z], .5, (FLORA[plant.species] || FLORA.cosmos).petal[0]); }
   function pin(tag, icon, id, title, note) {
     const element = document.createElement(tag); element.className = 'house-room-tag'; element.dataset.room = id;
     if (tag === 'button') element.type = 'button';
@@ -321,6 +335,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     lastPick = performance.now(); const id = pick(event);
     if (id === hovering) return;
     hovering = id; canvas.style.cursor = id ? 'pointer' : 'grab';
+    for (const button of tags.querySelectorAll('.garden-bed-pin')) button.classList.toggle('is-near', button.dataset.room === id);
     const room = house.rooms.find(room => room.id === id);
     canvas.title = id?.startsWith('plot-') ? gardenPlantName(house.plants?.find(plant => plant.slot === Number(id.slice(5)))) : id === 'garden-exit' ? 'Back to island' : id === 'orchard' ? 'Your garden' : id === 'pond' ? 'Willow Pond' : id === 'forest' ? 'The Forest' : id ? room ? roomDisplayName(room) : 'A little room to grow' : '';
   };
@@ -334,8 +349,12 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   return {
     update,
     turn,
-    selectGardenPlot(index) { gardenPlot = index; tags.querySelectorAll('.garden-bed-pin').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.room === `plot-${index}`))); if (index !== null) gardenRing.position.set(RETREAT_SPOTS[index][0], .18, RETREAT_SPOTS[index][1]); gardenRing.setEnabled(selectedId === 'orchard' && index !== null); requestRender(); },
-    celebrate(id) { if (!motion.matches) roomMotion.trigger(id, 'build', performance.now()); burst = { start: performance.now(), origin: (HOUSE_POSITIONS[id] || [0, 0, 0]).map((v, i) => v + (model.levels[id]?.position.asArray()[i] || 0)) }; requestRender(); },
+    selectGardenPlot(index) { gardenPlot = index; tags.querySelectorAll('.garden-bed-pin').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.room === `plot-${index}`))); if (index !== null) ringBed(index); gardenRing.setEnabled(selectedId === 'orchard' && index !== null); requestRender(); },
+    celebrate(id) {
+      if (id === 'orchard' && gardenPlot !== null) { const { x, z } = BEDS[gardenPlot]; petalBurst([x, BED.soil - .6, z], .4, '#f2c8b3'); return; }
+      if (!motion.matches) roomMotion.trigger(id, 'build', performance.now());
+      petalBurst((HOUSE_POSITIONS[id] || [0, 0, 0]).map((v, i) => v + (model.levels[id]?.position.asArray()[i] || 0)), 1, '#f2c8b3');
+    },
     async createPostcard(name, caption) {
       // Copy immediately after rendering: WebGL's default buffer need not be
       // preserved between frames (which would cost memory on every visit).
@@ -354,6 +373,6 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     },
     setFocused(value) { if (focused === Boolean(value)) return; focused = Boolean(value); requestRender(); },
     diagnostics: () => ({ scene, engine, closed, builds, angle: camera.alpha, tilt: camera.beta, turning: Math.abs(targetAngle - camera.alpha) > .001 || Math.abs(targetTilt - camera.beta) > .001, trees: model.trees, plots: selectedId === 'orchard' ? RETREAT_SPOTS : PLANT_SPOTS, stroll: focused && selectedId !== 'orchard' ? null : stroll?.pose, strollPet: focused && selectedId !== 'orchard' ? null : stroll?.pet, activeRoomMotions: roomMotion.activeCount, open: model.openAmount, renderCount, drawCalls: instrumentation.drawCallsCounter.current, triangles: scene.getActiveIndices() / 3 }),
-    dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); stroll?.dispose(); model.dispose(); grass.dispose(); forest.dispose(); painterly.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); backdrop.remove(); controls.remove(); tags.remove(); note.remove(); },
+    dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); motion.removeEventListener('change', onMotionChange); roomMotion.dispose(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onCancel); canvas.removeEventListener('lostpointercapture', onCancel); canvas.removeEventListener('pointerdown', onDown); canvas.removeEventListener('pointerup', onUp); canvas.removeEventListener('pointercancel', onCancel); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('pointermove', onMove); stroll?.dispose(); model.dispose(); grass.dispose(); flora.dispose(); forest.dispose(); painterly.dispose(); instrumentation.dispose(); scene.dispose(); engine.dispose(); canvas.remove(); backdrop.remove(); controls.remove(); tags.remove(); note.remove(); },
   };
 }

@@ -97,17 +97,17 @@ export function bladeColors(blades, tones, spill = 0, lamps = lanternLights()) {
 }
 
 class GrassWindPlugin extends MaterialPluginBase {
-  constructor(material) { super(material, 'GrassWind', 160, {}, true, true); this.time = 0; this.gustTint = [1, 1, .8]; }
+  constructor(material, gustMix = .4) { super(material, 'GrassWind', 160, {}, true, true); this.time = 0; this.gustTint = [1, 1, .8]; this.gustMix = gustMix; }
   getClassName() { return 'GrassWindPlugin'; }
   isCompatible(shaderLanguage) { return shaderLanguage === 0; }
   getAttributes(attributes) { attributes.push('grassBlade'); }
   getUniforms() {
     return {
-      ubo: [{ name: 'grassTime', size: 1, type: 'float' }, { name: 'grassGust', size: 3, type: 'vec3' }],
-      vertex: 'uniform float grassTime;', fragment: 'uniform vec3 grassGust;',
+      ubo: [{ name: 'grassTime', size: 1, type: 'float' }, { name: 'grassGust', size: 4, type: 'vec4' }],
+      vertex: 'uniform float grassTime;', fragment: 'uniform vec4 grassGust;',
     };
   }
-  bindForSubMesh(uniformBuffer) { uniformBuffer.updateFloat('grassTime', this.time); uniformBuffer.updateFloat3('grassGust', ...this.gustTint); }
+  bindForSubMesh(uniformBuffer) { uniformBuffer.updateFloat('grassTime', this.time); uniformBuffer.updateFloat4('grassGust', ...this.gustTint, this.gustMix); }
   getCustomCode(shaderType) {
     if (shaderType === 'vertex') return {
       CUSTOM_VERTEX_DEFINITIONS: 'attribute vec3 grassBlade; varying float vGrassGust;',
@@ -122,7 +122,7 @@ class GrassWindPlugin extends MaterialPluginBase {
     };
     return {
       CUSTOM_FRAGMENT_DEFINITIONS: 'varying float vGrassGust;',
-      CUSTOM_FRAGMENT_UPDATE_DIFFUSE: 'baseColor.rgb = mix(baseColor.rgb, grassGust, vGrassGust * .4);',
+      CUSTOM_FRAGMENT_UPDATE_DIFFUSE: 'baseColor.rgb = mix(baseColor.rgb, grassGust.rgb, vGrassGust * grassGust.a);',
     };
   }
 }
@@ -133,14 +133,18 @@ export const GRASS_TONES = Object.freeze({
   rain: { root: '#3f5c44', blade: '#6f9166', sunlit: '#a9c092', gust: '#c2d4ac' },
 });
 
+export function createWindPaint(scene, name, gustMix) {
+  const material = new StandardMaterial(name, scene);
+  material.diffuseColor = Color3.White(); material.specularColor.setAll(0); material.emissiveColor.setAll(.08); material.backFaceCulling = false;
+  return { material, wind: new GrassWindPlugin(material, gustMix) };
+}
+
 export function createIslandGrass(scene, theme = 'day', { name = 'island-grass', blades = [...grassBlades(), ...woodlandBlades(), ...rimBlades()], lamps = lanternLights() } = {}) {
   const { positions, shape, normals, indices } = bladeGeometry(blades);
   const mesh = new Mesh(name, scene);
   const data = new VertexData(); Object.assign(data, { positions, normals, indices, colors: bladeColors(blades, GRASS_TONES[theme] || GRASS_TONES.day, LANTERN_SPILL[theme] || 0, lamps) }); data.applyToMesh(mesh, true);
   mesh.setVerticesData('grassBlade', shape, false, 3);
-  const material = new StandardMaterial(`${name}-paint`, scene);
-  material.diffuseColor = Color3.White(); material.specularColor.setAll(0); material.emissiveColor.setAll(.08); material.backFaceCulling = false;
-  const wind = new GrassWindPlugin(material);
+  const { material, wind } = createWindPaint(scene, `${name}-paint`);
   mesh.material = material; mesh.receiveShadows = true; mesh.isPickable = false; mesh.metadata = { castShadow: false }; mesh.alwaysSelectAsActiveMesh = true; mesh.freezeWorldMatrix();
   function setTheme(next) {
     const tones = GRASS_TONES[next] || GRASS_TONES.day;

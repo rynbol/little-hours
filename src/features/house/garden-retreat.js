@@ -1,9 +1,11 @@
 import { gardenGround, gardenCliff, gardenEdge, onGarden } from './garden-ground.js';
 import { addBody, hangingRoots } from '../../models/landform.js';
 import { placeAsset } from '../../models/assets.js';
-import { buildGardenSpecimen } from './garden-model.js';
+import { plantBody } from '../../models/flora.js';
+import { gardenGrowth } from '../../core/garden-plants.js';
+import { BEDS, BED, bedBody, bedEdge, inBed, markerBody } from './garden-bed.js';
 
-export const RETREAT_SPOTS = [[-2.35, -1.95], [2.35, -1.95], [-3, .2], [3, .2], [-2.25, 2.35], [2.25, 2.35]];
+export const RETREAT_SPOTS = BEDS.map(({ x, z }) => [x, z]);
 export const RETREAT_LIGHT = {
   day: { sky: '#ffffff', ground: '#a0a7a4', sun: '#fff3d9', fill: .62, key: .95, bulb: ['#ffe7b3', 1.3] },
   dusk: { sky: '#b7b0dc', ground: '#6a6488', sun: '#ffc48a', fill: .6, key: .82, bulb: ['#ff8a3d', 2.8] },
@@ -105,14 +107,8 @@ export function buildGardenRetreat(kit, theme) {
   }
   for (const [i, [x, z]] of [[.52, -1.78], [.68, -2.32], [.46, -2.85], [0, -3.04]].entries()) stone(api, x, z, .58, .43, i);
   for (const side of [-1, 1]) for (let i = 0; i < 7; i++) stone(api, side * (.65 + i * .53), .05 + Math.sin(i * .7) * .36, .55, .38, i);
-  for (const [i, [x, z]] of [[-3.85, -.5], [-4.15, -1.05], [-3.95, -1.6], [-3.7, -2.15], [-3.45, -2.7], [-3.2, -3.25], [-3.25, -3.8], [-3.5, -4.3], [-3.8, -4.75]].entries()) stone(api, x, z, .7, .52, i);
-  for (const [slot, [x, z]] of RETREAT_SPOTS.entries()) {
-    terrace(api, x, .1, z, 2.08, 1.75, .16, '#baab87', slot);
-    terrace(api, x, .12, z, 1.79, 1.46, .04, '#80734f', slot);
-    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; api.ball(x + Math.cos(a) * .99, .13, z + Math.sin(a) * .8, .28, .2, .26, i % 3 ? '#dfcfad' : '#cbbd9d'); }
-    api.box(x + .65, .3, z + .54, .035, .38, .035, '#a18561'); api.box(x + .65, .49, z + .54, .27, .19, .045, '#eadbbb', -.1);
-    for (let i = 0; i < 5; i++) api.ball(x - .5 + i * .25, .15, z - .43, .16, .035, .12, '#94835f');
-  }
+  for (const [i, [x, z]] of [[-4.15, -1.05], [-3.95, -1.6], [-3.7, -2.15], [-3.45, -2.7], [-3.2, -3.25], [-3.25, -3.8], [-3.5, -4.3], [-3.8, -4.75]].entries()) stone(api, x, z, .7, .52, i);
+  for (const [slot, bed] of BEDS.entries()) { const { positions, colors, normals } = bedBody(bed, theme, slot); api.shape(positions, colors, normals); }
   for (let i = 0; i < 18; i++) {
     const a = Math.PI + i / 17 * Math.PI, x = Math.cos(a) * 5.25, z = Math.sin(a) * 4.55;
     if (i === 4 || i === 5) continue;
@@ -146,13 +142,13 @@ export function buildGardenRetreat(kit, theme) {
 }
 
 export const GARDEN_LAMPS = Object.freeze([[-4.6, -3.8], [-2.3, -3.8], [0, -3.8], [2.3, -3.8], [4.6, -3.8], [GARDEN_EXIT[0] + .65, GARDEN_EXIT[2]]].map(Object.freeze));
-const PAVED = Object.freeze([[.52, -1.78], [.68, -2.32], [.46, -2.85], [0, -3.04], [-3.85, -.5], [-4.15, -1.05], [-3.95, -1.6], [-3.7, -2.15], [-3.45, -2.7], [-3.2, -3.25], [-3.25, -3.8], [-3.5, -4.3], [-3.8, -4.75], [0, -2.35], [-5.2, -3.05], [4.3, -3.05]].map(Object.freeze));
+const PAVED = Object.freeze([[.52, -1.78], [.68, -2.32], [.46, -2.85], [0, -3.04], [-4.15, -1.05], [-3.95, -1.6], [-3.7, -2.15], [-3.45, -2.7], [-3.2, -3.25], [-3.25, -3.8], [-3.5, -4.3], [-3.8, -4.75], [0, -2.35], [-5.2, -3.05], [4.3, -3.05]].map(Object.freeze));
 
 export function gardenGrassy(x, z) {
   const lobe = x < -1.8 && z < -2.8;
   return onGarden(x, z, .2)
     && (lobe || (x / 5.65) ** 2 + ((z - .05) / 5) ** 2 < .84)
-    && RETREAT_SPOTS.every(([bx, bz]) => ((x - bx) / 1.14) ** 2 + ((z - bz) / .97) ** 2 > 1)
+    && !inBed(x, z, .02)
     && !(z > -1.5 && z < 4.95 && Math.abs(x - Math.sin(z * .8) * .42) < .58)
     && !(Math.abs(x) < 4.15 && Math.abs(z - .05) < .6)
     && !(Math.abs(x) < 1.75 && z > -4.35 && z < -2.85)
@@ -161,6 +157,7 @@ export function gardenGrassy(x, z) {
     && PAVED.every(([px, pz]) => Math.hypot(x - px, z - pz) > .42);
 }
 
+const TUFTS = 110;
 export function gardenBlades() {
   const blades = [], tries = 46000, rim = 1100;
   for (let i = 0; i < tries; i++) {
@@ -169,6 +166,13 @@ export function gardenBlades() {
     const patch = Math.sin(x * .8 + z * .35) * .5 + Math.sin(z * 1.6 - x * .45 + 1) * .5;
     blades.push({ x, z, ground: 0, height: (.1 + .13 * (.35 + .65 * hash(i * 3.3))) * (.8 + patch * .2), lean: hash(i * 5.1) * Math.PI * 2, tone: hash(i * 7.7), patch });
   }
+  BEDS.forEach((bed, slot) => {
+    for (let i = 0; i < TUFTS; i++) {
+      const [x, z] = bedEdge(bed, (i + hash(i * 3.1 + slot)) / TUFTS * Math.PI * 2, 1.035 + hash(i * 1.9 + slot * 5) * .09);
+      if (!gardenGrassy(x, z)) continue;
+      blades.push({ x, z, ground: 0, height: .2 + hash(i * 4.7 + slot) * .16, lean: hash(i * 5.9 + slot) * Math.PI * 2, tone: hash(i * 7.3 + slot), patch: .1 + hash(i * 2.1) * .5 });
+    }
+  });
   for (let i = 0; i < rim; i++) {
     const a = (i + hash(i * 2.7) * .8) / rim * Math.PI * 2, [rx, rz] = gardenEdge(a), [nx, nz] = gardenEdge(a + .01), along = Math.hypot(nx - rx, nz - rz), dx = (nz - rz) / along, dz = (rx - nx) / along;
     const inset = .015 + hash(i * 4.3) * .06, height = .14 + hash(i * 6.1) * .2;
@@ -177,11 +181,21 @@ export function gardenBlades() {
   return blades;
 }
 
-export function buildRetreatFlowers(api, plants) {
+export function retreatFlora(plants, theme = 'day') {
+  const body = { positions: [], colors: [], normals: [], indices: [], sway: [] }, blooms = [];
   for (const plant of plants) {
-    const spot = RETREAT_SPOTS[plant.slot];
-    if (spot) buildGardenSpecimen(api, plant, ...spot, { floor: .16, reach: .82, spread: .58, count: 7 });
+    const bed = BEDS[plant.slot];
+    if (!bed) continue;
+    const growth = gardenGrowth(plant), part = plantBody(plant.species, growth, { x: bed.x, z: bed.z, floor: BED.soil + .1, theme, seed: plant.slot + 1 }), offset = body.positions.length / 3;
+    for (const key of ['positions', 'colors', 'normals', 'sway']) for (const value of part[key]) body[key].push(value);
+    for (const index of part.indices) body.indices.push(index + offset);
+    if (growth >= 1) blooms.push({ slot: plant.slot, species: plant.species, at: part.crown });
   }
+  return { ...body, blooms };
+}
+
+export function buildRetreatMarkers(api, empty, theme) {
+  for (const slot of empty) { const { positions, colors, normals } = markerBody(BEDS[slot], theme); api.shape(positions, colors, normals); }
 }
 
 export function buildGardenExit(api, theme) {

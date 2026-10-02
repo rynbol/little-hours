@@ -118,5 +118,10 @@ button.house-room-tag.is-garden { cursor: pointer; }
 .is-living-garden .garden-bed-pin .house-pin { width: 30px; height: 30px; box-shadow: 0 2px 8px #30271730; border: 1px solid #fff9e0; background: #fbf4e3df; }
 .is-living-garden .garden-bed-pin[aria-pressed='true'] .house-pin { background: #60724b; color: #fff7e1; }
 .is-living-garden .garden-bed-pin svg { width: 16px; height: 16px; }
+@media (hover: hover) {
+  .is-living-garden .garden-bed-pin .house-pin { opacity: 0; }
+  .is-living-garden .garden-bed-pin:is(:hover, :focus-visible, .is-near, [aria-pressed='true']) .house-pin { opacity: 1; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) { .is-living-garden .garden-bed-pin .house-pin { transition: opacity .18s ease, transform .2s cubic-bezier(.3, 1.5, .5, 1); } }
 .is-living-garden [data-room='garden-exit'] .house-pin-label { max-width: 100px; opacity: 1; padding: 6px 12px 6px 20px; }
 .is-living-garden [data-room='garden-exit'] .house-pin { width: 36px; height: 36px; }

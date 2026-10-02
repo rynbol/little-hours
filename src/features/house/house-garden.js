@@ -121,7 +121,7 @@ export function buildGarden(api, trees, theme, plants = []) {
   api.prism(nx, GROUND + 1.08, nz, .32, .14, .26, '#5a746c');
   api.disc(nx, GROUND + .98, nz + .11, .07, .02, '#4b3a30');
 
-  buildGardenPlants(api, plants);
+  buildGardenPlants(api, plants, theme);
 
   trees.forEach((entry, index) => {
     const [x, z] = treeSpot(index), seed = [...entry.date].reduce((sum, char) => sum * 31 + char.charCodeAt(0), 7) >>> 0;

@@ -13,7 +13,7 @@ import { houseFurniture, houseArchitecture } from './house-furniture.js';
 import { warmRoom } from './house-lamplight.js';
 import { gardenGrowth } from '../../core/garden-plants.js';
 import { buildGarden } from './house-garden.js';
-import { buildGardenRetreat, buildRetreatFlowers, buildGardenExit } from './garden-retreat.js';
+import { buildGardenRetreat, buildRetreatMarkers, buildGardenExit, RETREAT_SPOTS } from './garden-retreat.js';
 import { buildPond } from './house-pond.js';
 import { buildIsland } from './house-island.js';
 import { buildExteriorPart, buildBlueprint, exteriorPlan, hingeOf, hingePose, CHIMNEY_TOP, HOUSE_POSITIONS } from './house-exterior.js';
@@ -152,7 +152,8 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   if (selectedId === 'orchard' || previous?.pieces.has('retreat-grounds')) {
     batch('retreat-exit', theme, () => buildGardenExit({ ...outside, cylinder }, theme), 'garden-exit');
     batch('retreat-grounds', theme, () => buildGardenRetreat({ ...outside, cylinder }, theme), 'orchard');
-    if (plants.some(plant => plant.slot !== null)) batch('retreat-plants', JSON.stringify(plants.map(plant => [plant.slot, plant.species, gardenGrowth(plant)])), () => buildRetreatFlowers({ ...outside, cylinder }, plants), 'orchard');
+    const empty = RETREAT_SPOTS.map((_, slot) => slot).filter(slot => !plants.some(plant => plant.slot === slot));
+    if (empty.length) batch('retreat-markers', JSON.stringify([theme, empty]), () => buildRetreatMarkers(outside, empty, theme), 'orchard');
   }
   for (const entry of house.rooms) batch(entry.id, JSON.stringify([entry.layout, theme, entry.id === house.activeId && avatar, house.rooms.length === 1]), () => {
     origin = HOUSE_POSITIONS[entry.id];
