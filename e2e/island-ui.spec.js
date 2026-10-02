@@ -129,6 +129,8 @@ test('island postcards preserve the rendered house and include only the chosen s
 test('the island page keeps its top bar with coins, the day and night toggle and a way back to the focus timer, and the room screen shows none of it', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  const seed = seedState('three-rooms'), coins = 37;
+  await page.addInitScript(state => localStorage.setItem('little-hours-v1', JSON.stringify(state)), { ...seed, house: { ...seed.house, coins } });
   await page.goto('/');
   await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await expect(page.locator('#house-bar')).toBeHidden();
@@ -137,8 +139,7 @@ test('the island page keeps its top bar with coins, the day and night toggle and
   const bar = page.locator('#house-bar');
   await expect(bar).toBeVisible();
   await expect(bar.locator('.brand')).toHaveText('little hours.');
-  const coins = (await saved(page)).house.coins;
-  await expect(page.locator('#house-coin-balance')).toHaveText(String(coins));
+  await expect(page.locator('#house-coin-balance')).toHaveText('37');
   await expect(bar.getByRole('button', { name: `${coins} coins · Visit your house` })).toBeVisible();
   await expect(page.locator('#dock-timer')).toHaveText('25:00');
   const barBox = await bar.boundingBox(), titleBox = await page.locator('#house-title').boundingBox();
