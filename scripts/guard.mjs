@@ -78,7 +78,7 @@ export function commentLines(file, code) {
   return lines;
 }
 
-const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
 function addedLines(base) {
   const added = new Map(), removed = new Set();
