@@ -14,6 +14,8 @@ export default {
     const copy = ['.house-address', '.house-scene-caption', '.house-map-hint', '.house-description', '.house-paper-top', '.house-underworld p', '.house-room-link .house-slot-label'];
     const shown = []; for (const selector of copy) if (await app.visible(selector)) shown.push(selector);
     check('the house page shows no decorative copy', shown.length === 0, shown);
+    const buried = await app.js(`(() => { const sky = document.querySelector('.island-sky'); sky.style.pointerEvents = 'auto'; const under = ['#house-rooms-toggle', '#house-open-garden', '#house-open-pond', '#house-postcard'].filter(selector => { const el = document.querySelector(selector), box = el.getBoundingClientRect(); return !el.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)); }); sky.style.pointerEvents = ''; return under; })()`);
+    check('the island dock and the Postcard button paint above the sky backdrop', buried.length === 0, buried);
     check('the toggle offers to close it', await app.text('[data-house-open]') === 'Close the house' && await app.attr('[data-house-open]', 'aria-pressed') === 'true');
     await steps.toggleHouse(app);
     check('a click closes the house', (await app.house()).open === 0);
