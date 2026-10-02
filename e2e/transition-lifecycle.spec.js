@@ -44,7 +44,9 @@ test('replacement, reduced motion and hidden-page events clean up travel @dev-di
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await settled(page);
   await page.evaluate(() => { window.travelForTest('home', () => window.arrivals.push('home')); });
-  expect(await page.evaluate(() => window.arrivals)).toEqual(['island', 'home']);
+  await expect(page.locator('.place-transition')).toHaveAttribute('data-style', 'fade');
+  await expect.poll(() => page.evaluate(() => window.arrivals)).toEqual(['island', 'home']);
+  await settled(page);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.evaluate(() => {
     window.travelForTest('pond', () => window.arrivals.push('pond'), () => false);

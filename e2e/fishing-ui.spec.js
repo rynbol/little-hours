@@ -93,6 +93,7 @@ test('the pond keeps keyboard navigation off the covered island and restores it 
   }
   await page.keyboard.press('Escape');
   await expect(page.locator('#lake-page')).toBeHidden();
+  await expect(page.locator('html')).not.toHaveAttribute('data-place-transition');
   await page.locator('#back-to-room').focus(); await page.keyboard.press('Enter');
   await expect(page.locator('#room-section')).toBeVisible();
   await expect(page.locator('#start-button')).toBeEnabled();

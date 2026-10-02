@@ -48,7 +48,7 @@ test('garden and pond entrances and exits fade, including the path home and stud
   await expect(page.locator('#house-canvas [data-room="pond"]')).toBeFocused();
 });
 
-test('reduced motion skips place transitions and repeated keyboard exits leave no overlay', async ({ page }) => {
+test('reduced motion cross-fades place transitions and repeated keyboard exits leave no overlay', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/'); await ready(page);
   await openGarden(page);

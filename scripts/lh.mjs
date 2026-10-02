@@ -6,7 +6,7 @@ import { openApp } from './lh/app.mjs';
 import { serve } from './lh/server.mjs';
 import { SEEDS } from './lh/seeds.mjs';
 import { cycles, steps, views } from './lh/steps.mjs';
-import { allocations, collectGarbage, focusTrip, gpuCosts, heapSnapshot, heapUsed, idle, takeEvents, trace, watchEvents } from './lh/measure.mjs';
+import { allocations, collectGarbage, focusTrip, placeTrips, gpuCosts, heapSnapshot, heapUsed, idle, takeEvents, trace, watchEvents } from './lh/measure.mjs';
 import { commandOf, lhDir, outDir, repoRoot, stopTracked, tracked } from './lh/state.mjs';
 
 const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence.
@@ -20,7 +20,7 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
   lh flows                          list the flows
   lh run <flow...|all>              run flows with real input; exits 1 on any failure
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
-  lh perf [--view house|garden|lake|room|decorate|pet|focus|focus-trip]
+  lh perf [--view house|garden|lake|room|decorate|pet|focus|focus-trip|trips]
                                     idle cost, frame gaps, click-to-paint, GPU time, draw calls
   lh trace <cycle>                  Chrome performance trace of one cycle (--cold: the first run, without a warm-up run)
   lh alloc <cycle>                  sampled allocations during one cycle, by allocating function (--cold as for trace)
@@ -221,6 +221,7 @@ async function perfOnce(url, view) {
     if (view === 'pet') { await views.pet.go(app); result.openMs = await takeEvents(app, 1500); }
     if (view === 'focus') { await views.focus.go(app); result.openMs = await takeEvents(app, 1500); }
     if (view === 'focus-trip') { Object.assign(result, await focusTrip(app, viewport)); result.pageErrors = app.errors.length; return result; }
+    if (view === 'trips') { await app.settle(); Object.assign(result, await placeTrips(app)); result.pageErrors = app.errors.length; return result; }
     if (view === 'decorate') { await app.clickSel('#decorate-button'); result.openMs = await takeEvents(app, 3000); }
     if (options.before) await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; ${options.before}; })()`);
     Object.assign(result, await idle(app, Number(options.seconds || 5)));
