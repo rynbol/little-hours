@@ -6,14 +6,14 @@ export const gardenPlotAt = (x, z, spots = PLANT_SPOTS, radius = .6) => spots.fi
 
 export function buildGardenPlants(api, plants) {
   const fence = groundsKit();
-  railFence(fence, Array.from({ length: 7 }, (_, i) => [6.15 + i * .662, -4.05]), -.175, { seed: 5 });
+  railFence(fence, Array.from({ length: 7 }, (_, i) => [6.95 + i * .53, -4.05]), -.175, { seed: 5 });
   fence.flush(api);
-  for (const x of [5.8, 10.35]) {
+  for (const x of [6.65, 10.35]) {
     api.box(x, .6, -4.05, .1, 1.65, .1, '#b89a71');
     for (let i = 0; i < 5; i++) api.ball(x + (i % 2 ? .04 : -.04), .15 + i * .25, -4.01, .23, .22, .19, i % 3 === 0 ? '#dcaab1' : '#829b70');
   }
   for (let i = 0; i < 15; i++) {
-    const x = 5.8 + i * .325, y = 1.45 - Math.sin(i / 14 * Math.PI) * .2;
+    const x = 6.65 + i * .264, y = 1.45 - Math.sin(i / 14 * Math.PI) * .2;
     api.box(x, y, -4.05, .34, .028, .028, '#8b7759');
     if (i % 2) { api.ball(x, y - .08, -4.05, .09, .12, .09, '#ffe6a9', 1.45); api.ball(x, y + .035, -4.08, .25, .13, .15, '#98ad7f'); }
   }

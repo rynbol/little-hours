@@ -3,6 +3,7 @@ import { placeAsset } from '../../models/assets.js';
 import { onIsland, STREAMS } from './house-island.js';
 import { inPond, DOCK } from './house-pond.js';
 import { pathDistance, PATH_LINES, PATH_WIDTH } from './house-paths.js';
+import { forestPathDistance, FOREST_PATH_WIDTH } from './island-forest.js';
 import { groundsKit, lanternPost, stringLights, gardenBench, barrelPlanter, wildflowers, groundsHash } from './grounds-kit.js';
 
 export const GARDEN_CENTER = [8.9, 0, 0];
@@ -46,7 +47,7 @@ export function edgeFlowers() {
       const [x, z] = line[i], [px, pz] = line[i - 1], [nx, nz] = line[i + 1], length = Math.hypot(nx - px, nz - pz) || 1;
       const side = (i + l) % 2 ? 1 : -1, reach = PATH_WIDTH / 2 + .3 + groundsHash(i * 3 + l) * .18;
       const fx = x - (nz - pz) / length * reach * side, fz = z + (nx - px) / length * reach * side;
-      if (!onIsland(fx, fz, .35) || inPond(fx, fz, .25) || pathDistance(fx, fz) < PATH_WIDTH / 2 + .18) continue;
+      if (!onIsland(fx, fz, .35) || inPond(fx, fz, .25) || pathDistance(fx, fz) < PATH_WIDTH / 2 + .18 || forestPathDistance(fx, fz) < FOREST_PATH_WIDTH / 2 + .5) continue;
       if (fx > -5.9 && fx < 5.4 && fz < 3.25) continue;
       if ([...LANTERNS, ...PLANTERS, ARCH, BENCH].some(([px2, pz2]) => Math.hypot(fx - px2, fz - pz2) < .42)) continue;
       if (STREAMS.flat().some(([sx, sz]) => Math.hypot(fx - sx, fz - sz) < .45) || (Math.abs(fx - DOCK.x) < .6 && fz > DOCK.to - .3)) continue;
@@ -111,7 +112,7 @@ export function buildGarden(api, trees, theme, plants = []) {
   PLANTERS.forEach(([x, z], i) => barrelPlanter(kit, x, GROUND, z, { seed: i * 3 }));
   signpost(kit, -3.35, 3.55);
   for (const [x, z, seed] of edgeFlowers()) wildflowers(kit, x, GROUND, z, seed, { palette: wilds, count: 5 + seed % 3, height: .34 });
-  [[6.9, 2.55], [7.1, -.4], [11.95, .9], [11.2, 3.05], [6.2, -.55], [10.4, -.85]].forEach(([x, z], i) => wildflowers(kit, x, GROUND, z, i * 7, { palette: wilds, count: 8, spread: .26, height: .36 }));
+  [[6.9, 2.55], [7.1, -.4], [11.95, .9], [11.2, 3.05], [6.45, -.55], [10.4, -.85]].forEach(([x, z], i) => wildflowers(kit, x, GROUND, z, i * 7, { palette: wilds, count: 8, spread: .26, height: .36 }));
   kit.flush(api);
 
   const [nx, nz] = NEST;
