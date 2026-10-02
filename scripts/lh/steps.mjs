@@ -52,6 +52,7 @@ export const cycles = {
 };
 
 export const views = {
+  'wilds-style': { about: 'the single Forest style frame', scene: 'wilds', settings: { path: '/checks/wilds-style.html', storageKey: 'little-hours-wilds-style-v1' }, async go(app) { await app.waitFor('window.__littleHours.wilds.ready()', { what: 'the style frame to render', timeout: 60000 }); } },
   wilds: { about: 'the Wilds forest and exploration view', settings: { path: '/checks/wilds.html', storageKey: 'little-hours-wilds-check-v1' }, async go(app) { await app.waitFor('window.__littleHours.wilds.ready()', { what: 'the Wilds to render' }); } },
   garden: { about: 'the personal garden, or the whole house on older refs', async go(app) { await steps.openHouse(app); if (await app.visible('#house-open-garden')) await app.clickSel('#house-open-garden'); await app.settle(); } },
   focus: { about: 'the seated Focus view, or the room on older refs', async go(app) {
@@ -69,5 +70,5 @@ export const views = {
   decorate: { about: 'Decorate mode', async go(app) { await steps.openDecorate(app); } },
   avatar: { about: 'the avatar editor', async go(app) { await steps.openAvatar(app); } },
   lake: { about: 'fishing at Willow Pond, idle', async go(app) { await steps.openLake(app); } },
-  forest: { about: 'the walk-in forest, at the start of the path', async go(app) { await steps.openHouse(app); await app.clickSel('[data-room="forest"]'); await app.waitFor(`Boolean(window.__littleHours.forest.isOpen && window.__littleHours.forest.diagnostics()?.ready)`, { what: 'the forest', timeout: 90000 }); await app.settle(); } },
+  forest: { about: 'the walk-in forest, at the start of the path', scene: 'forest', async go(app) { await steps.openHouse(app); await app.clickSel('[data-room="forest"]'); await app.waitFor(`Boolean(window.__littleHours.forest.isOpen && window.__littleHours.forest.diagnostics()?.ready)`, { what: 'the forest', timeout: 90000 }); await app.settle(); } },
 };

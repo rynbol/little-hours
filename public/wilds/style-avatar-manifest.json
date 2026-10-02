@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "generator": "tools/blender/style_avatar.py",
+  "asset": "style-avatar.glb",
+  "forward": "+Z",
+  "up": "+Y",
+  "feetY": 0,
+  "heightMetres": 1.75,
+  "headHeightMetres": 0.389,
+  "headCount": 4.499,
+  "bounds": {
+    "min": [
+      -0.34390151500701904,
+      0.0,
+      -0.21199998259544373
+    ],
+    "max": [
+      0.3440511226654053,
+      1.7499998807907104,
+      0.210999995470047
+    ]
+  },
+  "clips": {
+    "idle": {
+      "durationMs": 2400,
+      "loop": true
+    },
+    "attack1": {
+      "durationMs": 420,
+      "hitMs": 180,
+      "loop": false
+    },
+    "attack2": {
+      "durationMs": 460,
+      "hitMs": 200,
+      "loop": false
+    },
+    "attack3": {
+      "durationMs": 620,
+      "hitMs": 300,
+      "loop": false
+    },
+    "dodge": {
+      "durationMs": 580,
+      "loop": false
+    },
+    "hit": {
+      "durationMs": 360,
+      "loop": false
+    }
+  },
+  "materialSlots": [
+    "skin",
+    "skin-warm",
+    "cheek",
+    "hair",
+    "hair-light",
+    "hair-shadow",
+    "cardigan",
+    "cardigan-shadow",
+    "cardigan-edge",
+    "shirt",
+    "trousers",
+    "trousers-seam",
+    "boot",
+    "boot-toe",
+    "sole",
+    "button",
+    "eye-white",
+    "eye",
+    "pupil",
+    "glint",
+    "mouth"
+  ],
+  "palette": {
+    "skin": "#d5a27e",
+    "skin-warm": "#c98a6b",
+    "cheek": "#ce947c",
+    "hair": "#59402f",
+    "hair-light": "#71503b",
+    "hair-shadow": "#443226",
+    "cardigan": "#b67e63",
+    "cardigan-shadow": "#95634f",
+    "cardigan-edge": "#c68f72",
+    "shirt": "#ead8b3",
+    "trousers": "#71816c",
+    "trousers-seam": "#5c6e59",
+    "boot": "#725341",
+    "boot-toe": "#89674e",
+    "sole": "#493e33",
+    "button": "#d2b58b",
+    "eye-white": "#f5e9d5",
+    "eye": "#3c302a",
+    "pupil": "#241f1c",
+    "glint": "#fff7e9",
+    "mouth": "#82503f"
+  },
+  "joints": [
+    "pelvis",
+    "spine",
+    "neck",
+    "head",
+    "thigh.L",
+    "shin.L",
+    "foot.L",
+    "arm.L",
+    "forearm.L",
+    "hand.L",
+    "thigh.R",
+    "shin.R",
+    "foot.R",
+    "arm.R",
+    "forearm.R",
+    "hand.R"
+  ],
+  "meshGroups": [
+    "ears",
+    "eyes",
+    "eyelids",
+    "brows",
+    "cheeks",
+    "nose",
+    "smile",
+    "face",
+    "hair-cap",
+    "hair-fringe",
+    "hair-temples",
+    "hair-strands",
+    "hair-bun",
+    "hair-tie",
+    "cardigan-hem",
+    "shirt-inset",
+    "collar",
+    "cardigan-placket",
+    "buttons",
+    "pockets",
+    "pocket-welts",
+    "cardigan-seams",
+    "hem-knit",
+    "trousers",
+    "trouser-cuffs",
+    "trouser-seams",
+    "sleeve-cuffs",
+    "cuff-knit",
+    "hands",
+    "thumbs",
+    "finger-folds",
+    "boots",
+    "soles",
+    "boot-welts",
+    "boot-toe-seams",
+    "boot-laces",
+    "boot-pull",
+    "trouser-hips",
+    "cardigan"
+  ],
+  "style": {
+    "skin": "warm",
+    "hair": "chestnut bun",
+    "top": "clay cardigan",
+    "bottom": "sage trousers",
+    "shoes": "brown lace-up boots"
+  },
+  "defaultClip": "idle",
+  "defaultFrame": 0,
+  "footContacts": {
+    "L": {
+      "bone": "foot.L",
+      "position": [
+        -0.105,
+        0,
+        0.033
+      ]
+    },
+    "R": {
+      "bone": "foot.R",
+      "position": [
+        0.105,
+        0,
+        0.077
+      ]
+    }
+  },
+  "scope": "single styleframe, original Blender geometry"
+}

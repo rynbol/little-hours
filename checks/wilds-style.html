@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Little Hours · Forest style frame</title>
+  <style>
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#bfd9e8;font-family:system-ui,sans-serif;color:#283f43}
+    #style-stage{position:fixed;inset:0}
+    #loading-note{position:fixed;bottom:16px;left:16px}
+  </style>
+</head>
+<body>
+  <main id="style-stage" aria-label="Forest style frame"></main>
+  <div id="loading-note" role="status">Loading the Forest style frame…</div>
+  <script type="module">
+    if (!import.meta.env.DEV) throw new Error('Development check only');
+    import { freshState, restoreState } from '../src/core/state.js';
+    import { enterWildsStyle } from '../src/features/wilds/style-frame.js';
+    import { installTestHook } from '../src/dev/test-hook.js';
+
+    const parameters = new URLSearchParams(location.search);
+    let state;
+    try { state = restoreState(localStorage.getItem('little-hours-wilds-style-v1')); }
+    catch { state = freshState(); }
+    if (['day', 'dusk', 'rain'].includes(parameters.get('theme'))) state.theme = parameters.get('theme');
+    const presentation = {};
+    const subject = parameters.get('subject'), angle = parameters.get('angle');
+    if (['group', 'avatar', 'cat', 'warden', 'scenery'].includes(subject)) presentation.subject = subject;
+    if (['front', 'three-quarter', 'side'].includes(angle)) presentation.angle = angle;
+    const app = { state, wilds: enterWildsStyle(document.getElementById('style-stage'), state, { presentation }) };
+    installTestHook(app);
+    const loading = document.getElementById('loading-note');
+    app.wilds.initialization.then(() => {
+      const failure = app.wilds.diagnostics().failure;
+      loading.hidden = !failure;
+      if (failure) loading.textContent = failure;
+    });
+    addEventListener('pagehide', () => app.wilds.dispose(), { once: true });
+  </script>
+</body>
+</html>
