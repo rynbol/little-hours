@@ -1,54 +1,44 @@
 # The Wilds current state
 
-- Branch: `codex/wilds`, isolated worktree `little-hours-wilds`.
-- Scope: forest clearing, path, first vista, avatar, one fighting pet, sword combat and Mossback Warden.
-- The revised user goal replaces the old milestone order, score-based review loop and completion checklist.
-- Brief section 2 remains mandatory. Other biomes and bosses are out of scope.
+- Branch `codex/wilds`, based on `origin/codex/botw-look` at `d41dd6c`.
+- Scope is the Forest route, path to first vista, avatar, one fighting pet, sword and Mossback Warden with reward and level-up.
+- The current user goal replaces the brief’s old milestone, review and completion sections. Brief section 2 still applies.
 
 ## Current checkpoint
 
-The M1 round-3 work is integrated into the live worktree. It includes the clearing, streamed terrain and scenery, Blender avatar, locomotion, climbing, camera and HUD. This checkpoint is being committed and pushed as requested, without waiting for the discontinued review loop.
+M1 round 3 was integrated and pushed as `38e79f6`, then rebased onto the requested Forest branch as `6060f94`. Rebase conflicts retained both Forest and Wilds hooks, tests and world APIs.
 
-Validation on the current source:
+The rebased checkpoint passed 891 unit tests, guard, room verification and production build. Existing room skeleton and build-size warnings remain. Combat and final visual quality are not established by these checks.
 
-- 872 unit tests pass.
-- Guard passes with 359 files and zero problems against `13fc9ee`.
-- Room verification and production build pass.
-- Existing room skeleton and build chunk warnings remain.
-- The unchanged game source passed all 33 Wilds browser checks.
-- Four measured noncombat cases run at approximately 60 fps with no frame gaps over 20 ms.
-- These measurements do not establish combat or final visual quality.
+Old staging copies and capture archives were deleted. `.lh` is approximately 22 MB. The obsolete bulk capture catalog and numerical rubric are being retired.
 
-The old large capture/review workflow is stopped. Staging copies and capture archives will be removed after this push. No old numerical review is an acceptance gate.
+## In progress: playable slice
 
-## Next: playable slice
+- Reuse the actual Forest route terrain, trees, grass, sky and palette. Keep the Wilds avatar, movement and camera.
+- Pure encounter reducer owns one player stamina pool, sword combo, dodge, pet actions, Warden phases and once-only rewards.
+- Scene connects actual input, lock camera, health/XP/pet/boss HUD and persistence.
+- Temporary combat models establish readable actions before the Blender art step.
+- Fixed-clock `lh wilds` must walk the forest path, defeat the Warden with pet damage, receive materials/trophy and level up.
+- Root owns browser validation and commits. Agents own separate rules, scene and model files.
 
-1. Implement sword lock-on, combo, dodge and shared stamina rules.
-2. Add one pet fighting beside the avatar, with actual combat effects.
-3. Build the Mossback Warden encounter, arena, non-gold reward and a level-up.
-4. Extend the fixed-clock `lh wilds` flow from clearing to pet-assisted victory and level-up.
-5. Run command/browser gates, take at most 12 stills and four short clips, review, commit and push.
+## Next: style frame only
 
-## Remaining steps
+Write `art-direction.md` with exact shading, rim, sky, haze, day/dusk/rain colors and proportions. Rebuild the avatar, pet and Warden in Blender with hands, faces, bent joints and authored fight animation. No visible placeholder primitives in the frame.
 
-- Art direction: use actual Focus-window valley shots as the quality bar; define toon ramp, rim light, sky gradient, haze, day/dusk/rain palettes and proportions in `art-direction.md`; build one clearing style frame containing avatar, pet and Warden.
-- Blender art: rebuild those three characters and their fight animation; replace placeholder geometry in the slice, including the cylinder outcrop and plain arch.
-- Feel: hit stop, camera, readable telegraphs and sound hooks.
+Blind scenery review uses six randomly ordered, unlabeled Wilds/Forest shot pairs at matching times with avatar and HUD hidden. Blind character review uses six pairs against existing room avatar/pet close-ups. A fresh reviewer sees only the pairs and names the weaker picture and reason. Each category passes if Wilds is weaker in at most two pairs.
 
-After each step, one fresh reviewer sees only the limited captures and reference shots. It answers whether this looks like one finished game and names the five most useful changes. Fix those five and repeat for at most three rounds, then record remaining issues and move on.
+Fix the named defects after each failed round. Save one short review file per round. Stop after six failed rounds and report the unresolved look; do not extend rejected art. Save passing shots under `docs/openworld/shots/style-frame/`.
 
-## Working rules
+## Constraints and remaining work
 
-- Use pstack and Astra subagents at extra-high effort; host concurrency is four including the lead.
+- Use pstack with Astra at extra-high effort; host allows four concurrent agents including the lead.
 - Commit and push at least hourly. Push only `codex/wilds`; no PR or merge.
 - Keep `.lh` below 2 GB and this file below 100 lines.
-- No new capture plans, score tables, evidence archives or provenance audits.
-- Preserve room, house, timer, friendship modules and study-earned gold behavior.
-- Use Node 24, pinned game time/randomness, the lh CLI, and headless automated browsers.
-- No Docker, port 5420, or unowned process termination.
+- No capture plans, score tables, evidence archives or provenance audits.
+- Preserve house, room, timer, friendship and study-earned gold behavior.
+- Use Node 24, pinned time/randomness, headless lh checks and the in-app browser for visible work.
+- No Docker, port 5420 or termination of unowned processes.
 
-## Known unfinished work
+Combat is in progress; the first playable flow and fight performance remain unverified. The style frame and blind A/B reviews are not started. Do not apply the style beyond the single frame or add other biomes/bosses.
 
-Combat, pet combat, the Warden reward and level-up are not implemented yet. The current art is a starting point, with primitive landmarks, simple character proportions and rough clothing joins. Final fight performance is unmeasured.
-
-Done requires pet-assisted Warden victory and level-up in the lh flow, all gates passing, 60 fps measured in the fight, the final small review accepted or its three rounds exhausted, and all work pushed. Then stop.
+Done requires pet-assisted Warden victory and level-up in the lh flow, all gates passing, measured 60 fps in the fight, both blind A/B tests passing, passing shots saved and everything pushed.

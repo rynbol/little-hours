@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { join } from 'node:path';
 import { chromePath, closeAll, gpuFlag, killAllNow, launch, sleep, slow } from './lh/chrome.mjs';
 import { captureSequence, dispatchSequenceInput, validateSequence } from './lh/sequence.mjs';
-import { captureCatalog, expandCatalog } from './lh/catalog.mjs';
 import { openApp } from './lh/app.mjs';
 import { serve } from './lh/server.mjs';
 import { SEEDS } from './lh/seeds.mjs';
@@ -51,11 +50,6 @@ Options:
   --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
   --freeze <ms>      shots: stop the game clock at this many ms after the start, so two shots can be compared pixel for pixel
   --sequence <json>  wilds shots: capture a complete input/frame sequence and timed playback
-  --catalog <json>   wilds shots: capture an inventory of views or sequences
-  --catalog-mode <mode>  stills (default) or sequences
-  --catalog-ids <ids>  comma-separated catalog item, view, sequence or appearance IDs
-  --catalog-list     print matching catalog jobs without opening a browser
-  --build-id <id>    source fingerprint recorded with catalog evidence
   --still            prefers-reduced-motion: reduce
   --headed           show the browser window
   --hold <codes>     wilds perf: hold real keys during measurement, e.g. KeyW,ShiftLeft
@@ -290,7 +284,6 @@ async function perf() {
 }
 
 async function shots() {
-  if (options.catalog) return catalogShots();
   const names = positional.length ? positional : ['room', 'house'], list = await sides(), out = outDir('shot');
   for (const side of list) for (const name of names) {
     if (!views[name]) throw new Error(`Unknown view "${name}". Views: ${Object.keys(views).join(', ')}`);
@@ -329,33 +322,6 @@ async function shots() {
         console.log(`  pick ${x},${y}: ${hit}`);
       }
       if (options.probe) console.log(`  probe: ${await app.js(`(async () => { const scene = window.__littleHours.${sceneView}.diagnostics().scene; return JSON.stringify(await (${options.probe})); })()`)}`);
-    } finally { await app.close(); }
-  }
-  return 0;
-}
-
-async function catalogShots() {
-  if (positional.length !== 1 || positional[0] !== 'wilds') throw new Error('Catalog captures require shot wilds');
-  if (options.sequence || options.freeze || options.before) throw new Error('Catalog fixtures set their own sequence, clock and starting view');
-  const plan = JSON.parse(readFileSync(String(options.catalog), 'utf8'));
-  const theme = options.theme || 'day', mode = options['catalog-mode'] || 'stills';
-  const ids = String(options['catalog-ids'] || '').split(',').map(id => id.trim()).filter(Boolean);
-  const jobs = expandCatalog(plan, { theme, mode, ids });
-  if (options['catalog-list']) {
-    console.log(JSON.stringify(jobs.map(job => ({ id: job.id, kind: job.kind, itemIds: job.itemIds, clockMode: job.clockMode })), null, 2));
-    return 0;
-  }
-  if (!options['build-id']) throw new Error('Catalog captures require --build-id');
-  const catalogViewport = options.size ? viewport : { ...viewport, ...plan.captureDefaults.viewport };
-  const list = await sides(), out = outDir('shot');
-  for (const side of list) {
-    const app = await openApp(side.url, { ...catalogViewport, ...views.wilds.settings, scale: Number(options.scale || plan.captureDefaults.viewport.scale || 1), seed: options.seed || plan.captureDefaults.saveFixture, theme });
-    try {
-      await app.settle(); await views.wilds.go(app);
-      const result = await captureCatalog(app, plan, out, { theme, mode, ids, buildId: String(options['build-id']) });
-      console.log(`${side.label}: ${result.manifestFile} (${result.manifest.captures.length} captures)`);
-      if (result.errors.length) throw new Error(`Catalog errors: ${JSON.stringify(result.errors)}`);
-      if (app.errors.length) throw new Error(`Catalog page errors: ${app.errors.join(' | ')}`);
     } finally { await app.close(); }
   }
   return 0;
