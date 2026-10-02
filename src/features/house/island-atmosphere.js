@@ -17,6 +17,11 @@ const RANGES = {
   dusk: { far: '#5d5f93', mid: '#4d4f84', near: '#3f4274', cloud: '#a9a3cf', shade: '#6f6ca3' },
   rain: { far: '#6f8a9c', mid: '#5f7b8f', near: '#526d82', cloud: '#c9d6de', shade: '#8ea3b1' },
 };
+export const SKY_ISLAND_PAINT = Object.freeze({
+  day: { grass: '#86b264', lit: '#b4d68a', rock: ['#c4b29c', '#a8988a', '#8e8796', '#6f7088'], side: '#4f5470', tree: '#4f7f4a' },
+  dusk: { grass: '#4c6c6a', lit: '#6d8e86', rock: ['#7b7398', '#666189', '#524f7a', '#3d3c66'], side: '#232448', tree: '#2f4a4c' },
+  rain: { grass: '#66855f', lit: '#88a37e', rock: ['#9fa3a2', '#878e93', '#717b87', '#5a6576'], side: '#3c4656', tree: '#40593f' },
+});
 const skyHash = n => { const s = Math.sin(n * 71.3 + 5.7) * 43758.5453; return s - Math.floor(s); };
 
 export function mountainRange(width, height, base, rise, seed, mesas) {
@@ -53,12 +58,31 @@ export function skyIsland(x, y, scale, seed) {
   return `M${top.join(' L')} L${keel.join(' L')} Z`;
 }
 
-function skyIslands(r, width, height) {
-  const scale = Math.min(1.1, width / 1300);
+export function skyCap(x, y, scale, seed) {
+  const half = 72 * scale, crest = [], lip = [];
+  for (let i = 0; i <= 12; i++) {
+    const u = i / 12, px = x - half + u * half * 2, crown = Math.sin(u * Math.PI) ** .6;
+    crest.push(`${px.toFixed(1)} ${(y - 1.5 * scale - crown * (5 + skyHash(seed + i) * 9) * scale).toFixed(1)}`);
+    lip.unshift(`${px.toFixed(1)} ${(y + (3 + Math.sin(u * Math.PI) * 5 + skyHash(seed + i * 5.3) * 6 * Math.sin(u * Math.PI)) * scale).toFixed(1)}`);
+  }
+  return `M${crest.join(' L')} L${lip.join(' L')} Z`;
+}
+
+function skyIslands(theme, r, width, height) {
+  const scale = Math.min(1.1, width / 1300), paint = SKY_ISLAND_PAINT[theme] || SKY_ISLAND_PAINT.day;
   return SKY_ISLANDS.map(([x, y, size, seed]) => {
     const cx = x * width, cy = y * height, s = size * scale, fall = size > .55 ? `<rect x="${(cx + 22 * s).toFixed(1)}" y="${cy.toFixed(1)}" width="${(3 * s).toFixed(1)}" height="${(150 * s).toFixed(1)}" fill="url(#island-far-fall)"/>` : '';
-    return `<g data-sky-island="${seed}" opacity="${(.5 + size * .4).toFixed(2)}">${fall}<path d="${skyIsland(cx, cy, s, seed)}" fill="${r.far}"/><ellipse cx="${cx.toFixed(1)}" cy="${(cy - 3 * s).toFixed(1)}" rx="${(66 * s).toFixed(1)}" ry="${(7 * s).toFixed(1)}" fill="${r.mid}"/><ellipse cx="${cx.toFixed(1)}" cy="${(cy + 30 * s).toFixed(1)}" rx="${(95 * s).toFixed(1)}" ry="${(9 * s).toFixed(1)}" fill="${r.cloud}" opacity=".45" filter="url(#island-wisp)"/></g>`;
+    const trees = [-.42, -.3, .18, .34].filter((_, i) => size > .5 || i % 2).map((at, i) => `<ellipse cx="${(cx + at * 140 * s).toFixed(1)}" cy="${(cy - (12 + i % 2 * 3) * s).toFixed(1)}" rx="${(7 + skyHash(seed + i) * 4) * s}" ry="${(9 + skyHash(seed + i * 2) * 5) * s}" fill="${paint.tree}"/>`).join('');
+    return `<g data-sky-island="${seed}" opacity="${(.72 + size * .28).toFixed(2)}">${fall}<path d="${skyIsland(cx, cy, s, seed)}" fill="url(#island-sky-rock)"/><path d="${skyIsland(cx, cy, s, seed)}" fill="url(#island-sky-side)"/>${trees}<path data-sky-cap d="${skyCap(cx, cy, s, seed)}" fill="url(#island-sky-grass)"/><ellipse cx="${cx.toFixed(1)}" cy="${(cy + 30 * s).toFixed(1)}" rx="${(95 * s).toFixed(1)}" ry="${(9 * s).toFixed(1)}" fill="${r.cloud}" opacity=".4" filter="url(#island-wisp)"/></g>`;
   }).join('');
+}
+
+function skyIslandPaint(theme) {
+  const { grass, lit, rock, side } = SKY_ISLAND_PAINT[theme] || SKY_ISLAND_PAINT.day;
+  const bands = rock.flatMap((color, i) => [`<stop offset="${(i / rock.length + (i ? .02 : 0)).toFixed(2)}" stop-color="${color}"/>`, `<stop offset="${((i + 1) / rock.length).toFixed(2)}" stop-color="${color}"/>`]).join('');
+  return `<linearGradient id="island-sky-rock" x1="0" y1="0" x2="0" y2="1">${bands}</linearGradient>`
+    + `<linearGradient id="island-sky-side" x1="0" y1="0" x2="1" y2="0"><stop offset=".45" stop-color="${side}" stop-opacity="0"/><stop offset="1" stop-color="${side}" stop-opacity=".6"/></linearGradient>`
+    + `<linearGradient id="island-sky-grass" x1="0" y1="0" x2="1" y2="0"><stop offset=".1" stop-color="${lit}"/><stop offset=".7" stop-color="${grass}"/></linearGradient>`;
 }
 
 function sunRays(x, y, width, height) {
@@ -73,10 +97,10 @@ function skyScenery(theme, width, height) {
   const r = RANGES[theme] || RANGES.day;
   const wisps = [[.3, .36, 1.3], [.62, .1, 1], [.84, .22, 1.2], [.46, .3, .8]].map(([x, y, s], i) => `<ellipse cx="${x * width}" cy="${y * height}" rx="${160 * s}" ry="${9 * s}" fill="${r.cloud}" opacity="${theme === 'day' ? .55 : .25}" transform="rotate(${-4 + i * 2} ${x * width} ${y * height})"/>`).join('');
   const banks = [[.1, .6, 1, 1], [.9, .55, 1.2, 2], [.3, .86, 1.3, 3], [.74, .9, 1.5, 4]].map(([x, y, s, seed]) => cloudBank(x * width, y * height, s * Math.min(1.2, width / 1200), r.cloud, r.shade, seed)).join('');
-  return `<defs><linearGradient id="island-puff" x1="0" y1="0" x2="0" y2="1"><stop offset=".15" stop-color="${r.cloud}"/><stop offset=".95" stop-color="${r.shade}"/></linearGradient><filter id="island-cloud-soft" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="3.5"/></filter><filter id="island-wisp" x="-20%" y="-300%" width="140%" height="700%"><feGaussianBlur stdDeviation="7"/></filter><linearGradient id="island-far-fall" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${r.cloud}" stop-opacity=".7"/><stop offset="1" stop-color="${r.cloud}" stop-opacity="0"/></linearGradient><linearGradient id="island-range-mist" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="${r.far}" stop-opacity="0"/><stop offset="1" stop-color="${r.far}" stop-opacity=".9"/></linearGradient></defs>`
+  return `<defs><linearGradient id="island-puff" x1="0" y1="0" x2="0" y2="1"><stop offset=".15" stop-color="${r.cloud}"/><stop offset=".95" stop-color="${r.shade}"/></linearGradient><filter id="island-cloud-soft" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="3.5"/></filter><filter id="island-wisp" x="-20%" y="-300%" width="140%" height="700%"><feGaussianBlur stdDeviation="7"/></filter><linearGradient id="island-far-fall" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${r.cloud}" stop-opacity=".7"/><stop offset="1" stop-color="${r.cloud}" stop-opacity="0"/></linearGradient>${skyIslandPaint(theme)}<linearGradient id="island-range-mist" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="${r.far}" stop-opacity="0"/><stop offset="1" stop-color="${r.far}" stop-opacity=".9"/></linearGradient></defs>`
     + (theme === 'day' ? sunRays(width * .16, Math.max(44, height * .27), width, height) : '')
     + `<g filter="url(#island-wisp)">${wisps}</g>`
-    + skyIslands(r, width, height)
+    + skyIslands(theme, r, width, height)
     + `<path d="${mountainRange(width, height, .74, .16, 3, true)}" fill="${r.far}"/>`
     + `<path d="${mountainRange(width, height, .84, .13, 11, true)}" fill="${r.mid}"/>`
     + `<path d="${mountainRange(width, height, .95, .1, 23, false)}" fill="${r.near}"/>`

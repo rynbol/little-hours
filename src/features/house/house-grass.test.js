@@ -47,7 +47,8 @@ test('each blade is darker at the root than at its sunlit tip', () => {
   blades.forEach((_, i) => assert.ok(light(i * 12) < light(i * 12 + 8), `blade ${i} root is as bright as its tip`));
 });
 
-test('no blade grows on the forest path or under the grove', () => {
-  for (const [x, z] of FOREST_PATH.filter(([x, z]) => onIsland(x, z, .22))) assert.equal(grassy(x, z), false, `${x}, ${z}`);
-  for (const [x, z] of [[4.5, -4.9], [7.4, -4.6]]) assert.equal(grassy(x, z), false, `${x}, ${z} is under the grove`);
+test('no blade grows on the forest path', () => {
+  const onLawn = FOREST_PATH.filter(([x, z]) => onIsland(x, z, .22));
+  assert.ok(onLawn.length > 5);
+  for (const [x, z] of onLawn) assert.equal(grassy(x, z), false, `${x}, ${z}`);
 });

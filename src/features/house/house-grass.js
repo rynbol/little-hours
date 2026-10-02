@@ -6,7 +6,7 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { edgePoint, onIsland, ISLAND, STREAMS } from './house-island.js';
 import { inPond, DOCK } from './house-pond.js';
 import { pathDistance, PATH_WIDTH } from './house-paths.js';
-import { forestPathDistance, FOREST_PATH_WIDTH, onForest } from './island-forest.js';
+import { forestPathDistance, FOREST_PATH_WIDTH } from './island-forest.js';
 import { PLANT_SPOTS } from './garden-model.js';
 import { ARBOUR, BENCH, NEST } from './house-garden.js';
 
@@ -21,7 +21,7 @@ export function grassy(x, z) {
   return onIsland(x, z, .22) && !inPond(x, z, .3)
     && !(x > minX && x < maxX && z > minZ && z < maxZ)
     && !(Math.abs(x - DOCK.x) < DOCK.width / 2 + .15 && z > DOCK.to - .15 && z < DOCK.from + .3)
-    && pathDistance(x, z) > PATH_WIDTH / 2 + .04 && forestPathDistance(x, z) > FOREST_PATH_WIDTH / 2 + .1 && !onForest(x, z, .6)
+    && pathDistance(x, z) > PATH_WIDTH / 2 + .04 && forestPathDistance(x, z) > FOREST_PATH_WIDTH / 2 + .1
     && PLANT_SPOTS.every(([px, pz]) => Math.hypot(x - px, z - pz) > .72)
     && [ARBOUR, BENCH].every(([px, pz]) => Math.hypot(x - px, z - pz) > .5) && Math.hypot(x - NEST[0], z - NEST[1]) > .35
     && STREAMS.flat().every(([sx, sz]) => Math.hypot(x - sx, z - sz) > .34);

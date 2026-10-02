@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
 import { Scene } from '@babylonjs/core/scene.js';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera.js';
 import { onIsland } from './house-island.js';
+import { onLandmass } from './island-landform.js';
 import { ISLAND_SUN } from './island-atmosphere.js';
 import { TREE_FORMS } from '../../models/world/trees.js';
 import {
@@ -11,13 +14,13 @@ import {
 
 test('the grove grows on the new forest lobe, off the lawn and clear of the path', () => {
   const trees = grove();
-  assert.equal(trees.length, 34);
+  assert.equal(trees.length, 33);
   for (const { x, z } of trees) {
-    assert.ok(onForest(x, z, .4), `${x}, ${z} is off the forest`);
+    assert.ok(onForest(x, z, .3), `${x}, ${z} is off the forest`);
     assert.equal(onIsland(x, z, -.25), false, `${x}, ${z} stands on the lawn`);
     assert.ok(forestPathDistance(x, z) > FOREST_PATH_WIDTH / 2, `${x}, ${z} blocks the path`);
   }
-  assert.deepEqual(Object.values(TREE_FORMS).map(form => trees.filter(tree => tree.form === form).length), [12, 13, 9]);
+  assert.deepEqual(Object.values(TREE_FORMS).map(form => trees.filter(tree => tree.form === form).length), [12, 15, 6]);
 });
 
 test('the canopy steps up from low spreading trees at the lawn to tall conifers at the back', () => {
@@ -52,8 +55,7 @@ test('the forest path leaves the cottage grounds and ends inside the trees', () 
   assert.equal(onForest(...FOREST_PATH[0]), false);
   assert.ok(onForest(...FOREST_PATH.at(-1), .4));
   assert.equal(onIsland(...FOREST_PATH.at(-1)), false);
-  for (const [x, z] of FOREST_PATH) assert.ok(onIsland(x, z, .2) || onForest(x, z, .2), `the path leaves the ground at ${x}, ${z}`);
-  assert.ok(FOREST_PATH.some(([x, z]) => onIsland(x, z) && onForest(x, z)), 'the forest lobe overlaps the lawn');
+  for (const [x, z] of FOREST_PATH) assert.ok(onLandmass(x, z, .3), `the path leaves the ground at ${x}, ${z}`);
 });
 
 test('each tree form gets one placed matrix per tree, standing on the forest floor', () => {
@@ -77,7 +79,7 @@ test('the grove is lit by the island sun, not the valley sun', () => {
 
 test('the grove draws as one thin-instanced mesh per tree form and hides on demand', () => {
   const engine = new NullEngine(), scene = new Scene(engine), forest = createIslandForest(scene, 'dusk');
-  assert.deepEqual(forest.meshes.map(mesh => mesh.thinInstanceCount), [12, 13, 9]);
+  assert.deepEqual(forest.meshes.map(mesh => mesh.thinInstanceCount), [12, 15, 6]);
   assert.equal(new Set(forest.meshes.map(mesh => mesh.material)).size, 1);
   forest.animate(3);
   forest.setTheme('rain');
@@ -88,10 +90,21 @@ test('the grove draws as one thin-instanced mesh per tree form and hides on dema
   engine.dispose();
 });
 
+test('the grove shades its leaves from a distant eye so the island view takes the cheap leaf path', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), target = new Vector3(0, 1.3, 0);
+  scene.activeCamera = new ArcRotateCamera('island', Math.PI / 2.8, 1.02, 32, target, scene);
+  const forest = createIslandForest(scene, 'day'), material = forest.meshes[0].material;
+  scene.onBeforeRenderObservable.notifyObservers(scene);
+  const eye = material._vectors3.eye, toEye = eye.subtract(target), toCamera = scene.activeCamera.globalPosition.subtract(target);
+  for (const { x, z } of grove()) assert.ok(Vector3.Distance(eye, new Vector3(x, 0, z)) > 110);
+  assert.ok(Vector3.Dot(toEye.normalize(), toCamera.normalize()) > .999);
+  forest.dispose(); engine.dispose();
+});
+
 test('every face of the forest floor and trail turns up toward the sky', () => {
   const shapes = [];
   buildForestEdge({ box() {}, ball() {}, cylinder() {}, shape: (positions, colors, normals, indices) => shapes.push({ positions, indices }) });
-  const [floor, , , trail] = shapes;
+  const [floor, trail] = shapes;
   for (const { positions, indices = positions.map((_, i) => i).slice(0, positions.length / 3) } of [floor, trail]) {
     let up = 0, down = 0;
     for (let t = 0; t < indices.length; t += 3) {

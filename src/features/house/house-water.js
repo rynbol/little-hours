@@ -4,8 +4,8 @@ import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
-import { waterfalls, edgePoint } from './house-island.js';
-import { forestEdgePoint } from './island-forest.js';
+import { waterfalls } from './house-island.js';
+import { landmassEdge } from './island-landform.js';
 import { pondPoint, WATER } from './house-pond.js';
 import { ISLAND_ATMOSPHERES } from './island-atmosphere.js';
 
@@ -65,12 +65,8 @@ export function cloudCollar() {
   const puffs = [];
   for (let i = 0; i < COLLAR_PUFFS; i++) {
     const a = (i + veil(i) * .6) / COLLAR_PUFFS * Math.PI * 2, under = i % 3 === 0;
-    const [x, z] = edgePoint(a, under ? .5 + veil(i * 2.3) * .2 : 1 + veil(i * 3.1) * .2);
+    const [x, z] = landmassEdge(a, under ? .5 + veil(i * 2.3) * .2 : 1 + veil(i * 3.1) * .2);
     puffs.push({ x, y: (under ? -6.4 : -3.6) - veil(i * 1.7) * 1.1, z, size: (under ? 1.3 : .9) + veil(i * 4.4) * .55, seed: veil(i * 5.9) });
-  }
-  for (let i = 0; i < 6; i++) {
-    const [x, z] = forestEdgePoint(Math.PI * (.9 + i * .27), .95);
-    puffs.push({ x, y: -3.4 - veil(i * 8.1) * 1.1, z, size: .85 + veil(i * 6.3) * .45, seed: veil(i * 7.7 + 1) });
   }
   return puffs;
 }

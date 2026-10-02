@@ -2,40 +2,30 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { buildPaths } from './house-paths.js';
 import { placeAsset } from '../../models/assets.js';
 import { buildForestEdge } from './island-forest.js';
-import { strataBody, strataSteps, spire, addBody, hangingRoots } from './island-landform.js';
+import { ISLAND, edgePoint, landmassEdge, onIsland, strataBody, strataSteps, spire, addBody, hangingRoots } from './island-landform.js';
 
-export const ISLAND = Object.freeze({ cx: 2.85, cz: .1, rx: 10.15, rz: 5.2, power: 2.9 });
+export { ISLAND, edgePoint, onIsland };
+
 export const STREAMS = Object.freeze([
   [[11.75, 1.3], [12.1, 1.75], [12.5, 2.15], [12.95, 2.5]],
   [[-3.85, 3.5], [-4.15, 3.9], [-4.45, 4.25], [-4.8, 4.62]],
   [[10.55, -2.7], [11, -2.88], [11.45, -3.05], [12.25, -3.42]],
 ]);
-const TOP = -.175, SEGMENTS = 72, RINGS = 7;
+const TOP = -.175, SEGMENTS = 72, RINGS = 7, EDGE = 120;
 export const ISLAND_DEPTH = -5.4;
 const SPIRES = Object.freeze([[-1.5, -.4, 2.4, .9], [4.2, 1.1, 2.9, 1.1], [8.4, -.6, 2, .8], [1.4, -1.7, 1.6, .7], [-4.3, .9, 1.4, .6], [10.7, .8, 1.3, .55]].map(Object.freeze));
 const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const lawn = ['#7aa046', '#8cb24e', '#6b9140', '#a3c35c'];
 const rim = '#6f9640', lip = '#5b7f3a';
 
-export function edgePoint(a, scale = 1) {
-  const { cx, cz, rx, rz, power } = ISLAND, c = Math.cos(a), s = Math.sin(a);
-  const r = (Math.abs(c / rx) ** power + Math.abs(s / rz) ** power) ** (-1 / power);
-  const wobble = 1 + .018 * Math.sin(a * 5 + 1.3) + .012 * Math.sin(a * 9 + .4) + .008 * Math.sin(a * 17 + 2);
-  return [cx + c * r * wobble * scale, cz + s * r * wobble * scale];
-}
-export function onIsland(x, z, margin = 0) {
-  const { cx, cz } = ISLAND, a = Math.atan2(z - cz, x - cx), [ex, ez] = edgePoint(a);
-  return Math.hypot(x - cx, z - cz) <= Math.hypot(ex - cx, ez - cz) - margin;
-}
-
 function rgba(hex, shade = 1) { const c = Color3.FromHexString(hex); return [c.r * shade, c.g * shade, c.b * shade, 1]; }
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 
-export function buildIsland(api) {
+export function buildIsland(api, theme = 'day') {
   const positions = [], colors = [], normals = [];
   const tri = (a, b, c, ca, cb = ca, cc = ca, n = [0, 1, 0]) => { positions.push(...a, ...b, ...c); colors.push(...ca, ...cb, ...cc); normals.push(...n, ...n, ...n); };
-  const outward = j => { const [x, z] = edgePoint(angle(j + .5)), dx = x - cx, dz = z - cz, l = Math.hypot(dx, dz * 2.1, .5); return [dx / l, .5 / l, dz * 2.1 / l]; };
-  const angle = j => j / SEGMENTS * Math.PI * 2;
+  const outward = j => { const [x, z] = landmassEdge(edgeAngle(j + .5)), dx = x - cx, dz = z - cz, l = Math.hypot(dx, dz * 2.1, .5); return [dx / l, .5 / l, dz * 2.1 / l]; };
+  const angle = j => j / SEGMENTS * Math.PI * 2, edgeAngle = j => j / EDGE * Math.PI * 2;
   const { cx, cz } = ISLAND;
 
   const lawnAt = (k, j) => {
@@ -59,12 +49,12 @@ export function buildIsland(api) {
     { y: TOP - .1, scale: 1.02, color: rim },
     { y: TOP - .25, scale: 1.018, color: lip, tongue: .22 },
   ];
-  const ring = profile.map((step, r) => Array.from({ length: SEGMENTS + 1 }, (_, j) => {
-    const jj = j % SEGMENTS, [x, z] = edgePoint(angle(jj), step.scale);
+  const ring = profile.map((step, r) => Array.from({ length: EDGE + 1 }, (_, j) => {
+    const jj = j % EDGE, [x, z] = landmassEdge(edgeAngle(jj), step.scale);
     const scallop = step.tongue ? Math.max(0, Math.sin(jj * Math.PI / 3 + hash(Math.floor(jj / 6)) * 2)) ** 2 * step.tongue * (.5 + hash(jj * 2.9) * .5) : 0;
     return [x, step.y - scallop, z];
   }));
-  for (let r = 0; r < profile.length - 1; r++) for (let j = 0; j < SEGMENTS; j++) {
+  for (let r = 0; r < profile.length - 1; r++) for (let j = 0; j < EDGE; j++) {
     const u0 = ring[r][j], u1 = ring[r][j + 1], l0 = ring[r + 1][j], l1 = ring[r + 1][j + 1];
     const shade = .93 + hash(j * 1.7 + r * 5.3) * .12, top = rgba(profile[r].color, shade), bottom = rgba(profile[r + 1].color, shade);
     const n = outward(j); tri(u0, l0, u1, top, bottom, top, n); tri(u1, l0, l1, top, bottom, bottom, n);
@@ -72,7 +62,7 @@ export function buildIsland(api) {
   api.shape(positions.splice(0), colors.splice(0), normals.splice(0));
   const asset = (name, at) => { const { positions: p, colors: c, normals: n, indices } = placeAsset(name, at); api.shape(p, c, n, indices); };
   for (const body of islandCliff()) addBody(api, body);
-  hangingRoots(api, { edge: a => edgePoint(a, .998), top: TOP - .26, count: 110 });
+  hangingRoots(api, { edge: a => landmassEdge(a, .998), top: TOP - .26, count: 150 });
   asset('islet-a', { x: -8.3, y: -1, z: 2.6, yaw: .4, scale: 1.1 });
   asset('islet-b', { x: 13.9, y: -1.9, z: -1, yaw: 2, scale: 1 });
 
@@ -97,13 +87,13 @@ export function buildIsland(api) {
   });
 
   buildPaths(api);
-  buildForestEdge(api);
+  buildForestEdge(api, theme);
 }
 
 export function islandCliff() {
   const { cx, cz } = ISLAND, rock = ['#8f8584', '#7a7579', '#8a8388', '#6b686f', '#5d5b63'];
   return [
-    strataBody({ edge: a => edgePoint(a, 1.004), segments: SEGMENTS, strata: strataSteps(TOP - .28, ISLAND_DEPTH), keel: [cx + .3, cz - .2, ISLAND_DEPTH] }),
+    strataBody({ edge: a => landmassEdge(a, 1.004), segments: EDGE, strata: strataSteps(TOP - .28, ISLAND_DEPTH), keel: [cx + .9, cz - .9, ISLAND_DEPTH] }),
     ...SPIRES.map(([x, z, length, radius], i) => spire({ x, z, top: ISLAND_DEPTH * .62, length: length + 1.2, radius, colors: rock, seed: i * 2.7 })),
   ];
 }
