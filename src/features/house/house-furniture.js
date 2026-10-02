@@ -5,17 +5,18 @@ import { getFurniture } from '../../core/catalog.js';
 import { tintPaint } from '../../core/tints.js';
 import { surfacePaint } from '../../core/surfaces.js';
 import { openings, SHELLS } from '../../core/walls.js';
+import { glowOf, lampAt, lamplight } from './house-lamplight.js';
 
-export function bakeHousePart(mesh) {
+export function bakeHousePart(mesh, shade = 0) {
   mesh.unfreezeWorldMatrix(); mesh.computeWorldMatrix(true);
   const data = VertexData.ExtractFromMesh(mesh, true, true);
   data.transform(mesh.getWorldMatrix());
-  const diffuse = mesh.material?.diffuseColor || { r: 1, g: 1, b: 1 };
+  const diffuse = mesh.material?.diffuseColor || { r: 1, g: 1, b: 1 }, glow = shade && glowOf(mesh.material) || [0, 0, 0];
   const original = data.colors, colors = new Float32Array(data.positions.length / 3 * 4);
   for (let i = 0; i < colors.length; i += 4) {
-    colors[i] = (original?.[i] ?? 1) * diffuse.r;
-    colors[i + 1] = (original?.[i + 1] ?? 1) * diffuse.g;
-    colors[i + 2] = (original?.[i + 2] ?? 1) * diffuse.b;
+    colors[i] = (original?.[i] ?? 1) * diffuse.r + glow[0] * shade;
+    colors[i + 1] = (original?.[i + 1] ?? 1) * diffuse.g + glow[1] * shade;
+    colors[i + 2] = (original?.[i + 2] ?? 1) * diffuse.b + glow[2] * shade;
     colors[i + 3] = original?.[i + 3] ?? 1;
   }
   data.colors = colors;
@@ -43,7 +44,7 @@ export function houseArchitecture(scene, layout, style, origin, theme, roomId) {
 
 // The house uses the SAME authored furniture as the room. Static geometry is
 // baked into the house batches; only the occupied desk keeps its live rig.
-export function houseFurniture(scene, item, { style, origin, occupied, avatar, floor = .16, rugScale = 1 }) {
+export function houseFurniture(scene, item, { style, origin, occupied, avatar, floor = .16, rugScale = 1, theme = 'day' }) {
   const definition = getFurniture(item.type);
   const root = createFurniture(item.type, scene, avatar);
   styleFurniture(root, style, tintPaint(item.type, item.tint));
@@ -60,15 +61,17 @@ export function houseFurniture(scene, item, { style, origin, occupied, avatar, f
     root.position.set(origin[0] + item.x * .43, origin[1] + floor, origin[2] + item.z * .43);
     root.rotation.y = item.rotation * Math.PI / 2;
   }
-  const parts = [];
+  const parts = [], lamps = [], { shade } = lamplight(theme);
   for (const mesh of root.getChildMeshes()) {
     const avatar = root.metadata.avatar && mesh.isDescendantOf(root.metadata.avatar);
     if (occupied && avatar) { mesh.isPickable = false; continue; }
     if (mesh.isEnabled() && !mesh.metadata?.effect && mesh.getTotalVertices() && (mesh.material?.alpha ?? 1) >= 1) {
-      parts.push(bakeHousePart(mesh));
+      const part = bakeHousePart(mesh, shade), glow = glowOf(mesh.material);
+      parts.push(part);
+      if (glow) lamps.push(lampAt(part.positions, glow));
     }
     mesh.setEnabled(false);
   }
   if (!occupied) root.dispose(false, false);
-  return { parts, live: occupied ? root : null };
+  return { parts, lamps, live: occupied ? root : null };
 }

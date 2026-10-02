@@ -7,20 +7,20 @@ import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera.js';
 import { onIsland } from './house-island.js';
 import { onLandmass } from './island-landform.js';
 import { ISLAND_SUN } from './island-atmosphere.js';
-import { TREE_FORMS } from '../../models/world/trees.js';
+import { TREE_FORMS, CROWN_TOPS } from '../../models/world/trees.js';
 import {
   FOREST_PATH, FOREST_PATH_WIDTH, FOREST_TRAILHEAD, FOREST_CLEARING, buildForestEdge, createIslandForest, forestAtmosphere, forestPathDistance, groveMatrices, grove, onForest, groveBounds,
 } from './island-forest.js';
 
 test('the grove grows on the new forest lobe, off the lawn and clear of the path', () => {
   const trees = grove();
-  assert.equal(trees.length, 45);
+  assert.equal(trees.length, 70);
   for (const { x, z } of trees) {
     assert.ok(onForest(x, z, .3), `${x}, ${z} is off the forest`);
     assert.equal(onIsland(x, z, -.25), false, `${x}, ${z} stands on the lawn`);
     assert.ok(forestPathDistance(x, z) > FOREST_PATH_WIDTH / 2, `${x}, ${z} blocks the path`);
   }
-  assert.deepEqual(Object.values(TREE_FORMS).map(form => trees.filter(tree => tree.form === form).length), [21, 20, 4]);
+  assert.deepEqual(Object.values(TREE_FORMS).map(form => trees.filter(tree => tree.form === form).length), [19, 33, 18]);
 });
 
 test('the canopy steps up from low spreading trees at the lawn to tall conifers at the back', () => {
@@ -79,7 +79,7 @@ test('the grove is lit by the island sun, not the valley sun', () => {
 
 test('the grove draws as one thin-instanced mesh per tree form and hides on demand', () => {
   const engine = new NullEngine(), scene = new Scene(engine), forest = createIslandForest(scene, 'dusk');
-  assert.deepEqual(forest.meshes.map(mesh => mesh.thinInstanceCount), [21, 20, 4]);
+  assert.deepEqual(forest.meshes.map(mesh => mesh.thinInstanceCount), [19, 33, 18]);
   assert.equal(new Set(forest.meshes.map(mesh => mesh.material)).size, 1);
   forest.animate(3);
   forest.setTheme('rain');
@@ -133,4 +133,22 @@ test('the dusk grove stays a readable green and no lantern paints a glow disc on
     buildForestEdge({ box() {}, ball() {}, shape() {}, cylinder: (x, y, z, top, bottom, height) => discs.push({ top, height }) }, theme);
     assert.ok(discs.length > 0 && discs.every(({ top, height }) => top < .45 && height > .01), theme);
   }
+});
+
+test('the back of the forest is a dense wall of conifers and no tree near the camera towers over the cottage', () => {
+  const top = tree => CROWN_TOPS[tree.form] * .3 * tree.size * tree.height, trees = grove(), conifers = trees.filter(tree => tree.form === TREE_FORMS.conifer);
+  assert.ok(conifers.filter(tree => tree.z < -8).length >= 22, 'the back row is thin');
+  assert.ok(Math.max(...trees.map(top)) < 4.8, 'a tree stands taller than the cottage ridge');
+  const { position: [x] } = FOREST_TRAILHEAD;
+  for (const tree of trees.filter(tree => tree.x > x + 2 && tree.z > -7.5)) assert.ok(top(tree) < 2.8, `the tree at ${tree.x}, ${tree.z} towers over the right shore`);
+});
+
+test('the trail lanterns and the arch lamps burn brighter and larger at dusk than by day', () => {
+  const glass = theme => {
+    const lit = [];
+    buildForestEdge({ box() {}, cylinder() {}, shape() {}, ball: (x, y, z, w, h, d, hex, strength = 1) => { if (strength > 1.04) lit.push({ w, strength }); } }, theme);
+    return lit.filter(({ w }) => w >= .15);
+  };
+  assert.equal(glass('dusk').length, 7);
+  assert.ok(glass('dusk').every(({ strength }) => strength > 3) && glass('day').every(({ strength }) => strength < 1.2));
 });

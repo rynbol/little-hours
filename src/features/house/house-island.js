@@ -24,7 +24,7 @@ const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 export function buildIsland(api, theme = 'day') {
   const positions = [], colors = [], normals = [];
   const tri = (a, b, c, ca, cb = ca, cc = ca, n = [0, 1, 0]) => { positions.push(...a, ...b, ...c); colors.push(...ca, ...cb, ...cc); normals.push(...n, ...n, ...n); };
-  const outward = j => { const [x, z] = landmassEdge(edgeAngle(j + .5)), dx = x - cx, dz = z - cz, l = Math.hypot(dx, dz * 2.1, .5); return [dx / l, .5 / l, dz * 2.1 / l]; };
+  const outward = j => { const [ax, az] = landmassEdge(edgeAngle(j)), [bx, bz] = landmassEdge(edgeAngle(j + 1)), along = Math.hypot(bx - ax, bz - az), dx = (bz - az) / along, dz = (ax - bx) / along * 2.1, l = Math.hypot(dx, dz, .5); return [dx / l, .5 / l, dz / l]; };
   const angle = j => j / SEGMENTS * Math.PI * 2, edgeAngle = j => j / EDGE * Math.PI * 2;
   const { cx, cz } = ISLAND;
 

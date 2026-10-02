@@ -76,7 +76,7 @@ const WOODS_TRAIL = spline([...FOREST_PATH, ...WOODS_WAY]);
 const [[wx0, wz0], , [wx1, wz1]] = WOODS_WAY, LANE = [wx1 - wx0, wz1 - wz0].map(v => v / Math.hypot(wx1 - wx0, wz1 - wz0)), LANE_SIDE = [-LANE[1], LANE[0]];
 
 export const forestPathDistance = (x, z) => trailDistance(TRAIL, x, z);
-const woodsDistance = (x, z) => trailDistance(WOODS_TRAIL, x, z);
+export const woodsDistance = (x, z) => trailDistance(WOODS_TRAIL, x, z);
 export function behindFence(x, z) {
   const { t, width } = band(x, z);
   return x > FENCE_STRIP.from && x < FENCE_STRIP.to && t * width < FENCE_STRIP.depth;
@@ -95,20 +95,22 @@ function trailDistance(trail, x, z) {
 const CROWN_REACH = [5.4, 3.6, 7.2];
 const thicket = (x, z) => .5 + .3 * Math.sin(x * 1.9 + z * .7 + 1.1) * Math.cos(z * 1.4 - x * .5) + .2 * Math.sin(x * 4.3 - z * 3.1);
 
+const farBack = (x, z) => clamp01((-(x - CX) * HOME_VIEW[0] - (z - CZ) * HOME_VIEW[1] - 3.4) / 4.6);
+
 export const GROVE = Object.freeze((() => {
   const trees = [];
-  for (let i = 0; trees.length < 54 && i < 9000; i++) {
+  for (let i = 0; trees.length < 70 && i < 14000; i++) {
     const x = 1 + hash(i * 1.37) * 14, z = -3 - hash(i * 2.11 + 5) * 9, { t } = band(x, z);
     if (!onForest(x, z, .3) || behindFence(x, z) || thicket(x, z) < hash(i * 8.3) * .55) continue;
-    const layer = t * 1.05 + (hash(i * 3.3 + 1) - .5) * .7;
-    const form = layer < .34 ? TREE_FORMS.spreading : layer < .8 ? TREE_FORMS.broadleaf : TREE_FORMS.conifer;
+    const back = farBack(x, z), layer = t * .45 + back * .8 + (hash(i * 3.3 + 1) - .5) * .5;
+    const form = layer < .3 ? TREE_FORMS.spreading : layer < .64 ? TREE_FORMS.broadleaf : TREE_FORMS.conifer;
     const conifer = form === TREE_FORMS.conifer;
-    const size = (.36 + hash(i * 4.9) * .34 + t * .42) * (form === TREE_FORMS.spreading ? .82 : 1);
-    const height = conifer ? .8 + hash(i * 7.3) * .65 : .82 + hash(i * 7.3) * .36, width = conifer ? .78 + hash(i * 9.1) * .4 : .85 + hash(i * 9.1) * .4;
+    const size = (.42 + hash(i * 4.9) * .26 + back * (conifer ? .4 : .2)) * (form === TREE_FORMS.spreading ? .82 : 1);
+    const height = conifer ? .82 + hash(i * 7.3) * .4 + back * .12 : .82 + hash(i * 7.3) * .36, width = conifer ? .78 + hash(i * 9.1) * .4 : .85 + hash(i * 9.1) * .4;
     const crown = CROWN_REACH[form] * TREE_SCALE * size * width * .62, top = CROWN_TOPS[form] * TREE_SCALE * size * height;
     if (woodsDistance(x, z) < FOREST_PATH_WIDTH / 2 + crown * .55 || hidesTheWay(x, z, crown, top)) continue;
     if (Math.hypot(x - FOREST_CLEARING[0], z - FOREST_CLEARING[1]) < .95 + crown * .4) continue;
-    const spacing = .4 + hash(i * 5.7) * .3;
+    const spacing = (.4 + hash(i * 5.7) * .3) * (1 - back * .3);
     if (trees.some(other => Math.hypot(other.x - x, other.z - z) < (other.crown + crown) * spacing)) continue;
     trees.push(Object.freeze({ x, z, form, size, height, width, crown, turn: hash(i * 6.1) * Math.PI * 2 }));
   }
@@ -170,7 +172,7 @@ function trail(api, light) {
   });
 }
 
-const LANTERN = { day: ['#f6e3b8', 1.05], dusk: ['#ffcf78', 2.7], rain: ['#f3d699', 1.7] };
+const LANTERN = { day: ['#f6e3b8', 1.05], dusk: ['#ffc76a', 3.6], rain: ['#f3d699', 2] };
 const LANTERN_SPOTS = Object.freeze([[3, 1], [14, 1], [26, 1], [44, -1], [58, -1]]);
 
 function lantern(api, x, z, theme, toward) {
@@ -178,8 +180,8 @@ function lantern(api, x, z, theme, toward) {
   const [hx, hz] = [x + toward[0] * .15, z + toward[1] * .15];
   api.box(x, y + .36, z, .05, .72, .05, '#5c4434');
   api.box((x + hx) / 2, y + .72, (z + hz) / 2, .035, .035, .035, '#5c4434');
-  api.box(hx, y + .6, hz, .13, .02, .13, '#3f3229');
-  api.ball(hx, y + .53, hz, .1, .13, .1, glow, strength);
+  api.box(hx, y + .62, hz, .17, .02, .17, '#3f3229');
+  api.ball(hx, y + .53, hz, .15, .18, .15, glow, strength);
   api.box(hx, y + .67, hz, .1, .04, .1, '#3f3229');
 }
 
@@ -248,7 +250,7 @@ function threshold(api, theme) {
     api.ball(sx, forestFloor(sx, sz) + .1, sz, .42, .28, .36, '#8f9284');
     api.ball(sx, forestFloor(sx, sz) + .24, sz, .3, .08, .26, '#6f9a46');
     api.box(px - FACING[0] * .12, y + rise * .8, pz - FACING[1] * .12, .012, .1, .012, '#3f3a34');
-    api.ball(px - FACING[0] * .12, y + rise * .8 - .1, pz - FACING[1] * .12, .13, .16, .13, glow, strength);
+    api.ball(px - FACING[0] * .12, y + rise * .8 - .12, pz - FACING[1] * .12, .19, .23, .19, glow, strength);
   }
   for (let k = 0; k < segments; k++) {
     const theta = Math.PI * (k + .5) / segments, across = Math.cos(theta) * half, up = Math.sin(theta) * half * .75;

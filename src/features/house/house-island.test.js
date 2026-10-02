@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { onIsland, edgePoint, islandCliff, ISLAND, ISLAND_DEPTH, STREAMS, waterfalls } from './house-island.js';
+import { onIsland, edgePoint, islandCliff, buildIsland, ISLAND, ISLAND_DEPTH, STREAMS, waterfalls } from './house-island.js';
 import { strataSteps, hangingRoots, landmassEdge, onLandmass } from './island-landform.js';
 import { HOUSE_POSITIONS } from './house-model.js';
 import { GARDEN_CENTER } from './house-garden.js';
@@ -78,4 +78,21 @@ test('the forest swells out of the island outline with no notch or step where th
   }
   assert.ok(widest > 4, `the forest reaches only ${widest} past the lawn`);
   assert.ok(onLandmass(9, -8) && !onIsland(9, -8));
+});
+
+test('the grass lip is lit by the way each stretch of shore really faces, on the forest flank too', () => {
+  const shapes = [], quiet = () => {};
+  buildIsland({ box: quiet, ball: quiet, cylinder: quiet, prism: quiet, disc: quiet, orb: quiet, shape: (positions, colors, normals) => shapes.push({ positions, normals }) });
+  const [{ positions, normals }] = shapes;
+  let flank = 0;
+  for (let t = 0; t < positions.length; t += 9) {
+    if (normals[t + 1] > .9) continue;
+    const [a, b, c] = [0, 3, 6].map(k => positions.slice(t + k, t + k + 3));
+    const u = b.map((v, k) => v - a[k]), w = c.map((v, k) => v - a[k]), fx = u[1] * w[2] - u[2] * w[1], fz = u[0] * w[1] - u[1] * w[0];
+    const face = Math.hypot(fx, fz), given = Math.hypot(normals[t], normals[t + 2]);
+    if (face < 1e-9) continue;
+    assert.ok(Math.abs(fx * normals[t] + fz * normals[t + 2]) / face / given > .85, `the lip at ${a[0]}, ${a[2]} is lit from the wrong side`);
+    if (!onIsland(a[0], a[2], -.6)) flank++;
+  }
+  assert.ok(flank > 40, `only ${flank} lip faces on the forest shore`);
 });

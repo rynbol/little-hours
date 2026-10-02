@@ -10,6 +10,7 @@ import { roomDesign, rugStack, standHeight, FLOOR_Y } from '../../core/layout.js
 import { getFurniture } from '../../core/catalog.js';
 import { surfaceChoices } from '../../core/surfaces.js';
 import { houseFurniture, houseArchitecture } from './house-furniture.js';
+import { warmRoom } from './house-lamplight.js';
 import { gardenGrowth } from '../../core/garden-plants.js';
 import { buildGarden } from './house-garden.js';
 import { buildGardenRetreat, buildRetreatFlowers, buildGardenExit } from './garden-retreat.js';
@@ -43,7 +44,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     material: new StandardMaterial('house-paint', scene), hinges: {},
   };
   shared.owner = model;
-  const { levels, material, hinges } = shared; let furnitureFloor = .16, rugs = [];
+  const { levels, material, hinges } = shared; let furnitureFloor = .16, rugs = [], lamps = [];
   material.diffuseColor = Color3.White(); material.specularColor.setAll(0); material.emissiveColor.setAll(0.08);
   let bucket = 'grounds', piece = null;
   let origin = [0, 0, 0];
@@ -105,10 +106,10 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     const itemFloor = furnitureFloor + ((rug?.y ?? standHeight(item, rugs)) - FLOOR_Y) * .43;
     const result = houseFurniture(scene, item, {
       style: roomDesign(entry.layout).style || 'retreat', origin, floor: itemFloor, rugScale: rug?.scale || 1,
-      avatar, occupied: house.activeId === bucket && item.id === entry.layout.activeDeskId,
+      avatar, occupied: house.activeId === bucket && item.id === entry.layout.activeDeskId, theme,
     });
     if (!buckets.has(bucket)) buckets.set(bucket, []);
-    buckets.get(bucket).push(...result.parts);
+    buckets.get(bucket).push(...result.parts); lamps.push(...result.lamps);
     if (result.live) { result.live.parent = levels[bucket]; piece.live.push(result.live); }
   }
   batch('grounds', String(house.rooms.length === 3), () => {
@@ -186,8 +187,9 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
     box(0, 2.84, -1.9, 4.98, .16, .25, trim); box(-2.4, 2.84, 0, .19, .16, 4, trim);
     box(-2.3, .4, 0, .06, .08, 3.9, cream); box(0, .4, -1.8, 4.65, .08, .06, cream);
     }
-    rugs = rugStack(entry.layout.items);
+    rugs = rugStack(entry.layout.items); lamps = [];
     for (const item of [...entry.layout.items].sort((a, b) => (getFurniture(a.type)?.category === 'Rugs' ? -1 : 0) - (getFurniture(b.type)?.category === 'Rugs' ? -1 : 0))) furniture(item);
+    warmRoom(buckets.get(bucket), lamps, theme, origin);
   });
   // The selected room's front edge is its own small batch, so choosing a room
   // never rebuilds the rooms themselves.
