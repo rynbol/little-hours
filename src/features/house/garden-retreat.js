@@ -1,6 +1,7 @@
 import { gardenGround } from './garden-ground.js';
 import { buildGardenTree } from './garden-trees.js';
 import { buildGardenSpecimen } from './garden-model.js';
+import { groundsKit, groundsHash, railFence, lanternPost } from './grounds-kit.js';
 
 export const RETREAT_SPOTS = [[-2.35, -1.95], [2.35, -1.95], [-3, .2], [3, .2], [-2.25, 2.35], [2.25, 2.35]];
 export const GARDEN_EXIT = [-3.8, .04, -6.1];
@@ -34,7 +35,9 @@ function flowers(api, x, z, seed, scale = 1) {
 }
 
 function stone(api, x, z, width, depth, seed) {
-  terrace(api, x, .035, z, width, depth, .045, ['#dfd6bb', '#d8ceb3', '#e7dbc2'][seed % 3], seed);
+  const kit = groundsKit();
+  kit.slab(x, .045, z, depth / 2 * 1.1, .07, ['#cfc6ae', '#bdb59f', '#d8cfb8', '#b3ab95'][seed % 4], { sides: 7, seed: seed * 3 + x, stretch: width / depth, yaw: (groundsHash(seed + x) - .5) * .5 });
+  kit.flush(api);
 }
 
 function roseArbour(api) {
@@ -110,12 +113,15 @@ export function buildGardenRetreat(api, theme) {
     api.box(x + .65, .3, z + .54, .035, .38, .035, '#a18561'); api.box(x + .65, .49, z + .54, .27, .19, .045, '#eadbbb', -.1);
     for (let i = 0; i < 5; i++) api.ball(x - .5 + i * .25, .15, z - .43, .16, .035, .12, '#94835f');
   }
+  const fence = groundsKit(), runs = [[]];
   for (let i = 0; i < 18; i++) {
-    const a = Math.PI + i / 17 * Math.PI, x = Math.cos(a) * 5.25, z = Math.sin(a) * 4.55;
-    if (i === 4 || i === 5) continue;
-    api.box(x, .45, z, .1, .9, .1, '#dbcead'); api.ball(x, .92, z, .15, .13, .15, '#f0e2bd');
-    if (i < 17 && i !== 3) { const b = Math.PI + (i + .5) / 17 * Math.PI; for (const y of [.35, .66]) api.box(Math.cos(b) * 5.25, y, Math.sin(b) * 4.55, .96, .06, .06, '#d6c8a6', [0, -b - Math.PI / 2, 0]); }
+    if (i === 4 || i === 5) { runs.push([]); continue; }
+    const a = Math.PI + i / 17 * Math.PI;
+    runs.at(-1).push([Math.cos(a) * 5.25 / 1.7, Math.sin(a) * 4.55 / 1.7]);
   }
+  for (const [k, run] of runs.entries()) railFence(fence, run, 0, { height: .55, seed: k * 11, wood: '#b29a78', rail: '#c7b08d' });
+  const kit = groundsKit();
+  kit.absorb(fence, 1.7, [0, 0, 0]);
   roseArbour(api); pottingCorner(api);
   for (const [i, [x, z]] of [[-6.1, -3.9], [-5.8, -5.1], [-5.05, -6.65], [-3.4, -7.5], [-1.2, -6.1], [-1.7, -4.9]].entries()) flowers(api, x, z, i + 11, 1.4);
   for (const [i, x] of [-5.2, 4.3].entries()) {
@@ -139,9 +145,12 @@ export function buildGardenRetreat(api, theme) {
     if (i < 27) { const rise = 2.55 - Math.sin((i + 1) / 27 * Math.PI) * .62 - y; api.box(x + step / 2, y + rise / 2, z, Math.hypot(step, rise), .024, .025, '#97876a', Math.atan2(rise, step)); }
     if (i % 2) api.ball(x, y - .09, z, .105, .135, .105, '#ffe7b3', glow);
   }
-  for (const [x, z] of [[-1.15, 3.35], [1.15, 3.35], [-1, -1.2], [1, -1.2]]) {
-    api.box(x, .28, z, .045, .56, .045, '#8c795b'); api.box(x, .57, z, .2, .06, .2, '#8c795b'); api.ball(x, .48, z, .15, .15, .15, '#ffe7b3', glow);
+  for (const [x, z, yaw] of [[-1.15, 3.35, Math.PI], [1.15, 3.35, 0], [-1, -1.2, Math.PI], [1, -1.2, 0]]) {
+    const lantern = groundsKit();
+    lanternPost(lantern, x, 0, z, ['#ffe7b3', glow], { yaw, seed: x + z, height: .62, wood: '#b29a78', iron: '#6f675b' });
+    kit.absorb(lantern, 1.45, [x, 0, z]);
   }
+  kit.flush(api);
 }
 
 export function buildRetreatFlowers(api, plants) {

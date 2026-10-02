@@ -1,15 +1,13 @@
 import { gardenSpecies, gardenGrowth } from '../../core/garden-plants.js';
+import { groundsKit, railFence } from './grounds-kit.js';
 
 export const PLANT_SPOTS = [[6.55, -3.3], [8, -3.3], [9.45, -3.3], [6.55, -1.9], [8, -1.9], [9.45, -1.9]];
 export const gardenPlotAt = (x, z, spots = PLANT_SPOTS, radius = .6) => spots.findIndex(([px, pz]) => Math.hypot(x - px, z - pz) < radius);
 
 export function buildGardenPlants(api, plants) {
-  for (let i = 0; i < 9; i++) {
-    const x = 5.8 + i * .57;
-    api.box(x, .12, -4.05, .075, .65, .075, '#d7c6a2');
-    api.ball(x, .47, -4.05, .12, .11, .12, '#eee0bc');
-  }
-  for (const y of [.02, .28]) api.box(8.08, y, -4.05, 4.63, .065, .045, '#e1d2af');
+  const fence = groundsKit();
+  railFence(fence, Array.from({ length: 7 }, (_, i) => [5.85 + i * .712, -4.05]), -.175, { seed: 5 });
+  fence.flush(api);
   for (const x of [5.8, 10.35]) {
     api.box(x, .6, -4.05, .1, 1.65, .1, '#b89a71');
     for (let i = 0; i < 5; i++) api.ball(x + (i % 2 ? .04 : -.04), .15 + i * .25, -4.01, .23, .22, .19, i % 3 === 0 ? '#dcaab1' : '#829b70');
