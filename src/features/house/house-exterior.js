@@ -2,14 +2,20 @@
 // roofs that run on from room to room, and a stair hall up to the loft.
 export const STAIR_TOP = -1.03, WALL_TOP = 2.95, FRONT = 2.2, BACK = -2.2, HALF = 2.55, RISE = 1.75, BAY = .7;
 export const PALETTE = Object.freeze({
-  plaster: Object.freeze(['#f4e6ca', '#f0dfc0', '#f6ead2', '#ecdab9']), timber: '#5c3f2e', cream: '#f3e6cc',
+  plaster: Object.freeze(['#f4e6ca', '#f0dfc0', '#f6ead2', '#ecdab9']), timber: '#71503a', cream: '#f3e6cc',
   shutter: '#6b9086', door: '#8b5b3c', ceiling: '#c9a47c', iron: '#3b302b', lamp: '#ffd27e',
   stones: Object.freeze(['#bcae95', '#a99a80', '#cbbd9f', '#9d9180', '#b4a68c']),
   shingles: Object.freeze(['#8f5c47', '#875643', '#96634c', '#80513f', '#8c5f48', '#7f5543']),
-  ridge: '#6b4233', moss: Object.freeze(['#76804f', '#6c7a4a', '#808a58']),
+  ridge: '#6b4233', flashing: '#9a9488',
   blossoms: Object.freeze(['#f1b2ad', '#f7e0a0', '#c4b0de', '#f4cfd8', '#ffe9c2']), leaves: Object.freeze(['#6f8d5c', '#86a46c']),
 });
-const { timber, cream, shutter, door, ceiling, iron, stones, shingles, moss, blossoms, leaves } = PALETTE;
+const { timber, cream, shutter, door, ceiling, iron, stones, blossoms, leaves } = PALETTE;
+const ROOF_WEATHER = Object.freeze({ day: ['#000000', 0], dusk: ['#4b3d63', .34], rain: ['#2c3236', .32] });
+const mix = (hex, toward, amount) => '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - amount) + parseInt(toward.slice(i, i + 2), 16) * amount).toString(16).padStart(2, '0')).join('');
+export function roofPaint(theme) {
+  const [toward, amount] = ROOF_WEATHER[theme] || ROOF_WEATHER.day;
+  return { shingles: PALETTE.shingles.map(hex => mix(hex, toward, amount)), ridge: mix(PALETTE.ridge, toward, amount) };
+}
 const PLINTH = .5;
 const hash = n => { const s = Math.sin(n * 78.233 + 12.9898) * 43758.5453; return s - Math.floor(s); };
 const pick = (list, n) => list[Math.floor(hash(n) * list.length)];
@@ -26,7 +32,7 @@ export function exteriorPlan(house, id) {
   const built = new Set(house.rooms.map(room => room.id)), loft = built.has('loft'), garden = built.has('garden');
   const options = {
     bay: loft && id !== 'garden' ? BAY : 0, hingeRight: id === 'garden', under: id === 'studio' && loft, floor: id === 'loft' ? WALL_TOP : 0,
-    leftEnd: id !== 'garden', rightEnd: id !== 'studio' || !garden, chimney: id === 'garden' || house.rooms.length === 1,
+    leftEnd: id !== 'garden', rightEnd: id !== 'studio' || !garden, chimney: id === 'garden' || house.rooms.length === 1, shaded: id === 'garden' && loft,
   };
   const parts = ['front', 'roof', 'back'];
   if (!options.under) parts.push('lid');
@@ -42,13 +48,13 @@ export function hingeOf(part, options) {
 
 // The pose of a moving part at `eased` open (0 closed, 1 open).
 export function hingePose(part, options, eased) {
-  if (part === 'lid') return { lift: 0, fold: 1 - eased * .98 };
+  if (part === 'lid') return { lift: 0, fold: 1 - eased * .999 };
   const rest = options.floor ? -.2 : OPEN_FRONT_RAIL;
   return { lift: -(options.floor + WALL_TOP - rest) * eased, fold: 1 };
 }
 
-const windowGlass = theme => theme === 'dusk' ? ['#ffd88f', 2.1] : theme === 'rain' ? ['#f0d6a0', 1.45] : ['#b9cfc8', 1];
-const curtainGlow = theme => theme === 'dusk' ? ['#f6c27e', 1.7] : theme === 'rain' ? ['#efc996', 1.2] : ['#efe1c8', 1];
+const windowGlass = theme => theme === 'dusk' ? ['#ffb65e', 2.2] : theme === 'rain' ? ['#f6c27c', 1.5] : ['#b9cfc8', 1];
+const curtainGlow = theme => theme === 'dusk' ? ['#f2a35c', 1.8] : theme === 'rain' ? ['#efbb84', 1.3] : ['#efe1c8', 1];
 
 // A wall with rectangular openings, as a few boxes. `holes` are [u0, u1, v0, v1]
 // along the wall; `put(u, v, w, h)` places one solid piece.
@@ -137,7 +143,7 @@ function windowAt(api, x, y, z, w, h, theme, facing = 'front', flowers = true) {
 }
 
 function frontDoor(api, theme) {
-  const [glass, glow] = windowGlass(theme), z = FRONT;
+  const [glass, glow] = windowGlass(theme), z = FRONT, roof = roofPaint(theme);
   api.box(0, .97, z - .02, .9, 1.93, .08, door);
   for (const x of [-.22, 0, .22]) api.box(x, .9, z + .025, .02, 1.7, .01, '#6e4630');
   for (const y of [.42, 1.32]) { api.box(-.08, y, z + .035, .66, .06, .02, iron); api.ball(.25, y, z + .04, .07, .07, .03, iron); }
@@ -147,11 +153,11 @@ function frontDoor(api, theme) {
   for (const x of [-.52, .52]) api.box(x, .97, z + .04, .12, 1.95, .14, cream);
   for (const s of [-1, 1]) {
     const reach = .7, drop = .32;
-    api.box(s * reach / 2, 2.38 - drop / 2, z + .27, Math.hypot(reach, drop) + .06, .07, .62, shingles[s > 0 ? 0 : 2], -s * Math.atan2(drop, reach));
+    api.box(s * reach / 2, 2.38 - drop / 2, z + .27, Math.hypot(reach, drop) + .06, .07, .62, roof.shingles[s > 0 ? 0 : 2], -s * Math.atan2(drop, reach));
     api.box(s * .55, 1.83, z + .2, .07, .5, .07, timber, [Math.atan2(.38, .32), 0, 0]);
   }
   api.prism(0, 2.03, z + .5, 1.3, .33, .05, cream);
-  api.box(0, 2.42, z + .27, .09, .09, .66, PALETTE.ridge, [0, 0, Math.PI / 4]);
+  api.box(0, 2.42, z + .27, .09, .09, .66, roof.ridge, [0, 0, Math.PI / 4]);
   api.box(.86, 1.86, z + .08, .05, .05, .2, iron); api.box(.86, 1.8, z + .17, .03, .1, .03, iron);
   api.box(.86, 1.75, z + .17, .17, .04, .17, iron); api.ball(.86, 1.62, z + .17, .13, .2, .13, PALETTE.lamp, windowGlass(theme)[1] * 1.25);
   api.box(.86, 1.5, z + .17, .15, .04, .15, iron);
@@ -163,22 +169,24 @@ function roofSpan(d0, d1) {
 }
 
 // One roof slope running along the house, from eave to ridge.
-function slopeRows(api, x0, x1, side, ends) {
-  const rows = 13, seg = RUN / rows;
+function slopeRows(api, x0, x1, side, ends, theme, shaded) {
+  const rows = 13, seg = RUN / rows, { shingles } = roofPaint(theme);
   for (let i = 0; i < rows; i++) {
     const { d, y, length, angle } = roofSpan(RUN - (i + 1) * seg, RUN - i * seg), z = side * d, tilt = [side * (angle + .05), 0, 0];
     let x = x0 - (i % 2) * .18;
     for (let k = 0; x < x1; k++) {
       const n = i * 97 + k * 13 + side * 7 + Math.round(x0 * 10), w = .3 + hash(n) * .14, a = Math.max(x0, x), b = Math.min(x1, x + w);
-      const mossy = i < 3 && hash(n * 5.7) > .9;
-      if (b - a > .04) api.box((a + b) / 2, y + .11 + hash(n * 3.1) * .025, z, b - a - .025, .1, length * 1.35, mossy ? pick(moss, n) : pick(shingles, n * 1.3), tilt);
+      if (b - a > .04) api.box((a + b) / 2, y + .11 + hash(n * 3.1) * .025, z, b - a - .025, .1, length * 1.35, pick(shingles, n * 1.3), tilt, shaded ? 1 + .5 * Math.max(0, 1 - (a - x0) / 1.6) : 1);
       x += w;
     }
   }
-  for (let k = 0; k < 4; k++) {
-    const { d, y, length, angle } = roofSpan(RUN * k / 4, RUN * (k + 1) / 4);
+  for (let k = 0; k < 10; k++) {
+    const { d, y, length, angle } = roofSpan(RUN * k / 10, RUN * (k + 1) / 10);
     api.box((x0 + x1) / 2, y - .02, side * d, x1 - x0 - .1, .06, length + .02, ceiling, [side * angle, 0, 0]);
-    for (const [x, end] of [[x0 + .04, ends[0]], [x1 - .04, ends[1]]]) if (end) api.box(x, y + .05, side * d, .1, .3, length + .03, timber, [side * angle, 0, 0]);
+    for (const [x, end] of [[x0 + .04, ends[0]], [x1 - .04, ends[1]]]) {
+      if (end) api.box(x, y + .05, side * d, .1, .3, length + .04, timber, [side * angle, 0, 0]);
+      else api.box(x + (x === x0 + .04 ? .1 : -.1), y + .19, side * d, .28, .05, length + .04, PALETTE.flashing, [side * angle, 0, 0]);
+    }
   }
   const eave = roofSpan(RUN - .12, RUN);
   api.box((x0 + x1) / 2, eave.y + .04, side * (RUN + .02), x1 - x0, .26, .1, timber);
@@ -189,35 +197,38 @@ function slopeRows(api, x0, x1, side, ends) {
 }
 
 function dormer(api, theme) {
-  const face = 1.5, base = roofY(face) + .02, top = base + .62, back = (RISE - (top - WALL_TOP)) / slope, ridge = top + .3;
-  for (const s of [-1, 1]) api.box(s * .5, (base + top) / 2, (face + back) / 2, .1, top - base + .1, face - back, PALETTE.plaster[0]);
-  api.box(0, (base + top) / 2, face - .08, 1.06, top - base, .08, PALETTE.plaster[1]);
-  windowAt(api, 0, base + .32, face, .62, .42, theme, 'front', false);
-  api.prism(0, top, face, 1.12, ridge - top, .08, PALETTE.plaster[2]);
+  const { shingles, ridge: ridgePaint } = roofPaint(theme);
+  const face = 1.62, half = .7, base = roofY(face) + .02, top = base + .78, back = (RISE - (top - WALL_TOP)) / slope, ridge = top + .32;
+  for (const s of [-1, 1]) api.box(s * half, (base + top) / 2 - .06, (face + back) / 2, .1, top - base + .1, face - back, PALETTE.plaster[0]);
+  api.box(0, (base + top) / 2, face - .08, 2 * half + .06, top - base, .08, PALETTE.plaster[1]);
+  windowAt(api, 0, base + .38, face, .9, .52, theme, 'front', false);
+  for (const s of [-1, 1]) api.box(s * (half - .02), (base + top) / 2, face + .02, .1, top - base, .08, timber);
+  api.prism(0, top, face, 2 * half + .12, ridge - top, .08, PALETTE.plaster[2]);
   for (const s of [-1, 1]) {
-    const reach = .68, drop = ridge - top + .1;
-    const angle = -s * Math.atan2(drop, reach), from = back - .1, to = face + .3;
-    api.box(s * reach / 2, ridge - drop / 2 + .03, (from + to) / 2, Math.hypot(reach, drop) + .04, .06, to - from, PALETTE.ridge, angle);
+    const reach = half + .12, drop = ridge - top + .06, slant = Math.hypot(reach, drop);
+    const angle = -s * Math.atan2(drop, reach), from = back - .1, to = face + .22;
+    api.box(s * reach / 2, ridge - drop / 2 + .01, (from + to) / 2, slant, .04, to - from, ridgePaint, angle);
     for (let row = 0; row < 3; row++) {
       const t = (row + .5) / 3;
       for (let z = from - (row % 2) * .11; z < to; z += .22) {
         const a = Math.max(from, z), b = Math.min(to, z + .22), n = row * 17 + z * 31 + s * 5;
-        if (b - a > .05) api.box(s * reach * t, ridge - drop * t + .1, (a + b) / 2, Math.hypot(reach, drop) / 3 * 1.3, .07, b - a - .02, pick(shingles, n), angle - s * .06);
+        if (b - a > .05) api.box(s * reach * t, ridge - drop * t + .045, (a + b) / 2, slant / 3 * 1.25, .04, b - a - .02, pick(shingles, n), angle - s * .04);
       }
     }
-    api.box(s * reach / 2, ridge - drop / 2, face + .28, Math.hypot(reach, drop), .14, .06, timber, -s * Math.atan2(drop, reach));
+    api.box(s * reach / 2, ridge - drop / 2 - .02, to - .02, slant, .1, .05, timber, angle);
   }
-  api.box(0, ridge + .06, (face + back) / 2 + .1, .1, .1, face - back + .4, PALETTE.ridge, [0, 0, Math.PI / 4]);
+  api.box(0, ridge + .05, (back + face + .12) / 2, .08, .08, face - back + .32, ridgePaint, [0, 0, Math.PI / 4]);
 }
 
 // A gable end: the triangle under the roof at the end of the house.
 function gableEnd(api, x, facing, theme) {
   api.prism(x, WALL_TOP, 0, FRONT - BACK, RISE, .14, PALETTE.plaster[2], true);
-  const face = x + facing * .09;
-  api.box(face, WALL_TOP + .06, 0, .06, .12, FRONT - BACK, timber);
-  for (const z of [-1.15, 1.15]) {
-    const height = roofY(Math.abs(z)) - WALL_TOP - .1;
-    api.box(face, WALL_TOP + height / 2, z, .06, height, .12, timber);
+  for (const face of [x + facing * .09, x - facing * .09]) {
+    api.box(face, WALL_TOP + .06, 0, .06, .12, FRONT - BACK, timber);
+    for (const z of [-1.15, 1.15]) {
+      const height = roofY(Math.abs(z)) - WALL_TOP - .1;
+      api.box(face, WALL_TOP + height / 2, z, .06, height, .12, timber);
+    }
   }
   const [glass, glow] = windowGlass(theme), centre = WALL_TOP + RISE * .42;
   api.disc(x + facing * .08, centre, 0, .66, .08, timber, 1, true); api.disc(x + facing * .1, centre, 0, .52, .06, glass, glow, true);
@@ -239,7 +250,8 @@ function endWall(api, x, floors) {
 }
 
 function chimney(api) {
-  const [x, top, z] = CHIMNEY_TOP, foot = roofY(Math.abs(z) + .4) - .1;
+  const [x, top, z] = CHIMNEY_TOP, saddle = roofSpan(Math.abs(z) - .3, Math.abs(z) + .3), foot = roofY(Math.abs(z) - .25);
+  api.box(x, saddle.y + .2, z, .56, .44, saddle.length, '#9a8d7b', [-saddle.angle, 0, 0]);
   api.box(x, (foot + top) / 2 - .1, z, .5, top - foot - .2, .5, '#9a8d7b');
   for (let y = foot, row = 0; y < top - .28; y += .19, row++) {
     for (const [u, v] of [[0, .26], [0, -.26], [.26, 0], [-.26, 0]]) {
@@ -287,7 +299,7 @@ export function buildExteriorPart(api, part, id, theme, options) {
   } else if (part === 'lid') {
     // The front roof slope: it tips up from the ridge to show the rooms.
     const l = x0 - (options.leftEnd ? END : 0), r = x1 + (options.rightEnd ? END : 0);
-    slopeRows(api, l, r, 1, ends);
+    slopeRows(api, l, r, 1, ends, theme, options.shaded);
     dormer(api, theme);
   } else if (options.under) {
     api.box((x0 + x1) / 2, WALL_TOP + .02, FRONT + .05, x1 - x0 + .1, .12, .2, timber);
@@ -295,8 +307,8 @@ export function buildExteriorPart(api, part, id, theme, options) {
   } else {
     // The back slope, the ridge, the gable ends and the chimney stay put.
     const l = x0 - (options.leftEnd ? END : 0), r = x1 + (options.rightEnd ? END : 0);
-    slopeRows(api, l, r, -1, ends);
-    api.box((l + r) / 2, WALL_TOP + RISE + .16, 0, r - l + .06, .2, .2, PALETTE.ridge, [Math.PI / 4, 0, 0]);
+    slopeRows(api, l, r, -1, ends, theme, options.shaded);
+    api.box((l + r) / 2, WALL_TOP + RISE + .16, 0, r - l + .06, .2, .2, roofPaint(theme).ridge, [Math.PI / 4, 0, 0]);
     if (options.leftEnd) gableEnd(api, x0, -1, theme);
     if (id === 'studio') endWall(api, x0, 1);
     if (options.rightEnd) gableEnd(api, x1, 1, theme);

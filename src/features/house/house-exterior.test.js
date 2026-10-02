@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildClosedHouse, buildExteriorPart, exteriorPlan, roofY, FRONT, BACK, HALF, WALL_TOP, RISE, EAVE, PALETTE } from './house-exterior.js';
+import { buildClosedHouse, buildExteriorPart, exteriorPlan, hingePose, roofY, FRONT, BACK, HALF, WALL_TOP, RISE, EAVE, PALETTE } from './house-exterior.js';
 
 function boxesOf(house, id, theme = 'day', only = null) {
   const boxes = [], { parts, options } = exteriorPlan(house, id);
@@ -67,4 +67,41 @@ test('plain wall panels between posts are braced in timber', () => {
   const { boxes } = boxesOf({ rooms: [{ id: 'studio' }, { id: 'garden' }, { id: 'loft' }] }, 'loft', 'day', 'front');
   const braces = boxes.filter(([x, y, z, w, h, d, hex, tilt]) => hex === PALETTE.timber && typeof tilt === 'number' && Math.abs(tilt) > .2 && z > FRONT);
   assert.ok(braces.length >= 1, 'the loft front has no braces');
+});
+
+const lightness = hex => [1, 3, 5].reduce((sum, i) => sum + parseInt(hex.slice(i, i + 2), 16), 0);
+
+test('the roof darkens and cools at dusk and in rain', () => {
+  const house = { rooms: [{ id: 'studio' }] };
+  const roof = theme => boxesOf(house, 'studio', theme, 'lid').boxes.filter(([x, y, z, w, h]) => y > WALL_TOP + .3 && h === .1).map(box => box[6]);
+  const day = roof('day'), dusk = roof('dusk'), rain = roof('rain'), mean = list => list.reduce((sum, hex) => sum + lightness(hex), 0) / list.length;
+  assert.ok(day.length > 100);
+  const blue = list => list.reduce((sum, hex) => sum + parseInt(hex.slice(5, 7), 16) / lightness(hex), 0) / list.length;
+  assert.ok(mean(dusk) < mean(day) * .95 && blue(dusk) > blue(day) * 1.15, 'dusk roof keeps its daytime colour');
+  assert.ok(mean(rain) < mean(day) * .85, 'rain roof does not look wet');
+});
+
+test('the chimney stands on the roof and never hangs below it', () => {
+  const { boxes } = boxesOf({ rooms: [{ id: 'studio' }] }, 'studio', 'day', 'roof');
+  const stack = boxes.filter(([x, y, z, w, h, d, hex, tilt]) => Math.abs(x - 1.3) < .45 && Math.abs(z + .9) < .45 && y > WALL_TOP + .3 && !tilt);
+  assert.ok(stack.length > 10, `only ${stack.length} chimney pieces`);
+  for (const [, y, z, , h, d] of stack) assert.ok(y - h / 2 >= roofY(Math.abs(z) - d / 2) - .06, `a chimney piece hangs below the roof at y ${(y - h / 2).toFixed(2)}`);
+});
+
+test('an open roof lid folds away to nothing', () => {
+  assert.ok(hingePose('lid', {}, 1).fold < .005);
+  assert.equal(hingePose('lid', {}, 0).fold, 1);
+});
+
+test('the gables are framed in timber inside as well as out', () => {
+  const { boxes, options } = boxesOf({ rooms: [{ id: 'studio' }] }, 'studio', 'day', 'roof'), left = -HALF - options.bay;
+  const framed = face => boxes.filter(([x, y, z, w, h, d, hex]) => Math.abs(x - face) < .02 && y > WALL_TOP && hex === PALETTE.timber).length;
+  assert.ok(framed(left - .09) >= 3, 'no timber outside the gable');
+  assert.ok(framed(left + .09) >= 3, 'no timber inside the gable');
+});
+
+test('the wing roof lifts its shingles where the loft shades it, and only then', () => {
+  const lifted = ids => boxesOf({ rooms: ids.map(id => ({ id })) }, 'garden', 'day', 'lid').boxes.filter(([x, y, z, w, h, d, hex, tilt, strength]) => h === .1 && strength > 1.2);
+  assert.ok(lifted(['studio', 'garden', 'loft']).every(([x]) => x < -HALF + 1.6) && lifted(['studio', 'garden', 'loft']).length > 10);
+  assert.equal(lifted(['studio', 'garden']).length, 0);
 });
