@@ -26,6 +26,7 @@ test('the outdoor world builds terrain rings and a sky that switch theme togethe
   assert.equal(skyPaint._colors3.horizon.toHexString().toLowerCase(), WORLD_ATMOSPHERES.dusk.horizon);
   assert.notEqual(WORLD_ATMOSPHERES.dusk.horizon, WORLD_ATMOSPHERES.day.horizon);
   assert.equal(skyPaint._vectors3.sun.y, WORLD_ATMOSPHERES.dusk.sun[1]);
+  assert.ok(world.trees.count > 1000 && world.trees.x.length === world.trees.count && world.trees.width.length === world.trees.count, `${world.trees.count} trees to walk among`);
   world.dispose();
   assert.equal(scene.meshes.length, 0);
 });

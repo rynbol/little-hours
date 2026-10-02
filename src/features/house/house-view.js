@@ -20,6 +20,7 @@ import { RETREAT_SPOTS, RETREAT_BOUNDS, GARDEN_EXIT_TAG, RETREAT_LIGHT } from '.
 import { createGardenButterflies } from './garden-butterflies.js';
 import { GARDEN_TAG } from './house-garden.js';
 import { POND_TAG } from './house-pond.js';
+import { FOREST_TAG } from './island-forest.js';
 import { createStroll } from './house-stroll.js';
 import { createHousePostcard } from './house-postcard.js';
 import { houseFrame } from './house-framing.js';
@@ -41,6 +42,7 @@ const PIN_ICONS = {
   loft: '<path d="M5 19h4v-4h4v-4h4V7h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   garden: '<path d="M12 20v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 13c0-4 2.5-6.5 6.5-6.5 0 4-2.5 6.5-6.5 6.5ZM12 15.5c0-3-2-5-5.5-5 0 3 2 5 5.5 5Z" fill="currentColor"/>',
   pond: '<path d="M4.5 12c2.2-3.2 5.3-4.6 8.6-4.6 2.3 0 4.4 1.3 5.4 3.1L21 8.4v7.2l-2.5-2.1c-1 1.8-3.1 3.1-5.4 3.1-3.3 0-6.4-1.4-8.6-4.6Z" fill="currentColor"/><circle cx="8.7" cy="11.2" r="1.1" fill="var(--pin-bg, #fff)"/>',
+  forest: '<path d="M12 3.5 7 10.5h2.6L5.5 16.5h13l-4.1-6H17Z" fill="currentColor"/><path d="M12 16.5V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   site: '<path d="M12 6v12M6 12h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
 };
 
@@ -200,7 +202,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       button.hidden = (id === 'garden-exit' || plot !== null) !== (selectedId === 'orchard');
       const base = HOUSE_POSITIONS[id], offset = model.levels[id]?.position;
       if (plot !== null) { const [x, z] = RETREAT_SPOTS[plot]; tagPoint.set(x + .65, .52, z + .54); }
-      else if (!base) tagPoint.set(...(id === 'garden-exit' ? GARDEN_EXIT_TAG : id === 'pond' ? POND_TAG : GARDEN_TAG));
+      else if (!base) tagPoint.set(...(id === 'garden-exit' ? GARDEN_EXIT_TAG : id === 'pond' ? POND_TAG : id === 'forest' ? FOREST_TAG : GARDEN_TAG));
       else tagPoint.set(base[0] + offset.x, base[1] + offset.y - .15 + (button.classList.contains('is-site') ? 1.6 : id === 'loft' ? .7 : 0), base[2] + offset.z + 2.08);
       Vector3.TransformCoordinatesToRef(tagPoint, matrix, tagProjection);
       const half = Math.min(24, width / 4);
@@ -270,6 +272,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     }
     pin('button', 'garden', 'orchard', 'Garden').classList.add('is-garden');
     const pond = pin('button', 'pond', 'pond', 'Willow Pond', 'Go fishing'); pond.classList.add('is-pond'); pond.setAttribute('aria-label', 'Go fishing at Willow Pond');
+    const trailhead = pin('button', 'forest', 'forest', 'The Forest', 'Walk in'); trailhead.classList.add('is-forest'); trailhead.setAttribute('aria-label', 'Walk into the forest');
     // The blueprint's tag: what grows next and how close it is.
     const site = nextExpansion(house);
     if (site && container.id === 'house-canvas') {
@@ -320,7 +323,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     if (id === hovering) return;
     hovering = id; canvas.style.cursor = id ? 'pointer' : 'grab';
     const room = house.rooms.find(room => room.id === id);
-    canvas.title = id?.startsWith('plot-') ? gardenPlantName(house.plants?.find(plant => plant.slot === Number(id.slice(5)))) : id === 'garden-exit' ? 'Back to island' : id === 'orchard' ? 'Your garden' : id === 'pond' ? 'Willow Pond' : id ? room ? roomDisplayName(room) : 'A little room to grow' : '';
+    canvas.title = id?.startsWith('plot-') ? gardenPlantName(house.plants?.find(plant => plant.slot === Number(id.slice(5)))) : id === 'garden-exit' ? 'Back to island' : id === 'orchard' ? 'Your garden' : id === 'pond' ? 'Willow Pond' : id === 'forest' ? 'The Forest' : id ? room ? roomDisplayName(room) : 'A little room to grow' : '';
   };
   const onVisibility = () => { if (document.hidden) { onCancel(); roomMotion.stop(); shadows.getShadowMap().resetRefreshCounter(); cancelAnimationFrame(frame); frame = 0; } else requestRender(); };
   window.addEventListener('blur', onCancel); canvas.addEventListener('lostpointercapture', onCancel); canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointerup', onUp); canvas.addEventListener('pointercancel', onCancel); canvas.addEventListener('pointerleave', onLeave); canvas.addEventListener('pointermove', onMove);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PLACES, SKIES, cloudFrame, planTrip } from './cloud-trip.js';
 
-const SCREEN_CHANGES = [['home', 'island'], ['island', 'garden'], ['garden', 'island'], ['island', 'pond'], ['pond', 'island'], ['island', 'home'], ['garden', 'home'], ['pond', 'home']];
+const SCREEN_CHANGES = [['home', 'island'], ['island', 'garden'], ['garden', 'island'], ['island', 'pond'], ['pond', 'island'], ['island', 'home'], ['garden', 'home'], ['pond', 'home'], ['island', 'forest'], ['forest', 'island'], ['forest', 'home']];
 
 test('every screen change flies through clouds in about a second', () => {
   for (const [from, to] of SCREEN_CHANGES) {
@@ -25,7 +25,9 @@ test('the clouds travel the way the view moves', () => {
   assert.deepEqual(planTrip({ from: 'island', to: 'home', theme: 'dusk', seed: 0 }).heading, [0, -1]);
   const pond = planTrip({ from: 'island', to: 'pond', theme: 'dusk', seed: 0 }).heading, garden = planTrip({ from: 'island', to: 'garden', theme: 'dusk', seed: 0 }).heading;
   assert.ok(pond[0] > 0.8 && garden[0] < -0.8, `${pond} ${garden}`);
-  assert.deepEqual(Object.keys(PLACES), ['home', 'island', 'garden', 'pond']);
+  const forest = planTrip({ from: 'island', to: 'forest', theme: 'dusk', seed: 0 }).heading;
+  assert.ok(forest[1] > 0.6 && forest[0] > 0, `the forest lies beyond the island, ${forest}`);
+  assert.deepEqual(Object.keys(PLACES), ['home', 'island', 'garden', 'pond', 'forest']);
 });
 
 test('day, dusk and rain tint the clouds, and an unknown theme falls back to dusk', () => {

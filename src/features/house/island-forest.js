@@ -56,6 +56,7 @@ const TRAIL = spline(FOREST_PATH);
 const [[ex0, ez0], [ex1, ez1]] = FOREST_PATH.slice(-2), FACING = [ex1 - ex0, ez1 - ez0].map(v => v / Math.hypot(ex1 - ex0, ez1 - ez0));
 const ACROSS = [-FACING[1], FACING[0]];
 export const FOREST_TRAILHEAD = Object.freeze({ position: Object.freeze([ex1, forestFloor(ex1, ez1), ez1]), facing: Object.freeze([FACING[0], 0, FACING[1]]) });
+export const FOREST_TAG = Object.freeze([ex1, forestFloor(ex1, ez1) + .9, ez1]);
 const WOODS_WAY = Object.freeze([[10.86, -7.2], [11.75, -7.62], [12.75, -7.78]].map(Object.freeze));
 export const FOREST_CLEARING = WOODS_WAY[1];
 const HOME_VIEW = [Math.cos(Math.PI / 2.8), Math.sin(Math.PI / 2.8)];

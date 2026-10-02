@@ -3,6 +3,7 @@ export const PLACES = Object.freeze({
   island: Object.freeze({ x: 0, y: 1 }),
   garden: Object.freeze({ x: -1, y: .35 }),
   pond: Object.freeze({ x: 1, y: .35 }),
+  forest: Object.freeze({ x: .7, y: 1.8 }),
 });
 
 export const SKIES = Object.freeze({

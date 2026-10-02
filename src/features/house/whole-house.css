@@ -36,6 +36,7 @@ body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(450px, c
 .house-room-tag[aria-current='location'] { --pin-bg: #5f7456; --pin-ink: #f3ecd9; --pin-edge: #e6efd6; color: #f7f1e3; }
 .house-room-tag[aria-current='location'] .house-pin-label small { color: #d7e3c4; }
 .house-room-tag.is-pond { --pin-bg: #e3f0ee; --pin-ink: #3f7486; --pin-edge: #ffffff; color: #2f4d57; }
+.house-room-tag.is-forest { --pin-bg: #e2ecd8; --pin-ink: #47693f; --pin-edge: #ffffff; color: #33472e; }
 .house-room-tag.is-garden { --pin-bg: #e6edd6; --pin-ink: #5c7a45; pointer-events: auto; cursor: default; }
 .house-room-tag.is-site { --pin-bg: #f5eddfd9; --pin-ink: #8a7a64; --pin-edge: #8a7a6466; }
 .house-room-tag.is-site .house-pin { box-shadow: 0 0 0 2px var(--pin-edge), 0 6px 14px #241a2a30; outline: 1.5px dashed #8a7a64; outline-offset: -5px; }

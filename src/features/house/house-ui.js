@@ -20,7 +20,7 @@ const roomTints = {
   'midnight-metro': '#c5c3dd',
 };
 
-export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onFocus, onPond, art, icon, notice }) {
+export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onFocus, onPond, onForest, art, icon, notice }) {
   let view, firstBuild = 0, shown = false, selectedId = store.state.house.activeId, signature = '', modelSignature = '';
   let detailOpen = false, detailReturn = '#house-rooms-toggle', renaming = false;
   let preview = true, celebration = null, celebrationTimer, exporting = false, postcardUrl = null;
@@ -36,7 +36,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     <div class="house-layout"><div class="house-left"><div class="house-world">
       <div class="house-scene"><div id="house-canvas" class="house-canvas"></div><div id="house-celebration" class="house-celebration" role="status" hidden></div><div class="house-view-tools"><button id="house-turn-left" aria-label="Turn house left">↶</button><button id="house-reset-view" aria-label="Reset house view">${icon('home')}</button><button id="house-turn-right" aria-label="Turn house right">↷</button></div></div>
       <div class="house-preview-bar"><button id="house-preview-toggle" aria-pressed="true" hidden>Show before</button></div>
-      <nav class="island-dock" aria-label="Island destinations"><button id="house-rooms-toggle" popovertarget="house-room-menu">${icon('home')} Rooms</button><button id="house-open-garden">${icon('leaf')} Garden</button><button id="house-open-pond"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 12c-4-7-11-7-14 0 3 7 10 7 14 0Zm0 0 6-5v10Z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="11" r="1" fill="currentColor"/></svg> Pond</button></nav>
+      <nav class="island-dock" aria-label="Island destinations"><button id="house-rooms-toggle" popovertarget="house-room-menu">${icon('home')} Rooms</button><button id="house-open-garden">${icon('leaf')} Garden</button><button id="house-open-pond"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 12c-4-7-11-7-14 0 3 7 10 7 14 0Zm0 0 6-5v10Z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="11" r="1" fill="currentColor"/></svg> Pond</button><button id="house-open-forest"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 6.5 10.5h3L5 17h14l-4.5-6.5h3ZM12 17v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg> Forest</button></nav>
       <div id="house-room-menu" popover role="dialog" aria-label="Rooms in your house"><header><h2>Rooms</h2><span id="house-count"></span></header><nav id="house-rooms" class="house-rooms" aria-label="Rooms in your house"></nav></div></div>
       <div class="house-underworld"><button class="mode-button" id="house-postcard">${icon('mini')} Postcard</button></div>
       </div>
@@ -45,6 +45,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
   const gardenUI = createGardenUI($('#house-detail'), { store, acceptUpdate, onFocus, onBack: () => select(store.state.house.activeId, false), notice, onPlot: index => view?.selectGardenPlot(index), celebrate: () => view?.celebrate('orchard') });
   $('#house-open-garden').addEventListener('click', () => select('orchard'));
   $('#house-open-pond').addEventListener('click', () => { $('#house-room-menu').hidePopover(); onPond?.(); });
+  $('#house-open-forest').addEventListener('click', () => { $('#house-room-menu').hidePopover(); onForest?.(); });
   $('#back-to-room').addEventListener('click', onClose);
   $('#rename-house').addEventListener('click', () => {
     $('#house-name-form').hidden = false; $('#house-name-input').value = store.state.house.name; $('#house-name-input').focus(); $('#house-name-input').select();
@@ -183,7 +184,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     const nextModel = JSON.stringify([modelHouse.rooms, modelHouse.garden, modelHouse.plants, house.activeId, selectedId, store.state.theme, store.state.avatar, store.state.pet]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
-      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: isFocusing(store.state.session), onSelect: id => id === 'garden-exit' ? select(store.state.house.activeId, false) : id === 'pond' ? onPond?.() : select(id) };
+      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: isFocusing(store.state.session), onSelect: id => id === 'garden-exit' ? select(store.state.house.activeId, false) : id === 'pond' ? onPond?.() : id === 'forest' ? onForest?.() : select(id) };
       const build = () => {
         try {
           if (view) view.update(options.house, options.selectedId, options.theme, options.avatar);

@@ -29,14 +29,15 @@ export function* buildOutdoorWorld(scene, { theme = 'day', parent = null, still 
   let current = worldAtmosphere(theme);
   const context = { root, atmosphere: current, still, rings, blades };
   const layers = [ground, { setTheme: paintSky }];
-  for (const create of [createWorldClouds, createWorldWater, createWorldLandmarks, createWorldTrees, createWorldGrass]) { yield; layers.push(create(scene, context)); }
+  let trees = null;
+  for (const create of [createWorldClouds, createWorldWater, createWorldLandmarks, createWorldTrees, createWorldGrass]) { yield; const layer = create(scene, context); layers.push(layer); trees = layer.planted ?? trees; }
   function setTheme(next) {
     current = worldAtmosphere(next);
     for (const layer of layers) layer.setTheme(current);
   }
   setTheme(theme);
   return {
-    root, terrain, sky, setTheme,
+    root, terrain, sky, trees, setTheme,
     get atmosphere() { return current; },
     dispose() { root.dispose(false, true); },
   };
