@@ -56,13 +56,24 @@ const TRAIL = spline(FOREST_PATH);
 const [[ex0, ez0], [ex1, ez1]] = FOREST_PATH.slice(-2), FACING = [ex1 - ex0, ez1 - ez0].map(v => v / Math.hypot(ex1 - ex0, ez1 - ez0));
 const ACROSS = [-FACING[1], FACING[0]];
 export const FOREST_TRAILHEAD = Object.freeze({ position: Object.freeze([ex1, forestFloor(ex1, ez1), ez1]), facing: Object.freeze([FACING[0], 0, FACING[1]]) });
-export const FOREST_CLEARING = Object.freeze([ex1 + FACING[0] * 1.4, ez1 + FACING[1] * 1.4]);
+const WOODS_WAY = Object.freeze([[10.86, -7.2], [11.75, -7.62], [12.75, -7.78]].map(Object.freeze));
+export const FOREST_CLEARING = WOODS_WAY[1];
 const HOME_VIEW = [Math.cos(Math.PI / 2.8), Math.sin(Math.PI / 2.8)];
-function inThresholdView(x, z, clearance = 0) {
-  const dx = x - ex1, dz = z - ez1, along = dx * HOME_VIEW[0] + dz * HOME_VIEW[1], side = Math.abs(dx * HOME_VIEW[1] - dz * HOME_VIEW[0]);
-  return along > -.6 && along < 5 && side < FOREST_PATH_WIDTH / 2 + .75 + clearance;
+function inView(x, z, [px, pz]) {
+  const dx = x - px, dz = z - pz;
+  return { along: dx * HOME_VIEW[0] + dz * HOME_VIEW[1], side: Math.abs(dx * HOME_VIEW[1] - dz * HOME_VIEW[0]) };
 }
-const WOODS_TRAIL = spline([...FOREST_PATH, FOREST_CLEARING, [FOREST_CLEARING[0] + FACING[0] * 1.1 + ACROSS[0] * .45, FOREST_CLEARING[1] + FACING[1] * 1.1 + ACROSS[1] * .45]]);
+const WAY_IN_VIEW = spline(WOODS_WAY, 3);
+export function hidesTheWay(x, z, crown, top) {
+  const arch = inView(x, z, [ex1, ez1]);
+  if (arch.along > -.6 && arch.along < 4 && arch.side < FOREST_PATH_WIDTH / 2 + .45 + crown * .8) return true;
+  return WAY_IN_VIEW.some(point => {
+    const { along, side } = inView(x, z, point);
+    return along > -crown && along < top * .5 + crown && side < FOREST_PATH_WIDTH / 2 + .2 + crown * .6;
+  });
+}
+const WOODS_TRAIL = spline([...FOREST_PATH, ...WOODS_WAY]);
+const [[wx0, wz0], , [wx1, wz1]] = WOODS_WAY, LANE = [wx1 - wx0, wz1 - wz0].map(v => v / Math.hypot(wx1 - wx0, wz1 - wz0)), LANE_SIDE = [-LANE[1], LANE[0]];
 
 export const forestPathDistance = (x, z) => trailDistance(TRAIL, x, z);
 const woodsDistance = (x, z) => trailDistance(WOODS_TRAIL, x, z);
@@ -86,16 +97,16 @@ const thicket = (x, z) => .5 + .3 * Math.sin(x * 1.9 + z * .7 + 1.1) * Math.cos(
 
 export const GROVE = Object.freeze((() => {
   const trees = [];
-  for (let i = 0; trees.length < 46 && i < 9000; i++) {
-    const x = 1 + hash(i * 1.37) * 12.5, z = -3 - hash(i * 2.11 + 5) * 7, { t } = band(x, z);
+  for (let i = 0; trees.length < 54 && i < 9000; i++) {
+    const x = 1 + hash(i * 1.37) * 14, z = -3 - hash(i * 2.11 + 5) * 9, { t } = band(x, z);
     if (!onForest(x, z, .3) || behindFence(x, z) || thicket(x, z) < hash(i * 8.3) * .55) continue;
     const layer = t * 1.05 + (hash(i * 3.3 + 1) - .5) * .7;
     const form = layer < .34 ? TREE_FORMS.spreading : layer < .8 ? TREE_FORMS.broadleaf : TREE_FORMS.conifer;
     const conifer = form === TREE_FORMS.conifer;
     const size = (.36 + hash(i * 4.9) * .34 + t * .42) * (form === TREE_FORMS.spreading ? .82 : 1);
     const height = conifer ? .8 + hash(i * 7.3) * .65 : .82 + hash(i * 7.3) * .36, width = conifer ? .78 + hash(i * 9.1) * .4 : .85 + hash(i * 9.1) * .4;
-    const crown = CROWN_REACH[form] * TREE_SCALE * size * width * .62;
-    if (woodsDistance(x, z) < FOREST_PATH_WIDTH / 2 + crown * .55 || inThresholdView(x, z, crown * .8)) continue;
+    const crown = CROWN_REACH[form] * TREE_SCALE * size * width * .62, top = CROWN_TOPS[form] * TREE_SCALE * size * height;
+    if (woodsDistance(x, z) < FOREST_PATH_WIDTH / 2 + crown * .55 || hidesTheWay(x, z, crown, top)) continue;
     if (Math.hypot(x - FOREST_CLEARING[0], z - FOREST_CLEARING[1]) < .95 + crown * .4) continue;
     const spacing = .4 + hash(i * 5.7) * .3;
     if (trees.some(other => Math.hypot(other.x - x, other.z - z) < (other.crown + crown) * spacing)) continue;
@@ -160,18 +171,16 @@ function trail(api, light) {
 }
 
 const LANTERN = { day: ['#f6e3b8', 1.05], dusk: ['#ffcf78', 2.7], rain: ['#f3d699', 1.7] };
-const POOL = { dusk: '#d39a52', rain: '#b4a07c' };
 const LANTERN_SPOTS = Object.freeze([[3, 1], [14, 1], [26, 1], [44, -1], [58, -1]]);
 
 function lantern(api, x, z, theme, toward) {
-  const [glow, strength] = LANTERN[theme] || LANTERN.day, pool = POOL[theme], y = Math.max(TOP, forestFloor(x, z));
+  const [glow, strength] = LANTERN[theme] || LANTERN.day, y = Math.max(TOP, forestFloor(x, z));
   const [hx, hz] = [x + toward[0] * .15, z + toward[1] * .15];
   api.box(x, y + .36, z, .05, .72, .05, '#5c4434');
   api.box((x + hx) / 2, y + .72, (z + hz) / 2, .035, .035, .035, '#5c4434');
   api.box(hx, y + .6, hz, .13, .02, .13, '#3f3229');
   api.ball(hx, y + .53, hz, .1, .13, .1, glow, strength);
   api.box(hx, y + .67, hz, .1, .04, .1, '#3f3229');
-  if (pool) api.cylinder(hx, y + .016, hz, .9, .9, .006, pool);
 }
 
 export function lanternSpots() {
@@ -210,13 +219,13 @@ function undergrowth(api) {
       if (hash(i * 6.1) > .5) for (let k = 0; k < 4; k++) api.ball(x + Math.cos(k * 1.7 + i) * .17, forestFloor(x, z) + .2 + hash(i + k) * .1, z + Math.sin(k * 1.7 + i) * .17, .06, .06, .06, '#d2453e', 1.2);
     }
   }
-  const [cx, cz] = FOREST_CLEARING, cy = forestFloor(cx, cz), turn = Math.atan2(FACING[0], FACING[1]) + 1.25;
-  const [lx, lz] = [cx + ACROSS[0] * .62, cz + ACROSS[1] * .62], ly = forestFloor(lx, lz);
+  const [cx, cz] = FOREST_CLEARING, cy = forestFloor(cx, cz), turn = Math.atan2(LANE[0], LANE[1]) + .2;
+  const [lx, lz] = [cx - LANE_SIDE[0] * .78, cz - LANE_SIDE[1] * .78], ly = forestFloor(lx, lz);
   api.box(lx, ly + .1, lz, .2, .2, 1.25, '#7a5c42', [0, turn, 0]);
   api.cylinder(lx + Math.sin(turn) * .63, ly + .1, lz + Math.cos(turn) * .63, .2, .2, .03, '#c9a879');
   for (let k = 0; k < 3; k++) api.ball(lx + Math.sin(turn) * (k - 1) * .35, ly + .2, lz + Math.cos(turn) * (k - 1) * .35, .18, .06, .16, '#6f9a46');
   for (const [k, side] of [[0, -1], [1, 1]]) {
-    const gx = cx - ACROSS[0] * .7 * side + FACING[0] * .3 * k, gz = cz - ACROSS[1] * .7 * side + FACING[1] * .3 * k, gy = forestFloor(gx, gz);
+    const gx = cx - LANE_SIDE[0] * .7 * side + LANE[0] * .3 * k, gz = cz - LANE_SIDE[1] * .7 * side + LANE[1] * .3 * k, gy = forestFloor(gx, gz);
     api.ball(gx, gy + .05, gz, .12, .07, .1, '#e6efd2', 1.5);
     api.box(gx, gy + .03, gz, .02, .06, .02, '#efe4cc');
     api.ball(gx + .12, gy + .04, gz + .06 * side, .08, .05, .07, k ? '#cfe6c4' : '#e6efd2', 1.4);
@@ -263,7 +272,7 @@ export function buildForestEdge(api, theme = 'day') {
 
 const FOREST_TINTS = Object.freeze({
   day: { leafTop: '#9cc94a', leafUnder: '#3f7a38', leafCrown: '#a2cc52', leafBack: '#d4e68a', needleTop: '#5a9244', needleUnder: '#2c4e34', bark: '#7a6650' },
-  dusk: { sunColor: '#b9b4d8', sunStrength: .52, goldenHour: .1, leafTop: '#4f6a5e', leafUnder: '#22343c', leafMid: '#1e2e38', leafCrown: '#566e66', leafBack: '#8f8fb8', needleTop: '#3c5654', needleUnder: '#18262e', bark: '#5a5260', skyAmbient: '#6c70a8', groundAmbient: '#3a3f60', shadowTint: '#3e4374' },
+  dusk: { sunColor: '#e9dcc4', sunStrength: .82, goldenHour: .25, leafTop: '#7f9a68', leafUnder: '#3a5650', leafMid: '#2e4a48', leafCrown: '#7d966a', leafBack: '#c8c8a0', needleTop: '#56745c', needleUnder: '#263c40', bark: '#8a7c6e', skyAmbient: '#8c94c0', groundAmbient: '#55607a', shadowTint: '#5a6290' },
   rain: { leafTop: '#76935a', leafUnder: '#465e3a', leafCrown: '#71904f', needleTop: '#4f6a46', bark: '#5e5a46', sunStrength: .55 },
 });
 

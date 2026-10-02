@@ -9,18 +9,18 @@ import { onLandmass } from './island-landform.js';
 import { ISLAND_SUN } from './island-atmosphere.js';
 import { TREE_FORMS } from '../../models/world/trees.js';
 import {
-  FOREST_PATH, FOREST_PATH_WIDTH, FOREST_TRAILHEAD, buildForestEdge, createIslandForest, forestAtmosphere, forestPathDistance, groveMatrices, grove, onForest, groveBounds,
+  FOREST_PATH, FOREST_PATH_WIDTH, FOREST_TRAILHEAD, FOREST_CLEARING, buildForestEdge, createIslandForest, forestAtmosphere, forestPathDistance, groveMatrices, grove, onForest, groveBounds,
 } from './island-forest.js';
 
 test('the grove grows on the new forest lobe, off the lawn and clear of the path', () => {
   const trees = grove();
-  assert.equal(trees.length, 33);
+  assert.equal(trees.length, 45);
   for (const { x, z } of trees) {
     assert.ok(onForest(x, z, .3), `${x}, ${z} is off the forest`);
     assert.equal(onIsland(x, z, -.25), false, `${x}, ${z} stands on the lawn`);
     assert.ok(forestPathDistance(x, z) > FOREST_PATH_WIDTH / 2, `${x}, ${z} blocks the path`);
   }
-  assert.deepEqual(Object.values(TREE_FORMS).map(form => trees.filter(tree => tree.form === form).length), [12, 15, 6]);
+  assert.deepEqual(Object.values(TREE_FORMS).map(form => trees.filter(tree => tree.form === form).length), [21, 20, 4]);
 });
 
 test('the canopy steps up from low spreading trees at the lawn to tall conifers at the back', () => {
@@ -79,7 +79,7 @@ test('the grove is lit by the island sun, not the valley sun', () => {
 
 test('the grove draws as one thin-instanced mesh per tree form and hides on demand', () => {
   const engine = new NullEngine(), scene = new Scene(engine), forest = createIslandForest(scene, 'dusk');
-  assert.deepEqual(forest.meshes.map(mesh => mesh.thinInstanceCount), [12, 15, 6]);
+  assert.deepEqual(forest.meshes.map(mesh => mesh.thinInstanceCount), [21, 20, 4]);
   assert.equal(new Set(forest.meshes.map(mesh => mesh.material)).size, 1);
   forest.animate(3);
   forest.setTheme('rain');
@@ -114,5 +114,23 @@ test('every face of the forest floor and trail turns up toward the sky', () => {
       if (facing < -1e-9) up++; else if (facing > 1e-9) down++;
     }
     assert.ok(up > 100 && down === 0, `${up} up, ${down} down`);
+  }
+});
+
+test('the forest reaches well to the right of the arch, and the trail turns across the home view inside it', () => {
+  const { position: [x, , z] } = FOREST_TRAILHEAD;
+  assert.ok(Math.max(...grove().map(tree => tree.x)) > x + 3);
+  assert.ok(grove().filter(tree => tree.x > x + 1).length >= 4);
+  assert.ok(FOREST_CLEARING[0] > x + .8 && FOREST_CLEARING[1] < z - 1 && onForest(...FOREST_CLEARING, .4));
+});
+
+test('the dusk grove stays a readable green and no lantern paints a glow disc on the ground', () => {
+  const green = hex => parseInt(hex.slice(3, 5), 16);
+  assert.ok(green(forestAtmosphere('dusk').leafTop) > 140 && green(forestAtmosphere('dusk').needleTop) > 105);
+  assert.ok(forestAtmosphere('dusk').sunStrength > .75);
+  for (const theme of ['day', 'dusk', 'rain']) {
+    const discs = [];
+    buildForestEdge({ box() {}, ball() {}, shape() {}, cylinder: (x, y, z, top, bottom, height) => discs.push({ top, height }) }, theme);
+    assert.ok(discs.length > 0 && discs.every(({ top, height }) => top < .45 && height > .01), theme);
   }
 });

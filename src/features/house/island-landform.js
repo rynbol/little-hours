@@ -14,11 +14,11 @@ export function onIsland(x, z, margin = 0) {
   return Math.hypot(x - cx, z - cz) <= Math.hypot(ex - cx, ez - cz) - margin;
 }
 
-export const FOREST_REACH = Object.freeze({ from: -2.3, to: -.42, peak: 1.05, lean: 2.5 });
+export const FOREST_REACH = Object.freeze({ from: -2.3, to: -.3, peak: 1.1, lean: 2.3 });
 
 export function forestBulge(a) {
   const { from, to, peak, lean } = FOREST_REACH, t = (Math.atan2(Math.sin(a), Math.cos(a)) - from) / (to - from);
-  return t <= 0 || t >= 1 ? 0 : peak * Math.sin(Math.PI * t ** lean) ** 3 * (1 + .07 * Math.sin(a * 11 + .5) + .04 * Math.sin(a * 23 + 1.7));
+  return t <= 0 || t >= 1 ? 0 : peak * Math.sin(Math.PI * t ** lean) ** 2 * (1 + .07 * Math.sin(a * 11 + .5) + .04 * Math.sin(a * 23 + 1.7));
 }
 
 export const landmassEdge = (a, scale = 1) => edgePoint(a, scale * (1 + forestBulge(a)));
