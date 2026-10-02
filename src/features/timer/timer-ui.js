@@ -156,6 +156,7 @@ export function createTimerUI(app) {
     $('#avatar-button').disabled = travelling;
     $('#decorate-button').disabled = travelling || !app.room;
     $('#rooms-button').disabled = travelling || !app.room;
+    $('#house-coin-wallet').disabled = travelling;
     $('#mini-button').disabled = travelling;
     $('#rename-room').disabled = travelling;
     $('#room-title-input').disabled = travelling;
@@ -178,6 +179,7 @@ export function createTimerUI(app) {
     if (!isBreak) app.room?.setFocusProgress?.(1 - remainingAt(state.session) / state.session.duration);
     $('#timer-dial').dataset.phase = isBreak ? 'break' : state.session.running ? 'focusing' : ms === 0 ? 'complete' : presence;
     const label = isBreak ? phase === 'completed' ? 'Start focusing' : 'End break' : focusing ? 'Pause a moment' : phase === 'completed' ? 'Begin another session' : phase === 'paused' ? 'Keep going' : 'Start focusing';
+    $('#dock-timer').textContent = formatted;
     pill.render({ time: formatted, remaining: spokenTime(ms), label, running: focusing, paused: phase === 'paused', completed: phase === 'completed', disabled: travelling || editingAvatar || pending });
     $('#reset-session').hidden = isBreak || phase === 'ready' || phase === 'completed';
     $('#reset-session').disabled = editingAvatar || pending;

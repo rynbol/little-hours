@@ -125,3 +125,37 @@ test('island postcards preserve the rendered house and include only the chosen s
   }
   expect(restoreState(await saved(page)).house).toEqual(before);
 });
+
+test('the island page keeps its top bar with coins, the day and night toggle and a way back to the focus timer, and the room screen shows none of it', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
+  await expect(page.locator('#house-bar')).toBeHidden();
+  await page.locator('#rooms-button').click();
+  await expect(page.locator('#house-canvas canvas')).toBeVisible({ timeout: 30000 });
+  const bar = page.locator('#house-bar');
+  await expect(bar).toBeVisible();
+  await expect(bar.locator('.brand')).toHaveText('little hours.');
+  const coins = (await saved(page)).house.coins;
+  await expect(page.locator('#house-coin-balance')).toHaveText(String(coins));
+  await expect(bar.getByRole('button', { name: `${coins} coins · Visit your house` })).toBeVisible();
+  await expect(page.locator('#dock-timer')).toHaveText('25:00');
+  const barBox = await bar.boundingBox(), titleBox = await page.locator('#house-title').boundingBox();
+  expect(barBox.y + barBox.height).toBeLessThanOrEqual(titleBox.y);
+  await expect(page.locator('body')).toHaveAttribute('data-theme', 'dusk');
+  await bar.getByRole('button', { name: 'Switch to daylight' }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-theme', 'day');
+  expect((await saved(page)).theme).toBe('day');
+  await expect(bar.getByRole('button', { name: 'Switch to night' })).toBeVisible();
+  await bar.getByRole('button', { name: `${coins} coins · Visit your house` }).click();
+  await expect(page.locator('body')).not.toHaveClass(/is-house/);
+  await expect(page.locator('#house-bar')).toBeHidden();
+  await page.locator('#rooms-button').click();
+  await expect(bar).toBeVisible();
+  await expect(page.locator('#focus-card')).toBeHidden();
+  await bar.getByRole('button', { name: 'Show focus panel' }).click();
+  await expect(page.locator('body')).not.toHaveClass(/is-house/);
+  await expect(page.locator('#focus-card')).toBeVisible();
+  await expect(page.locator('#house-bar')).toBeHidden();
+});

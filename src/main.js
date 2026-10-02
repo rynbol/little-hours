@@ -73,6 +73,8 @@ function applyState(next, force = false) {
   document.body.dataset.design = design.style || 'retreat';
 
   $('#coin-balance').textContent = state.house.coins;
+  $('#house-coin-balance').textContent = state.house.coins;
+  $('#house-coin-wallet').setAttribute('aria-label', `${state.house.coins} coins · Visit your house`);
   app.timer.renderFocusReward();
   app.houseUI?.render();
   app.lake.render();
@@ -162,6 +164,8 @@ app.houseUI = createHouseUI($('#house-page'), {
   onFocus: () => travelTo('home', () => { app.nav.setHouseOpen(false); app.timer.expand(); $('#start-button').focus(); }),
   onPond: () => app.lake.open(),
 });
+$('#house-coin-wallet').addEventListener('click', () => app.nav.setHouseOpen(false), { signal: listeners.signal });
+$('#house-focus').addEventListener('click', async () => { await app.nav.setHouseOpen(false); app.timer.expand(); if (!app.nav.houseOpen) $('#focus-card').showPopover(); }, { signal: listeners.signal });
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !event.isComposing && app.timer.leaveFocusMode({ animate: true })) { event.preventDefault(); return; }
   if (event.key === 'Escape' && app.nav.houseOpen && !event.target.closest('input')) { app.nav.setHouseOpen(false); return; }

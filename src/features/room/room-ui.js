@@ -46,9 +46,11 @@ export function createRoomUI(app) {
       app.room?.setTheme(state.theme);
       const [symbol, label] = state.theme === 'day' ? ['sun', 'Daylight'] : state.theme === 'rain' ? ['rain', 'Rain'] : ['moon', 'Night'];
       const nextLabel = state.theme === 'day' ? 'Switch to night' : 'Switch to daylight';
-      $('#time-toggle').innerHTML = `${icon(symbol)}<span>${label}</span>`;
-      $('#time-toggle').setAttribute('aria-label', nextLabel);
-      $('#time-toggle').title = nextLabel;
+      for (const toggle of document.querySelectorAll('[data-time-toggle]')) {
+        toggle.innerHTML = `${icon(symbol)}<span>${label}</span>`;
+        toggle.setAttribute('aria-label', nextLabel);
+        toggle.title = nextLabel;
+      }
     }
   }
 
@@ -121,7 +123,7 @@ export function createRoomUI(app) {
   });
   $('#cancel-room-title').addEventListener('click', () => closeNameEditor());
 
-  $('#time-toggle').addEventListener('click', () => {
+  for (const toggle of document.querySelectorAll('[data-time-toggle]')) toggle.addEventListener('click', () => {
     app.acceptUpdate(app.store.update(draft => { draft.theme = draft.theme === 'day' ? 'dusk' : 'day'; }));
   });
   $('#reset-view').addEventListener('click', () => app.room?.resetView());
