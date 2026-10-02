@@ -319,7 +319,7 @@ async function shots() {
       if (options.freeze) await app.js(`window.__lhFrozenAt = window.__lhStartAt + ${Number(options.freeze)}`);
       await sleep(Number(options.wait || 600));
       if (options.sequence) {
-        if (name !== 'wilds' || options.freeze) throw new Error('Sequences require the wilds view; use fixedStepMs in the sequence instead of --freeze');
+        if (sceneView !== 'wilds' || options.freeze) throw new Error('Sequences require a Wilds view; use fixedStepMs in the sequence instead of --freeze');
         const sequence = JSON.parse(readFileSync(String(options.sequence), 'utf8'));
         const folder = join(out, `${name}-sequence`);
         const result = await captureSequence(app, sequence, folder);

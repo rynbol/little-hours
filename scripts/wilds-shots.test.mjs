@@ -6,11 +6,11 @@ import { join } from 'node:path';
 import { wildsShotView, captureWildsCrop } from './lh/wilds-shots.mjs';
 
 test('piece views pin seed, time, player and camera independently of gameplay camera changes', async () => {
-  for (const piece of ['player', 'grass', 'meadow', 'vista']) {
+  for (const piece of ['player', 'grass', 'meadow', 'vista', 'wind']) {
     const calls = [], view = wildsShotView(piece);
     await view.go({ async waitFor() {}, async js(code) { calls.push(code); } });
     assert.equal(view.settings.randomSeed, 7);
-    assert.equal(view.settings.reducedMotion, true);
+    assert.equal(view.settings.reducedMotion, piece !== 'wind');
     assert.match(calls[0], /__lhStartAt \+ 4000/);
     assert.match(calls[1], /wilds.place/);
     assert.match(calls[2], /camera.position.set/);
