@@ -171,6 +171,7 @@ export default {
       const step = (turn - (slivers.at(-1)?.turn ?? 0)) * Math.PI / 180 / 0.0042;
       if (step) await app.drag({ x: box.x - step / 2, y: box.y }, { x: box.x + step / 2, y: box.y });
       await app.settle();
+      await app.js(`(() => { const d = window.__littleHours.room.diagnostics(); d.engine.beginFrame(); d.draw(); d.engine.endFrame(); return true; })()`);
       slivers.push({ turn, cut: await app.js(SLIVERS) });
     }
     check('day, from the chair: no cumulus is cut by the top of the view down to a grey sliver of underside, each one either clears the top or shows at least a tenth of the view', slivers.every(({ cut }) => cut.every(({ shown }) => shown >= 0.1)), slivers);

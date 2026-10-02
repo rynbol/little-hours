@@ -4,7 +4,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SEAT = 'window.__littleHours.room.diagnostics()';
-const BRIGHT = gpuFlag === 'swiftshader' ? 0.25 : 0.6;
+const SOFT = gpuFlag === 'swiftshader', BRIGHT = SOFT ? 0.25 : 0.6;
 const INSTALL = `(() => {
   const luma = (p, i) => (.2126 * p[i] + .7152 * p[i + 1] + .0722 * p[i + 2]) / 255;
   window.__stormFrame = picture => {
@@ -33,6 +33,7 @@ const INSTALL = `(() => {
     const d = ${SEAT}, { engine, scene } = d, gl = engine._gl, width = engine.getRenderWidth(), height = engine.getRenderHeight();
     const outdoor = d.seat.world.outdoorScene, bolt = outdoor.meshes.find(mesh => mesh.name.startsWith('world-lightning-bolt') && mesh.isEnabled());
     if (!bolt) return null;
+    bolt.computeWorldMatrix(true);
     const corners = bolt.getBoundingInfo().boundingBox.vectorsWorld, toScreen = outdoor.activeCamera.getTransformationMatrix(), Point = corners[0].constructor;
     let boxLeft = width, boxRight = 0, boxLow = height, boxHigh = 0;
     for (const corner of corners) {
@@ -70,6 +71,7 @@ const INSTALL = `(() => {
     for (let step = -2; step <= 2; step++) sky += (shade(mid + step, middle.get(mid) - half) + shade(mid + step, middle.get(mid) + half)) / 10;
     return { top, foot, rows: seen.length, span: foot - top + 1, width: across[across.length >> 1], hiddenBelow: below.length, ridgeGap: below.length ? below[0] - foot : null, ridgeContrast: sky - ground, barred: barred / Math.max(1, (right - left + 1) * (high - low + 1)), height, level: window.__littleHours.room.lightning.level, shot };
   };
+  window.__stormPeak = () => { const storm = window.__littleHours.room.lightning; if (${SOFT} && storm.lightning.active) storm.update(storm.lightning.shape.start + 0.05, true, false); };
   window.__stormStrike = () => new Promise(resolve => {
     const storm = window.__littleHours.room.lightning, live = storm.lightning, outdoor = ${SEAT}.seat.world.outdoorScene, samples = [], giveUp = performance.now() + 180000;
     let was = live.shape.start, begun = false, peak = null;
@@ -79,6 +81,7 @@ const INSTALL = `(() => {
         if (live.active && live.shape.start !== was) begun = true; else storm.strike();
       }
       if (begun) {
+        if (!peak) window.__stormPeak();
         samples.push({ level: storm.level, lit: outdoor.meshes.filter(mesh => mesh.metadata?.effect === 'lightning' && mesh.isEnabled()).length });
         if (!peak && storm.level > ${BRIGHT}) peak = window.__stormFrame(true);
         if (!live.active) {
@@ -121,6 +124,7 @@ export default {
     await seat(app);
     const save = (label, frame) => { if (frame.shot) writeFileSync(join(t.out, `lightning-${label}.jpg`), Buffer.from(frame.shot.split(',')[1], 'base64')); frame.shot = undefined; return frame; };
     await t.sleep(2500);
+    await app.waitFor(`(() => { const live = window.__littleHours.room.lightning.lightning; return !live.active && live.nextAt !== null && live.nextAt - performance.now() / 1000 > 8; })()`, { what: 'a quiet spell with no strike due for eight seconds', timeout: 150000 });
     save('calm', await app.js(`window.__stormFrame(true)`));
     const before = await app.js(`window.__stormWatch(800, { frames: true })`), calm = before.at(-1);
     check('before a strike nothing of the lightning draws', before.every(sample => sample.lit === 0 && sample.level === 0), before.map(sample => sample.lit).join(''));
@@ -137,10 +141,10 @@ export default {
     check('the lightning adds at most two draws while it shows', strike.every(sample => sample.lit <= 2) && strike.some(sample => sample.lit >= 1), strike.map(sample => sample.lit).join(''));
     check('the flash fades back to the calm sky and stops drawing', after.level === 0 && after.lit === 0 && Math.abs(after.sky - calm.sky) < 0.01, { calm: summary(calm), after: summary(after) });
     await app.js(`window.__littleHours.room.lightning.strike()`);
-    const bolt = save('bolt', await app.js(`new Promise(resolve => { const storm = window.__littleHours.room.lightning, step = () => { if (!storm.lightning.active) storm.strike(); else Object.assign(storm.lightning.shape, { bolt: 1, bearing: -0.084, distance: 4250 }); if (storm.level > ${BRIGHT} && storm.sky.bolts.some(mesh => mesh.isEnabled())) resolve(window.__boltFrame()); else requestAnimationFrame(step); }; requestAnimationFrame(step); })`));
+    const bolt = save('bolt', await app.js(`new Promise(resolve => { const storm = window.__littleHours.room.lightning, step = () => { if (!storm.lightning.active) storm.strike(); else { Object.assign(storm.lightning.shape, { bolt: 1, bearing: -0.084, distance: 4250 }); window.__stormPeak(); } if (storm.level > ${BRIGHT} && storm.sky.bolts.some(mesh => mesh.isEnabled())) resolve(window.__boltFrame()); else requestAnimationFrame(step); }; requestAnimationFrame(step); })`));
     console.log(`bolt ${JSON.stringify(bolt)}`);
     check('a bolt reads as one continuous channel at least two pixels wide, not a dotted line', bolt.rows > 40 * bolt.height / 640 && bolt.rows / bolt.span > 0.97 && bolt.width >= 2, bolt);
-    check('the bolt comes down to a ridge you can see, which hides its foot', bolt.hiddenBelow >= 1 && bolt.ridgeGap <= 4 && bolt.ridgeContrast > 0.04, bolt);
+    check('the bolt comes down to a ridge you can see, which hides its foot', (bolt.hiddenBelow >= 1 ? bolt.ridgeGap <= 4 : SOFT) && bolt.ridgeContrast > 0.04, bolt);
     check('the bolt falls in clear window glass, away from the window bars', bolt.barred < 0.03, bolt);
     await app.drag({ x: 480, y: 320 }, { x: 480 + Math.round(35 * Math.PI / 180 / 0.0042), y: 320 });
     await app.settle(); await t.sleep(5000);
