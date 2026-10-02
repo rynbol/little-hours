@@ -184,7 +184,7 @@ function slopeRows(api, x0, x1, side, ends, theme, shaded) {
     const { d, y, length, angle } = roofSpan(RUN * k / 10, RUN * (k + 1) / 10);
     api.box((x0 + x1) / 2, y - .02, side * d, x1 - x0 - .1, .06, length + .02, ceiling, [side * angle, 0, 0]);
     for (const [x, end] of [[x0 + .04, ends[0]], [x1 - .04, ends[1]]]) {
-      if (end) api.box(x, y + .05, side * d, .1, .3, length + .04, timber, [side * angle, 0, 0]);
+      if (end || d > FRONT) api.box(x, y + .05, side * d, .1, .3, length + .04, timber, [side * angle, 0, 0]);
       else api.box(x + (x === x0 + .04 ? .1 : -.1), y + .19, side * d, .28, .05, length + .04, PALETTE.flashing, [side * angle, 0, 0]);
     }
   }

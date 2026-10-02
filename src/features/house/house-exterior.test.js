@@ -105,3 +105,12 @@ test('the wing roof lifts its shingles where the loft shades it, and only then',
   assert.ok(lifted(['studio', 'garden', 'loft']).every(([x]) => x < -HALF + 1.6) && lifted(['studio', 'garden', 'loft']).length > 10);
   assert.equal(lifted(['studio', 'garden']).length, 0);
 });
+
+test('wall flashing runs only where a roof meets a wall, and the eave beyond it ends in a timber verge', () => {
+  const house = { rooms: ['studio', 'garden', 'loft'].map(id => ({ id })) }, { boxes } = boxesOf(house, 'garden', 'day', 'lid');
+  const flashing = boxes.filter(([, , , , , , hex]) => hex === PALETTE.flashing);
+  assert.ok(flashing.length >= 6);
+  for (const [, , z] of flashing) assert.ok(Math.abs(z) <= FRONT, `flashing hangs in the air at depth ${z}`);
+  const left = -HALF, verge = boxes.filter(([x, , z, w, , , hex]) => hex === PALETTE.timber && w === .1 && Math.abs(x - left) < .1 && Math.abs(z) > FRONT);
+  assert.ok(verge.length >= 1, 'the eave has no end board where it passes the wall');
+});

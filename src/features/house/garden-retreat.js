@@ -6,7 +6,7 @@ export const RETREAT_SPOTS = [[-2.35, -1.95], [2.35, -1.95], [-3, .2], [3, .2], 
 export const RETREAT_LIGHT = {
   day: { sky: '#ffffff', ground: '#a0a7a4', sun: '#fff3d9', fill: .62, key: .95, bulb: ['#ffe7b3', 1.3] },
   dusk: { sky: '#b7b0dc', ground: '#6a6488', sun: '#ffc48a', fill: .52, key: .82, bulb: ['#ff8a3d', 1.7] },
-  rain: { sky: '#ffffff', ground: '#a0a7a4', sun: '#fff3d9', fill: .62, key: .95, bulb: ['#ffc27a', 1.2] },
+  rain: { sky: '#cfdde6', ground: '#7d8d94', sun: '#dde7ea', fill: .6, key: .6, bulb: ['#ffb866', 1.9] },
 };
 export const GARDEN_EXIT = [-3.8, .04, -6.1];
 export const GARDEN_EXIT_TAG = [-3.8, .45, -4.45];

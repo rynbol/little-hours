@@ -25,3 +25,10 @@ test('dusk turns the garden amber: warm low sun, dim lavender sky, glowing bulbs
   assert.ok(RETREAT_LIGHT.dusk.fill < RETREAT_LIGHT.day.fill && RETREAT_LIGHT.dusk.key < RETREAT_LIGHT.day.key);
   for (const { color: [r, g, b] } of lights('dusk')) assert.ok(r > 1.5 && g / r < .6 && b / r < .3, `a dusk bulb reads ${r}, ${g}, ${b}`);
 });
+
+test('rain turns the garden grey and dim, cooler than day, with the string lights lit against it', () => {
+  const warmth = hex => { const [r, , b] = rgb(hex); return r - b; };
+  assert.ok(RETREAT_LIGHT.rain.key < RETREAT_LIGHT.day.key - .25);
+  assert.ok(warmth(RETREAT_LIGHT.rain.sun) < 0 && warmth(RETREAT_LIGHT.rain.sky) < 0 && warmth(RETREAT_LIGHT.day.sun) > 0);
+  assert.ok(RETREAT_LIGHT.rain.bulb[1] > RETREAT_LIGHT.day.bulb[1]);
+});

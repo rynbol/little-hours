@@ -10,6 +10,7 @@ import { ISLAND_SUN } from './island-atmosphere.js';
 import { TREE_FORMS, CROWN_TOPS } from '../../models/world/trees.js';
 import {
   FOREST_PATH, FOREST_PATH_WIDTH, FOREST_TRAILHEAD, FOREST_CLEARING, buildForestEdge, createIslandForest, forestAtmosphere, forestPathDistance, groveMatrices, grove, onForest, groveBounds,
+  ELDERS,
 } from './island-forest.js';
 
 test('the grove grows on the new forest lobe, off the lawn and clear of the path', () => {
@@ -20,7 +21,7 @@ test('the grove grows on the new forest lobe, off the lawn and clear of the path
     assert.equal(onIsland(x, z, -.25), false, `${x}, ${z} stands on the lawn`);
     assert.ok(forestPathDistance(x, z) > FOREST_PATH_WIDTH / 2, `${x}, ${z} blocks the path`);
   }
-  assert.deepEqual(Object.values(TREE_FORMS).map(form => trees.filter(tree => tree.form === form).length), [19, 33, 18]);
+  assert.deepEqual(Object.values(TREE_FORMS).map(form => trees.filter(tree => tree.form === form).length), [18, 36, 16]);
 });
 
 test('the canopy steps up from low spreading trees at the lawn to tall conifers at the back', () => {
@@ -79,7 +80,7 @@ test('the grove is lit by the island sun, not the valley sun', () => {
 
 test('the grove draws as one thin-instanced mesh per tree form and hides on demand', () => {
   const engine = new NullEngine(), scene = new Scene(engine), forest = createIslandForest(scene, 'dusk');
-  assert.deepEqual(forest.meshes.map(mesh => mesh.thinInstanceCount), [19, 33, 18]);
+  assert.deepEqual(forest.meshes.map(mesh => mesh.thinInstanceCount), [18, 36, 16]);
   assert.equal(new Set(forest.meshes.map(mesh => mesh.material)).size, 1);
   forest.animate(3);
   forest.setTheme('rain');
@@ -136,10 +137,12 @@ test('the dusk grove stays a readable green and no lantern paints a glow disc on
 });
 
 test('the back of the forest is a dense wall of conifers and no tree near the camera towers over the cottage', () => {
-  const top = tree => CROWN_TOPS[tree.form] * .3 * tree.size * tree.height, trees = grove(), conifers = trees.filter(tree => tree.form === TREE_FORMS.conifer);
+  const top = tree => CROWN_TOPS[tree.form] * .3 * tree.size * tree.height, trees = grove(), conifers = trees.filter(tree => tree.form === TREE_FORMS.conifer), { position: [x] } = FOREST_TRAILHEAD;
   assert.ok(conifers.filter(tree => tree.z < -8).length >= 22, 'the back row is thin');
-  assert.ok(Math.max(...trees.map(top)) < 4.8, 'a tree stands taller than the cottage ridge');
-  const { position: [x] } = FOREST_TRAILHEAD;
+  const elders = trees.filter(tree => top(tree) > 4.8), rest = conifers.filter(tree => !elders.includes(tree)).map(top).sort((a, b) => a - b);
+  assert.deepEqual(elders.map(({ x, z }) => [x, z]), ELDERS.map(([x, z]) => [x, z]), 'only the elders stand above the cottage ridge');
+  for (const elder of elders) assert.ok(top(elder) < 6 && onForest(elder.x, elder.z, .8) && elder.x < x && top(elder) > rest[rest.length >> 1] * 1.6, `the elder at ${elder.x}, ${elder.z} does not break the treeline from inside the wood`);
+  assert.ok(rest.at(-1) > rest[0] * 2, 'the conifers are all one height');
   for (const tree of trees.filter(tree => tree.x > x + 2 && tree.z > -7.5)) assert.ok(top(tree) < 2.8, `the tree at ${tree.x}, ${tree.z} towers over the right shore`);
 });
 
