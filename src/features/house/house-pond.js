@@ -73,7 +73,7 @@ function waterColor(palette, x, z, s) {
   const offset = Math.hypot((x - DEEPEST.x) / rx, (z - DEEPEST.z) / rz) * 1.05;
   const shelf = Math.max(...SHELVES.map(([sx, sz, r]) => 1 - smooth(.1, r, Math.hypot(x - sx, z - sz))));
   const depth = (1 - smooth(0, EDGE * 1.05, Math.max(offset, s) * .5 + offset * .5)) * (1 - .65 * shelf);
-  return mix(mix(shallow, mid, smooth(0, .55, depth)), deep, smooth(.45, 1, depth) * .8);
+  return mix(mix(shallow, mid, smooth(0, .55, depth)), deep, smooth(.25, 1.15, depth) * .72);
 }
 
 function shoreRing(j) {

@@ -95,18 +95,19 @@ function trailDistance(trail, x, z) {
 const CROWN_REACH = [5.4, 3.6, 7.2];
 const thicket = (x, z) => .5 + .3 * Math.sin(x * 1.9 + z * .7 + 1.1) * Math.cos(z * 1.4 - x * .5) + .2 * Math.sin(x * 4.3 - z * 3.1);
 
+export const ELDERS = Object.freeze([[6.3, -7.3, 1.12, 1.2], [8.4, -8.9, 1.04, 1.12], [9.9, -9.3, 1.1, 1.16]].map(Object.freeze));
 const farBack = (x, z) => clamp01((-(x - CX) * HOME_VIEW[0] - (z - CZ) * HOME_VIEW[1] - 3.4) / 4.6);
 
 export const GROVE = Object.freeze((() => {
-  const trees = [];
+  const trees = ELDERS.map(([x, z, size, height], i) => Object.freeze({ x, z, form: TREE_FORMS.conifer, size, height, width: .9, crown: CROWN_REACH[TREE_FORMS.conifer] * TREE_SCALE * size * .9 * .62, turn: i * 2.1 }));
   for (let i = 0; trees.length < 70 && i < 14000; i++) {
     const x = 1 + hash(i * 1.37) * 14, z = -3 - hash(i * 2.11 + 5) * 9, { t } = band(x, z);
     if (!onForest(x, z, .3) || behindFence(x, z) || thicket(x, z) < hash(i * 8.3) * .55) continue;
     const back = farBack(x, z), layer = t * .45 + back * .8 + (hash(i * 3.3 + 1) - .5) * .5;
     const form = layer < .3 ? TREE_FORMS.spreading : layer < .64 ? TREE_FORMS.broadleaf : TREE_FORMS.conifer;
     const conifer = form === TREE_FORMS.conifer;
-    const size = (.42 + hash(i * 4.9) * .26 + back * (conifer ? .4 : .2)) * (form === TREE_FORMS.spreading ? .82 : 1);
-    const height = conifer ? .82 + hash(i * 7.3) * .4 + back * .12 : .82 + hash(i * 7.3) * .36, width = conifer ? .78 + hash(i * 9.1) * .4 : .85 + hash(i * 9.1) * .4;
+    const size = (conifer ? .36 + hash(i * 4.9) * .3 + back * .3 : .42 + hash(i * 4.9) * .26 + back * .2) * (form === TREE_FORMS.spreading ? .82 : 1);
+    const height = conifer ? .74 + hash(i * 7.3) * .56 + back * .1 : .82 + hash(i * 7.3) * .36, width = conifer ? .78 + hash(i * 9.1) * .4 : .85 + hash(i * 9.1) * .4;
     const crown = CROWN_REACH[form] * TREE_SCALE * size * width * .62, top = CROWN_TOPS[form] * TREE_SCALE * size * height;
     if (woodsDistance(x, z) < FOREST_PATH_WIDTH / 2 + crown * .55 || hidesTheWay(x, z, crown, top)) continue;
     if (Math.hypot(x - FOREST_CLEARING[0], z - FOREST_CLEARING[1]) < .95 + crown * .4) continue;
@@ -275,7 +276,7 @@ export function buildForestEdge(api, theme = 'day') {
 const FOREST_TINTS = Object.freeze({
   day: { leafTop: '#9cc94a', leafUnder: '#3f7a38', leafCrown: '#a2cc52', leafBack: '#d4e68a', needleTop: '#5a9244', needleUnder: '#2c4e34', bark: '#7a6650' },
   dusk: { sunColor: '#e9dcc4', sunStrength: .82, goldenHour: .25, leafTop: '#7f9a68', leafUnder: '#3a5650', leafMid: '#2e4a48', leafCrown: '#7d966a', leafBack: '#c8c8a0', needleTop: '#56745c', needleUnder: '#263c40', bark: '#8a7c6e', skyAmbient: '#8c94c0', groundAmbient: '#55607a', shadowTint: '#5a6290' },
-  rain: { leafTop: '#76935a', leafUnder: '#465e3a', leafCrown: '#71904f', needleTop: '#4f6a46', bark: '#5e5a46', sunStrength: .55 },
+  rain: { leafTop: '#84a166', leafUnder: '#4f6a44', leafCrown: '#7f9c5c', needleTop: '#5f7c54', needleUnder: '#3a5442', bark: '#5e5a46', sunStrength: .62 },
 });
 
 export function forestAtmosphere(theme) {

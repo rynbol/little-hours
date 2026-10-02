@@ -102,5 +102,14 @@ export default {
     check('phone: it opens', (await app.house()).open === 1);
     await t.shot(app, 'phone');
     await t.close(app);
+
+    const RAINING = `window.__littleHours.house.diagnostics().scene.getMeshByName('island-rain')?.isEnabled() ?? null`;
+    for (const theme of ['rain', 'day']) {
+      app = await t.open({ seed: 'three-rooms', theme, label: `weather ${theme}` });
+      await t.steps.openHouse(app);
+      check(`${theme}: rain falls on the island only in the rain`, await app.js(RAINING) === (theme === 'rain'));
+      if (theme === 'rain') await t.shot(app, 'island-rain');
+      await t.close(app);
+    }
   },
 };

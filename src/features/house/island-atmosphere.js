@@ -42,7 +42,7 @@ function cloudBank(x, y, scale, fill, shade, seed) {
     return `<ellipse cx="${(x + px).toFixed(1)}" cy="${(y - ry * .45).toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}"/>`;
   }).join('');
   const id = `island-bank-${seed}`;
-  return `<clipPath id="${id}"><rect x="${x - 200 * scale}" y="${y - 120 * scale}" width="${400 * scale}" height="${120 * scale}"/></clipPath><g filter="url(#island-cloud-soft)" clip-path="url(#${id})" fill="url(#island-puff)">${puffs}</g>`;
+  return `<mask id="${id}"><rect x="${x - 200 * scale}" y="${y - 120 * scale}" width="${400 * scale}" height="${120 * scale}" fill="url(#island-bank-fade)"/></mask><g filter="url(#island-cloud-soft)" mask="url(#${id})" fill="url(#island-puff)">${puffs}</g>`;
 }
 
 const SKY_ISLANDS = Object.freeze([[.6, .19, 1, 5], [.8, .32, .6, 9], [.93, .41, .45, 14], [.36, .13, .38, 21]]);
@@ -97,7 +97,7 @@ function skyScenery(theme, width, height) {
   const r = RANGES[theme] || RANGES.day;
   const wisps = [[.3, .36, 1.3], [.62, .1, 1], [.84, .22, 1.2], [.46, .3, .8]].map(([x, y, s], i) => `<ellipse cx="${x * width}" cy="${y * height}" rx="${160 * s}" ry="${9 * s}" fill="${r.cloud}" opacity="${theme === 'day' ? .55 : .25}" transform="rotate(${-4 + i * 2} ${x * width} ${y * height})"/>`).join('');
   const banks = [[.1, .6, 1, 1], [.9, .55, 1.2, 2], [.3, .86, 1.3, 3], [.74, .9, 1.5, 4]].map(([x, y, s, seed]) => cloudBank(x * width, y * height, s * Math.min(1.2, width / 1200), r.cloud, r.shade, seed)).join('');
-  return `<defs><linearGradient id="island-puff" x1="0" y1="0" x2="0" y2="1"><stop offset=".15" stop-color="${r.cloud}"/><stop offset=".95" stop-color="${r.shade}"/></linearGradient><filter id="island-cloud-soft" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="3.5"/></filter><filter id="island-wisp" x="-20%" y="-300%" width="140%" height="700%"><feGaussianBlur stdDeviation="7"/></filter><linearGradient id="island-far-fall" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${r.cloud}" stop-opacity=".7"/><stop offset="1" stop-color="${r.cloud}" stop-opacity="0"/></linearGradient>${skyIslandPaint(theme)}<linearGradient id="island-range-mist" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="${r.far}" stop-opacity="0"/><stop offset="1" stop-color="${r.far}" stop-opacity=".9"/></linearGradient></defs>`
+  return `<defs><linearGradient id="island-puff" x1="0" y1="0" x2="0" y2="1"><stop offset=".15" stop-color="${r.cloud}"/><stop offset=".95" stop-color="${r.shade}"/></linearGradient><linearGradient id="island-bank-fade" x1="0" y1="0" x2="0" y2="1"><stop offset=".62" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><filter id="island-cloud-soft" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="3.5"/></filter><filter id="island-wisp" x="-20%" y="-300%" width="140%" height="700%"><feGaussianBlur stdDeviation="7"/></filter><linearGradient id="island-far-fall" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${r.cloud}" stop-opacity=".7"/><stop offset="1" stop-color="${r.cloud}" stop-opacity="0"/></linearGradient>${skyIslandPaint(theme)}<linearGradient id="island-range-mist" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="${r.far}" stop-opacity="0"/><stop offset="1" stop-color="${r.far}" stop-opacity=".9"/></linearGradient></defs>`
     + (theme === 'day' ? sunRays(width * .16, Math.max(44, height * .27), width, height) : '')
     + `<g filter="url(#island-wisp)">${wisps}</g>`
     + skyIslands(theme, r, width, height)

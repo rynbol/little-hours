@@ -87,3 +87,9 @@ test('lily pads take on the dusk and rain light instead of glowing', () => {
   const day = pads('day');
   for (const theme of ['dusk', 'rain']) assert.ok(pads(theme) < day * .75, `${theme} pads are muted (${pads(theme).toFixed(2)} vs ${day.toFixed(2)})`);
 });
+
+test('the pond darkens toward its middle in small even steps, with no hard dark core', () => {
+  const lights = [];
+  for (let x = 9.45; x <= 11.1; x += .15) lights.push(waterAt('day', x, .4).light);
+  for (let i = 1; i < lights.length; i++) assert.ok(Math.abs(lights[i] - lights[i - 1]) < .12, `the water jumps from ${lights[i - 1].toFixed(2)} to ${lights[i].toFixed(2)}`);
+});

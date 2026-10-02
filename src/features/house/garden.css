@@ -4,6 +4,7 @@ body.is-garden > .app-footer, body.is-garden .app-header, body.is-garden #save-s
 .house-page.is-living-garden { --garden-paper: #fbf5ea; --garden-ink: #485840; position: fixed; inset: 0; width: 100%; height: 100svh; max-width: none; padding: 0; margin: 0; z-index: 50; overflow: hidden; background: #5b586a; color: var(--garden-ink); }
 .is-living-garden .house-layout, .is-living-garden .house-left, .is-living-garden .house-scene { display: contents; }
 .is-living-garden .house-world { position: absolute; inset: 0; border: 0; border-radius: 0; box-shadow: none; background: radial-gradient(ellipse at 35% 30%, #fcf4dfaa, transparent 65%), linear-gradient(155deg, #bdcdb6, #d4d9bf 55%, #e8d8bf); }
+body[data-theme='rain'] .is-living-garden .house-world { background: radial-gradient(ellipse at 40% 30%, #dfe9ec66, transparent 62%), linear-gradient(160deg, #5f7686, #8ba0aa 55%, #a9b9bb); }
 body[data-theme='dusk'] .is-living-garden .house-world { background: radial-gradient(ellipse at 50% 38%, #ffcf9a55, transparent 60%), linear-gradient(165deg, #3d3f6c, #6b6597 52%, #c99486); }
 .is-living-garden .house-world::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, #70836422); pointer-events: none; }
 .is-living-garden .house-heading, .is-living-garden .house-world-caption, .is-living-garden .house-rooms, .is-living-garden .house-garden-link, .is-living-garden .house-preview-bar, .is-living-garden .house-camera-controls, .is-living-garden .house-sky-mark { display: none; }

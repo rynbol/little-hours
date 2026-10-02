@@ -17,6 +17,7 @@ const SPIRES = Object.freeze([[-1.5, -.4, 2.4, .9], [4.2, 1.1, 2.9, 1.1], [8.4, 
 const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const lawn = ['#7aa046', '#8cb24e', '#6b9140', '#a3c35c'];
 const rim = '#6f9640', lip = '#5b7f3a';
+export const RIM_LIGHT = Object.freeze({ day: [1, 1, 1], dusk: [.6, .68, .88], rain: [.78, .84, .86] });
 
 function rgba(hex, shade = 1) { const c = Color3.FromHexString(hex); return [c.r * shade, c.g * shade, c.b * shade, 1]; }
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
@@ -26,7 +27,7 @@ export function buildIsland(api, theme = 'day') {
   const tri = (a, b, c, ca, cb = ca, cc = ca, n = [0, 1, 0]) => { positions.push(...a, ...b, ...c); colors.push(...ca, ...cb, ...cc); normals.push(...n, ...n, ...n); };
   const outward = j => { const [ax, az] = landmassEdge(edgeAngle(j)), [bx, bz] = landmassEdge(edgeAngle(j + 1)), along = Math.hypot(bx - ax, bz - az), dx = (bz - az) / along, dz = (ax - bx) / along * 2.1, l = Math.hypot(dx, dz, .5); return [dx / l, .5 / l, dz / l]; };
   const angle = j => j / SEGMENTS * Math.PI * 2, edgeAngle = j => j / EDGE * Math.PI * 2;
-  const { cx, cz } = ISLAND;
+  const { cx, cz } = ISLAND, light = RIM_LIGHT[theme] || RIM_LIGHT.day, toned = (hex, shade = 1) => rgba(hex, shade).map((v, i) => i < 3 ? v * light[i] : v);
 
   const lawnAt = (k, j) => {
     const [ex, ez] = edgePoint(angle(j)), t = k / RINGS;
@@ -38,7 +39,7 @@ export function buildIsland(api, theme = 'day') {
   };
   for (let k = 0; k < RINGS; k++) for (let j = 0; j < SEGMENTS; j++) {
     const a = lawnAt(k, j), b = lawnAt(k, j + 1), c = lawnAt(k + 1, j), d = lawnAt(k + 1, j + 1);
-    const edge = k === RINGS - 1 ? rgba(rim) : null;
+    const edge = k === RINGS - 1 ? toned(rim) : null;
     if (k === 0) { tri(a, c, d, patch(a[0], a[2]), patch(c[0], c[2]), patch(d[0], d[2])); continue; }
     tri(a, c, b, patch(a[0], a[2]), edge || patch(c[0], c[2]), patch(b[0], b[2]));
     tri(b, c, d, patch(b[0], b[2]), edge || patch(c[0], c[2]), edge || patch(d[0], d[2]));
@@ -56,7 +57,7 @@ export function buildIsland(api, theme = 'day') {
   }));
   for (let r = 0; r < profile.length - 1; r++) for (let j = 0; j < EDGE; j++) {
     const u0 = ring[r][j], u1 = ring[r][j + 1], l0 = ring[r + 1][j], l1 = ring[r + 1][j + 1];
-    const shade = .93 + hash(j * 1.7 + r * 5.3) * .12, top = rgba(profile[r].color, shade), bottom = rgba(profile[r + 1].color, shade);
+    const shade = .93 + hash(j * 1.7 + r * 5.3) * .12, top = toned(profile[r].color, shade), bottom = toned(profile[r + 1].color, shade);
     const n = outward(j); tri(u0, l0, u1, top, bottom, top, n); tri(u1, l0, l1, top, bottom, bottom, n);
   }
   api.shape(positions.splice(0), colors.splice(0), normals.splice(0));
@@ -69,7 +70,7 @@ export function buildIsland(api, theme = 'day') {
   for (let i = 0; i < 14; i++) {
     const [x, z] = edgePoint(angle(i * 5.3 + hash(i * 3.7) * 2), .96);
     if (!onIsland(x, z, .2) || Math.abs(z) < 3.3 && x > -6 && x < 5.5) continue;
-    asset('bush', { x, y: TOP - .02, z, yaw: i * 1.9, scale: .55 + hash(i * 2.1) * .35 });
+    asset('bush', { x, y: TOP - .02, z, yaw: i * 1.9, scale: .55 + hash(i * 2.1) * .35, tint: light });
   }
 
   STREAMS.forEach((course, s) => {
@@ -82,7 +83,7 @@ export function buildIsland(api, theme = 'day') {
     if (s) {
       const [x, z] = course[0];
       for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2 + s; asset(k % 2 ? 'rock-a' : 'rock-b', { x: x + Math.cos(a) * .5, y: TOP - .05, z: z + Math.sin(a) * .4, yaw: k, scale: .26 + hash(k + s * 5) * .16 }); }
-      asset('bush', { x: x - .55, y: TOP, z: z - .45, yaw: s, scale: .5 });
+      asset('bush', { x: x - .55, y: TOP, z: z - .45, yaw: s, scale: .5, tint: light });
     }
   });
 

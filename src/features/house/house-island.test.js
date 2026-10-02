@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { placeAsset } from '../../models/assets.js';
 import assert from 'node:assert/strict';
 import { onIsland, edgePoint, islandCliff, buildIsland, ISLAND, ISLAND_DEPTH, STREAMS, waterfalls } from './house-island.js';
 import { strataSteps, hangingRoots, landmassEdge, onLandmass } from './island-landform.js';
@@ -95,4 +96,31 @@ test('the grass lip is lit by the way each stretch of shore really faces, on the
     if (!onIsland(a[0], a[2], -.6)) flank++;
   }
   assert.ok(flank > 40, `only ${flank} lip faces on the forest shore`);
+});
+
+test('the grass rim dims and cools at dusk and in rain, so it does not glow against the lawn', () => {
+  const lip = theme => {
+    const shapes = [], quiet = () => {};
+    buildIsland({ box: quiet, ball: quiet, cylinder: quiet, prism: quiet, disc: quiet, orb: quiet, shape: (positions, colors, normals) => shapes.push({ colors, normals }) }, theme);
+    const [{ colors, normals }] = shapes, sum = [0, 0, 0];
+    let count = 0;
+    for (let v = 0; v < normals.length / 3; v++) if (normals[v * 3 + 1] < .9) { for (let k = 0; k < 3; k++) sum[k] += colors[v * 4 + k]; count++; }
+    return sum.map(value => value / count);
+  };
+  const day = lip('day'), dusk = lip('dusk'), rain = lip('rain');
+  assert.ok(dusk[1] < day[1] * .72 && dusk[2] / dusk[1] > day[2] / day[1] * 1.2, `dusk lip ${dusk}`);
+  assert.ok(rain[1] < day[1] * .9 && rain[1] > dusk[1], `rain lip ${rain}`);
+});
+
+test('the shore bushes take the dusk and rain light with the rim, so none stays lime against a dark lawn', () => {
+  const bush = placeAsset('bush'), size = bush.positions.length, plain = bush.colors.filter((_, i) => i % 4 === 1).reduce((sum, green) => sum + green, 0) / (bush.colors.length / 4);
+  const bushes = theme => {
+    const greens = [], quiet = () => {};
+    buildIsland({ box: quiet, ball: quiet, cylinder: quiet, prism: quiet, disc: quiet, orb: quiet, shape: (positions, colors) => { if (positions.length !== size) return; let green = 0; for (let v = 1; v < colors.length; v += 4) green += colors[v]; greens.push(green / (colors.length / 4)); } }, theme);
+    return greens;
+  };
+  const day = bushes('day'), dusk = bushes('dusk'), rain = bushes('rain');
+  const shore = day.map((green, i) => Math.abs(green - plain) < .001 ? i : -1).filter(i => i >= 0);
+  assert.ok(shore.length >= 12, `only ${shore.length} shore bushes`);
+  shore.forEach(i => { const green = day[i]; assert.ok(Math.abs(dusk[i] / green - .68) < .01, `bush ${i} at dusk ${dusk[i] / green}`); assert.ok(Math.abs(rain[i] / green - .84) < .01, `bush ${i} in rain ${rain[i] / green}`); });
 });

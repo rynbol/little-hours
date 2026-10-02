@@ -28,6 +28,7 @@ import { createIslandWater } from './house-water.js';
 import { createIslandGrass } from './house-grass.js';
 import { createIslandForest } from './island-forest.js';
 import { createChimneySmoke } from './house-smoke.js';
+import { createIslandRain } from './house-rain.js';
 import { createPainterly } from '../../models/painterly.js';
 import { ISLAND_ATMOSPHERES, ISLAND_SUN, islandSkyArt } from './island-atmosphere.js';
 import { nextExpansion, roomDisplayName } from '../../core/house.js';
@@ -76,6 +77,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const motes = MeshBuilder.CreateSphere('cottage-fireflies', { diameter: .045, segments: 3 }, scene);
   const motePaint = new StandardMaterial('cottage-firefly-light', scene); motePaint.disableLighting = true; motePaint.emissiveColor = Color3.FromHexString('#efd6a5'); motes.material = motePaint; motes.isPickable = false;
   const smoke = createChimneySmoke(scene, theme), smokeAt = new Vector3(), smokeLocal = new Vector3();
+  const rain = createIslandRain(scene, theme);
   const water = createIslandWater(scene, theme);
   const grass = createIslandGrass(scene, theme);
   const forest = createIslandForest(scene, theme);
@@ -161,6 +163,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       smokeLocal.fromArray(model.chimney.point); Vector3.TransformCoordinatesToRef(smokeLocal, model.chimney.node.getWorldMatrix(), smokeAt);
       smoke.animate(seconds, smokeAt, camera);
     }
+    if (rain.mesh.isEnabled()) rain.animate(seconds, engine.getRenderWidth() / engine.getRenderHeight());
     const readyBeforeDraw = scene.isReady();
     engine.beginFrame(); scene.render(); engine.endFrame(); renderCount++;
     // A shader may finish after its mesh was skipped during this draw.
@@ -233,7 +236,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       : { sky: '#ffffff', ground: '#a0a7a4', sun: theme === 'dusk' ? '#ead2ab' : '#fff3d9', fill: theme === 'dusk' ? .56 : .62, key: theme === 'dusk' ? .8 : .95 };
     sky.intensity = light.fill; sun.intensity = light.key;
     sky.diffuse = Color3.FromHexString(light.sky); sky.groundColor = Color3.FromHexString(light.ground);
-    sun.diffuse = Color3.FromHexString(light.sun); water.setTheme(theme); smoke.setTheme(theme);
+    sun.diffuse = Color3.FromHexString(light.sun); water.setTheme(theme); smoke.setTheme(theme); rain.setTheme(theme);
     painterly.setTheme(theme); grass.setTheme(theme); forest.setTheme(theme);
     const previous = model;
     builds++;

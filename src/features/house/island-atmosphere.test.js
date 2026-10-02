@@ -48,3 +48,12 @@ test('each sky island wears a grass cap over banded, side-shaded rock that holds
     assert.ok(opacities.every(o => o >= .8), `${theme} islands fade out: ${opacities}`);
   }
 });
+
+test('each cloud bank fades out at its base, with no hard cut line across the sky', () => {
+  for (const theme of ['day', 'dusk', 'rain']) {
+    const art = islandSkyArt(theme, 1440, 1000);
+    assert.equal(art.includes('clipPath'), false, `${theme} cuts a cloud on a straight line`);
+    assert.equal(art.match(/<mask id="island-bank-\d+"><rect [^>]*fill="url\(#island-bank-fade\)"/g)?.length, 4);
+    assert.match(art, /<linearGradient id="island-bank-fade" x1="0" y1="0" x2="0" y2="1"><stop offset="\.62" stop-color="#fff"\/><stop offset="1" stop-color="#000"\/>/);
+  }
+});
