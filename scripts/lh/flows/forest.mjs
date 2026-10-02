@@ -8,10 +8,15 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const arrive = app => app.waitFor(`(() => { const f = window.__littleHours.forest; return f.isOpen && Boolean(f.diagnostics()?.ready) && document.querySelector('#forest-status').hidden; })()`, { what: 'the forest to be built', timeout: 90000 });
 const leave = app => app.waitFor(`!window.__littleHours.forest.isOpen && !document.body.classList.contains('is-forest')`, { what: 'the island after the forest', timeout: 20000 });
 
-async function walk(app, key, code, ms) {
+const frames = async (app, count) => { const from = (await app.js(FOREST)).drawn; await app.waitFor(`window.__littleHours.forest.diagnostics().drawn >= ${from + count}`, { what: `${count} more forest frames`, timeout: 30000 }); };
+const STOPPED = `new Promise(done => { const read = () => { const d = window.__littleHours.forest.diagnostics(); return [d.walker.x, d.walker.z, d.drawn]; }; let last = read(), since = performance.now(); const poll = () => { const now = read(); if (now[0] !== last[0] || now[1] !== last[1]) { last = now; since = performance.now(); } else if (now[2] >= last[2] + 2 || performance.now() - since > 3000) return done(true); setTimeout(poll, 60); }; poll(); })`;
+
+async function walk(app, key, code, ms, least) {
   const from = (await app.js(FOREST)).walker;
-  await hold(app, key, code, true); await pause(ms); await hold(app, key, code, false);
-  await app.waitFor(`(() => { const d = window.__littleHours.forest.diagnostics(), a = d.walker; return new Promise(done => setTimeout(() => { const b = window.__littleHours.forest.diagnostics().walker; done(a.x === b.x && a.z === b.z); }, 120)); })()`, { what: 'the walker to coast to a stop', timeout: 10000 });
+  await hold(app, key, code, true); await pause(ms);
+  await app.waitFor(`(() => { const w = window.__littleHours.forest.diagnostics().walker; return Math.hypot(w.x - ${from.x}, w.z - ${from.z}) > ${least}; })()`, { what: `the walker to cover ${least} m`, timeout: 60000 });
+  await hold(app, key, code, false);
+  await app.waitFor(STOPPED, { what: 'the walker to coast to a stop', timeout: 30000 });
   const to = (await app.js(FOREST)).walker;
   return { from, to, east: to.x - from.x, south: to.z - from.z, far: Math.hypot(to.x - from.x, to.z - from.z) };
 }
@@ -33,20 +38,20 @@ export default {
     const ratio = await app.js(drawnRatio('forest'));
     check('the forest draws at the screen pixel ratio, capped at 2, or at 0.6 on a software renderer', Math.abs(ratio.drawn - ratioCeiling(ratio)) < 0.01, ratio);
     check('the hint names the keys, and the thumb stick stays away from mouse users', await app.visible('#forest-hint') && !await app.visible('#forest-stick'));
-    await pause(400);
+    await frames(app, 2);
     const idle = await app.js(FOREST);
     check('the forest keeps moving while the walker stands still', idle.drawn > start.drawn && idle.walker.x === start.walker.x, { before: start.drawn, after: idle.drawn });
 
-    const ahead = await walk(app, 'w', 'KeyW', 1500), facing = [Math.sin(ahead.from.yaw), -Math.cos(ahead.from.yaw)];
+    const ahead = await walk(app, 'w', 'KeyW', 1500, 2), facing = [Math.sin(ahead.from.yaw), -Math.cos(ahead.from.yaw)];
     const along = (ahead.east * facing[0] + ahead.south * facing[1]) / ahead.far;
     check('holding W walks the way the walker faces, at a walking pace, and letting go stops', ahead.far > 1.5 && ahead.far < 17 && along > 0.9, { far: ahead.far, along });
     check('the first step tucks the hint away', await app.js(`document.querySelector('#forest-hint').classList.contains('is-read')`));
-    const back = await walk(app, 's', 'KeyS', 800);
+    const back = await walk(app, 's', 'KeyS', 800, 0.8);
     check('S backs away', (back.east * facing[0] + back.south * facing[1]) < -0.5, back);
 
     const before = (await app.js(FOREST)).walker, middle = { x: app.width / 2, y: app.height / 2 };
     await app.drag(middle, { x: middle.x + 200, y: middle.y });
-    await pause(200);
+    await frames(app, 2);
     const turned = (await app.js(FOREST)).walker;
     check('dragging across the view turns the walker without moving them', Math.abs(Math.abs(turned.yaw - before.yaw) - 0.84) < 0.15 && turned.x === before.x && turned.z === before.z, { before: before.yaw, after: turned.yaw });
 
@@ -74,7 +79,7 @@ export default {
     await pause(600);
     const later = await still.js(FOREST);
     check('reduced motion: a still forest draws no further frames', later.drawn === rest.drawn, { rest: rest.drawn, later: later.drawn });
-    const stepped = await walk(still, 'w', 'KeyW', 800);
+    const stepped = await walk(still, 'w', 'KeyW', 800, 0.8);
     check('reduced motion: walking still moves the view and draws it', stepped.far > 0.5 && (await still.js(FOREST)).drawn > later.drawn, stepped);
     await still.close();
   },
