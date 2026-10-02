@@ -16,7 +16,7 @@ import '@babylonjs/core/Culling/ray.js';
 import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
 import { gardenPlantName } from '../../core/garden-plants.js';
 import { PLANT_SPOTS, gardenPlotAt } from './garden-model.js';
-import { RETREAT_SPOTS, RETREAT_BOUNDS, GARDEN_EXIT_TAG } from './garden-retreat.js';
+import { RETREAT_SPOTS, RETREAT_BOUNDS, GARDEN_EXIT_TAG, RETREAT_LIGHT } from './garden-retreat.js';
 import { createGardenButterflies } from './garden-butterflies.js';
 import { GARDEN_TAG } from './house-garden.js';
 import { POND_TAG } from './house-pond.js';
@@ -229,10 +229,11 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     grass.mesh.setEnabled(container.id === 'house-canvas' && selectedId !== 'orchard');
     forest.setEnabled(selectedId !== 'orchard');
     gardenRing.setEnabled(selectedId === 'orchard' && gardenPlot !== null); if (gardenPlot !== null) gardenRing.position.set(RETREAT_SPOTS[gardenPlot][0], .18, RETREAT_SPOTS[gardenPlot][1]);
-    const island = container.id === 'house-canvas' && selectedId !== 'orchard', light = ISLAND_ATMOSPHERES[theme];
-    sky.intensity = island ? light.fill : theme === 'dusk' ? .56 : .62; sun.intensity = island ? light.key : theme === 'dusk' ? .8 : .95;
-    sky.diffuse = Color3.FromHexString(island ? light.sky : '#ffffff'); sky.groundColor = Color3.FromHexString(island ? light.ground : '#a0a7a4');
-    sun.diffuse = Color3.FromHexString(island ? light.sun : theme === 'dusk' ? '#ead2ab' : '#fff3d9'); water.setTheme(theme); smoke.setTheme(theme);
+    const island = container.id === 'house-canvas' && selectedId !== 'orchard', light = island ? ISLAND_ATMOSPHERES[theme] : selectedId === 'orchard' ? RETREAT_LIGHT[theme]
+      : { sky: '#ffffff', ground: '#a0a7a4', sun: theme === 'dusk' ? '#ead2ab' : '#fff3d9', fill: theme === 'dusk' ? .56 : .62, key: theme === 'dusk' ? .8 : .95 };
+    sky.intensity = light.fill; sun.intensity = light.key;
+    sky.diffuse = Color3.FromHexString(light.sky); sky.groundColor = Color3.FromHexString(light.ground);
+    sun.diffuse = Color3.FromHexString(light.sun); water.setTheme(theme); smoke.setTheme(theme);
     painterly.setTheme(theme); grass.setTheme(theme); forest.setTheme(theme);
     const previous = model;
     builds++;

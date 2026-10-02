@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildGarden, edgeFlowers, treeSpot, LANTERNS, BEDS_FENCE, ARCH } from './house-garden.js';
+import { buildGarden, edgeFlowers, treeSpot, LANTERNS, ARCH } from './house-garden.js';
 import { buildPaths, pathStones, pathDistance, PATH_WIDTH } from './house-paths.js';
-import { PLANT_SPOTS } from './garden-model.js';
+import { PLANT_SPOTS, buildGardenPlants } from './garden-model.js';
+import { forestPathDistance, FOREST_PATH_WIDTH } from './island-forest.js';
 import { inPond } from './house-pond.js';
 import { onIsland } from './house-island.js';
 import { STROLL } from './house-stroll.js';
@@ -14,6 +15,8 @@ const counting = () => {
   } });
   return { calls, api };
 };
+const shapes = build => { const out = []; build(new Proxy({}, { get: (_, name) => (...args) => { if (name === 'shape') out.push({ positions: args[0], colors: args[1], normals: args[2] }); } })); return out; };
+const RESTS = [[5.6, 3.3], [9.55, 1.6], [7.85, 1.75], [6.35, 3.2]];
 
 test('lanterns stand at the path edge, dry and on the island', () => {
   for (const [x, z] of LANTERNS) {
@@ -27,7 +30,9 @@ test('the arbour straddles the path so the walk passes under it', () => {
   const [x, z] = ARCH;
   assert.ok(pathDistance(x, z) < .1);
   for (const side of [-.56, .56]) assert.ok(pathDistance(x, z + side) > PATH_WIDTH / 2, 'an arbour post blocks the path');
-  assert.ok(STROLL.every(([sx, sz]) => Math.hypot(sx - x, sz - z) > .35), 'a stroll stop stands inside the arbour, hidden by its posts');
+  for (const rest of RESTS) assert.ok(STROLL.some(([sx, sz]) => sx === rest[0] && sz === rest[1]), `${rest} is no longer a stroll stop`);
+  assert.ok(RESTS.every(([sx, sz]) => Math.hypot(sx - x, sz - z) > 1.2), 'the avatar rests beside the arbour, hidden by its posts');
+  for (const [i] of Array.from({ length: 24 }).entries()) assert.ok(Math.hypot(treeSpot(i)[0] - x, treeSpot(i)[1] - z) > 1.2, `tree ${i} grows into the arbour`);
 });
 
 test('wildflowers line the paths without growing on them, in the pond or off the edge', () => {
@@ -39,16 +44,25 @@ test('wildflowers line the paths without growing on them, in the pond or off the
   }
 });
 
-test('the bed fence rings the plots, leaves a gate and keeps clear of beds and trees', () => {
-  const posts = BEDS_FENCE.filter(Boolean);
-  assert.equal(BEDS_FENCE.filter(post => post === null).length, 1, 'one gate');
-  for (const [x, z] of posts) {
-    const nearest = Math.min(...PLANT_SPOTS.map(([px, pz]) => Math.hypot(x - px, z - pz)));
-    assert.ok(nearest > .62, `post ${x}, ${z} cuts into a bed`);
-    for (let i = 0; i < 24; i++) assert.ok(Math.hypot(x - treeSpot(i)[0], z - treeSpot(i)[1]) > .3, `post ${x}, ${z} stands in tree ${i}`);
+test('the walk into the forest stays open past the garden fence and grounds', () => {
+  const pieces = [...shapes(api => buildGardenPlants(api, [])), ...shapes(api => buildGarden(api, [], 'day', []))];
+  assert.ok(pieces.length >= 2);
+  for (const { positions } of pieces) for (let i = 0; i < positions.length; i += 3) {
+    assert.ok(forestPathDistance(positions[i], positions[i + 2]) > FOREST_PATH_WIDTH / 2 + .15, `${positions[i]}, ${positions[i + 2]} stands on the forest trail`);
   }
-  const xs = posts.map(([x]) => x), zs = posts.map(([, z]) => z);
-  for (const [px, pz] of PLANT_SPOTS) assert.ok(px > Math.min(...xs) && px < Math.max(...xs) && pz > Math.min(...zs) && pz < Math.max(...zs));
+});
+
+test('lanterns and string lights glow amber at dusk and softly in rain, lit evenly from every side', () => {
+  const glowing = theme => {
+    const [{ colors, normals }] = shapes(api => buildGarden(api, [], theme, [])), lit = [];
+    for (let i = 0; i < colors.length; i += 4) if (colors[i] > 1.1) lit.push([colors[i], colors[i + 1], colors[i + 2], normals[i / 4 * 3 + 1]]);
+    return lit;
+  };
+  const dusk = glowing('dusk'), rain = glowing('rain');
+  assert.ok(dusk.length > 300, `${dusk.length} glowing vertices at dusk`);
+  for (const [r, g, b, up] of dusk) { assert.ok(g / r < .55 && b / r < .25, `a dusk light reads ${r}, ${g}, ${b}`); assert.equal(up, 1); }
+  assert.ok(rain.length > 300 && rain.every(([r, g, b]) => r < 1.3 && g / r > .6 && g / r < .8 && b / r < .5), 'rain lights are soft and warm');
+  assert.equal(glowing('day').length, 0);
 });
 
 test('path stones are set inside the path', () => {

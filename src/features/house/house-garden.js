@@ -3,15 +3,15 @@ import { placeAsset } from '../../models/assets.js';
 import { onIsland, STREAMS } from './house-island.js';
 import { inPond, DOCK } from './house-pond.js';
 import { pathDistance, PATH_LINES, PATH_WIDTH } from './house-paths.js';
-import { groundsKit, lanternPost, stringLights, railFence, gardenBench, barrelPlanter, wildflowers, groundsHash } from './grounds-kit.js';
+import { groundsKit, lanternPost, stringLights, gardenBench, barrelPlanter, wildflowers, groundsHash } from './grounds-kit.js';
 
 export const GARDEN_CENTER = [8.9, 0, 0];
 export const GARDEN_TAG = [8.2, -.15, -2.2];
 const GROUND = -.175, soil = '#8a6a4f';
-const lampGlow = theme => theme === 'dusk' ? ['#ffd88f', 3.6] : theme === 'rain' ? ['#f0d9a4', 2.2] : ['#f6e4b8', 1.15];
+const lampGlow = theme => theme === 'dusk' ? ['#ff7a30', 1.65] : theme === 'rain' ? ['#ffb66d', 1.18] : ['#f2c799', 1];
 const hash = n => { const s = Math.sin(n * 57.3 + 9.1) * 43758.5453; return s - Math.floor(s); };
 export const ARBOUR = [6.35, 3.2], BENCH = [7.55, 1.05], NEST = [11.55, -2.35];
-export const ARCH = [ARBOUR[0] - .4, ARBOUR[1]];
+export const ARCH = [8.86, 3.17];
 
 const clear = (x, z) => onIsland(x, z, .55) && !inPond(x, z, .7)
   && !(Math.abs(x - DOCK.x) < .75 && z > DOCK.to - .2)
@@ -35,9 +35,8 @@ function tree(api, x, z, growth, seed) {
   api.shape(positions, colors, normals, indices);
 }
 
-export const LANTERNS = [[-1.1, 4.05, 0], [1.7, 4.12, Math.PI], [4.4, 3.88, 0], [7.85, 3.78, Math.PI], [8.95, 2.6, 0]];
-export const BEDS_FENCE = [[5.85, -4.05], [5.85, -3.05], [5.85, -2.12], [5.85, -1.2], [6.4, -1.2], [6.9, -1.2], null, [7.6, -1.2], [8.1, -1.2], [8.75, -1.2], [9.4, -1.2], [10.12, -1.2], [10.12, -2.12], [10.12, -3.05], [10.12, -4.05]];
-const PLANTERS = [[5.3, 3.9], [8.6, 3.78]];
+export const LANTERNS = [[-1.1, 4.05, 0], [1.7, 4.12, Math.PI], [4.4, 3.88, 0], [7.85, 3.78, Math.PI]];
+const PLANTERS = [[4.95, 3.98]];
 const wilds = ['#f4eedb', '#eab0b6', '#f3d27a', '#b9a3dc', '#f6c49a'];
 
 export function edgeFlowers() {
@@ -89,7 +88,7 @@ function stumpTable(kit, x, z, glow) {
   kit.blob(x - .05, GROUND + .4, z + .02, .12, .1, .12, '#f0e6d2', 1, { rows: 3, sides: 7 });
   kit.beam([x + .01, GROUND + .41, z + .02], [x + .08, GROUND + .44, z + .02], .02, .02, '#f0e6d2');
   kit.blob(x + .08, GROUND + .37, z - .06, .07, .05, .07, '#e9ddc8', 1, { rows: 2, sides: 6 });
-  kit.blob(x + .05, GROUND + .44, z + .08, .06, .09, .06, glow[0], glow[1], { rows: 2, sides: 5 });
+  kit.blob(x + .05, GROUND + .44, z + .08, .06, .09, .06, glow[0], glow[1], { rows: 2, sides: 5, glowing: true });
 }
 
 function signpost(kit, x, z) {
@@ -107,15 +106,12 @@ export function buildGarden(api, trees, theme, plants = []) {
   stumpTable(kit, bx - .66, bz + .46, glow);
   for (const [x, z, yaw] of LANTERNS) lanternPost(kit, x, GROUND, z, glow, { yaw, seed: x * 3, height: 1.2 });
   const [ax, az] = ARCH;
-  stringLights(kit, [[LANTERNS[2][0], GROUND + 1.15, LANTERNS[2][1]], [ax, GROUND + 1.2, az + .62], [LANTERNS[3][0], GROUND + 1.15, LANTERNS[3][1]]], glow, { sag: .16 });
   stringLights(kit, [[LANTERNS[0][0], GROUND + 1.15, LANTERNS[0][1]], [LANTERNS[1][0], GROUND + 1.15, LANTERNS[1][1]], [LANTERNS[2][0], GROUND + 1.15, LANTERNS[2][1]]], glow, { sag: .2 });
-  railFence(kit, BEDS_FENCE.slice(0, 6), GROUND, { seed: 1 });
-  railFence(kit, BEDS_FENCE.slice(7), GROUND, { seed: 9 });
-  for (const [x, z] of [BEDS_FENCE[5], BEDS_FENCE[7]]) kit.post(x, GROUND, z, .66, .06, '#7a5b40', { sides: 5, taper: .9, seed: x });
+  stringLights(kit, [[LANTERNS[2][0], GROUND + 1.15, LANTERNS[2][1]], [LANTERNS[3][0], GROUND + 1.15, LANTERNS[3][1]], [ax, GROUND + 1.2, az + .62]], glow, { sag: .16 });
   PLANTERS.forEach(([x, z], i) => barrelPlanter(kit, x, GROUND, z, { seed: i * 3 }));
   signpost(kit, -3.35, 3.55);
   for (const [x, z, seed] of edgeFlowers()) wildflowers(kit, x, GROUND, z, seed, { palette: wilds, count: 5 + seed % 3, height: .34 });
-  [[6.9, 2.55], [8.35, 2.7], [7.1, -.4], [11.95, .9], [11.2, 3.05], [6.2, -.55], [10.4, -.85]].forEach(([x, z], i) => wildflowers(kit, x, GROUND, z, i * 7, { palette: wilds, count: 8, spread: .26, height: .36 }));
+  [[6.9, 2.55], [7.1, -.4], [11.95, .9], [11.2, 3.05], [6.2, -.55], [10.4, -.85]].forEach(([x, z], i) => wildflowers(kit, x, GROUND, z, i * 7, { palette: wilds, count: 8, spread: .26, height: .36 }));
   kit.flush(api);
 
   const [nx, nz] = NEST;

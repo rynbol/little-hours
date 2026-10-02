@@ -54,8 +54,8 @@ export function groundsKit() {
       });
       solid([ring(y, .86), ring(y - thick * .35, 1), ring(y - thick, 1.04)], hex, [x, y - thick * 2, z], { top: light * 1.04 });
     },
-    blob(x, y, z, w, h, d, hex, light = 1, { rows = 3, sides = 6, seed = 0 } = {}) {
-      const rings = [];
+    blob(x, y, z, w, h, d, hex, light = 1, { rows = 3, sides = 6, seed = 0, glowing = false } = {}) {
+      const rings = [], first = normals.length;
       for (let r = 0; r <= rows; r++) {
         const phi = r / rows * Math.PI, level = y + Math.cos(phi) * h / 2, spread = Math.sin(phi);
         rings.push(Array.from({ length: sides }, (_, i) => { const a = (i + r * .5) / sides * Math.PI * 2 + seed; return [x + Math.cos(a) * w / 2 * spread, level, z + Math.sin(a) * d / 2 * spread]; }));
@@ -68,6 +68,7 @@ export function groundsKit() {
         else if (r === rows - 1) tri(a, b, e, shade, sub(a, center));
         else quad(a, b, c, e, shade, sub([0, 1, 2].map(k => (a[k] + c[k]) / 2), center));
       }
+      if (glowing) for (let i = first; i < normals.length; i += 3) normals.splice(i, 3, 0, 1, 0);
     },
     patch(points, y, hex, light = 1) {
       const middle = [points.reduce((s, p) => s + p[0], 0) / points.length, y, points.reduce((s, p) => s + p[1], 0) / points.length];
@@ -101,7 +102,7 @@ export function groundsKit() {
 
 const footStone = '#b3ab97';
 
-export function lanternPost(kit, x, y, z, [glow, strength], { yaw = 0, height = 1.05, seed = 0, wood: lanternWood = '#866244', iron: lanternIron = '#3f3a33' } = {}) {
+export function lanternPost(kit, x, y, z, [glow, strength], { yaw = 0, height = 1.05, seed = 0, wood: lanternWood = '#a07a54', iron: lanternIron = '#3f3a33' } = {}) {
   const ax = Math.cos(yaw), az = Math.sin(yaw), lean = (groundsHash(seed) - .5) * .05;
   kit.slab(x, y + .05, z, .17, .07, footStone, { sides: 6, seed });
   kit.post(x, y, z, height, .055, lanternWood, { sides: 5, taper: .8, lean: [lean, -lean * .6], seed });
@@ -115,7 +116,7 @@ export function lanternPost(kit, x, y, z, [glow, strength], { yaw = 0, height = 
   const [hx, hy, hz] = hang, body = .19;
   kit.post(hx, hy - .045, hz, .045, .03, lanternIron, { sides: 4, taper: .3, seed: Math.PI / 4 });
   kit.post(hx, hy - .075, hz, .045, .13, lanternIron, { sides: 4, taper: .35, seed: Math.PI / 4 });
-  kit.blob(hx, hy - .075 - body / 2, hz, .12, body * .95, .12, glow, strength, { rows: 3, sides: 6 });
+  kit.blob(hx, hy - .075 - body / 2, hz, .12, body * .95, .12, glow, strength, { rows: 3, sides: 6, glowing: true });
   for (const [u, w] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) kit.beam([hx + u * .058, hy - .075, hz + w * .058], [hx + u * .058, hy - .075 - body, hz + w * .058], .016, .016, lanternIron);
   kit.slab(hx, hy - .075 - body, hz, .07, .025, lanternIron, { sides: 4, seed: 1 });
 }
@@ -130,7 +131,7 @@ export function stringLights(kit, points, [glow, strength], { sag = .22, spacing
     for (let i = 1; i < count; i++) {
       const [x, y, z] = at(i / count);
       kit.beam([x, y, z], [x, y - .05, z], .012, .012, wire);
-      kit.blob(x, y - .085, z, .085, .1, .085, glow, strength * (i % 3 === 1 ? 1.06 : 1), { rows: 2, sides: 5 });
+      kit.blob(x, y - .085, z, .085, .1, .085, glow, strength * (i % 3 === 1 ? 1.06 : 1), { rows: 2, sides: 5, glowing: true });
       bulbs.push([x, y - .085, z]);
     }
   }

@@ -6,7 +6,7 @@ export const gardenPlotAt = (x, z, spots = PLANT_SPOTS, radius = .6) => spots.fi
 
 export function buildGardenPlants(api, plants) {
   const fence = groundsKit();
-  railFence(fence, Array.from({ length: 7 }, (_, i) => [5.85 + i * .712, -4.05]), -.175, { seed: 5 });
+  railFence(fence, Array.from({ length: 7 }, (_, i) => [6.15 + i * .662, -4.05]), -.175, { seed: 5 });
   fence.flush(api);
   for (const x of [5.8, 10.35]) {
     api.box(x, .6, -4.05, .1, 1.65, .1, '#b89a71');

@@ -55,9 +55,10 @@ test('string lights hang below their anchors and carry a glowing bulb every spac
 test('a lantern post stands its glass beside the post, not on top of it', () => {
   const kit = groundsKit();
   lanternPost(kit, 0, 0, 0, ['#ffd88f', 2.1], { yaw: 0 });
-  const { positions, colors } = kit.data, lit = [];
+  const { positions, colors, normals } = kit.data, lit = [];
   for (let i = 0; i < colors.length; i += 4) if (colors[i] > 1.5) lit.push(positions.slice(i / 4 * 3, i / 4 * 3 + 3));
   assert.ok(lit.length > 10);
+  for (let i = 0; i < colors.length; i += 4) if (colors[i] > 1.5) assert.deepEqual(normals.slice(i / 4 * 3, i / 4 * 3 + 3), [0, 1, 0], 'a side of the glass falls into shade');
   assert.ok(lit.every(([x, y]) => x > .22 && x < .4 && y > .6 && y < 1), JSON.stringify(lit[0]));
   assert.ok(Math.max(...positions.filter((_, i) => i % 3 === 1)) < 1.15);
 });
