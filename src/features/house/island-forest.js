@@ -5,7 +5,8 @@ import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import { createTreePaint, treeModel, TREE_FORMS, CROWN_TOPS } from '../../models/world/trees.js';
 import { WORLD_ATMOSPHERES } from '../../models/world/atmosphere.js';
 import { placeAsset } from '../../models/assets.js';
-import { ISLAND, FOREST_REACH, edgePoint, forestBulge, ringGrid, addBody, rgba } from './island-landform.js';
+import { ISLAND, FOREST_REACH, edgePoint, forestBulge } from './island-landform.js';
+import { ringGrid, addBody, rgba } from '../../models/landform.js';
 import { ISLAND_SUN } from './island-atmosphere.js';
 
 export const FOREST_PATH = Object.freeze([

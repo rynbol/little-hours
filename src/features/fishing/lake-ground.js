@@ -1,5 +1,6 @@
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
+import { strataBody, strataSteps, spire, shadeBody } from '../../models/landform.js';
 
 export const POND = { x: 0, z: -3.2, rx: 8.6, rz: 7.2 };
 export const pondRim = (a, k) => [POND.x + Math.cos(a) * POND.rx * k, POND.z + Math.sin(a) * POND.rz * k];
@@ -14,8 +15,10 @@ export function meadowTone(x, z) {
   return .5 + Math.sin(x * .47 + Math.sin(z * .29)) * .2 + Math.sin(z * .53 - x * .16) * .16 + Math.sin(x * 1.1 + z * .7) * .035;
 }
 
-const EDGE = [[1.006, .12, 0], [1.012, .03, 1], [1.006, -.3, 2], [.99, -.95, 3], [.955, -1.5, 4], [.89, -1.9, 5], [.74, -2.18, 6]];
-const EARTH = ['#8f9d6c', '#b9a98a', '#b3a488', '#a6987e', '#978d77', '#8a8570', '#7f7c69'];
+const LIP = [[1.006, .12, .94], [1.012, .02, .86], [1.008, -.17, .68]];
+const SPIRES = [[-5.2, -5.4, 3.2, 1.5], [3.4, -1.6, 3.8, 1.8], [8.6, -5.8, 2.6, 1.3], [-.6, -8.2, 2.4, 1.2], [-9.4, -1.2, 2.2, 1.1], [1.2, 2.6, 2, 1], [-3.8, 1.4, 1.7, .9]];
+export const LAKE_DEPTH = -6.4;
+export const LAKE_POSTS = Object.freeze([[-.72, 1.02], [-.72, 5.2], [.72, 5.2], pondRim(1.45, 1.16), pondRim(1.18, 1.15)].map(Object.freeze));
 
 export function plotReach(a) {
   return 1.6 + Math.sin(a * 3 + .7) * .03 + Math.sin(a * 7 + 2) * .012;
@@ -29,7 +32,7 @@ export function createLakeBank(palette) {
   const shore = [.97, 1.015, 1.035, 1.06, 1.085, 1.12], spans = 16, segments = 160;
   const positions = [], colors = [], indices = [], normals = [];
   const grass = Color3.FromHexString(palette.grass), meadow = Color3.FromHexString(palette.meadow), sand = Color3.FromHexString(palette.sand);
-  const rings = shore.length + spans + EDGE.length;
+  const rings = shore.length + spans + LIP.length;
   for (let r = 0; r < rings; r++) for (let i = 0; i < segments; i++) {
     const a = i / segments * Math.PI * 2, reach = plotReach(a), ripple = Math.sin(a * 5 + 1) * .014 + Math.sin(a * 9 - .4) * .009;
     let k, y, c;
@@ -43,20 +46,17 @@ export function createLakeBank(palette) {
       const [x, z] = pondRim(a, k);
       c = Color3.Lerp(meadow, grass, meadowTone(x, z));
     } else {
-      const [scale, level, tone] = EDGE[r - shore.length - spans], fold = level < -.2 ? Math.sin(a * 23 + level * 3) * .012 + Math.sin(a * 41 - level) * .006 : 0;
-      k = reach * (scale + fold); y = level;
-      c = Color3.FromHexString(EARTH[tone]).scale(level < -.2 ? 1 + Math.sin(a * 11 + level * 2) * .035 : 1);
+      const [scale, level, shade] = LIP[r - shore.length - spans], [x, z] = pondRim(a, reach);
+      k = reach * scale; y = level - (level < 0 ? Math.max(0, Math.sin(i * Math.PI / 4 + hash(Math.floor(i / 8)) * 2)) ** 2 * .16 * (.5 + hash(i * 2.9) * .5) : 0);
+      c = Color3.Lerp(meadow, grass, meadowTone(x, z)).scale(shade);
     }
     const [x, z] = pondRim(a, k);
     positions.push(x, y, z); colors.push(c.r, c.g, c.b, 1);
     if (r) { const n = r * segments + i, m = r * segments + (i + 1) % segments; indices.push(n - segments, n, m - segments, m - segments, n, m); }
   }
-  const basin = positions.length / 3, last = (rings - 1) * segments;
-  positions.push(POND.x, -.5, POND.z, POND.x, -2.24, POND.z); colors.push(...colors.slice(0, 4), ...colors.slice(-4));
-  for (let i = 0; i < segments; i++) {
-    const j = (i + 1) % segments;
-    indices.push(basin, j, i, basin + 1, last + i, last + j);
-  }
+  const basin = positions.length / 3;
+  positions.push(POND.x, -.5, POND.z); colors.push(...colors.slice(0, 4));
+  for (let i = 0; i < segments; i++) indices.push(basin, (i + 1) % segments, i);
   VertexData.ComputeNormals(positions, indices, normals);
   return { positions, colors, indices, normals };
 }
@@ -73,38 +73,39 @@ export function lakeWater(rings = 14, segments = 96) {
   return { positions, indices };
 }
 
-export function lakeGrassSpots() {
-  const spots = [];
-  for (let row = 0; row < 40; row++) for (let column = 0; column < 46; column++) {
-    const seed = row * 47 + column, x = -18 + column * .8 + (hash(seed + 5) - .5) * .6, z = -19 + row * .8 + (hash(seed + 11) - .5) * .6;
-    const radius = radiusAt(x, z);
-    if (radius < 1.13 || !onPlot(x, z, .12) || hash(seed + 87) > .45 + smooth((meadowTone(x, z) - .4) * 2.5) * .45) continue;
-    if (Math.abs(x) < 1.25 && z > .5 && z < 6.8) continue;
-    if (POND_PATH.some(([px, pz]) => Math.hypot(x - px, z - pz) < .72)) continue;
-    if ([[2.39, 4.61, 1.2], [POND_EXIT.x, POND_EXIT.z, 1.7], [7.4, 3.2, 1], [-4.3, -11.5, 3.6]].some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r)) continue;
-    spots.push({ x, z, seed });
-  }
-  return spots;
+export function lakeCliff(theme = 'day') {
+  const rock = ['#8f8584', '#7a7579', '#8a8388', '#6b686f', '#5d5b63'];
+  return [
+    strataBody({ edge: a => pondRim(a, plotReach(a) * .992), segments: 144, strata: strataSteps(-.2, LAKE_DEPTH).map(step => ({ ...step, scale: step.scale ** .4 })), keel: [POND.x + .8, POND.z - .6, LAKE_DEPTH], seed: 7 }),
+    ...SPIRES.map(([x, z, length, radius], i) => spire({ x, z, top: LAKE_DEPTH * .6, length: length + 1, radius, colors: rock, seed: i * 3.1 + 1 })),
+  ].map(body => shadeBody(body, theme));
 }
 
-export function createLakeGrass(palette) {
-  const positions = [], colors = [], indices = [], normals = [];
-  const root = Color3.FromHexString(palette.meadow).scale(.96), tip = Color3.FromHexString(palette.grass).scale(1.08);
-  for (const { x, z, seed } of lakeGrassSpots()) for (let blade = 0; blade < 3; blade++) {
-    const a = seed * 2.4 + blade * 2.1, dx = Math.cos(a), dz = Math.sin(a), width = .025 + hash(seed + blade * 5) * .018;
-    const h = .1 + hash(seed * 3 + blade * 7) * .14, bend = .04 + hash(seed + blade) * .07, offset = (blade - 1) * .055;
-    const cx = x + dx * offset, cz = z + dz * offset, y = .148;
-    const points = [[cx - dz * width, y, cz + dx * width], [cx + dz * width, y, cz - dx * width], [cx + dx * bend * .3 - dz * width * .6, y + h * .55, cz + dz * bend * .3 + dx * width * .6], [cx + dx * bend * .3 + dz * width * .6, y + h * .55, cz + dz * bend * .3 - dx * width * .6], [cx + dx * bend, y + h, cz + dz * bend]];
-    for (const side of [1, -1]) {
-      const start = positions.length / 3;
-      points.forEach((p, i) => { positions.push(...p); const c = Color3.Lerp(root, tip, i < 2 ? 0 : i < 4 ? .65 : 1); colors.push(c.r, c.g, c.b, 1); });
-      for (const tri of [[0, 1, 2], [1, 3, 2], [2, 3, 4]]) indices.push(...(side === 1 ? tri : tri.toReversed()).map(i => i + start));
-    }
+export function lakeFrame() {
+  return Array.from({ length: 48 }, (_, i) => { const a = i / 48 * Math.PI * 2, [x, z] = pondRim(a, plotReach(a) * .8); return [x, -3.6, z]; }).flat();
+}
+
+const CLEARINGS = [[2.39, 4.61, 1.2], [POND_EXIT.x, POND_EXIT.z, 1.2], [-4.3, -11.5, 3.6]];
+export function lakeGrassy(x, z) {
+  return radiusAt(x, z) > 1.135 && onPlot(x, z, .03)
+    && !(Math.abs(x) < 1 && z > .5 && z < 6.4)
+    && POND_PATH.every(([px, pz]) => Math.hypot(x - px, z - pz) > .36)
+    && CLEARINGS.every(([px, pz, r]) => Math.hypot(x - px, z - pz) > r);
+}
+
+export const LAKE_GRASS = Object.freeze({ tries: 78000, rim: 1500, ground: .148 });
+export function lakeBlades() {
+  const blades = [], { tries, rim, ground } = LAKE_GRASS;
+  for (let i = 0; i < tries; i++) {
+    const x = -14.6 + hash(i * 1.07 + 3) * 29.2, z = -15.4 + hash(i * 2.31 + 9) * 24.4;
+    if (!lakeGrassy(x, z)) continue;
+    const patch = (meadowTone(x, z) - .5) * 2.2;
+    blades.push({ x, z, ground, height: (.13 + .17 * hash(i * 3.3)) * (.85 + patch * .15), lean: hash(i * 5.1) * Math.PI * 2, tone: hash(i * 7.7), patch });
   }
-  VertexData.ComputeNormals(positions, indices, normals);
-  for (let i = 0; i < normals.length; i += 3) {
-    const x = normals[i] * .25, z = normals[i + 2] * .25, length = Math.hypot(x, .9, z);
-    normals[i] = x / length; normals[i + 1] = .9 / length; normals[i + 2] = z / length;
+  for (let i = 0; i < rim; i++) {
+    const a = (i + hash(i * 2.7) * .8) / rim * Math.PI * 2, reach = plotReach(a), [x, z] = pondRim(a, reach * (1.004 - hash(i * 4.3) * .004)), [ox, oz] = pondRim(a, reach * 1.03), height = .16 + hash(i * 6.1) * .22;
+    const out = Math.hypot(ox - x, oz - z), dx = (ox - x) / out, dz = (oz - z) / out;
+    blades.push({ x, z, ground: .1, height, lean: Math.atan2(dx, -dz), tone: hash(i * 7.9), patch: .2 + hash(i * 1.1) * .5, drop: [dx * height * .7, -height * (.55 + hash(i * 3.9) * .5), dz * height * .7] });
   }
-  return { positions, colors, indices, normals };
+  return blades;
 }

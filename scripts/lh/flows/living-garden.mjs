@@ -6,6 +6,13 @@ export default {
     await t.steps.openHouse(app); await app.clickSel('#house-open-garden'); await app.settle();
     check('the house page opens the garden', await app.text('#house-detail h2') === 'Your garden');
     check('an empty garden arrives without a seed card or a spots shelf', !await app.visible('#garden-card') && !await app.visible('#garden-spots'));
+    const bare = await app.js(`(() => { const scene = window.__littleHours.house.diagnostics().scene, markers = scene.getMeshByName('house-retreat-markers'), flora = scene.getMeshByName('garden-flora'); return { markers: markers?.isEnabled() ? markers.getTotalVertices() : 0, flora: Boolean(flora?.isEnabled()) }; })()`);
+    check('every empty bed shows a seed marker and no plant', bare.markers === 6 * 90 && !bare.flora, bare);
+    const pinShown = () => app.js(`getComputedStyle(document.querySelector('#garden-spot-0 .house-pin')).opacity`);
+    await app.move(4, 4); await sleep(350);
+    const resting = await pinShown(), bed = await app.point({ gardenPlot: 0 });
+    await app.move(bed.x, bed.y); await sleep(350);
+    check('the plus on a bed stays hidden until the pointer reaches the bed', resting === '0' && await pinShown() === '1', { resting, bed });
     await app.clickSel('#garden-spot-0'); await app.clickSel('#seed-moonflower'); await sleep(400); await t.shot(app, 'seeds');
     await app.clickSel('#garden-plant-seed');
     await app.waitFor(`(JSON.parse(localStorage.getItem('little-hours-v1') || 'null')?.garden?.plants.length === 1)`, { what: 'the first seed to save' }).catch(() => null);
@@ -48,6 +55,13 @@ export default {
       }
       const pair = await garden.js(`(() => { const d = window.__littleHours.house.diagnostics(); return { visible: d.scene.getTransformNodeByName('house-stroll').isEnabled(), avatar: Boolean(d.stroll), pet: Boolean(d.strollPet), home: d.scene.getMeshByName('house-retreat-exit').isEnabled() }; })()`);
       check(`${phone ? 'phone' : 'desktop'}: the garden includes you, your pet and the island gate`, pair.visible && pair.avatar && pair.pet && pair.home, pair);
+      const look = await garden.js(`(() => { const scene = window.__littleHours.house.diagnostics().scene, grass = scene.getMeshByName('garden-grass'), sky = document.querySelector('.island-sky'); return { blades: grass?.isEnabled() ? grass.getTotalVertices() / 3 : 0, sky: Boolean(sky?.querySelector('svg')) && !sky.hidden && getComputedStyle(sky).display !== 'none' }; })()`);
+      check(`${phone ? 'phone' : 'desktop'}: the garden floats under the island sky on a lawn of wind grass`, look.blades > 8000 && look.sky, look);
+      const beds = await garden.js(`(() => { const scene = window.__littleHours.house.diagnostics().scene, flora = scene.getMeshByName('garden-flora'); return { plants: flora?.isEnabled() ? flora.getTotalVertices() : 0, wind: Boolean(flora?.isVerticesDataPresent('grassBlade')), markers: Boolean(scene.getMeshByName('house-retreat-markers')) }; })()`);
+      check(`${phone ? 'phone' : 'desktop'}: six blooming plants stand in the beds, sway with the wind and leave no seed markers`, beds.plants > 12000 && beds.wind && !beds.markers, beds);
+      await garden.move(4, 4);
+      const shown = await garden.waitFor(`getComputedStyle(document.querySelector('#garden-spot-0 .house-pin')).opacity === '1' && getComputedStyle(document.querySelector('#garden-spot-1 .house-pin')).opacity === (matchMedia('(hover: hover)').matches ? '0' : '1')`, { what: 'the selected pin to show alone' }).catch(() => false);
+      check(`${phone ? 'phone' : 'desktop'}: the selected bed keeps its pin showing while the pointer is away`, shown);
       await sleep(400); await t.shot(garden, phone ? 'phone-bloom' : 'bloom');
       if (phone) {
         await sleep(1600); const before = (await garden.house()).renderCount; await sleep(700);

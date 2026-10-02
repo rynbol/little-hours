@@ -12,13 +12,13 @@ import { bondLevel } from '../../core/pet-bonds.js';
 import { petEntry } from '../../core/pets.js';
 import { createPetModel } from '../pet/index.js';
 import { createWildsWorld, wildsAtmosphere } from '../../models/wilds/world.js';
-import { loadWildsAvatar } from '../../models/wilds/avatar.js';
+import { createWildsPlayer } from '../../models/wilds/player.js';
 import { createWildsInput } from './input.js';
 import { createWildsCamera } from './camera.js';
 import { createWildsHud } from './hud.js';
 
 const SKY = { day: '#BFD9E8', dusk: '#D3B7C9', rain: '#A2B2BD' };
-const DEFAULTS = { createWorld: createWildsWorld, loadAvatar: loadWildsAvatar, createInput: createWildsInput, createCamera: createWildsCamera, createHud: createWildsHud, createCombatModels: (...args) => import('../../models/wilds/combat-models.js').then(module => module.createCombatModels(...args)) };
+const DEFAULTS = { createWorld: createWildsWorld, loadAvatar: createWildsPlayer, createInput: createWildsInput, createCamera: createWildsCamera, createHud: createWildsHud, createCombatModels: (...args) => import('../../models/wilds/encounter.js').then(module => module.createEncounter(...args)) };
 
 export function createWildsView(engine, canvas, state, now = clockNow, dependencies = DEFAULTS, { onProgress } = {}) {
   dependencies = { ...DEFAULTS, ...dependencies };

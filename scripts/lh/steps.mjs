@@ -1,5 +1,6 @@
 import { sleep } from './chrome.mjs';
 import { dispatchSequenceInput } from './sequence.mjs';
+import { wildsShotView } from './wilds-shots.mjs';
 
 export const steps = {
   async houseRooms(app) { if (await app.js(`Boolean(document.getElementById('house-room-menu') && !document.getElementById('house-room-menu').matches(':popover-open'))`)) await app.clickSel('#house-rooms-toggle'); },
@@ -52,7 +53,8 @@ export const cycles = {
 };
 
 export const views = {
-  'wilds-style': { about: 'the single Forest style frame', scene: 'wilds', settings: { path: '/checks/wilds-style.html', storageKey: 'little-hours-wilds-style-v1' }, async go(app) { await app.waitFor('window.__littleHours.wilds.ready()', { what: 'the style frame to render', timeout: 60000 }); } },
+  'wilds-player': wildsShotView('player'),
+  'wilds-grass': wildsShotView('grass'),
   wilds: { about: 'the Wilds forest and exploration view', settings: { path: '/checks/wilds.html', storageKey: 'little-hours-wilds-check-v1' }, async go(app) { await app.waitFor('window.__littleHours.wilds.ready()', { what: 'the Wilds to render' }); } },
   garden: { about: 'the personal garden, or the whole house on older refs', async go(app) { await steps.openHouse(app); if (await app.visible('#house-open-garden')) await app.clickSel('#house-open-garden'); await app.settle(); } },
   focus: { about: 'the seated Focus view, or the room on older refs', async go(app) {

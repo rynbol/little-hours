@@ -22,6 +22,10 @@ export const SEEDS = {
   ...Object.fromEntries(['cloud-loft', 'ember-library'].map(presetId => [`greenhouse-${presetId}`, { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'garden', rooms: rooms.map(entry => entry.id === 'garden' ? room('garden', presetId, 'Garden wing') : entry) } }])),
   'attic-stars': { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft', sessions: starLog } },
   'garden-grown': { ...house(3, 60), garden: { nextId: 7, activeId: null, plants: ['cosmos', 'lavender', 'sunflower', 'moonflower', 'cosmos', 'lavender'].map((species, slot) => ({ id: `plant-${slot + 1}`, species, minutes: 150, slot, name: slot === 0 ? 'Sunday' : '' })) } },
+  ...Object.fromEntries(Object.entries({
+    'garden-stages': [['sunflower', 80], ['moonflower', 70], ['cosmos', 15], ['lavender', 0], ['cosmos', 30]],
+    'garden-buds': [['cosmos', 40], ['lavender', 60], ['sunflower', 55], ['moonflower', 100], ['lavender', 41], ['sunflower', 30]],
+  }).map(([name, beds]) => [name, { ...house(3, 60), garden: { nextId: beds.length + 1, activeId: null, plants: beds.map(([species, minutes], slot) => ({ id: `plant-${slot + 1}`, species, minutes, slot, name: '' })) } }])),
   'garden-days': { ...house(3), history: studyDays },
   attic: { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft' } },
   ...Object.fromEntries(['bunny', 'fox', 'panda'].map(pet => [`pet-${pet}`, { ...house(1), pet, pets: ['cat', 'dog', pet] }])),

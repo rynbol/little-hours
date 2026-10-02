@@ -2,7 +2,8 @@ import test from 'node:test';
 import { placeAsset } from '../../models/assets.js';
 import assert from 'node:assert/strict';
 import { onIsland, edgePoint, islandCliff, buildIsland, ISLAND, ISLAND_DEPTH, STREAMS, waterfalls } from './house-island.js';
-import { strataSteps, hangingRoots, landmassEdge, onLandmass } from './island-landform.js';
+import { landmassEdge, onLandmass } from './island-landform.js';
+import { strataSteps, hangingRoots } from '../../models/landform.js';
 import { HOUSE_POSITIONS } from './house-model.js';
 import { GARDEN_CENTER } from './house-garden.js';
 

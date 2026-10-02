@@ -19,24 +19,27 @@ import { GlowLayer } from '@babylonjs/core/Layers/glowLayer.js';
 import '@babylonjs/core/Meshes/thinInstanceMesh.js';
 import { createMobileCompanion, disposeAvatarTemplates } from '../../models/furniture.js';
 import { createPetModel } from '../pet/index.js';
-import { buildGardenTree, buildRoseArch, houseFrame } from '../house/index.js';
+import { buildRoseArch, houseFrame, createIslandGrass, ISLAND_ATMOSPHERES } from '../house/index.js';
 import { speciesOf, tierOf } from '../../core/fishing.js';
 import { clockRandom } from '../../core/test-pins.js';
 import { POND_EXIT, lakeWater } from './lake-ground.js';
 import { placeAsset } from '../../models/assets.js';
-import { POND, POND_PATH, pondRim as rim, createLakeBank, createLakeGrass } from './lake-ground.js';
+import { POND, POND_PATH, LAKE_POSTS, plotReach, pondRim as rim, createLakeBank, lakeCliff, lakeFrame, lakeBlades } from './lake-ground.js';
+import { addBody, hangingRoots } from '../../models/landform.js';
+import { createPainterly } from '../../models/painterly.js';
 import { buildFishModel } from '../../models/fish-model.js';
 import { renderRatioCeiling } from '../../core/render-scale.js';
 
 const cardSide = new Vector3(), DOCK_Y = .42, STAND = new Vector3(0, DOCK_Y, 1.35), HOME_BOBBER = new Vector3(-.15, 0, .2);
 const PALETTES = {
-  dusk: { exposure: 1.05, sky: '#ffe3c5', ground: '#645441', ambient: .55, sun: .72, sunTint: '#ffcf9f', shade: .3, lamp: .9, glow: .5, lit: '#ffc873', deep: '#34506f', shallow: '#7fa5ad', skyLow: '#f2b8a2', skyMid: '#8b6d9f', waterSun: [-.35, .1, -1], glint: '#ffe2b8', leaf: ['#86a275', '#97b081', '#a9bf8e'], grass: '#95a877', meadow: '#879b6c', sand: '#cdb694', stone: ['#aaa597', '#9d978a', '#b8b1a1'], light: .95 },
-  day: { exposure: 1.1, sky: '#ffe9d2', ground: '#a48b6b', ambient: .66, sun: 1, sunTint: '#ffe3bb', shade: .24, lamp: 0, glow: .35, lit: '#ffd48a', deep: '#3d7b93', shallow: '#95cfc6', skyLow: '#f5ead6', skyMid: '#aed5ea', waterSun: [.35, .45, -1], glint: '#fffaf0', leaf: ['#86a86c', '#9ab97c', '#afc88e'], grass: '#a8bb82', meadow: '#9aae76', sand: '#dcc8a2', stone: ['#c9bfae', '#b8ae9d', '#d6ccb8'], light: 1 },
-  rain: { exposure: 1, sky: '#dfe4e2', ground: '#5c5a52', ambient: .6, sun: .45, sunTint: '#e6e8e4', shade: .18, lamp: .7, glow: .45, lit: '#ffd08a', deep: '#3a5463', shallow: '#76979d', skyLow: '#c2c9ce', skyMid: '#8491a3', waterSun: [0, .35, -1], glint: '#eef4f6', leaf: ['#6f8d6d', '#7f9d7a', '#91ab88'], grass: '#8a9f7c', meadow: '#7d9372', sand: '#b8ad98', stone: ['#a9a69c', '#9a978e', '#b6b3a8'], light: .85 },
+  dusk: { shade: .3, lamp: .9, glow: .5, lit: '#ffc873', deep: '#345a86', shallow: '#7fb4c8', skyLow: '#7e82b8', skyMid: '#3c4274', waterSun: [-.35, .1, -1], glint: '#8f96c8', leaf: ['#446639', '#577942', '#67844d'], grass: '#5a7b58', meadow: '#49684c', sand: '#a79a9a', tint: [.72, .74, .92], light: .95 },
+  day: { shade: .24, lamp: 0, glow: .35, lit: '#ffd48a', deep: '#3f94b4', shallow: '#8fd6d0', skyLow: '#d9ebf1', skyMid: '#6aa3dd', waterSun: [.35, .45, -1], glint: '#fffaf0', leaf: ['#5f8a3e', '#79a348', '#8fb354'], grass: '#8cb24e', meadow: '#6f9640', sand: '#dcc8a2', tint: [1, 1, 1], light: 1 },
+  rain: { shade: .18, lamp: .7, glow: .45, lit: '#ffd08a', deep: '#3f6677', shallow: '#8fb9b8', skyLow: '#90a8b2', skyMid: '#566f86', waterSun: [0, .35, -1], glint: '#8fa3ad', leaf: ['#527c3b', '#689344', '#7ba150'], grass: '#5f8b46', meadow: '#4b7539', sand: '#b8ad98', tint: [.86, .9, .95], light: .85 },
 };
 const HEAD = new Vector3(STAND.x, DOCK_Y + 2.45, STAND.z), GROUND = .15, FENCE = ['#c6b99b', '#b3a585'];
 const REFLECTION_EYE = new Vector3(5.6, 7, 16), LOOK = new Vector3(.5, 0, -5), VIEW = new Vector3(.45, .85, 1).normalize(), SUN = new Vector3(3, -8, -5).normalize();
-const TREES = [[-2.75, 1.34, 1.2, 'oak'], [-2.98, 1.28, .95, 'cherry'], [-1.95, 1.45, 1.1, 'oak'], [-1.6, 1.38, 1.05, 'oak'], [-1.15, 1.36, .95, 'cherry'], [-.5, 1.4, 1.1, 'oak'], [-.12, 1.36, .95, 'cherry'], [.22, 1.38, 1.1, 'oak'], [2.33, 1.4, 1.05, 'oak'], [2.8, 1.36, 1.15, 'oak'], [2.58, 1.42, .95, 'cherry']];
+const TREES = [[-2.75, 1.34, 1.2, 'oak'], [-2.98, 1.28, .95, 'cherry'], [-1.95, 1.47, 1.15, 'pine'], [-2.3, 1.5, 1.3, 'pine'], [-1.76, 1.5, 1, 'pine'], [-1.6, 1.38, 1.05, 'oak'], [-1.15, 1.36, .95, 'cherry'], [-.5, 1.4, 1.1, 'oak'], [-.12, 1.36, .95, 'cherry'], [.22, 1.38, 1.1, 'oak'], [2.33, 1.4, 1.05, 'oak'], [2.8, 1.36, 1.15, 'oak'], [2.58, 1.42, .95, 'cherry']];
+const KINDS = { oak: ['tree-round-a', 'tree-round-b', 'tree-round-c'], cherry: ['tree-blossom-a', 'tree-blossom-b'], willow: ['tree-willow'], pine: ['tree-pine'] };
 const EXIT_TAG = new Vector3(POND_EXIT.x, 2.9, POND_EXIT.z);
 const hash = n => { const s = Math.sin(n * 78.233 + 12.9898) * 43758.5453; return s - Math.floor(s); };
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
@@ -98,7 +101,7 @@ void main() {
 }`;
 
 export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat', exitTag, reducedMotion = false }) {
-  const palette = PALETTES[theme] || PALETTES.dusk;
+  const palette = PALETTES[theme] || PALETTES.dusk, air = ISLAND_ATMOSPHERES[theme] || ISLAND_ATMOSPHERES.dusk;
   const canvas = document.createElement('canvas'); canvas.className = 'lake-canvas';
   canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', 'A quiet pond at the end of a little wooden dock');
   container.appendChild(canvas);
@@ -107,13 +110,14 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   const scene = new Scene(engine); scene.useRightHandedSystem = true;
   scene.clearColor = new Color4(0, 0, 0, 0);
   scene.skipPointerMovePicking = true; scene.skipPointerDownPicking = true; scene.skipPointerUpPicking = true;
-  scene.imageProcessingConfiguration.toneMappingEnabled = true; scene.imageProcessingConfiguration.toneMappingType = 1; scene.imageProcessingConfiguration.exposure = palette.exposure;
+  scene.imageProcessingConfiguration.toneMappingEnabled = true; scene.imageProcessingConfiguration.toneMappingType = 1; scene.imageProcessingConfiguration.exposure = 1.12; scene.imageProcessingConfiguration.contrast = 1.12;
+  createPainterly(scene, theme).setDepth(58, 88, -6.5, -1.8);
   const camera = new TargetCamera('lake-camera', VIEW.scale(60).addInPlace(LOOK), scene);
   camera.mode = Camera.ORTHOGRAPHIC_CAMERA; camera.minZ = .1; camera.maxZ = 140; camera.setTarget(LOOK);
   const skyLight = new HemisphericLight('lake-sky', new Vector3(0, 1, 0), scene);
-  skyLight.intensity = palette.ambient; skyLight.diffuse = Color3.FromHexString(palette.sky); skyLight.groundColor = Color3.FromHexString(palette.ground); skyLight.specular = Color3.Black();
+  skyLight.intensity = air.fill; skyLight.diffuse = Color3.FromHexString(air.sky); skyLight.groundColor = Color3.FromHexString(air.ground); skyLight.specular = Color3.Black();
   const sun = new DirectionalLight('lake-sun', SUN, scene); sun.position = SUN.scale(-40);
-  sun.intensity = palette.sun; sun.diffuse = Color3.FromHexString(palette.sunTint); sun.specular = Color3.Black();
+  sun.intensity = air.key; sun.diffuse = Color3.FromHexString(air.sun); sun.specular = Color3.Black();
   sun.shadowMinZ = 1; sun.shadowMaxZ = 90; sun.autoUpdateExtends = false;
   sun.orthoLeft = -18; sun.orthoRight = 18; sun.orthoTop = 18; sun.orthoBottom = -18;
   const sunShadow = new ShadowGenerator(2048, sun); sunShadow.usePercentageCloserFiltering = true; sunShadow.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
@@ -150,8 +154,10 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     orb: (x, y, z, w, h, d, hex) => ball(x, y, z, w, h, d, hex, w < .12 ? 2 : w < .4 ? 4 : w < .8 ? 6 : 8),
     cylinder: (x, y, z, top, bottom, h, hex) => cyl(x, y, z, top, bottom, h, hex, [0, 0, 0], 12),
   };
-  const tree = (species, x, z, s) => buildGardenTree(api, species, x, z, GROUND - .02, s);
-  const bush = (x, y, z, s, yaw) => asset('bush', { x, y, z, yaw, scale: s });
+  api.shape = (positions, colors, normals, indices) => into.push(Object.assign(new VertexData(), { positions, colors, normals, indices }));
+  let planted = 0;
+  const tree = (species, x, z, s) => { const kinds = KINDS[species]; asset(kinds[planted % kinds.length], { x, y: GROUND - .02, z, yaw: planted++ * 2.1, scale: s * 1.05, tint: palette.tint }); };
+  const bush = (x, y, z, s, yaw) => asset('bush', { x, y, z, yaw, scale: s, tint: palette.tint });
   const boat = (x, z, yaw) => asset('rowboat', { x, y: .2, z, yaw });
   const reeds = (x, z, count, seed) => {
     for (let i = 0; i < count; i++) {
@@ -183,7 +189,10 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
   const archSeat = Matrix.RotationY(POND_EXIT.yaw).multiply(Matrix.Translation(POND_EXIT.x, GROUND - .04, POND_EXIT.z));
   for (const data of [...archParts, ...glowing.slice(litFrom)]) data.transform(archSeat);
 
-  baked.push(Object.assign(new VertexData(), createLakeBank(palette)), Object.assign(new VertexData(), createLakeGrass(palette)));
+  baked.push(Object.assign(new VertexData(), createLakeBank(palette)));
+  const cliffParts = [];
+  into = cliffParts; for (const body of lakeCliff(theme)) addBody(api, body);
+  hangingRoots(api, { edge: a => rim(a, plotReach(a)), top: -.2, count: 190, seed: 5 }); into = baked;
   tree('willow', ...rim(3.2, 1.2), 1.55);
   for (const [a, k, s, species] of TREES) tree(species, ...rim(a, k), s);
   picket(rim(1.16, 1.5), rim(1.34, 1.48), 5); picket(rim(1.34, 1.48), rim(1.5, 1.44), 4);
@@ -208,7 +217,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     box(side * .66, DOCK_Y - .1, 3.1, .08, .08, 4.5, '#8d6849');
     for (const z of [1, 3]) cyl(side * .72, DOCK_Y / 2 - .25, z, .16, .18, DOCK_Y + .7, '#6f5240');
   }
-  const posts = [[-.72, 1.02], [-.72, 5.2], [.72, 5.2], rim(1.45, 1.16), rim(1.18, 1.15)];
+  const posts = LAKE_POSTS;
   for (const [x, z] of posts) { cyl(x, .95, z, .09, .11, 1.9, '#6f5240'); box(x, 1.93, z, .16, .05, .16, '#4f3d31'); }
   box(1.25, .75, 5.5, .08, 1.1, .08, '#6f5240'); box(1.25, 1.18, 5.52, .95, .42, .07, '#b98d63', [0, -.25, 0]); box(1.25, 1.18, 5.56, .8, .3, .02, '#e8d6b8', [0, -.25, 0]);
   POND_PATH.forEach(([x, z], i) => cyl(x, .17, z, .5, .52, .05, ['#e3d7c1', '#d6c8ae'][i % 2], [0, 0, 0], 16));
@@ -225,7 +234,9 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     return mesh;
   };
   const scenery = batchOf('lake-scenery', baked), arch = batchOf('lake-exit', archParts);
-  const framing = [{ points: scenery.getVerticesData('position') }];
+  batchOf('lake-cliff', cliffParts);
+  const grass = createIslandGrass(scene, theme, { name: 'lake-grass', blades: lakeBlades(), lamps: LAKE_POSTS });
+  const framing = [{ points: scenery.getVerticesData('position') }, { points: lakeFrame() }];
   const core = [{ points: water.getVerticesData('position') }, { points: EXIT_TAG.asArray() }];
   const rest = { x: 0, y: 0, span: 10 }, aim = { x: 0, y: 0, span: 5.6 }, focusAt = new Vector3(), watch = new Vector3();
   const fit = () => {
@@ -559,6 +570,7 @@ export function createLakeScene(container, { theme = 'dusk', avatar, pet = 'cat'
     rise -= dt;
     if (rise < 0 && !reducedMotion) { rise = 2.5 + clockRandom() * 4; ripple((clockRandom() - .5) * 10, -1 - clockRandom() * 7, .7); }
 
+    if (!reducedMotion) grass.animate(clock);
     waterPaint.setFloat('time', clock); waterPaint.setVector3('eye', REFLECTION_EYE); waterPaint.setArray4('ripples', ripples);
     for (const m of fallPaints) m.setFloat('time', clock);
       }

@@ -79,7 +79,7 @@ export function fightInput(state) {
 async function movementChecks(t, app) {
   await app.js(`document.getElementById('wilds-canvas').focus(); window.__lhFrozenAt = ${D}.now`);
   const original = await snapshot(app), coins = await app.js('window.__littleHours.state.house.coins'), bonds = await app.js('JSON.stringify(window.__littleHours.state.petBonds)');
-  t.check('the walk begins at the existing Forest route with the Blender avatar and the player’s pet', original.player.position.x === -106.5 && original.player.position.z === -180 && original.combat.pet.id === await app.js('window.__littleHours.state.pet') && await app.js(`${D}.avatar.loaded`), original.player.position);
+  t.check('the walk begins at the existing Forest route with the player and the player’s pet', original.player.position.x === -106.5 && original.player.position.z === -180 && original.combat.pet.id === await app.js('window.__littleHours.state.pet') && await app.js(`${D}.avatar.loaded`), original.player.position);
   await hold(app, ['KeyW'], 500);
   const walked = await snapshot(app);
   t.check('actual W input walks across rendered Forest terrain', Math.hypot(walked.player.position.x - original.player.position.x, walked.player.position.z - original.player.position.z) > 2.2 && walked.player.grounded, walked.player.position);

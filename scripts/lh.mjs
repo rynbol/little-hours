@@ -5,7 +5,7 @@ import { chromePath, closeAll, gpuFlag, killAllNow, launch, sleep, slow } from '
 import { captureSequence, dispatchSequenceInput, validateSequence } from './lh/sequence.mjs';
 import { openApp } from './lh/app.mjs';
 import { prepareFight, driveFight } from './lh/wilds-fight.mjs';
-import { captureStylePairs } from './lh/style-pairs.mjs';
+import { captureWildsCrop } from './lh/wilds-shots.mjs';
 import { serve } from './lh/server.mjs';
 import { SEEDS } from './lh/seeds.mjs';
 import { cycles, steps, views } from './lh/steps.mjs';
@@ -23,7 +23,6 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
   lh flows                          list the flows
   lh run <flow...|all>              run flows with real input; exits 1 on any failure
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
-  lh style-pairs [scenery|characters]  six blind pairs per category from the actual app views
   lh perf [--view house|garden|lake|room|decorate|pet|focus|focus-trip|trips|wilds]
                                     idle cost, frame gaps, click-to-paint, GPU time, draw calls
   lh trace <cycle>                  Chrome performance trace of one cycle (--cold: the first run, without a warm-up run)
@@ -329,6 +328,7 @@ async function shots() {
       }
       const file = await app.shot(join(out, `${name}-${list.length > 1 ? (side === list[0] ? 'this' : String(options.against).replace(/[^\w.-]+/g, '_')) : 'this'}.jpg`));
       console.log(`${side.label} ${name}: ${file}${app.errors.length ? `  page errors: ${app.errors.join(' | ').slice(0, 200)}` : ''}`);
+      if (views[name].crop) console.log(`2x crop: ${await captureWildsCrop(app, file.replace('.jpg', '-2x.png'), views[name].crop, viewport)}`);
       if (options.pick) for (const point of String(options.pick).split(';')) {
         const [x, y] = point.split(',').map(Number);
         const hit = await app.js(`(() => { const scene = window.__littleHours.${sceneView}.diagnostics().scene, hit = scene.pick(${x}, ${y}, mesh => mesh.isEnabled() && mesh.isVisible); const mesh = hit?.pickedMesh; return mesh ? [mesh.name, mesh.material?.name, mesh.parent?.name].join(' | ') : 'nothing'; })()`);
@@ -466,7 +466,6 @@ const commands = {
   help: async () => { console.log(HELP); return 0; },
   flows: async () => { for (const name of await flowNames()) console.log(`${name.padEnd(12)} ${(await loadFlow(name)).about}`); return 0; },
   run: async () => runFlows(!positional.length || positional[0] === 'all' ? await flowNames() : positional),
-  'style-pairs': async () => { const server = await start(options.ref), out = outDir('style-pairs'); console.log(await captureStylePairs(server.url, out, positional[0])); return 0; },
   art: roomArt, asset: assetShots, world: worldShots, shot: shots, perf, trace: traceCommand, alloc: allocCommand, heap, doctor, cleanup, serve: serveForever,
 };
 

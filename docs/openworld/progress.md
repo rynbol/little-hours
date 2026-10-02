@@ -1,42 +1,38 @@
-# The Wilds current state
+# The Wilds rebuild
 
-- Branch `codex/wilds`, based on `origin/codex/botw-look` at `d41dd6c`.
-- Scope is the Forest route, path to first vista, avatar, one fighting pet, sword and Mossback Warden with reward and level-up.
-- The current user goal replaces the brief’s old milestone, review and completion sections. Brief section 2 still applies.
+The active specification is the owner's `wilds-assets/GOAL.md`, revised on 2026-10-02 to include combat playtesting. It replaces all earlier completion claims. Work stays in `codex/wilds`.
 
-## Current checkpoint
+## Current step
 
-M1 round 3 was pushed, rebased onto the requested Forest branch and pushed again. The old staging/capture archives and bulk catalog were removed. The playable slice is pushed as `2399e58`. The separate style frame is complete and has passed both blind comparisons.
+Step 0 is verified. The merge includes `origin/codex/botw-look` at `d447e42`. The rejected character generators, GLBs, style view, tests and reviews are removed. A plain 1.7 metre capsule keeps the playable view working. The old Warden's vertex data is frozen unchanged, and the existing pet stays unchanged. Neither is a visual acceptance claim.
 
-- Uses the actual Forest route builders and atmosphere, preserving the Wilds avatar, movement and camera.
-- Sword combo, lock, dodge and shared stamina work with a fighting companion and the Warden’s charge/stone exposure, phase-two roots and reward.
-- The fixed-clock browser flow passes all 30 checks from the forest start through pet-assisted victory, level three, first vista, persistence and remount.
-- 945 unit tests pass. Guard passes with 386 files and no problems. Room verification and production build pass. Browser flows pass all 38 checks, including eight style-frame checks.
-- `lh perf --view wilds --fight --seconds 15 --size 1280x800 --scale 1 --theme day --rounds 2` measured 59.994 and 59.992 fps, maximum frame gap 16.8 ms and zero gaps over 20 ms. Each fight recorded 270 sword damage and 150 pet damage, defeating the Warden.
-- The home save/backup retains Wilds progress. Legacy saves, study-earned gold and friendship are unchanged. Protected source paths have no diff against the new base.
-- Existing room skeleton and build-size warnings remain.
-- Combat models are temporary static art. Character body attacks are not animated yet. This is the playable checkpoint, not visual acceptance.
+The existing thirty fight checks are regression checks only. They do not prove the fight works for a player. No manual combat verdict has been reached. `OWNER-BUGS.md` was absent when checked on 2026-10-02.
 
-## Style frame
+## Delivery sequence
 
-`art-direction.md` records shading, rim, sky, haze, day/dusk/rain colors and proportions. The separate `/checks/wilds-style.html` view uses the actual Forest scenery and three new Blender models. `npm run wilds:assets` regenerated every GLB successfully. `lh style-pairs` captures anonymous pairs from actual app views.
+0. Merge Forest and remove rejected art. Verify tests, guard and the capsule fight flow. Commit and push.
+1. Create four provisional target stills. Owner approval is pending.
+2. Import, simplify and paint a Ranger in Blender. Export a weighted model and hand-parented sword. Warm the skinned painterly shader. Compare against step 0.
+3. Apply supplied animation clips through one rules-driven state machine. Rewrite the shoulder camera. Check blending, ground contact, hit-stop and reduced motion.
+4. Play and capture at least ten full fights from entry using real input and no placement hooks. Record and reproduce every bug, test it red, then fix it. Add an entry-to-victory browser flow.
+5. Build Wilds-only curved grass, GPU wind, foot response and distance fade. Match ground colours and measure fight performance.
+6. Save playable sequence, a whole fight, three-light stills and blind scores. Run every final gate, commit and push.
 
-Blind round one passed scenery with Wilds weaker in 2 of 6. Characters passed round two with Wilds weaker in 0 of 6 and one tie. The fixes corrected inward avatar normals, softened body transitions, refined the cat's eyes and anatomy, and added linear-light shading with broad indirect fill. Both rounds are recorded under `reviews/`.
+## pstack execution checkpoint
 
-Blind scenery review uses six randomly ordered, unlabeled Wilds/Forest shot pairs at matching times with avatar and HUD hidden. Blind character review uses six pairs against existing room avatar/pet close-ups. A fresh reviewer sees only the pairs and names the weaker picture and reason. Each category passes if Wilds is weaker in at most two pairs.
+- Blocking first steps. Read the current goal and source README. Build fixed piece shots before changing each piece. Verify each numbered step before the next.
+- Independent workstreams. None are delegated. The goal permits only one fresh blind picture judge at a time.
+- Shared mutable state. One builder owns the worktree, renderer, asset export and evidence. Existing source packs stay outside Git.
+- Smallest safe decomposition. One implementation owner follows the numbered steps. Each player or grass review compares shuffled pictures against the previous build with the target reference alongside.
 
-Passing scenery and character comparison pictures plus day, dusk, and rain group frames are saved under `docs/openworld/shots/style-frame/`. The reproducible captures run through `lh style-pairs` and `lh shot wilds-style`.
+The Feature playbook is adapted to the explicit goal. `how` is performed locally over the renderer and rules. Parallel `architect`, delegated implementation, and a review fan-out are skipped because the goal forbids them. PR creation is skipped because brief section 2 forbids PRs. Verification and ordered commits remain required.
 
-## Scope and limits
+## Evidence and remaining work
 
-- Use pstack with Astra at extra-high effort; host allows four concurrent agents including the lead.
-- Commit and push at least hourly. Push only `codex/wilds`; no PR or merge.
-- Keep `.lh` below 2 GB and this file below 100 lines.
-- No capture plans, score tables, evidence archives or provenance audits.
-- Preserve house, room, timer, friendship and study-earned gold behavior.
-- Use Node 24, pinned time/randomness, headless lh checks and the in-app browser for visible work.
-- No Docker, port 5420 or termination of unowned processes.
-
-The playable flow, fight performance, and both blind reviews pass. The front avatar comparison tied because the existing avatar has smoother shading while Wilds has richer detail. Combat art remains rough in the playable view. The new Blender art is isolated in the style frame as requested. Its exported movement clips have structural checks, but full combat animation polish is outside this frame.
-
-The requested slice and style-frame work are complete. Do not apply this look beyond the frame or start another biome or boss without a new instruction.
+- `lh doctor` passed on the Apple M5 Pro Metal GPU with no page errors.
+- `lh shot wilds-player` and `lh shot wilds-grass` provide fixed cameras, seed 7, frozen clock, reduced motion and 2x region crops. Use `--theme day`, `--theme dusk` and `--theme rain`.
+- Base checks passed. 897 unit tests, guard against `d447e42`, and all 30 `lh run wilds` checks.
+- Capsule fight performance against `642cdc3`, two 15-second rounds at 1280 by 800, measured 60.0 rendered frames per second in both builds. Median GPU cost fell from 2.30 to 1.65 ms and draw calls from 35 to 20. One new-build run had a frame gap over 20 ms; median maximum gap was 25.1 ms. This is not a zero-stutter claim. Evidence is `.lh/out/2026-10-02T22-08-43-perf/perf.json`.
+- The local preview now uses a separate Vite cache from `lh`. Simultaneous servers sharing the test cache caused shader source requests to return HTML during the first run. The isolated rerun had no page errors.
+- Visual scores are not yet available. No piece has passed the new review rule.
+- The player, motion, camera, combat audit and grass remain unfinished. The cat and Warden retain the old rough look deliberately.
