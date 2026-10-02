@@ -1,0 +1,15 @@
+{
+  "id": "sprint-exhaustion-and-recovery",
+  "durationMs": 17000,
+  "fixture": { "position": { "x": 0, "z": 0 }, "stamina": 100, "camera": { "yaw": 0, "pitch": 0.08 } },
+  "events": [
+    { "at": 500, "type": "keyDown", "code": "KeyW" },
+    { "at": 500, "type": "keyDown", "code": "ShiftLeft" },
+    { "at": 8700, "type": "keyUp", "code": "ShiftLeft" },
+    { "at": 8700, "type": "keyUp", "code": "KeyW" },
+    { "at": 14700, "type": "keyDown", "code": "KeyW" },
+    { "at": 14700, "type": "keyDown", "code": "ShiftLeft" },
+    { "at": 15900, "type": "keyUp", "code": "ShiftLeft" },
+    { "at": 15900, "type": "keyUp", "code": "KeyW" }
+  ]
+}

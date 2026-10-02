@@ -98,6 +98,21 @@ export function cloudCards(seed = WORLD.seed, height = heightAt) {
   return cards.sort((a, b) => Math.hypot(b.x, b.z) - Math.hypot(a.x, a.z));
 }
 
+function openSkyCards(seed) {
+  const masses = [
+    [-.94, 3800, 670, 1750, .29], [-.53, 4600, 1540, 1250, .42], [-.13, 5200, 920, 1480, .3],
+    [.36, 4300, 1720, 2000, .33], [.83, 3900, 850, 2200, .31], [1.7, 5000, 760, 2700, .28],
+    [-1.8, 4400, 1120, 1900, .38], [2.6, 4800, 810, 1700, .32], [-2.8, 3900, 1360, 2500, .29],
+  ];
+  const cards = masses.map(([bearing, distance, base, width, tall], i) => {
+    const random = seeded(seed + i * 977);
+    return { kind: CLOUD_KINDS.cumulus, x: Math.sin(bearing) * distance, y: base + width * tall * .6, z: -Math.cos(bearing) * distance, halfWidth: width / 2, halfHeight: width * tall, spin: .00018 + random() * .00012, seed: random() * 97, stretch: 1 };
+  });
+  for (const [bearing, distance, y, width] of [[-.45, 6500, 2300, 3100], [.65, 6900, 2700, 3600], [-1.5, 7100, 2200, 2800]]) cards.push({ kind: CLOUD_KINDS.wisp, x: Math.sin(bearing) * distance, y, z: -Math.cos(bearing) * distance, halfWidth: width / 2, halfHeight: width * .07, spin: .0002, seed: seed * .01 + bearing * 31, stretch: 1 });
+  for (const card of cards) for (const key of ['x', 'y', 'z', 'halfWidth', 'halfHeight']) card[key] *= .45;
+  return cards.sort((a, b) => Math.hypot(b.x, b.z) - Math.hypot(a.x, a.z));
+}
+
 export function cloudShape(cards) {
   const positions = new Float32Array(cards.length * 12), uvs = new Float32Array(cards.length * 8), seeds = new Float32Array(cards.length * 8), seedRests = new Float32Array(cards.length * 8), sizes = new Float32Array(cards.length * 16), indices = new Uint16Array(cards.length * 6);
   cards.forEach((card, c) => {
@@ -196,12 +211,12 @@ void main() {
   gl_FragColor = vec4(color * a, a);
 }`;
 
-export function createWorldClouds(scene, { root, still }) {
+export function createWorldClouds(scene, { root, still, definition }) {
   const paint = new ShaderMaterial('world-cloud-paint', scene, { vertexSource: CLOUD_VERTEX, fragmentSource: CLOUD_FRAGMENT }, { attributes: ['position', 'uv', 'uv2', 'uv3', 'color'], uniforms: [...new Set(['world', 'viewProjection', 'plume', 'cloudCover', 'sunStrength', ...CLOUD_COLORS, ...SKY_UNIFORMS, ...AIR_UNIFORMS])], needAlphaBlending: true });
   paint.backFaceCulling = false; paint.disableDepthWrite = true; paint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF;
   followEye(scene, paint, still);
-  paint.setVector4('plume', new Vector4(PLUME_COLUMN.x, PLUME_COLUMN.z, PLUME_COLUMN.reach, PLUME_COLUMN.summit));
-  const cards = cloudCards(), clouds = new Mesh('world-clouds', scene);
+  paint.setVector4('plume', new Vector4(PLUME_COLUMN.x, PLUME_COLUMN.z, PLUME_COLUMN.reach, definition?.id === 'wilds' ? 1000000 : PLUME_COLUMN.summit));
+  const cards = definition?.id === 'wilds' ? openSkyCards(definition.seed) : cloudCards(), clouds = new Mesh('world-clouds', scene);
   Object.assign(new VertexData(), cloudShape(cards)).applyToMesh(clouds);
   clouds.material = paint; clouds.parent = root; clouds.isPickable = false; clouds.alwaysSelectAsActiveMesh = true; clouds.metadata = { castShadow: false, world: true };
   return {

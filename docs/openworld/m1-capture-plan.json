@@ -1,0 +1,3173 @@
+{
+  "version": 1,
+  "milestone": "M1",
+  "purpose": "Capture planning only. This is not a capture manifest or a review result.",
+  "sourceFiles": [
+    "docs/openworld/rubric.md",
+    "src/core/wilds/world-definition.js",
+    "src/models/world/landmarks.js",
+    "src/models/wilds/world.js",
+    "public/wilds/avatar-manifest.json",
+    "src/core/avatar.js",
+    "src/core/wilds/movement.js",
+    "src/features/wilds/camera.js",
+    "scripts/lh/flows/wilds.mjs"
+  ],
+  "captureDefaults": {
+    "themes": [
+      "day",
+      "dusk",
+      "rain"
+    ],
+    "viewport": {
+      "width": 960,
+      "height": 640,
+      "scale": 1
+    },
+    "saveFixture": "one-room",
+    "randomSeed": 7,
+    "worldSeed": 731,
+    "motion": "normal",
+    "stillGameClockOffsetMs": 100000,
+    "fixedStepMs": 16.666666666666668,
+    "grounding": "Positions without y use rendered terrain. Wait until world.pending is false after moving a fixture, then place it again so streamed terrain and grounding agree. initialGroundY values below refer to the origin-centered terrain rings and must not substitute for the final streamed surface.",
+    "camera": "Third-person setPose distances clamp to3\u20139m and pitch to\u22120.15\u20131.1rad. Yaw0 views the avatar from behind looking toward\u2212Z; yaw\u03c0 gives the front. Always record actual camera position, distance and occlusion from diagnostics.",
+    "evidence": "Keep full uncropped frames, actual trusted input track, timestamps and gap report. Store complete frame sequences and normal-speed playback. Capture before input, transitions, release and recovery. Include the HUD. Fixed-clock runs establish action order and contacts; real-time runs establish input response."
+  },
+  "commandTemplates": {
+    "still": [
+      "npm",
+      "run",
+      "lh",
+      "--",
+      "shot",
+      "wilds",
+      "--seed",
+      "one-room",
+      "--theme",
+      "<theme>",
+      "--size",
+      "960x640",
+      "--scale",
+      "1",
+      "--before",
+      "window.__littleHours.wilds.place(<fixture JSON>)",
+      "--freeze",
+      "100000",
+      "--wait",
+      "700"
+    ],
+    "sequence": [
+      "npm",
+      "run",
+      "lh",
+      "--",
+      "shot",
+      "wilds",
+      "--seed",
+      "one-room",
+      "--theme",
+      "<theme>",
+      "--size",
+      "960x640",
+      "--scale",
+      "1",
+      "--sequence",
+      "<materialized sequence JSON path>"
+    ],
+    "reducedMotion": "Add --still to the corresponding still or sequence command.",
+    "performance": [
+      "npm",
+      "run",
+      "lh",
+      "--",
+      "perf",
+      "--view",
+      "wilds",
+      "--seconds",
+      "10"
+    ],
+    "materialize": "Each sequences[].sequence object is directly consumable by --sequence. For fixed-clock counterparts add fixedStepMs:16.666666666666668; leave it absent for real-time. Expand profile IDs by merging their complete appearance into sequence.fixture.appearance. Camera angle variants change fixture.camera only. Do not invoke hooks to perform tested movement or declare an action complete. For sequence cameraVariants, merge camera into fixture.camera and remap event.code through eventCodeMap before writing that concrete sequence file.",
+    "performanceBaseline": "The coordinator owns comparison against the required baseline. Record when the chosen baseline lacks checks/wilds.html instead of claiming a populated-world comparison."
+  },
+  "neutralManifestFields": [
+    "itemId",
+    "itemType",
+    "milestone",
+    "theme",
+    "view",
+    "resolution",
+    "viewportScale",
+    "motionSetting",
+    "appearanceFixtureId",
+    "clipIds",
+    "buildIdentifier",
+    "randomSeed",
+    "worldSeed",
+    "gameClockSetup",
+    "gameTimeRange",
+    "realCaptureTimeRange",
+    "frameIntervalOrPerFrameTimestamps",
+    "inputTrackFile",
+    "frameFiles",
+    "playbackFile",
+    "captureGapReport"
+  ],
+  "neutralHandoff": "The independent reviewer receives the rubric and actual captures with neutral metadata. Do not send this planning document, source code, implementation explanations or hypotheses.",
+  "inventory": [
+    {
+      "id": "forest",
+      "type": "biome",
+      "milestone": "M1",
+      "visibleScope": "Clearing, broadleaf grove, forest floor, trail, understory, canopy and transition toward the meadow.",
+      "extent": {
+        "x": [
+          -70,
+          70
+        ],
+        "z": [
+          20,
+          -130
+        ]
+      },
+      "stills": [
+        {
+          "id": "forest-wide",
+          "view": "wide",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 0,
+              "z": 10
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.08,
+              "distance": 9
+            }
+          },
+          "notes": "Wide clearing view includes the grove canopy and the trail ahead.",
+          "status": "planned"
+        },
+        {
+          "id": "forest-walk",
+          "view": "normal-walking-view",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 0,
+              "z": -28
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.15,
+              "distance": 6.5
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "forest-close",
+          "view": "close-understory",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 8.8,
+              "z": -9
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.32,
+              "distance": 3
+            }
+          },
+          "notes": "Grounded understory view clear of the nearby training-rock collider.",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "route-clearing-vista",
+        "ambient-clearing"
+      ],
+      "detailItems": [
+        "forest-dressing",
+        "trail-rocks",
+        "old-root-outcrop",
+        "sky-clouds-mist"
+      ]
+    },
+    {
+      "id": "meadow",
+      "type": "biome",
+      "milestone": "M1",
+      "visibleScope": "Opening grassland beyond the grove, overlapping the forest edge over the definition\u2019s80m blend.",
+      "extent": {
+        "fromAhead": 50,
+        "toAhead": 230,
+        "blendMetres": 80
+      },
+      "stills": [
+        {
+          "id": "meadow-wide",
+          "view": "wide",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -2,
+              "z": -145
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.08,
+              "distance": 9
+            }
+          },
+          "notes": "Positive pitch retains the requested 9m camera distance above the rising terrain behind this viewpoint.",
+          "status": "planned"
+        },
+        {
+          "id": "meadow-walk",
+          "view": "normal-walking-view",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 0,
+              "z": -120
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.15,
+              "distance": 6.5
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "meadow-close",
+          "view": "close-grass-and-terrain",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 6,
+              "z": -160
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0.4,
+              "pitch": 0.4,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "route-clearing-vista",
+        "slope-and-border",
+        "ambient-vista"
+      ],
+      "detailItems": [
+        "sky-clouds-mist"
+      ]
+    },
+    {
+      "id": "hearth-clearing",
+      "name": "Hearth clearing",
+      "type": "landmark",
+      "milestone": "M1",
+      "model": {
+        "id": "hearth-clearing",
+        "name": "Hearth clearing",
+        "kind": "hearth",
+        "x": -5,
+        "z": 3,
+        "radius": 1.4,
+        "initialGroundY": 0
+      },
+      "visibleScope": "Current visible geometry and its relation to the clearing-to-vista route.",
+      "stills": [
+        {
+          "id": "hearth-wide",
+          "view": "distant-approach",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -5,
+              "z": 15
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.22,
+              "distance": 9
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "hearth-normal",
+          "view": "normal-distance",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -5,
+              "z": 7
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.32,
+              "distance": 6.5
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "hearth-close",
+          "view": "nearest-accessible-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -5,
+              "z": 4.8
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.6,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": []
+    },
+    {
+      "id": "bellroot-gate",
+      "name": "Bellroot Gate",
+      "type": "landmark",
+      "milestone": "M1",
+      "model": {
+        "id": "bellroot-gate",
+        "name": "Bellroot Gate",
+        "kind": "gate",
+        "x": 3,
+        "z": -86,
+        "width": 12,
+        "height": 15,
+        "initialGroundY": 26.97015
+      },
+      "visibleScope": "Current visible geometry and its relation to the clearing-to-vista route.",
+      "stills": [
+        {
+          "id": "gate-wide",
+          "view": "distant-approach",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 3,
+              "z": -48
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.12,
+              "distance": 9
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "gate-normal",
+          "view": "normal-distance",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 3,
+              "z": -65
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.1,
+              "distance": 6.5
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "gate-close",
+          "view": "nearest-accessible-root-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -1,
+              "z": -81
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.08,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": []
+    },
+    {
+      "id": "first-vista",
+      "name": "First vista",
+      "type": "viewpoint",
+      "milestone": "M1",
+      "model": {
+        "id": "first-vista",
+        "name": "First vista",
+        "kind": "vista",
+        "x": -2,
+        "z": -145,
+        "initialGroundY": 27.02043
+      },
+      "visibleScope": "Named vantage position; no separate sign or marker geometry is generated. Capture the vista and its approach without inventing a prop.",
+      "stills": [
+        {
+          "id": "vista-approach",
+          "view": "approach",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 0,
+              "z": -110
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.08,
+              "distance": 6.5
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "vista-wide",
+          "view": "wide",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -2,
+              "z": -145
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.08,
+              "distance": 9
+            }
+          },
+          "notes": "Positive pitch retains the requested 9m camera distance above the rising terrain behind this viewpoint.",
+          "status": "planned"
+        },
+        {
+          "id": "vista-ground",
+          "view": "nearest-accessible-ground",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -2,
+              "z": -145
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0.6,
+              "pitch": 0.4,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "route-clearing-vista",
+        "ambient-vista"
+      ]
+    },
+    {
+      "id": "mirror-fen",
+      "name": "Mirror Fen",
+      "type": "landmark",
+      "milestone": "M1",
+      "model": {
+        "id": "mirror-fen",
+        "name": "Mirror Fen",
+        "kind": "lake",
+        "x": 25,
+        "z": -410,
+        "distant": true,
+        "initialGroundY": -27.54763
+      },
+      "visibleScope": "Current distant geometry and any view attainable from current walkable terrain. Full associated biome, traversal, arena and encounter remain future content.",
+      "stills": [
+        {
+          "id": "mirror-fen-horizon",
+          "view": "distant-from-first-vista",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -2,
+              "z": -145
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": -0.10153641273986758,
+              "pitch": 0.08,
+              "distance": 9
+            }
+          },
+          "notes": "Positive pitch retains the requested 9m camera distance above the rising terrain behind this viewpoint.",
+          "status": "planned"
+        },
+        {
+          "id": "fen-approach",
+          "view": "ground-approach",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 25,
+              "z": -285
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.1,
+              "distance": 6.5
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "fen-shore",
+          "view": "nearest-accessible-shore",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 25,
+              "z": -317
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.2,
+              "distance": 3
+            }
+          },
+          "notes": "Water outline depends on rendered terrain. Refine the fixture to the actual accessible shore after streaming; retain the chosen coordinates in the capture manifest.",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "ambient-fen"
+      ],
+      "futureCompletionMilestone": "M5"
+    },
+    {
+      "id": "split-glacier",
+      "name": "Split glacier",
+      "type": "landmark",
+      "milestone": "M1",
+      "model": {
+        "id": "split-glacier",
+        "name": "Split glacier",
+        "kind": "peak",
+        "x": -310,
+        "z": -790,
+        "summit": 248,
+        "radius": 230,
+        "snowLine": 168,
+        "warp": 0.2,
+        "summits": [
+          [
+            -0.27,
+            -0.05,
+            1,
+            0.64
+          ],
+          [
+            0.28,
+            0.04,
+            0.96,
+            0.59
+          ],
+          [
+            -0.65,
+            0.2,
+            0.5,
+            0.38
+          ]
+        ],
+        "distant": true,
+        "initialGroundY": 111.89616
+      },
+      "visibleScope": "Current distant geometry and any view attainable from current walkable terrain. Full associated biome, traversal, arena and encounter remain future content.",
+      "stills": [
+        {
+          "id": "split-glacier-horizon",
+          "view": "distant-from-first-vista",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -2,
+              "z": -145
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0.4455019162449474,
+              "pitch": 0.08,
+              "distance": 9
+            }
+          },
+          "notes": "Positive pitch retains the requested 9m camera distance above the rising terrain behind this viewpoint.",
+          "status": "planned"
+        },
+        {
+          "id": "glacier-approach",
+          "view": "ground-approach",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -310,
+              "z": -535
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.15,
+              "distance": 6.5
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "glacier-near",
+          "view": "nearest-accessible-ground-view",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -310,
+              "z": -590
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.15,
+              "distance": 3
+            }
+          },
+          "notes": "The peak is landmark geometry over terrain, without a climbable summit collider. Record the nearest reachable grounded view and any overlap or obstruction.",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "ambient-vista"
+      ],
+      "futureCompletionMilestone": "M5"
+    },
+    {
+      "id": "furnace-arch",
+      "name": "Furnace arch",
+      "type": "landmark",
+      "milestone": "M1",
+      "model": {
+        "id": "furnace-arch",
+        "name": "Furnace arch",
+        "kind": "arch",
+        "x": 175,
+        "z": -670,
+        "width": 70,
+        "height": 84,
+        "distant": true,
+        "initialGroundY": -2.11812
+      },
+      "visibleScope": "Current distant geometry and any view attainable from current walkable terrain. Full associated biome, traversal, arena and encounter remain future content.",
+      "stills": [
+        {
+          "id": "furnace-arch-horizon",
+          "view": "distant-from-first-vista",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -2,
+              "z": -145
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": -0.32517519854253635,
+              "pitch": 0.08,
+              "distance": 9
+            }
+          },
+          "notes": "Positive pitch retains the requested 9m camera distance above the rising terrain behind this viewpoint.",
+          "status": "planned"
+        },
+        {
+          "id": "arch-approach",
+          "view": "ground-approach",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 175,
+              "z": -540
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.15,
+              "distance": 6.5
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "arch-near",
+          "view": "nearest-accessible-column-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 145,
+              "z": -653
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.15,
+              "distance": 3
+            }
+          },
+          "notes": "Approach and nearest detail are separate views; ordinary camera limits need not fit the entire arch in a close detail shot.",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "ambient-vista"
+      ],
+      "futureCompletionMilestone": "M5"
+    },
+    {
+      "id": "threadwind-islets",
+      "name": "Threadwind islets",
+      "type": "landmark",
+      "milestone": "M1",
+      "model": {
+        "id": "threadwind-islets",
+        "name": "Threadwind islets",
+        "kind": "islets",
+        "x": 330,
+        "z": -930,
+        "height": 235,
+        "distant": true,
+        "initialGroundY": 83.77678
+      },
+      "visibleScope": "Current distant geometry and any view attainable from current walkable terrain. Full associated biome, traversal, arena and encounter remain future content.",
+      "stills": [
+        {
+          "id": "threadwind-islets-horizon",
+          "view": "distant-from-first-vista",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -2,
+              "z": -145
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": -0.4001159791192349,
+              "pitch": 0.08,
+              "distance": 9
+            }
+          },
+          "notes": "Positive pitch retains the requested 9m camera distance above the rising terrain behind this viewpoint.",
+          "status": "planned"
+        },
+        {
+          "id": "islets-approach",
+          "view": "ground-approach",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 330,
+              "z": -400
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0,
+              "distance": 6.5
+            }
+          },
+          "notes": "Ground approach retains the full 6.5m camera and includes the upper islet within the normal vertical field of view.",
+          "status": "planned"
+        },
+        {
+          "id": "islets-near-ground",
+          "view": "nearest-current-ground-vantage",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 330,
+              "z": -560
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.15,
+              "distance": 3
+            }
+          },
+          "notes": "Ground vantage preserves the highest islet within the normal camera pitch limit. Closer ground approaches crop the upper silhouette. Islet surfaces are not accessible in M1; record the unavailable surface detail explicitly.",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "ambient-vista"
+      ],
+      "futureCompletionMilestone": "M5"
+    },
+    {
+      "id": "broken-astrolabe",
+      "name": "Broken astrolabe",
+      "type": "landmark",
+      "milestone": "M1",
+      "model": {
+        "id": "broken-astrolabe",
+        "name": "Broken astrolabe",
+        "kind": "observatory",
+        "x": 20,
+        "z": -900,
+        "drum": 22,
+        "tower": 50,
+        "distant": true,
+        "initialGroundY": 81.79405
+      },
+      "visibleScope": "Current distant geometry and any view attainable from current walkable terrain. Full associated biome, traversal, arena and encounter remain future content.",
+      "stills": [
+        {
+          "id": "broken-astrolabe-horizon",
+          "view": "distant-from-first-vista",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -2,
+              "z": -145
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": -0.029130829857952324,
+              "pitch": 0.08,
+              "distance": 9
+            }
+          },
+          "notes": "Positive pitch retains the requested 9m camera distance above the rising terrain behind this viewpoint.",
+          "status": "planned"
+        },
+        {
+          "id": "astrolabe-approach",
+          "view": "ground-approach",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 20,
+              "z": -775
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.15,
+              "distance": 6.5
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "astrolabe-near",
+          "view": "nearest-accessible-base-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 20,
+              "z": -864
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.15,
+              "distance": 3
+            }
+          },
+          "notes": "The drawn platform and structure have no dedicated walkable collision surface in M1. Record actual ground access and any intersections rather than placing on a decorative deck.",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "ambient-vista"
+      ],
+      "futureCompletionMilestone": "M5"
+    },
+    {
+      "id": "old-root-outcrop",
+      "type": "formation-and-traversal",
+      "milestone": "M1",
+      "model": {
+        "id": "old-root-outcrop",
+        "kind": "outcrop",
+        "x": -9,
+        "z": -42,
+        "radius": 2.5,
+        "height": 5.5,
+        "climbable": true,
+        "initialGroundY": 9.72978,
+        "colliderTopY": 15.22978
+      },
+      "stills": [
+        {
+          "id": "outcrop-wide",
+          "view": "approach",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -9,
+              "z": -28
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.1,
+              "distance": 9
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "outcrop-normal",
+          "view": "normal-distance",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -3,
+              "z": -40
+            },
+            "yaw": 1.5707963267948966,
+            "stamina": 100,
+            "camera": {
+              "yaw": 1.5707963267948966,
+              "pitch": -0.06,
+              "distance": 6.5
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "outcrop-close",
+          "view": "nearest-accessible-face",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -9,
+              "z": -38.8
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.1,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "climb-outcrop",
+        "outcrop-jump-descent",
+        "camera-obstacle"
+      ]
+    },
+    {
+      "id": "forest-dressing",
+      "type": "biome-detail-group",
+      "milestone": "M1",
+      "visibleScope": "Four hero broadleaf trees plus scattered trunks/crowns,95 roadside fern/mushroom/stone placements, grass and flowers. These remain visible parts of the forest item.",
+      "heroTreeCoordinates": [
+        {
+          "x": -18,
+          "z": -15,
+          "size": 1.6,
+          "kind": 2,
+          "turn": 0.6
+        },
+        {
+          "x": 19,
+          "z": -22,
+          "size": 1.7,
+          "kind": 2,
+          "turn": 2.1
+        },
+        {
+          "x": -22,
+          "z": 13,
+          "size": 1.5,
+          "kind": 0,
+          "turn": 4.1
+        },
+        {
+          "x": 24,
+          "z": 9,
+          "size": 1.6,
+          "kind": 0,
+          "turn": 1.8
+        }
+      ],
+      "floraSamples": [
+        {
+          "id": "fern-fan",
+          "x": 7.8086,
+          "z": -7
+        },
+        {
+          "id": "mushroom",
+          "x": -6.7368,
+          "z": -8.379999999999999
+        },
+        {
+          "id": "trail-stone",
+          "x": 7.1344,
+          "z": -9.76
+        }
+      ],
+      "stills": [
+        {
+          "id": "detail-fern-fan",
+          "view": "nearest-gameplay-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 8.65,
+              "z": -7.2
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 1.05,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "detail-mushroom",
+          "view": "nearest-gameplay-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -7.5,
+              "z": -8.6
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 1.05,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "detail-trail-stone",
+          "view": "nearest-gameplay-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 9.1,
+              "z": -8.5
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 1.0007558630951863,
+              "pitch": 0.35,
+              "distance": 3
+            }
+          },
+          "notes": "Oblique view toward the dressing stone from outside the training-rock collider.",
+          "status": "planned"
+        },
+        {
+          "id": "hero-tree-detail",
+          "view": "trunk-and-canopy-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -18,
+              "z": -9
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.15,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "hero-tree-kind0-detail",
+          "view": "trunk-and-canopy-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -22,
+              "z": 19
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.15,
+              "distance": 3
+            }
+          },
+          "notes": "Second hero-tree silhouette family; preserve canopy and trunk context.",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "ambient-clearing",
+        "route-clearing-vista"
+      ]
+    },
+    {
+      "id": "trail-rocks",
+      "type": "biome-detail-and-collision-group",
+      "milestone": "M1",
+      "visibleScope": "All seven placed trail rocks, including the low climbable rock. Captures must retain their relation to feet and terrain.",
+      "instances": [
+        {
+          "id": "trail-rock-0",
+          "x": 5.5,
+          "z": -8,
+          "size": [
+            1.9,
+            1.15,
+            1.6
+          ],
+          "seat": true,
+          "climbable": true,
+          "turn": 0.4,
+          "initialGroundY": 0
+        },
+        {
+          "id": "trail-rock-1",
+          "x": -5.8,
+          "z": -14,
+          "size": [
+            1.3,
+            0.65,
+            1.1
+          ],
+          "turn": 0.7,
+          "initialGroundY": 0.30752
+        },
+        {
+          "id": "trail-rock-2",
+          "x": 8.5,
+          "z": -28,
+          "size": [
+            1.5,
+            0.85,
+            1.1
+          ],
+          "turn": 1.1,
+          "initialGroundY": 4.22925
+        },
+        {
+          "id": "trail-rock-3",
+          "x": -4.5,
+          "z": -36,
+          "size": [
+            0.7,
+            0.45,
+            0.7
+          ],
+          "turn": 1.7,
+          "initialGroundY": 6.79721
+        },
+        {
+          "id": "trail-rock-4",
+          "x": 7.6,
+          "z": -58,
+          "size": [
+            1.6,
+            0.9,
+            1.2
+          ],
+          "turn": 2.4,
+          "initialGroundY": 18.71629
+        },
+        {
+          "id": "trail-rock-5",
+          "x": -6.8,
+          "z": -72,
+          "size": [
+            1.8,
+            1.2,
+            1.5
+          ],
+          "climbable": true,
+          "turn": 3,
+          "initialGroundY": 25.30493
+        },
+        {
+          "id": "trail-rock-6",
+          "x": 8.2,
+          "z": -110,
+          "size": [
+            2.6,
+            1.4,
+            2
+          ],
+          "climbable": true,
+          "turn": 2.2,
+          "initialGroundY": 28.23969
+        }
+      ],
+      "stills": [
+        {
+          "id": "trail-rock-0-close",
+          "view": "nearest-gameplay-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 5.5,
+              "z": -5.1
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.3,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "trail-rock-1-close",
+          "view": "nearest-gameplay-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -5.8,
+              "z": -11.7
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.3,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "trail-rock-2-close",
+          "view": "nearest-gameplay-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 8.5,
+              "z": -25.5
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.3,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "trail-rock-3-close",
+          "view": "nearest-gameplay-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -2.6,
+              "z": -35
+            },
+            "yaw": 1.5707963267948966,
+            "stamina": 100,
+            "camera": {
+              "yaw": 1.5707963267948966,
+              "pitch": 0.3,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "trail-rock-4-close",
+          "view": "nearest-gameplay-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 7.6,
+              "z": -55.4
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.3,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "trail-rock-5-close",
+          "view": "nearest-gameplay-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -3.6,
+              "z": -70.8
+            },
+            "yaw": 1.5707963267948966,
+            "stamina": 100,
+            "camera": {
+              "yaw": 1.5707963267948966,
+              "pitch": 0.3,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "trail-rock-6-close",
+          "view": "nearest-gameplay-detail",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 8.2,
+              "z": -106.4
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.3,
+              "distance": 3
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "route-clearing-vista",
+        "climb-low-rock",
+        "camera-obstacle"
+      ]
+    },
+    {
+      "id": "sky-clouds-mist",
+      "type": "ambient-environment",
+      "milestone": "M1",
+      "visibleScope": "Current sky, moving cloud layers, distance haze/mist, terrain palette, grass and foliage motion. A rain theme is present; do not claim physical rain streaks unless captured pixels show them.",
+      "stills": [
+        {
+          "id": "atmosphere-clearing",
+          "view": "wide",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": 0,
+              "z": 0
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": -0.1,
+              "distance": 9
+            }
+          },
+          "notes": "",
+          "status": "planned"
+        },
+        {
+          "id": "atmosphere-vista",
+          "view": "wide",
+          "themes": [
+            "day",
+            "dusk",
+            "rain"
+          ],
+          "fixture": {
+            "position": {
+              "x": -2,
+              "z": -145
+            },
+            "yaw": 0,
+            "stamina": 100,
+            "camera": {
+              "yaw": 0,
+              "pitch": 0.08,
+              "distance": 9
+            }
+          },
+          "notes": "Positive pitch retains the requested 9m camera distance above the rising terrain behind this viewpoint.",
+          "status": "planned"
+        }
+      ],
+      "sequenceIds": [
+        "ambient-clearing",
+        "ambient-vista",
+        "ambient-fen"
+      ],
+      "reducedMotionSequenceIds": [
+        "ambient-clearing",
+        "ambient-vista"
+      ]
+    },
+    {
+      "id": "avatar",
+      "type": "character",
+      "milestone": "M1",
+      "model": {
+        "asset": "public/wilds/avatar.glb",
+        "manifest": "public/wilds/avatar-manifest.json",
+        "heightMetres": 1.81,
+        "forward": "-Z"
+      },
+      "stillsMatrix": "appearanceCoverage.stillMatrix",
+      "motionMatrix": "appearanceCoverage.motionMatrix",
+      "sequenceIds": [
+        "locomotion-overview",
+        "repeated-starts-turn",
+        "climb-outcrop",
+        "outcrop-jump-descent",
+        "fall-asset-fixture"
+      ],
+      "clips": [
+        "idle",
+        "walk",
+        "run",
+        "jump",
+        "fall",
+        "land",
+        "climb"
+      ]
+    },
+    {
+      "id": "m1-hud",
+      "type": "interface",
+      "milestone": "M1",
+      "visibleScope": "Current player HUD and native controls as actually present. Keep stamina values and feedback readable during movement, exhaustion, climb and recovery. Future pet/combat/shop UI is not due in M1.",
+      "sequenceIds": [
+        "locomotion-overview",
+        "stamina-exhaustion-recovery",
+        "climb-outcrop",
+        "repeated-starts-turn"
+      ],
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ]
+    }
+  ],
+  "appearanceProfiles": [
+    {
+      "id": "appearance-01",
+      "appearance": {
+        "skin": "warm",
+        "hair": "chestnut",
+        "top": "clay",
+        "bottom": "sage",
+        "style": "bun",
+        "outfit": "cardigan",
+        "bottomStyle": "trousers",
+        "accessory": "none"
+      }
+    },
+    {
+      "id": "appearance-02",
+      "appearance": {
+        "skin": "porcelain",
+        "hair": "espresso",
+        "top": "rose",
+        "bottom": "walnut",
+        "style": "bob",
+        "outfit": "hoodie",
+        "bottomStyle": "shorts",
+        "accessory": "glasses"
+      }
+    },
+    {
+      "id": "appearance-03",
+      "appearance": {
+        "skin": "golden",
+        "hair": "copper",
+        "top": "sage",
+        "bottom": "midnight",
+        "style": "waves",
+        "outfit": "overalls",
+        "bottomStyle": "skirt",
+        "accessory": "blossom"
+      }
+    },
+    {
+      "id": "appearance-04",
+      "appearance": {
+        "skin": "cocoa",
+        "hair": "honey",
+        "top": "butter",
+        "bottom": "plum",
+        "style": "crop",
+        "outfit": "sailor",
+        "bottomStyle": "trousers",
+        "accessory": "moon-clips"
+      }
+    },
+    {
+      "id": "appearance-05",
+      "appearance": {
+        "skin": "deep",
+        "hair": "silver",
+        "top": "lavender",
+        "bottom": "cream",
+        "style": "waves",
+        "outfit": "cardigan",
+        "bottomStyle": "skirt",
+        "accessory": "glasses"
+      }
+    },
+    {
+      "id": "appearance-06",
+      "appearance": {
+        "skin": "warm",
+        "hair": "chestnut",
+        "top": "sky",
+        "bottom": "sage",
+        "style": "bun",
+        "outfit": "hoodie",
+        "bottomStyle": "shorts",
+        "accessory": "none"
+      }
+    }
+  ],
+  "appearanceCoverage": {
+    "rule": "The six complete profiles cover every existing value of skin, hair, top, bottom, style, outfit, bottomStyle and accessory. This is coverage of every option, not a claim to capture every Cartesian combination.",
+    "values": {
+      "skin": [
+        "porcelain",
+        "warm",
+        "golden",
+        "cocoa",
+        "deep"
+      ],
+      "hair": [
+        "chestnut",
+        "espresso",
+        "copper",
+        "honey",
+        "silver"
+      ],
+      "top": [
+        "clay",
+        "rose",
+        "sage",
+        "butter",
+        "lavender",
+        "sky"
+      ],
+      "bottom": [
+        "sage",
+        "walnut",
+        "midnight",
+        "plum",
+        "cream"
+      ],
+      "style": [
+        "bun",
+        "bob",
+        "waves",
+        "crop"
+      ],
+      "outfit": [
+        "cardigan",
+        "hoodie",
+        "overalls",
+        "sailor"
+      ],
+      "bottomStyle": [
+        "trousers",
+        "skirt",
+        "shorts"
+      ],
+      "accessory": [
+        "none",
+        "glasses",
+        "blossom",
+        "moon-clips"
+      ]
+    },
+    "stillMatrix": {
+      "profiles": [
+        "appearance-01",
+        "appearance-02",
+        "appearance-03",
+        "appearance-04",
+        "appearance-05",
+        "appearance-06"
+      ],
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "distances": [
+        {
+          "id": "normal",
+          "metres": 6.5
+        },
+        {
+          "id": "close",
+          "metres": 3
+        }
+      ],
+      "angles": [
+        {
+          "id": "front",
+          "yaw": 3.141592653589793
+        },
+        {
+          "id": "side",
+          "yaw": 1.5707963267948966
+        },
+        {
+          "id": "rear",
+          "yaw": 0
+        }
+      ],
+      "fixtureBase": {
+        "position": {
+          "x": 0,
+          "z": 0
+        },
+        "yaw": 0,
+        "stamina": 100,
+        "camera": {
+          "yaw": 3.141592653589793,
+          "pitch": 0.08,
+          "distance": 3
+        }
+      },
+      "framing": "Keep the entire body and shoes in each view; add a supplementary face or garment detail crop only after the uncropped close view exists."
+    },
+    "motionMatrix": {
+      "sequences": [
+        "locomotion-overview",
+        "climb-outcrop",
+        "outcrop-jump-descent"
+      ],
+      "profiles": [
+        "appearance-01",
+        "appearance-02",
+        "appearance-03",
+        "appearance-04"
+      ],
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "notes": "These four profiles include every hair, outfit, bottomStyle and accessory silhouette. Profiles05 and06 add palette extremes in the still matrix. Add their sequences in any theme where the stills show contrast or material separation requiring motion evidence."
+    }
+  },
+  "sequences": [
+    {
+      "id": "locomotion-overview",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "locomotion-overview",
+        "durationMs": 11200,
+        "fixture": {
+          "position": {
+            "x": 0,
+            "z": 0
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0.5,
+            "pitch": 0.16,
+            "distance": 4.5
+          }
+        },
+        "events": [
+          {
+            "at": 6000,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 7300,
+            "type": "keyDown",
+            "code": "ShiftLeft"
+          },
+          {
+            "at": 8300,
+            "type": "keyUp",
+            "code": "KeyW"
+          },
+          {
+            "at": 8300,
+            "type": "keyUp",
+            "code": "ShiftLeft"
+          },
+          {
+            "at": 8600,
+            "type": "keyDown",
+            "code": "Space"
+          },
+          {
+            "at": 8750,
+            "type": "keyUp",
+            "code": "Space"
+          }
+        ]
+      },
+      "coverage": [
+        "idle",
+        "walk",
+        "run",
+        "jump",
+        "fall",
+        "land",
+        "walk-start-release",
+        "sprint-start-release",
+        "jump-land"
+      ],
+      "notes": "Six seconds idle plus1300ms walk and1000ms sprint show at least two loops each. Normal jump includes short fall and landing transitions, not two full fall loops. Reuse audited input schedule, recapture current post-gate build. The side-tracking variant replaces W with D while keeping camera yaw0, so movement crosses the view and exposes planted feet.",
+      "status": "planned",
+      "cameraVariants": [
+        {
+          "id": "rear-oblique",
+          "camera": {
+            "yaw": 0.5,
+            "pitch": 0.16,
+            "distance": 4.5
+          },
+          "eventCodeMap": {}
+        },
+        {
+          "id": "side-tracking",
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.1,
+            "distance": 4.5
+          },
+          "eventCodeMap": {
+            "KeyW": "KeyD"
+          }
+        }
+      ]
+    },
+    {
+      "id": "repeated-starts-turn",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "repeated-starts-turn",
+        "durationMs": 6800,
+        "fixture": {
+          "position": {
+            "x": 0,
+            "z": 0
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.16,
+            "distance": 6.5
+          }
+        },
+        "events": [
+          {
+            "at": 600,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 1300,
+            "type": "keyUp",
+            "code": "KeyW"
+          },
+          {
+            "at": 1650,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 1650,
+            "type": "keyDown",
+            "code": "ShiftLeft"
+          },
+          {
+            "at": 2550,
+            "type": "keyUp",
+            "code": "KeyW"
+          },
+          {
+            "at": 2550,
+            "type": "keyUp",
+            "code": "ShiftLeft"
+          },
+          {
+            "at": 2950,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 3500,
+            "type": "keyDown",
+            "code": "KeyD"
+          },
+          {
+            "at": 3750,
+            "type": "mousePressed",
+            "x": 450,
+            "y": 300,
+            "button": "left",
+            "buttons": 1
+          },
+          {
+            "at": 3820,
+            "type": "mouseMoved",
+            "x": 490,
+            "y": 312,
+            "buttons": 1
+          },
+          {
+            "at": 3890,
+            "type": "mouseMoved",
+            "x": 530,
+            "y": 320,
+            "buttons": 1
+          },
+          {
+            "at": 3960,
+            "type": "mouseReleased",
+            "x": 530,
+            "y": 320,
+            "button": "left",
+            "buttons": 0
+          },
+          {
+            "at": 4300,
+            "type": "keyUp",
+            "code": "KeyD"
+          },
+          {
+            "at": 4900,
+            "type": "keyUp",
+            "code": "KeyW"
+          },
+          {
+            "at": 5400,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 5850,
+            "type": "keyUp",
+            "code": "KeyW"
+          }
+        ]
+      },
+      "coverage": [
+        "repeated-start-stop",
+        "walk-turn",
+        "pointer-camera",
+        "release-recovery"
+      ],
+      "notes": "All turns and camera movement come from actual key/pointer events. Camera dragging also emits the currently mapped left-button action; no combat result is asserted in M1.",
+      "status": "planned"
+    },
+    {
+      "id": "route-clearing-vista",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "route-clearing-vista",
+        "durationMs": 34000,
+        "fixture": {
+          "position": {
+            "x": 0,
+            "z": 0
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.12,
+            "distance": 6.5
+          }
+        },
+        "events": [
+          {
+            "at": 1000,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 32200,
+            "type": "keyUp",
+            "code": "KeyW"
+          }
+        ]
+      },
+      "coverage": [
+        "clearing-to-vista",
+        "forest",
+        "meadow",
+        "biome-border",
+        "terrain-slope",
+        "terrain-streaming",
+        "bellroot-gate",
+        "first-vista"
+      ],
+      "notes": "Existing lh flow checks a31s forward route reaches z<\u2212145. Capture the entire route, not just its endpoint. Refine with actual directional input if the current path/collider layout prevents it.",
+      "status": "planned"
+    },
+    {
+      "id": "slope-and-border",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "slope-and-border",
+        "durationMs": 12500,
+        "fixture": {
+          "position": {
+            "x": 0,
+            "z": -74
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.14,
+            "distance": 6.5
+          }
+        },
+        "events": [
+          {
+            "at": 600,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 11600,
+            "type": "keyUp",
+            "code": "KeyW"
+          }
+        ]
+      },
+      "coverage": [
+        "forest-meadow-border",
+        "slope-foot-contact",
+        "terrain-streaming"
+      ],
+      "notes": "Normal-speed walking from forest edge through the gate toward z\u2248\u2212127. This complements the full route at a view where feet and terrain remain readable.",
+      "status": "planned"
+    },
+    {
+      "id": "stamina-exhaustion-recovery",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "stamina-exhaustion-recovery",
+        "durationMs": 13200,
+        "fixture": {
+          "position": {
+            "x": 0,
+            "z": 0
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.14,
+            "distance": 6.5
+          }
+        },
+        "events": [
+          {
+            "at": 600,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 600,
+            "type": "keyDown",
+            "code": "ShiftLeft"
+          },
+          {
+            "at": 8700,
+            "type": "keyUp",
+            "code": "KeyW"
+          },
+          {
+            "at": 8700,
+            "type": "keyUp",
+            "code": "ShiftLeft"
+          },
+          {
+            "at": 11800,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 11800,
+            "type": "keyDown",
+            "code": "ShiftLeft"
+          },
+          {
+            "at": 12400,
+            "type": "keyUp",
+            "code": "KeyW"
+          },
+          {
+            "at": 12400,
+            "type": "keyUp",
+            "code": "ShiftLeft"
+          }
+        ]
+      },
+      "coverage": [
+        "sprint-exhaustion",
+        "walk-fallback",
+        "release",
+        "stamina-recovery",
+        "sprint-after-recovery",
+        "hud"
+      ],
+      "notes": "Start with100stamina, hold sprint beyond100/14seconds, release long enough to show recovery, then sprint again. This is a response/feedback capture, not an authored-cycle-only clip.",
+      "status": "planned"
+    },
+    {
+      "id": "climb-low-rock",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "climb-low-rock",
+        "durationMs": 3600,
+        "fixture": {
+          "position": {
+            "x": 5.5,
+            "z": -5.7
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.14,
+            "distance": 6.5
+          }
+        },
+        "events": [
+          {
+            "at": 600,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 600,
+            "type": "keyDown",
+            "code": "Space"
+          },
+          {
+            "at": 1300,
+            "type": "keyUp",
+            "code": "KeyW"
+          },
+          {
+            "at": 1300,
+            "type": "keyUp",
+            "code": "Space"
+          }
+        ]
+      },
+      "coverage": [
+        "climb-entry",
+        "low-rock-contact",
+        "climb-release"
+      ],
+      "notes": "Existing lh flow reaches climb after300ms at this fixture. The low rock cannot provide two700ms climb loops; use the tall outcrop capture for full clip coverage.",
+      "status": "planned"
+    },
+    {
+      "id": "climb-outcrop",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "climb-outcrop",
+        "durationMs": 5600,
+        "fixture": {
+          "position": {
+            "x": -9,
+            "z": -38.98
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.16,
+            "distance": 6.5
+          }
+        },
+        "events": [
+          {
+            "at": 700,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 700,
+            "type": "keyDown",
+            "code": "Space"
+          },
+          {
+            "at": 4300,
+            "type": "keyUp",
+            "code": "KeyW"
+          },
+          {
+            "at": 4300,
+            "type": "keyUp",
+            "code": "Space"
+          }
+        ]
+      },
+      "coverage": [
+        "climb",
+        "two-climb-cycles",
+        "climb-foot-hand-contact",
+        "stamina",
+        "climb-to-top"
+      ],
+      "notes": "The5.5m outcrop supports about2.75seconds of ascent at2m/s, enough for two700ms loops plus entry and exit. At x\u22129,z\u221238.98, forward input reaches the collider contact shell. Stop if captured setup does not reach this face; record the actual corrected fixture.",
+      "status": "planned",
+      "cameraRequirement": "Both variants move toward the same outcrop face at world\u2212Z. The side camera uses D with yaw\u03c0/2. Check that ordinary camera collision does not hide the contacts and retain any obstruction in the evidence.",
+      "cameraVariants": [
+        {
+          "id": "rear",
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.16,
+            "distance": 6.5
+          },
+          "eventCodeMap": {}
+        },
+        {
+          "id": "side-contact",
+          "camera": {
+            "yaw": 1.5707963267948966,
+            "pitch": 0.1,
+            "distance": 6.5
+          },
+          "eventCodeMap": {
+            "KeyW": "KeyD"
+          }
+        }
+      ]
+    },
+    {
+      "id": "outcrop-jump-descent",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "outcrop-jump-descent",
+        "durationMs": 4500,
+        "fixture": {
+          "position": {
+            "x": -9,
+            "z": -41.5,
+            "y": 15.24478
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.1,
+            "distance": 6.5
+          }
+        },
+        "events": [
+          {
+            "at": 600,
+            "type": "keyDown",
+            "code": "Space"
+          },
+          {
+            "at": 620,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 780,
+            "type": "keyUp",
+            "code": "Space"
+          },
+          {
+            "at": 1400,
+            "type": "keyUp",
+            "code": "KeyW"
+          }
+        ]
+      },
+      "coverage": [
+        "reachable-outcrop-top",
+        "jump",
+        "fall",
+        "land",
+        "landing-ground-contact"
+      ],
+      "notes": "Start on the reachable outcrop top, whose y is the rendered base plus5.5m. This setup is allowed but does not itself show the ascent; pair it with climb-outcrop. Natural descent is shorter than two fall loops. Confirm support against the runtime collider before recording.",
+      "status": "planned"
+    },
+    {
+      "id": "fall-asset-fixture",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "fall-asset-fixture",
+        "durationMs": 3000,
+        "fixture": {
+          "position": {
+            "x": 0,
+            "y": 29,
+            "z": 0
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0.6,
+            "pitch": 0.08,
+            "distance": 4.5
+          }
+        },
+        "events": []
+      },
+      "coverage": [
+        "fall",
+        "two-fall-cycles",
+        "fall-land-transition"
+      ],
+      "notes": "Explicit elevated starting-position fixture for authored asset coverage. It starts29m above the clearing and falls under ordinary physics, staying within the30m recovery threshold. It does not prove an accessible cliff, a player-initiated jump, or control response. Pair with actual Space and outcrop sequences. Confirm two800ms cycles and the full landing after capture.",
+      "status": "planned",
+      "evidencePurpose": "asset-clip-coverage-only"
+    },
+    {
+      "id": "camera-obstacle",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "camera-obstacle",
+        "durationMs": 5600,
+        "fixture": {
+          "position": {
+            "x": -9,
+            "z": -31
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 3.141592653589793,
+            "pitch": 0.14,
+            "distance": 6.5
+          }
+        },
+        "events": [
+          {
+            "at": 800,
+            "type": "keyDown",
+            "code": "KeyS"
+          },
+          {
+            "at": 2500,
+            "type": "keyUp",
+            "code": "KeyS"
+          },
+          {
+            "at": 3000,
+            "type": "mousePressed",
+            "x": 360,
+            "y": 310,
+            "button": "left",
+            "buttons": 1
+          },
+          {
+            "at": 3100,
+            "type": "mouseMoved",
+            "x": 470,
+            "y": 320,
+            "buttons": 1
+          },
+          {
+            "at": 3200,
+            "type": "mouseMoved",
+            "x": 590,
+            "y": 315,
+            "buttons": 1
+          },
+          {
+            "at": 3300,
+            "type": "mouseReleased",
+            "x": 590,
+            "y": 315,
+            "button": "left",
+            "buttons": 0
+          },
+          {
+            "at": 3650,
+            "type": "keyDown",
+            "code": "KeyW"
+          },
+          {
+            "at": 4400,
+            "type": "keyUp",
+            "code": "KeyW"
+          }
+        ]
+      },
+      "coverage": [
+        "camera-terrain-obstacle",
+        "camera-pull-forward",
+        "camera-recovery",
+        "pointer-input"
+      ],
+      "notes": "Begin south of the outcrop with a clear camera ray. With camera yaw\u03c0, S moves the player toward the outcrop and brings the camera into collision. Capture contraction, release, then a pointer turn and movement away. This fixture is a candidate until actual framing and contact are inspected.",
+      "status": "planned"
+    },
+    {
+      "id": "ambient-clearing",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "ambient-clearing",
+        "durationMs": 6500,
+        "fixture": {
+          "position": {
+            "x": 0,
+            "z": 0
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.14,
+            "distance": 9
+          }
+        },
+        "events": []
+      },
+      "coverage": [
+        "ambient-motion",
+        "theme-lighting",
+        "environment-depth",
+        "idle"
+      ],
+      "notes": "Record normal motion in all three themes and a reduced-motion counterpart where listed in the inventory. This is environmental motion evidence, not a framerate measurement.",
+      "status": "planned"
+    },
+    {
+      "id": "ambient-vista",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "ambient-vista",
+        "durationMs": 6500,
+        "fixture": {
+          "position": {
+            "x": -2,
+            "z": -145
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.08,
+            "distance": 9
+          }
+        },
+        "events": []
+      },
+      "coverage": [
+        "ambient-motion",
+        "theme-lighting",
+        "environment-depth",
+        "idle"
+      ],
+      "notes": "Record normal motion in all three themes and a reduced-motion counterpart where listed in the inventory. This is environmental motion evidence, not a framerate measurement.",
+      "status": "planned"
+    },
+    {
+      "id": "ambient-fen",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "modes": [
+        "real-time",
+        "fixed-game-clock"
+      ],
+      "sequence": {
+        "id": "ambient-fen",
+        "durationMs": 6500,
+        "fixture": {
+          "position": {
+            "x": 25,
+            "z": -317
+          },
+          "yaw": 0,
+          "stamina": 100,
+          "camera": {
+            "yaw": 0,
+            "pitch": 0.18,
+            "distance": 6.5
+          }
+        },
+        "events": []
+      },
+      "coverage": [
+        "ambient-motion",
+        "theme-lighting",
+        "environment-depth",
+        "idle"
+      ],
+      "notes": "Record normal motion in all three themes and a reduced-motion counterpart where listed in the inventory. This is environmental motion evidence, not a framerate measurement.",
+      "status": "planned"
+    }
+  ],
+  "clipCoverage": [
+    {
+      "id": "idle",
+      "durationMs": 3000,
+      "loop": true,
+      "speedMetresPerSecond": 0,
+      "minimumAuthoredSpanMs": 6000,
+      "sequenceIds": [
+        "locomotion-overview"
+      ],
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "required": "Whole body, relevant contacts, entry and exit; looping clips need at least two complete cycles; non-looping clips need their complete action and settled endpoint.",
+      "confirmation": "Record actual action and clip timing from the captured build; the planned schedule does not itself establish coverage."
+    },
+    {
+      "id": "walk",
+      "durationMs": 533.333333,
+      "loop": true,
+      "speedMetresPerSecond": 4.8,
+      "stanceFraction": 0.24,
+      "minimumAuthoredSpanMs": 1066.666666,
+      "sequenceIds": [
+        "locomotion-overview",
+        "repeated-starts-turn",
+        "route-clearing-vista"
+      ],
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "required": "Whole body, relevant contacts, entry and exit; looping clips need at least two complete cycles; non-looping clips need their complete action and settled endpoint.",
+      "confirmation": "Record actual action and clip timing from the captured build; the planned schedule does not itself establish coverage."
+    },
+    {
+      "id": "run",
+      "durationMs": 433.333333,
+      "loop": true,
+      "speedMetresPerSecond": 8.5,
+      "stanceFraction": 0.2,
+      "minimumAuthoredSpanMs": 866.666666,
+      "sequenceIds": [
+        "locomotion-overview",
+        "stamina-exhaustion-recovery"
+      ],
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "required": "Whole body, relevant contacts, entry and exit; looping clips need at least two complete cycles; non-looping clips need their complete action and settled endpoint.",
+      "confirmation": "Record actual action and clip timing from the captured build; the planned schedule does not itself establish coverage."
+    },
+    {
+      "id": "jump",
+      "durationMs": 400,
+      "loop": false,
+      "speedMetresPerSecond": 0,
+      "minimumAuthoredSpanMs": 400,
+      "sequenceIds": [
+        "locomotion-overview",
+        "outcrop-jump-descent"
+      ],
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "required": "Whole body, relevant contacts, entry and exit; looping clips need at least two complete cycles; non-looping clips need their complete action and settled endpoint.",
+      "confirmation": "Record actual action and clip timing from the captured build; the planned schedule does not itself establish coverage."
+    },
+    {
+      "id": "fall",
+      "durationMs": 800,
+      "loop": true,
+      "speedMetresPerSecond": 0,
+      "minimumAuthoredSpanMs": 1600,
+      "sequenceIds": [
+        "fall-asset-fixture",
+        "outcrop-jump-descent",
+        "locomotion-overview"
+      ],
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "required": "Whole body, relevant contacts, entry and exit; looping clips need at least two complete cycles; non-looping clips need their complete action and settled endpoint.",
+      "confirmation": "Normal jump footage contains only a fraction of one800ms cycle. Require the explicitly labelled elevated fixture for two cycles."
+    },
+    {
+      "id": "land",
+      "durationMs": 333.333333,
+      "loop": false,
+      "speedMetresPerSecond": 0,
+      "minimumAuthoredSpanMs": 333.333333,
+      "sequenceIds": [
+        "locomotion-overview",
+        "outcrop-jump-descent",
+        "fall-asset-fixture"
+      ],
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "required": "Whole body, relevant contacts, entry and exit; looping clips need at least two complete cycles; non-looping clips need their complete action and settled endpoint.",
+      "confirmation": "Capture after the movement landing hold is aligned to333.333333ms and verify the endpoint before idle. Existing smoke footage predates that correction."
+    },
+    {
+      "id": "climb",
+      "durationMs": 700,
+      "loop": true,
+      "speedMetresPerSecond": 2,
+      "minimumAuthoredSpanMs": 1400,
+      "sequenceIds": [
+        "climb-outcrop",
+        "climb-low-rock"
+      ],
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "required": "Whole body, relevant contacts, entry and exit; looping clips need at least two complete cycles; non-looping clips need their complete action and settled endpoint.",
+      "confirmation": "The short low-rock flow is only a control smoke check. Require the tall-outcrop sequence for two cycles."
+    }
+  ],
+  "controls": [
+    {
+      "id": "walk-start-release",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "locomotion-overview",
+        "repeated-starts-turn"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    },
+    {
+      "id": "sprint-start-release",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "locomotion-overview",
+        "repeated-starts-turn"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    },
+    {
+      "id": "turn-while-moving",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "repeated-starts-turn"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    },
+    {
+      "id": "slope-crossing",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "slope-and-border",
+        "route-clearing-vista"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    },
+    {
+      "id": "biome-edge",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "slope-and-border",
+        "route-clearing-vista"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    },
+    {
+      "id": "jump-and-land",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "locomotion-overview",
+        "outcrop-jump-descent"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    },
+    {
+      "id": "camera-obstacles",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "camera-obstacle"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    },
+    {
+      "id": "repeated-starts-stops",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "repeated-starts-turn"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    },
+    {
+      "id": "stamina-exhaustion-and-recovery",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "stamina-exhaustion-recovery"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    },
+    {
+      "id": "climb-and-release",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "climb-outcrop",
+        "climb-low-rock"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    },
+    {
+      "id": "clearing-to-first-vista",
+      "milestone": "M1",
+      "themes": [
+        "day",
+        "dusk",
+        "rain"
+      ],
+      "sequenceIds": [
+        "route-clearing-vista"
+      ],
+      "requiredMode": "real-time plus fixed-clock contact evidence where applicable",
+      "inputSource": "trusted browser key/pointer events"
+    }
+  ],
+  "existingEvidence": [
+    {
+      "id": "locomotion-smoke-2026-10-02",
+      "sequenceFile": ".lh/out/2026-10-02T09-49-28-shot/wilds-sequence/sequence.json",
+      "playbackFile": ".lh/out/2026-10-02T09-49-28-shot/wilds-sequence/playback.mp4",
+      "mode": "real-time",
+      "theme": "day",
+      "viewport": {
+        "width": 960,
+        "height": 640,
+        "scale": 1
+      },
+      "frames": 672,
+      "actualCapturedSpanMs": 11181.3291,
+      "scheduledSequenceId": "locomotion-overview",
+      "candidateClips": [
+        "idle",
+        "walk",
+        "run",
+        "jump",
+        "fall",
+        "land"
+      ],
+      "notCovered": [
+        "climb",
+        "two-full-fall-cycles",
+        "all-three-themes",
+        "all-appearance-variants",
+        "current-post-fix-build"
+      ],
+      "limitations": [
+        "Input and frame integrity were decoded and checked, but this footage is a smoke capture from an earlier in-progress build.",
+        "Do not promote this file into the final round without identifying its exact build and inspecting current-scope coverage.",
+        "Three cleanup keyups occur after the last captured frame."
+      ]
+    },
+    {
+      "id": "existing-lh-wilds-flow",
+      "source": "scripts/lh/flows/wilds.mjs",
+      "coverage": "Real CDP keys for walk, sprint, jump, short climb, exhaustion/recovery, route and pointer camera; includes assertions and a vista still.",
+      "limitation": "This flow is technical evidence, not a complete timed frame sequence for each action. Use its established fixture coordinates and schedules for the planned --sequence captures."
+    }
+  ],
+  "pendingFutureContent": [
+    {
+      "id": "mossback-warden-and-arena",
+      "milestone": "M2",
+      "state": "future-content-not-present-in-M1"
+    },
+    {
+      "id": "progression-shops-benches-gathering-campfires",
+      "milestone": "M3",
+      "state": "future-interaction-content; current decorative hearth remains in M1 visual inventory"
+    },
+    {
+      "id": "all-existing-pet-species-combat",
+      "milestone": "M4",
+      "state": "future-character-content-not-present-in-M1"
+    },
+    {
+      "id": "lake-marsh-frozen-ember-sky-observatory-biomes-and-later-bosses",
+      "milestone": "M5",
+      "state": "future-complete-biomes-and-encounters; their currently visible landmarks and water are still listed in the M1 inventory"
+    }
+  ],
+  "captureExecutionNotes": [
+    "Run the milestone gates before capturing the review build. Preserve earlier rounds without overwriting.",
+    "Take current M1 wide stills first, then close details and appearance matrix; capture sequences after correcting any obstructed or invalid fixture. Record changes to candidate coordinates in the neutral manifest.",
+    "For every distant feature attempt current ground approach and nearest accessible detail as well as the first-vista silhouette. A distant:true source flag does not exempt visible unfinished geometry from review.",
+    "When an inaccessible sky surface or ordinary camera limit prevents the required detail, record the missing observation explicitly. A separately labelled inspection camera may supplement geometry evidence but cannot stand in for normal gameplay access.",
+    "For fixed captures, distinguish scheduled input offset, actual trusted-event game time, rendered frame game time and screenshot-completion wall time. Use the real-time runs for response timing.",
+    "Keep terrain, feet, and target/obstacle visible during contact sequences. Increase field of view only through an explicitly recorded supplementary capture, not by silently changing the gameplay camera.",
+    "The full-frame real-time output must retain every captured frame and its timestamp. Confirm decoded frame count/order against sequence.json and report every capture gap.",
+    "Performance, hidden-tab suspension, lifecycle, save isolation and Blender provenance remain separate technical gates; screenshots cannot establish them."
+  ]
+}

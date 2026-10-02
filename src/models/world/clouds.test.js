@@ -149,3 +149,17 @@ test('the sky framed by the window is authored, so a new world seed leaves every
   assert.deepEqual(framed(WORLD.seed + 1), composed);
   assert.deepEqual(framed(WORLD.seed * 7 + 3), composed);
 });
+
+test('Wilds cumulus gathers in separated rounded masses instead of the room mountain collar', async () => {
+  const { WILDS_WORLD } = await import('../../core/wilds/world-definition.js');
+  const scene = new Scene(new NullEngine()), root = new TransformNode('wilds', scene);
+  const clouds = createWorldClouds(scene, { root, still: true, definition: WILDS_WORLD });
+  const front = clouds.cards.filter(card => card.kind === CLOUD_KINDS.cumulus && Math.abs(Math.atan2(card.x, -card.z)) < 1.2);
+  assert.ok(front.length >= 3 && front.length <= 7, `${front.length} front banks`);
+  assert.ok(front.every(card => card.halfWidth / card.halfHeight < 2.6), 'a flat mountain collar remains');
+  const slopes = front.map(card => card.y / Math.hypot(card.x, card.z));
+  assert.ok(Math.max(...slopes) - Math.min(...slopes) > .15);
+  assert.ok(clouds.cards.every(card => Math.hypot(card.x, card.y, card.z) < 3600), 'a cloud center is beyond the gameplay view distance');
+  assert.equal(clouds.clouds.getTotalIndices(), clouds.cards.length * 6);
+  scene.dispose();
+});

@@ -1,6 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { heightAt, riverCenter, canopyAt, scatter, normalAt, padDistance, pathCenter, pathDistance } from './world-terrain.js';
+import { heightAt, riverCenter, canopyAt, scatter, normalAt, padDistance, pathCenter, pathDistance, createTerrainField } from './world-terrain.js';
+
+test('an optional shallow basin bounds its depth, raises a dry bank and blends back to the original terrain', () => {
+  const water = { x: 0, z: 0, radiusX: 20, radiusZ: 16, level: 2, basin: { depth: .3, bank: .8, blend: 12 } };
+  const definition = { seed: 1, terrain: { base: -20, noise: [], hills: [] }, path: { waves: [] }, clearings: [], water: [water] };
+  const field = createTerrainField(definition);
+  assert.ok(Math.abs(field.heightAt(0, 0) - 1.745) < 1e-10);
+  for (let x = -20; x <= 20; x++) for (let z = -16; z <= 16; z++) {
+    if (Math.hypot(x / 20, z / 16) <= 1) assert.ok(field.heightAt(x, z) >= 1.7 - 1e-10);
+  }
+  for (let angle = 0; angle < 360; angle += 5) assert.ok(field.heightAt(Math.cos(angle * Math.PI / 180) * 20, Math.sin(angle * Math.PI / 180) * 16) > 2.7);
+  assert.equal(field.heightAt(40, 0), -20);
+  const unshaped = createTerrainField({ ...definition, water: [{ ...water, basin: undefined }] });
+  assert.equal(unshaped.heightAt(0, 0), -20);
+  assert.equal(unshaped.heightAt(20, 0), -20);
+});
 
 test('the house stands on a flat pad and the land rolls away from its edge into the valley', () => {
   for (const [x, z] of [[0, 0], [7.4, -6.2], [-7.4, 6.2], [6, 0], [0, -6.2]]) assert.equal(heightAt(x, z), 0);
@@ -66,4 +81,32 @@ test('scatter is repeatable and keeps only what the density allows', () => {
   assert.equal(scatter(bounds, 10, () => 0).length, 0);
   assert.equal(scatter(bounds, 10, () => 1).length, 100);
   for (const point of scatter(bounds, 10, () => 1)) assert.equal(point.y, heightAt(point.x, point.z));
+});
+
+test('the Wilds fen waterline forms coves while the outer bank remains dry', async () => {
+  const { WILDS_WORLD } = await import('./wilds/world-definition.js');
+  const field = createTerrainField(WILDS_WORLD), body = WILDS_WORLD.water[0], crossings = [];
+  for (let turn = 0; turn < 48; turn++) {
+    const angle = turn / 48 * Math.PI * 2;
+    let low = .65, high = 1;
+    for (let n = 0; n < 20; n++) {
+      const radius = (low + high) / 2;
+      if (field.heightAt(body.x + Math.cos(angle) * body.radiusX * radius, body.z + Math.sin(angle) * body.radiusZ * radius) < body.level) low = radius;
+      else high = radius;
+    }
+    crossings.push((low + high) / 2);
+    assert.ok(field.heightAt(body.x + Math.cos(angle) * body.radiusX, body.z + Math.sin(angle) * body.radiusZ) > body.level);
+  }
+  const variation = Math.max(...crossings) - Math.min(...crossings);
+  assert.ok(variation > .09, `shoreline radius varies only ${variation.toFixed(3)}`);
+});
+
+test('a finite world trail rounds its endpoints without discontinuous vegetation masks', async () => {
+  const { WILDS_WORLD } = await import('./wilds/world-definition.js');
+  const definition = { ...WILDS_WORLD, path: { start: 0, end: 10, offset: 0, drift: 0, width: 1.4, waves: [] } };
+  const field = createTerrainField(definition);
+  assert.deepEqual([[0, 0], [0, -10], [3, -5], [3, 4], [3, -14]].map(([x, z]) => field.pathDistance(x, z)), [0, 0, 3, 5, 5]);
+  const before = field.pathDistance(2, 0.001), inside = field.pathDistance(2, -0.001);
+  assert.ok(Math.abs(before - inside) < 0.000001);
+  assert.equal(createTerrainField().pathDistance(0, 3), Infinity);
 });

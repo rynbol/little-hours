@@ -35,6 +35,23 @@ function matcher(target) {
 }
 
 export function installTestHook(app) {
+  let inputRecording = null;
+  const inputTypes = ['keydown', 'keyup', 'pointerdown', 'pointerup', 'pointermove'];
+  const recordInput = event => {
+    inputRecording?.events.push({ type: event.type, code: event.code || null, key: event.key || null, button: event.button ?? null, buttons: event.buttons ?? null, x: event.clientX ?? null, y: event.clientY ?? null, trusted: event.isTrusted, realEpochMs: performance.timeOrigin + event.timeStamp, observedEpochMs: performance.timeOrigin + performance.now(), gameMs: app.wilds?.diagnostics().now ?? null });
+  };
+  function stopInputCapture() {
+    for (const type of inputTypes) document.removeEventListener(type, recordInput, true);
+    const recording = inputRecording;
+    inputRecording = null;
+    return recording;
+  }
+  function startInputCapture() {
+    stopInputCapture();
+    inputRecording = { startEpochMs: performance.timeOrigin + performance.now(), startGameMs: app.wilds?.diagnostics().now ?? null, events: [] };
+    for (const type of inputTypes) document.addEventListener(type, recordInput, true);
+    return { startEpochMs: inputRecording.startEpochMs, startGameMs: inputRecording.startGameMs };
+  }
   const views = {
     room: () => app.room?.diagnostics(),
     house: () => app.house?.view?.diagnostics(),
@@ -168,5 +185,7 @@ export function installTestHook(app) {
     gpuFrame,
     counts,
     stats,
+    startInputCapture,
+    stopInputCapture,
   };
 }

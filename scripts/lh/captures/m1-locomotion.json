@@ -1,0 +1,13 @@
+{
+  "id": "avatar-locomotion",
+  "durationMs": 11200,
+  "fixture": { "position": { "x": 0, "z": 0 }, "camera": { "yaw": 0.5, "pitch": 0.16, "distance": 4.5 } },
+  "events": [
+    { "at": 6000, "type": "keyDown", "code": "KeyW" },
+    { "at": 7300, "type": "keyDown", "code": "ShiftLeft" },
+    { "at": 8300, "type": "keyUp", "code": "ShiftLeft" },
+    { "at": 8300, "type": "keyUp", "code": "KeyW" },
+    { "at": 8600, "type": "keyDown", "code": "Space" },
+    { "at": 8750, "type": "keyUp", "code": "Space" }
+  ]
+}

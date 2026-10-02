@@ -30,7 +30,9 @@ export async function idle(app, seconds = 5, { view } = {}) {
     idleMsPerSecond: (after - before) / seconds,
     rafPerSecond: gaps.length / elapsedSeconds,
     p95GapMs: sorted[Math.max(0, Math.ceil(sorted.length * .95) - 1)] || 0,
+    maxGapMs: sorted.at(-1) || 0,
     slowGaps: gaps.filter(gap => gap > 50).length,
+    gapsOver20Ms: gaps.filter(gap => gap > 20).length,
     ...(view ? { renderPerSecond: (ended.renderCount - started.renderCount) / elapsedSeconds } : {}),
   };
 }
@@ -74,7 +76,8 @@ export async function trace(app, path, action) {
   await finished;
   off();
   writeFileSync(path, JSON.stringify({ traceEvents: events }));
-  const main = events.filter(event => event.name === 'RunTask' && event.ph === 'X' && event.dur);
+  const rendererThreads = new Set(events.filter(event => event.name === 'thread_name' && event.args?.name === 'CrRendererMain').map(event => `${event.pid}:${event.tid}`));
+  const main = events.filter(event => event.name === 'RunTask' && event.ph === 'X' && event.dur && rendererThreads.has(`${event.pid}:${event.tid}`));
   const long = main.filter(event => event.dur > 50000).map(event => Math.round(event.dur / 1000)).sort((a, b) => b - a);
   return { events: events.length, longTasks: long.length, longestTasksMs: long.slice(0, 5), busyMs: Math.round(main.reduce((sum, event) => sum + event.dur, 0) / 1000) };
 }

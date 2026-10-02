@@ -85,3 +85,27 @@ test('a settle that times out names what is still busy at the end, not what was 
   delete document.documentElement.dataset.placeTransition; animations.push(transition(element('room-panel'), 'opacity'));
   await assert.rejects(waiting, { message: 'Timed out after 60 ms waiting for the page to settle (css animation: opacity on #room-panel)' });
 });
+
+test('input evidence records actual DOM events and removes its listeners on stop or restart', t => {
+  environment(t);
+  globalThis.document = Object.assign(new EventTarget(), document);
+  installTestHook({ wilds: { diagnostics: () => ({ now: 1234 }) } });
+  const capture = window.__littleHours.startInputCapture();
+  const down = new Event('keydown');
+  Object.defineProperties(down, { code: { value: 'KeyW' }, key: { value: 'w' } });
+  document.dispatchEvent(down);
+  const result = window.__littleHours.stopInputCapture();
+  assert.equal(result.events.length, 1);
+  assert.equal(result.events[0].type, 'keydown');
+  assert.equal(result.events[0].code, 'KeyW');
+  assert.equal(result.events[0].trusted, false);
+  assert.equal(result.events[0].gameMs, 1234);
+  assert.equal(capture.startGameMs, 1234);
+  assert.ok(result.events[0].realEpochMs >= capture.startEpochMs);
+  document.dispatchEvent(down);
+  assert.equal(result.events.length, 1);
+  window.__littleHours.startInputCapture();
+  window.__littleHours.startInputCapture();
+  document.dispatchEvent(down);
+  assert.equal(window.__littleHours.stopInputCapture().events.length, 1);
+});

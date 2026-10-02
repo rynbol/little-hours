@@ -7,7 +7,7 @@
   <style>
     html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#bfd9e8;font-family:system-ui,sans-serif;color:#283f43}
     #wilds-stage{position:fixed;inset:0}
-    nav{position:fixed;top:16px;left:16px;display:flex;gap:8px;align-items:center}
+    nav{position:fixed;top:16px;right:16px;display:flex;gap:8px;align-items:center}
     button{min-height:44px;border:1px solid #ffffff80;border-radius:12px;padding:8px 16px;background:#fffffff0;color:inherit;font:inherit;cursor:pointer}
     button:focus-visible{outline:3px solid #285d6b;outline-offset:3px}
     button:disabled{opacity:.5;cursor:default}
@@ -51,7 +51,8 @@
       const view = app.wilds;
       const ready = () => {
         if (app.wilds !== view || view.diagnostics().phase === 'disposed') return;
-        if (view.ready()) loading.hidden = true;
+        if (view.diagnostics().failure) loading.textContent = 'The Wilds could not load. Leave and enter to retry.';
+        else if (view.ready()) loading.hidden = true;
         else requestAnimationFrame(ready);
       };
       requestAnimationFrame(ready);

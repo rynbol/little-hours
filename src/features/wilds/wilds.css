@@ -1,0 +1,12 @@
+.wilds-hud{position:absolute;inset:0;pointer-events:none;color:#fff9e8;text-shadow:0 2px 8px #183f40a0;font-family:system-ui,sans-serif}
+.wilds-location{position:absolute;left:32px;top:30px;display:grid;gap:5px}
+.wilds-location span{font-size:10px;letter-spacing:.28em;font-weight:700}
+.wilds-location strong{font-family:Georgia,serif;font-size:28px;font-weight:400;letter-spacing:.02em}
+.wilds-stamina{position:absolute;left:32px;bottom:65px;display:grid;grid-template-columns:1fr auto;gap:7px 16px;padding:14px 18px;background:#153b3bba;border:1px solid #e4eec74d;border-radius:12px;backdrop-filter:blur(6px);min-width:194px;font-size:12px}
+.wilds-stamina progress{grid-column:1 / -1;grid-row:2;width:100%;height:6px;border:0;border-radius:4px;overflow:hidden;background:#072f32;accent-color:#cedca1}
+.wilds-stamina progress::-webkit-progress-bar{background:#072f32}
+.wilds-stamina progress::-webkit-progress-value{background:#cedca1}
+.wilds-stamina-value{font-variant-numeric:tabular-nums;color:#e8eccf}
+.wilds-hud[data-exhausted=true] .wilds-stamina progress{accent-color:#e9b887}
+.wilds-controls{position:absolute;bottom:18px;left:32px;margin:0;padding:7px 10px;border-radius:8px;background:#17383899;font-size:11px;letter-spacing:.03em}
+@media(max-width:650px){.wilds-location{top:24px;left:18px}.wilds-location strong{font-size:23px}.wilds-stamina{left:18px;bottom:70px;min-width:160px}.wilds-controls{left:18px;right:18px;font-size:10px;line-height:1.6}}

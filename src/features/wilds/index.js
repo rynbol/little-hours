@@ -1,3 +1,4 @@
+import './wilds.css';
 import { Engine } from '@babylonjs/core/Engines/engine.js';
 import { createWildsView } from './scene.js';
 

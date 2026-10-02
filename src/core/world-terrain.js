@@ -97,3 +97,43 @@ export function scatter({ minX, maxX, minZ, maxZ }, spacing, density, seed = WOR
   }
   return points;
 }
+
+export function createTerrainField(definition) {
+  if (!definition) return { heightAt, normalAt, canopyAt, riverDistance, pathDistance, pathCenter };
+  const terrain = definition.terrain, path = definition.path;
+  const basins = definition.water.filter(body => body.basin);
+  const routeCenter = ahead => path.offset + ahead * path.drift + path.waves.reduce((sum, wave) => sum + Math.sin(ahead / wave.scale + wave.phase) * wave.amplitude, 0);
+  const routeDistance = (x, z) => { const ahead = Math.max(path.start, Math.min(path.end, -z)); return Math.hypot(x - routeCenter(ahead), -z - ahead); };
+  const wetDistance = (x, z) => definition.water.reduce((nearest, body) => Math.min(nearest, Math.max(0, (Math.hypot((x - body.x) / body.radiusX, (z - body.z) / body.radiusZ) - 1) * Math.min(body.radiusX, body.radiusZ))), Infinity);
+  const elevation = (x, z) => {
+    let y = terrain.base;
+    for (const layer of terrain.noise) y += fbm(x / layer.scale, z / layer.scale, layer.octaves, layer.seed) * layer.amplitude;
+    for (const hill of terrain.hills) y += hill.height * Math.exp(-(((x - hill.x) / hill.radiusX) ** 2 + ((z - hill.z) / hill.radiusZ) ** 2));
+    for (const clearing of definition.clearings) {
+      const influence = 1 - smooth(clearing.radius, clearing.radius + clearing.blend, Math.hypot(x - clearing.x, z - clearing.z));
+      y += (clearing.height - y) * influence;
+    }
+    for (const body of basins) {
+      const { depth, bank, blend } = body.basin, edge = Math.hypot((x - body.x) / body.radiusX, (z - body.z) / body.radiusZ);
+      const influence = 1 - smooth(1, 1 + blend / Math.min(body.radiusX, body.radiusZ), edge);
+      if (!influence) continue;
+      const grain = Math.max(-1, Math.min(1, noise2(x / 27, z / 27, definition.seed + 151)));
+      const angle = Math.atan2((z - body.z) / body.radiusZ, (x - body.x) / body.radiusX);
+      const inlet = (body.basin.shoreline ?? []).reduce((sum, wave) => sum + Math.sin(angle * wave.lobes + wave.phase) * wave.amplitude, 0);
+      const bed = body.level - depth * (0.85 + grain * 0.15), shore = smooth(0.8, 0.96, edge + grain * 0.045 + inlet);
+      y += (bed + (body.level + bank - bed) * shore - y) * influence;
+    }
+    return y;
+  };
+  const normal = (x, z, step = 1) => {
+    const dx = elevation(x + step, z) - elevation(x - step, z), dz = elevation(x, z + step) - elevation(x, z - step), length = Math.hypot(dx, 2 * step, dz);
+    return [-dx / length, 2 * step / length, -dz / length];
+  };
+  const canopy = (x, z) => {
+    const forest = definition.regions.find(region => region.id === 'forest');
+    const border = 1 - smooth(forest.exit - forest.blend / 2, forest.exit + forest.blend / 2, -z);
+    const clearing = smooth(10, 23, Math.hypot(x, z));
+    return border * clearing * smooth(path.width + 2, path.width + 8, routeDistance(x, z));
+  };
+  return { heightAt: elevation, normalAt: normal, canopyAt: canopy, riverDistance: wetDistance, pathDistance: routeDistance, pathCenter: routeCenter };
+}

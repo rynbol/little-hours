@@ -1,7 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromePath, closeAll, gpuFlag, killAllNow, launch, sleep, slow } from './lh/chrome.mjs';
+import { captureSequence, dispatchSequenceInput, validateSequence } from './lh/sequence.mjs';
+import { captureCatalog, expandCatalog } from './lh/catalog.mjs';
 import { openApp } from './lh/app.mjs';
 import { serve } from './lh/server.mjs';
 import { SEEDS } from './lh/seeds.mjs';
@@ -48,8 +50,15 @@ Options:
   --before "<expr>"  shots, world and perf: evaluate an expression with scene bound before the picture is taken
   --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
   --freeze <ms>      shots: stop the game clock at this many ms after the start, so two shots can be compared pixel for pixel
+  --sequence <json>  wilds shots: capture a complete input/frame sequence and timed playback
+  --catalog <json>   wilds shots: capture an inventory of views or sequences
+  --catalog-mode <mode>  stills (default) or sequences
+  --catalog-ids <ids>  comma-separated catalog item, view, sequence or appearance IDs
+  --catalog-list     print matching catalog jobs without opening a browser
+  --build-id <id>    source fingerprint recorded with catalog evidence
   --still            prefers-reduced-motion: reduce
   --headed           show the browser window
+  --hold <codes>     wilds perf: hold real keys during measurement, e.g. KeyW,ShiftLeft
   --rounds <n>       perf rounds per side (default 1, or 2 with --against)
   --timeout <s>      hard time limit for the whole command (default 600, or 600 per flow for run)
 Evidence goes to .lh/out/<time>-<command>/.`;
@@ -225,7 +234,18 @@ async function perfOnce(url, view) {
     if (view === 'decorate') { await app.clickSel('#decorate-button'); result.openMs = await takeEvents(app, 3000); }
     const sceneView = view === 'wilds' ? 'wilds' : 'room';
     if (options.before) await app.js(`(() => { const scene = window.__littleHours.${sceneView}.diagnostics().scene; ${options.before}; })()`);
-    Object.assign(result, await idle(app, Number(options.seconds || 5), view === 'wilds' ? { view } : {}));
+    const worldBefore = view === 'wilds' ? await app.js('window.__littleHours.wilds.diagnostics().world') : null;
+    const held = options.hold ? String(options.hold).split(',') : [];
+    if (held.length) {
+      if (view !== 'wilds') throw new Error('--hold currently requires the wilds view');
+      validateSequence({ durationMs: 1, events: held.map(code => ({ at: 0, type: 'keyDown', code })) });
+      await app.js(`document.getElementById('wilds-canvas').focus()`);
+      for (const code of held) await dispatchSequenceInput(app, { type: 'keyDown', code });
+    }
+    try { Object.assign(result, await idle(app, Number(options.seconds || 5), view === 'wilds' ? { view } : {})); }
+    finally { for (const code of held) await dispatchSequenceInput(app, { type: 'keyUp', code }); }
+    if (view === 'wilds') result.world = { ...await app.js('window.__littleHours.wilds.diagnostics().world'), before: worldBefore };
+
     if (view === 'house') {
       const tags = await app.js(`[...document.querySelectorAll('button.house-room-tag:not(.is-site):not(.is-garden):not(.is-pond)')].map(tag => tag.dataset.room)`);
       for (const id of tags) { await app.clickSel(`.house-room-tag[data-room="${id}"]`); result[`tapMs ${id}`] = await takeEvents(app, 1500); }
@@ -258,7 +278,7 @@ async function perf() {
     runs[list.indexOf(side)].push(result);
     console.log(`  round ${round + 1} ${side.label}: idle ${fixed(result.idleMsPerSecond)} ms/s${result.openMs ? `, open ${result.openMs} ms` : ''}${result.gpuFrameMs ? `, gpu ${fixed(result.gpuFrameMs)} ms` : ''}`);
   }
-  const keys = [...new Set(runs.flat().flatMap(Object.keys))].filter(key => key !== 'passes');
+  const keys = [...new Set(runs.flat().flatMap(Object.keys))].filter(key => key !== 'passes' && key !== 'world');
   const rows = keys.map(key => [key, ...runs.map(side => fixed(median(side.map(result => result[key]))))]);
   if (list.length > 1) rows.forEach((row, i) => { const [a, b] = runs.map(side => median(side.map(result => result[keys[i]]))); row.push(a !== null && b !== null ? (a - b >= 0 ? '+' : '') + fixed(a - b) : '—'); });
   console.log('\n' + table(rows, ['metric (median)', ...list.map(side => side.label), ...(list.length > 1 ? ['difference'] : [])]));
@@ -270,6 +290,7 @@ async function perf() {
 }
 
 async function shots() {
+  if (options.catalog) return catalogShots();
   const names = positional.length ? positional : ['room', 'house'], list = await sides(), out = outDir('shot');
   for (const side of list) for (const name of names) {
     if (!views[name]) throw new Error(`Unknown view "${name}". Views: ${Object.keys(views).join(', ')}`);
@@ -292,6 +313,14 @@ async function shots() {
       if (options.before) await app.js(`(() => { const scene = window.__littleHours.${sceneView}.diagnostics().scene; ${options.before}; })()`);
       if (options.freeze) await app.js(`window.__lhFrozenAt = window.__lhStartAt + ${Number(options.freeze)}`);
       await sleep(Number(options.wait || 600));
+      if (options.sequence) {
+        if (name !== 'wilds' || options.freeze) throw new Error('Sequences require the wilds view; use fixedStepMs in the sequence instead of --freeze');
+        const sequence = JSON.parse(readFileSync(String(options.sequence), 'utf8'));
+        const folder = join(out, `${name}-sequence`);
+        const result = await captureSequence(app, sequence, folder);
+        if (result.pageErrors.length) throw new Error(`Sequence page errors: ${result.pageErrors.join(' | ')}`);
+        console.log(`${side.label} ${name}: ${folder} (${result.frames.length} frames, max real gap ${result.timing.maxRealGapMs.toFixed(1)} ms)`);
+      }
       const file = await app.shot(join(out, `${name}-${list.length > 1 ? (side === list[0] ? 'this' : String(options.against).replace(/[^\w.-]+/g, '_')) : 'this'}.jpg`));
       console.log(`${side.label} ${name}: ${file}${app.errors.length ? `  page errors: ${app.errors.join(' | ').slice(0, 200)}` : ''}`);
       if (options.pick) for (const point of String(options.pick).split(';')) {
@@ -300,6 +329,33 @@ async function shots() {
         console.log(`  pick ${x},${y}: ${hit}`);
       }
       if (options.probe) console.log(`  probe: ${await app.js(`(async () => { const scene = window.__littleHours.${sceneView}.diagnostics().scene; return JSON.stringify(await (${options.probe})); })()`)}`);
+    } finally { await app.close(); }
+  }
+  return 0;
+}
+
+async function catalogShots() {
+  if (positional.length !== 1 || positional[0] !== 'wilds') throw new Error('Catalog captures require shot wilds');
+  if (options.sequence || options.freeze || options.before) throw new Error('Catalog fixtures set their own sequence, clock and starting view');
+  const plan = JSON.parse(readFileSync(String(options.catalog), 'utf8'));
+  const theme = options.theme || 'day', mode = options['catalog-mode'] || 'stills';
+  const ids = String(options['catalog-ids'] || '').split(',').map(id => id.trim()).filter(Boolean);
+  const jobs = expandCatalog(plan, { theme, mode, ids });
+  if (options['catalog-list']) {
+    console.log(JSON.stringify(jobs.map(job => ({ id: job.id, kind: job.kind, itemIds: job.itemIds, clockMode: job.clockMode })), null, 2));
+    return 0;
+  }
+  if (!options['build-id']) throw new Error('Catalog captures require --build-id');
+  const catalogViewport = options.size ? viewport : { ...viewport, ...plan.captureDefaults.viewport };
+  const list = await sides(), out = outDir('shot');
+  for (const side of list) {
+    const app = await openApp(side.url, { ...catalogViewport, ...views.wilds.settings, scale: Number(options.scale || plan.captureDefaults.viewport.scale || 1), seed: options.seed || plan.captureDefaults.saveFixture, theme });
+    try {
+      await app.settle(); await views.wilds.go(app);
+      const result = await captureCatalog(app, plan, out, { theme, mode, ids, buildId: String(options['build-id']) });
+      console.log(`${side.label}: ${result.manifestFile} (${result.manifest.captures.length} captures)`);
+      if (result.errors.length) throw new Error(`Catalog errors: ${JSON.stringify(result.errors)}`);
+      if (app.errors.length) throw new Error(`Catalog page errors: ${app.errors.join(' | ')}`);
     } finally { await app.close(); }
   }
   return 0;
@@ -314,7 +370,7 @@ function cycleFor(name) {
 async function traceCommand() {
   const name = positional[0] || 'house', cycle = cycleFor(name), out = outDir('trace');
   const server = await start(options.ref);
-  const app = await openApp(server.url, { ...viewport, scale: Number(options.scale || 2), seed: options.seed || 'three-rooms', theme: options.theme });
+  const app = await openApp(server.url, { ...viewport, ...cycle.settings, scale: Number(options.scale || 2), seed: options.seed || 'three-rooms', theme: options.theme });
   try {
     await sleep(1500); await app.settle(); await cycle.setup?.(app); if (!options.cold) await cycle.run(app);
     const file = join(out, `trace-${name}.json`);
@@ -326,7 +382,7 @@ async function traceCommand() {
 
 async function allocCommand() {
   const name = positional[0] || 'house', cycle = cycleFor(name), server = await start(options.ref);
-  const app = await openApp(server.url, { ...viewport, scale: Number(options.scale || 2), seed: options.seed || 'three-rooms', theme: options.theme });
+  const app = await openApp(server.url, { ...viewport, ...cycle.settings, scale: Number(options.scale || 2), seed: options.seed || 'three-rooms', theme: options.theme });
   try {
     await sleep(1500); await app.settle(); await cycle.setup?.(app); if (!options.cold) await cycle.run(app);
     const result = await allocations(app, () => cycle.run(app));
@@ -337,7 +393,7 @@ async function allocCommand() {
 }
 
 async function heapOnce(side, cycle, repeat, out, tag) {
-  const app = await openApp(side.url, { ...viewport, scale: 1, seed: options.seed || 'three-rooms', theme: options.theme });
+  const app = await openApp(side.url, { ...viewport, ...cycle.settings, scale: 1, seed: options.seed || 'three-rooms', theme: options.theme });
   try {
     await sleep(1000); await app.settle(); await cycle.setup?.(app);
     for (let i = 0; i < 3; i++) await cycle.run(app);

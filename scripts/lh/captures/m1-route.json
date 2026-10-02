@@ -1,0 +1,9 @@
+{
+  "id": "clearing-to-vista",
+  "durationMs": 33000,
+  "fixture": { "position": { "x": 0, "z": 0 }, "camera": { "yaw": 0, "pitch": 0.08 } },
+  "events": [
+    { "at": 500, "type": "keyDown", "code": "KeyW" },
+    { "at": 31900, "type": "keyUp", "code": "KeyW" }
+  ]
+}

@@ -52,6 +52,33 @@ export function riverShape(rows = riverLevels()) {
   return { positions, uvs, indices };
 }
 
+export function lakeShape(bodies, surface) {
+  const positions = [], uvs = [], indices = [];
+  for (const body of bodies) {
+    const step = body.basin ? 2 : 8;
+    const minX = body.basin ? Math.floor((body.x - body.radiusX) / step) * step : body.x - body.radiusX, minZ = body.basin ? Math.floor((body.z - body.radiusZ) / step) * step : body.z - body.radiusZ;
+    const width = body.basin ? Math.ceil((body.x + body.radiusX) / step) * step - minX : body.radiusX * 2, depth = body.basin ? Math.ceil((body.z + body.radiusZ) / step) * step - minZ : body.radiusZ * 2;
+    const nx = Math.ceil(width / step), nz = Math.ceil(depth / step), start = positions.length / 3;
+    for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) {
+      const x = minX + i / nx * width, z = minZ + j / nz * depth;
+      const ground = surface(x, z)?.height, edge = Math.hypot((x - body.x) / body.radiusX, (z - body.z) / body.radiusZ);
+      positions.push(x, body.level, z); uvs.push(ground === undefined ? 0 : body.basin ? Number(edge <= 1) : 1 - smooth(0.85, 1, edge), ground === undefined ? 0 : body.level - ground);
+    }
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const a = start + i * (nz + 1) + j, b = a + nz + 1; indices.push(a, a + 1, b, b, a + 1, b + 1); }
+  }
+  return { positions: new Float32Array(positions), uvs: new Float32Array(uvs), indices: new Uint32Array(indices) };
+}
+
+export function sampleWaterSurface(bodies, surface, x, z) {
+  let water = null;
+  for (const body of bodies) {
+    if (Math.hypot((x - body.x) / body.radiusX, (z - body.z) / body.radiusZ) > 1) continue;
+    const ground = surface(x, z);
+    if (ground && ground.height < body.level && (!water || water.height < body.level)) water = { height: body.level, depth: body.level - ground.height };
+  }
+  return water;
+}
+
 const WATER_VERTEX = `precision highp float;
 attribute vec3 position; attribute vec2 uv; uniform mat4 world, viewProjection;
 varying vec3 vWorld; varying vec2 vWater;
@@ -59,13 +86,13 @@ void main() { vec4 p = world * vec4(position, 1.); vWorld = p.xyz; vWater = uv; 
 
 const WATER_FRAGMENT = `precision highp float;
 varying vec3 vWorld; varying vec2 vWater;
-uniform vec3 eye, fogNear, water, waterShallow, sunColor, skyAmbient; uniform float time, fogDensity, fogHeight, sunStrength;
+uniform vec3 eye, fogNear, water, waterShallow, sunColor, skyAmbient; uniform float time, fogDensity, fogHeight, sunStrength, rippleScale, glintScale;
 ${WORLD_GLSL}
 ${SKY_GLSL}
 float wave(vec2 q, float near) { return worldNoise(q * .21 + vec2(time * .11, 0.)) * .5 + worldNoise(q * .57 - vec2(time * .19, time * .05)) * .3 + worldNoise(q * 1.9 + vec2(time * .42, time * .1)) * .2 * near; }
 void main() {
   vec3 ray = vWorld - eye; float d = length(ray); vec3 view = ray / d;
-  float depth = vWater.y, e = .4, ripple = 1.1 / (1. + d / 260.), near = 1. - smoothstep(20., 120., d);
+  float depth = vWater.y, e = .4, ripple = 1.1 * rippleScale / (1. + d / 260.), near = 1. - smoothstep(20., 120., d);
   vec2 q = vWorld.xz; float h = wave(q, near);
   vec3 n = normalize(vec3((h - wave(q + vec2(e, 0.), near)) * ripple, e, (h - wave(q + vec2(0., e), near)) * ripple));
   vec3 bounce = reflect(view, n); bounce.y = max(bounce.y, .015);
@@ -73,7 +100,7 @@ void main() {
   vec3 body = mix(waterShallow, water, deep) * mix(skyAmbient, sunColor, .5) * (.55 + .45 * sunStrength);
   vec3 color = mix(body, worldSky(bounce) * mix(.62, 1., deep), fresnel);
   float glint = pow(max(dot(bounce, sun), 0.), 320.) * 2.4 + pow(max(dot(bounce, sun), 0.), 30.) * .12 * fresnel;
-  color += sunColor * glint * sunStrength * smoothstep(.1, .6, glowStrength) * smoothstep(5., 60., d);
+  color += sunColor * glint * glintScale * sunStrength * smoothstep(.1, .6, glowStrength) * smoothstep(5., 60., d);
   color = worldAir(color, vWorld, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight);
   float alpha = smoothstep(0., .45, depth) * vWater.x * mix(.72, 1., max(fresnel, smoothstep(.6, 2.4, depth)));
   gl_FragColor = vec4(color * alpha, alpha);
@@ -81,17 +108,21 @@ void main() {
 
 const WATER_COLORS = ['water', 'waterShallow', 'sunColor', 'skyAmbient'];
 
-export function createWorldWater(scene, { root, still }) {
-  const uniforms = [...new Set(['world', 'viewProjection', 'sunStrength', ...WATER_COLORS, ...SKY_UNIFORMS, ...AIR_UNIFORMS])];
+export function createWorldWater(scene, { root, still, definition, surface }) {
+  const uniforms = [...new Set(['world', 'viewProjection', 'sunStrength', 'rippleScale', 'glintScale', ...WATER_COLORS, ...SKY_UNIFORMS, ...AIR_UNIFORMS])];
   const paint = new ShaderMaterial('world-water-paint', scene, { vertexSource: WATER_VERTEX, fragmentSource: WATER_FRAGMENT }, { attributes: ['position', 'uv'], uniforms, needAlphaBlending: true });
+  const shallow = definition?.water.some(body => body.basin);
+  paint.setFloat('rippleScale', shallow ? .24 : 1);
+  paint.setFloat('glintScale', shallow ? .3 : 1);
   paint.backFaceCulling = false; paint.disableDepthWrite = true; paint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF;
   followEye(scene, paint, still);
   const river = new Mesh('world-river', scene);
-  Object.assign(new VertexData(), riverShape()).applyToMesh(river);
+  Object.assign(new VertexData(), definition ? lakeShape(definition.water, surface) : riverShape()).applyToMesh(river);
   river.material = paint; river.parent = root; river.isPickable = false; river.metadata = { castShadow: false, world: true };
   river.freezeWorldMatrix();
   return {
     river,
+    refresh() { if (definition) Object.assign(new VertexData(), lakeShape(definition.water, surface)).applyToMesh(river); },
     setTheme(atmosphere) {
       applySkyTheme(paint, atmosphere); applyAir(paint, atmosphere);
       paint.setFloat('sunStrength', atmosphere.sunStrength);

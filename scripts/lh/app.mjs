@@ -27,10 +27,11 @@ export async function openApp(url, { seed = 'three-rooms', theme, reducedMotion 
     await browser.navigate(url + path);
     let hook = false;
     for (let i = 0; i < 600; i++) {
-      const status = await browser.js(`({ hook: typeof window.__littleHours?.ready === 'function', ready: document.getElementById('loading-note')?.hidden === true })`).catch(() => ({}));
+      const status = await browser.js(`({ hook: typeof window.__littleHours?.ready === 'function', ready: document.getElementById('loading-note')?.hidden === true, failure: window.__littleHours?.wilds?.diagnostics?.().failure })`).catch(() => ({}));
       hook = status.hook;
+      if (status.failure) throw new Error(`The view at ${path} failed: ${status.failure}`);
       if (status.ready) break;
-      if (i === 599) throw new Error(`The view at ${path} never reported ready`);
+      if (i === 599) throw new Error(`The view at ${path} never reported ready${browser.errors.length ? ': ' + browser.errors.slice(-2).join(' | ').slice(-1200) : ''}`);
       await sleep(50);
     }
     if (hook) await browser.js('window.__littleHours.ready()');

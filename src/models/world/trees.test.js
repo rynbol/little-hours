@@ -236,6 +236,69 @@ function forestScene(still) {
   return { scene, camera, trees };
 }
 
+test('connected tree clearing is opt-in and follows the current render eye without changing tree draws', () => {
+  const { scene, camera, trees } = forestScene(true), draws = trees.meshes.length, instances = trees.meshes.map(mesh => mesh.thinInstanceCount);
+  assert.deepEqual(trees.paint._vectors4.viewTarget.asArray(), [0, 0, 0, 0]);
+  trees.setViewTarget(-9, 7, -36, 1.35);
+  camera.position.set(-9, 8, -30); scene.render();
+  assert.match(trees.paint.getEffect()._fragmentSourceCode, /if \(vTreeClearance > \.5\) discard;/);
+  assert.deepEqual(trees.paint._vectors4.viewTarget.asArray(), [-9, 7, -36, 1.35]);
+  assert.deepEqual(trees.paint._vectors3.eye.asArray(), [-9, 8, -30]);
+  trees.setTheme(WORLD_ATMOSPHERES.rain);
+  assert.deepEqual(trees.paint._vectors4.viewTarget.asArray(), [-9, 7, -36, 1.35]);
+  assert.equal(trees.meshes.length, draws);
+  assert.equal(trees.meshes.reduce((total, mesh) => total + mesh.thinInstanceCount, 0), instances.reduce((a, b) => a + b));
+  trees.setViewTarget(0, 0, 0, 0);
+  assert.equal(trees.paint._vectors4.viewTarget.w, 0);
+  scene.dispose();
+});
+
+test('connected tree clearing preserves background, peripheral trees and the default room view', async () => {
+  const { treeClearance } = await import('./trees.js');
+  const eye = { x: 0, y: 2, z: 8 }, target = { x: 0, y: 2, z: 0, w: 1.35 }, trunk = { x: 0, y: 2, z: 4, radius: .5, height: 2 };
+  assert.equal(treeClearance([trunk], eye, target), true);
+  assert.equal(treeClearance([{ ...trunk, x: 4 }], eye, target), false);
+  assert.equal(treeClearance([{ ...trunk, z: -4 }], eye, target), false);
+  assert.equal(treeClearance([{ ...trunk, z: 12 }], eye, target), false);
+  assert.equal(treeClearance([trunk], eye, { ...target, w: 0 }), false);
+  assert.equal(treeClearance([trunk], target, target), false);
+  assert.equal(treeClearance([{ ...trunk, x: 4, z: 0 }], { x: 8, y: 2, z: 0 }, target), true);
+});
+
+test('a crown crossing the view clears its supporting tree even when the trunk misses', async () => {
+  const { treeClearance } = await import('./trees.js');
+  const eye = { x: 0, y: 5, z: 8 }, target = { x: 0, y: 5, z: 0, w: 1.35 }, trunk = { x: 4, y: 1.5, z: 4, radius: .5, height: 2 }, crown = { x: 4, y: 6, z: 4, radius: 5, height: 3 };
+  assert.equal(treeClearance([trunk], eye, target), false);
+  assert.equal(treeClearance([trunk, crown], eye, target), true);
+  assert.equal(treeClearance([{ ...trunk, x: 20 }, { ...crown, x: 20 }], eye, target), false);
+});
+
+test('trunk, every branch, solid crown and leaf cards share the same connected visibility bounds', () => {
+  const { scene, trees } = forestScene(true);
+  for (const mesh of trees.meshes) {
+    const colors = mesh.getVerticesData('color');
+    for (const name of ['treeTrunk', 'treeCrown']) {
+      const bounds = mesh.getVerticesData(name);
+      assert.ok(bounds, `${mesh.name} needs connected ${name} bounds`);
+      assert.equal(bounds.length, colors.length);
+      assert.ok(bounds[1] > 0 && bounds[2] > 0);
+      for (let i = 4; i < bounds.length; i += 4) assert.deepEqual(bounds.slice(i, i + 4), bounds.slice(0, 4));
+    }
+  }
+  scene.dispose();
+});
+
+test('connected tree bounds enclose all actual wood and crown vertices without changing their geometry', () => {
+  for (const style of [undefined, 'woodland']) for (const form of Object.values(TREE_FORMS)) {
+    const model = treeModel(form, style), bounds = [model.treeTrunk, model.treeCrown];
+    assert.ok(bounds.every(Boolean));
+    for (let i = 0; i < model.positions.length; i += 3) {
+      const [x, y, z] = model.positions.slice(i, i + 3);
+      assert.ok(bounds.some(bound => (x * x + z * z) / bound[1] ** 2 + (y - bound[0]) ** 2 / bound[2] ** 2 < 1.000001), `${style ?? 'room'} form ${form}, vertex ${i / 3} escaped its bounds`);
+    }
+  }
+});
+
 test('six thin-instanced meshes split every tree between near models and far impostors', () => {
   const { scene, camera, trees } = forestScene(true);
   assert.deepEqual(trees.meshes.map(mesh => mesh.name), ['world-trees-broadleaf-near', 'world-trees-broadleaf-far', 'world-trees-conifer-near', 'world-trees-conifer-far', 'world-trees-spreading-near', 'world-trees-spreading-far']);
@@ -308,6 +371,8 @@ test('dusk swaps in its own foliage and a still world never advances the wind', 
 test('a tree paint takes its foliage colours and light from the atmosphere it is given', () => {
   const engine = new NullEngine(), scene = new Scene(engine), { paint, setTheme } = createTreePaint(scene, { name: 'grove-paint', still: true });
   assert.equal(paint.name, 'grove-paint');
+  assert.deepEqual(paint.options.attributes, ['position', 'normal', 'color', 'uv']);
+  assert.deepEqual(paint._vectors4.viewTarget.asArray(), [0, 0, 0, 0]);
   setTheme({ ...WORLD_ATMOSPHERES.day, leafTop: '#ff0000', sunStrength: .4 });
   assert.deepEqual(paint._colors3.leafTop.asArray(), [1, 0, 0]);
   assert.equal(paint._floats.sunStrength, .4);
@@ -320,4 +385,112 @@ test('each tree form has a near model with one colour per vertex', () => {
     assert.equal(colors.length / 4, positions.length / 3);
     assert.ok(indices.length > 300, `form ${form} has ${indices.length} indices`);
   }
+});
+
+test('woodland models are opt-in, retain crown clearance, and fit the near-tree geometry budget', () => {
+  for (const form of [TREE_FORMS.broadleaf, TREE_FORMS.spreading]) {
+    const original = treeModel(form), woodland = treeModel(form, 'woodland');
+    assert.ok(woodland.positions.length !== original.positions.length || woodland.positions.some((value, index) => value !== original.positions[index]), 'woodland must have its own geometry');
+    assert.deepEqual(treeModel(form, 'room').positions, original.positions);
+    assert.deepEqual(treeModel(form, 'woodland').positions, woodland.positions);
+    assert.equal(woodland.colors.length / 4, woodland.positions.length / 3);
+    assert.ok(woodland.indices.length / 3 <= 4000);
+    for (let i = 1; i < woodland.positions.length; i += 3) assert.ok(woodland.positions[i] <= CROWN_TOPS[form], `form ${form} exceeds its crown clearance`);
+  }
+  assert.deepEqual(treeModel(TREE_FORMS.conifer, 'woodland').positions, treeModel(TREE_FORMS.conifer).positions);
+});
+
+test('woodland bough colliders cover reachable wood while leaving the ground below branches open', async () => {
+  const { treeBranchColliders } = await import('./trees.js');
+  assert.equal(typeof treeBranchColliders, 'function');
+  for (const form of Object.values(TREE_FORMS)) assert.deepEqual(treeBranchColliders(form), []);
+  assert.deepEqual(treeBranchColliders(TREE_FORMS.conifer, 'woodland'), []);
+  for (const form of [TREE_FORMS.broadleaf, TREE_FORMS.spreading]) {
+    const model = treeModel(form, 'woodland'), colliders = treeBranchColliders(form, 'woodland');
+    assert.ok(colliders.length > 0 && colliders.length <= 16);
+    for (const collider of colliders) {
+      assert.ok(Object.values(collider).every(Number.isFinite));
+      assert.ok(collider.baseY > 2.5, 'bough colliders must not close off the ground below');
+      assert.ok(collider.radius > 0 && collider.radius < .7, 'use short cylinders along the bough, not a solid crown collider');
+      assert.ok(collider.height > 0 && collider.height < 1.5);
+    }
+    let reachable = 0;
+    const check = ([x, y, z]) => {
+      if (y < .5 || y > 5.5 || Math.hypot(x, z) <= .48) return;
+      reachable++;
+      assert.ok(colliders.some(c => y >= c.baseY - 1e-5 && y <= c.baseY + c.height + 1e-5 && Math.hypot(x - c.x, z - c.z) <= c.radius + 1e-5), `form ${form}: wood at ${[x, y, z]} escaped its collision shape`);
+    };
+    for (let i = 0; i < model.indices.length; i += 3) {
+      const ids = [...model.indices.slice(i, i + 3)];
+      if (ids.some(v => model.colors[v * 4 + 2] >= .1)) continue;
+      const vertices = ids.map(v => [...model.positions.slice(v * 3, v * 3 + 3)]);
+      vertices.forEach(check);
+      for (let edge = 0; edge < 3; edge++) check(vertices[edge].map((value, axis) => (value + vertices[(edge + 1) % 3][axis]) / 2));
+    }
+    assert.ok(reachable > 20, 'the woodland needs real lower boughs, not only a bare trunk');
+  }
+});
+
+test('tree paint binds shared grove lighting only when its world supplies that field', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), bound = [];
+  const plain = createTreePaint(scene, { still: true }).paint;
+  const lit = createTreePaint(scene, { still: true, grove: { bind: paint => bound.push(paint) } }).paint;
+  assert.deepEqual(bound, [lit]);
+  assert.ok(lit.options.samplers.includes('groveField'));
+  assert.ok(!plain.options.samplers.includes('groveField'));
+  assert.match(lit.shaderPath.vertexSource, /vRootY = base\.y/);
+  assert.match(lit.shaderPath.fragmentSource, /groveLight\(bark, n, field\)/);
+  assert.doesNotMatch(plain.shaderPath.fragmentSource, /groveLight\(bark/);
+  engine.dispose();
+});
+
+test('woodland distance trees keep a three-dimensional crown and supported trunk within the reduced geometry budget', async () => {
+  const { farTreeModel } = await import('./trees.js');
+  assert.equal(typeof farTreeModel, 'function');
+  for (const form of [TREE_FORMS.broadleaf, TREE_FORMS.spreading]) {
+    const distant = farTreeModel(form, 'woodland'), original = farTreeModel(form);
+    assert.equal(original.indices.length / 3, 2);
+    assert.ok(distant.indices.length / 3 < 1100);
+    const depth = [], height = [], wood = [];
+    for (let i = 0; i < distant.positions.length / 3; i++) {
+      depth.push(distant.positions[i * 3 + 2]); height.push(distant.positions[i * 3 + 1]);
+      if (distant.colors[i * 4 + 2] < .1) wood.push(distant.positions[i * 3 + 1]);
+      const [x, y, z] = distant.positions.slice(i * 3, i * 3 + 3);
+      assert.ok([distant.treeTrunk, distant.treeCrown].some(bound => (x * x + z * z) / bound[1] ** 2 + (y - bound[0]) ** 2 / bound[2] ** 2 <= 1.000001));
+    }
+    assert.ok(Math.max(...depth) - Math.min(...depth) > 7);
+    assert.ok(Math.min(...height) < -.7 && Math.max(...height) > 8);
+    assert.ok(Math.min(...wood) < -.7 && Math.max(...wood) > 6);
+  }
+});
+
+test('a defined forest keeps the clearing, walking path, landmarks and climbable formation open', async () => {
+  const { WILDS_WORLD } = await import('../../core/wilds/world-definition.js');
+  const { createTerrainField } = await import('../../core/world-terrain.js');
+  const { plantDefinitionTrees } = await import('./trees.js');
+  const ring = terrainRing(0, [{ minX: -128, maxX: 128, minZ: -128, maxZ: 128, step: 2 }], WILDS_WORLD), trees = plantDefinitionTrees([ring], WILDS_WORLD), field = createTerrainField(WILDS_WORLD);
+  assert.ok(trees.count > 200);
+  assert.equal(trees.x[0], -15); assert.equal(trees.z[0], 10);
+  for (let i = 0; i < trees.count; i++) {
+    assert.ok(Math.hypot(trees.x[i], trees.z[i]) > 16);
+    assert.ok(field.pathDistance(trees.x[i], trees.z[i]) >= WILDS_WORLD.path.width + trees.width[i] * 3.29);
+    assert.ok(Math.hypot(trees.x[i] + 9, trees.z[i] + 42) > 5);
+  }
+});
+
+
+test('authored clearing groups replace scattered opening trees and retain varied crown heights', async () => {
+  const { WILDS_WORLD } = await import('../../core/wilds/world-definition.js');
+  const { plantDefinitionTrees } = await import('./trees.js');
+  const rings = [terrainRing(0, [{ minX: -128, maxX: 128, minZ: -128, maxZ: 128, step: 4 }], WILDS_WORLD)];
+  const trees = plantDefinitionTrees(rings, WILDS_WORLD), outside = plantDefinitionTrees(rings, { ...WILDS_WORLD, trees: { ...WILDS_WORLD.trees, opening: undefined } });
+  const opening = Array.from({ length: trees.count }, (_, i) => i).filter(i => trees.x[i] > -29 && trees.x[i] < 29 && trees.z[i] > -62 && trees.z[i] < 28);
+  assert.equal(opening.length, 11);
+  assert.ok(trees.count < outside.count);
+  assert.deepEqual(plantDefinitionTrees(rings, WILDS_WORLD), trees);
+  assert.ok(Math.abs(trees.height[0] - 2.064) < 1e-6);
+  assert.ok(Math.abs(trees.height[1] - 1.368) < 1e-6);
+  assert.ok(trees.width[0] > trees.width[6]);
+  const unshaped = plantDefinitionTrees(rings, { ...WILDS_WORLD, trees: { ...WILDS_WORLD.trees, heroes: [{ x: -18, z: -15, size: 1.6, kind: 2, turn: .6 }] } });
+  assert.ok(Math.abs(unshaped.height[0] - 1.6) < 1e-6);
 });

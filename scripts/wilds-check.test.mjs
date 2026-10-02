@@ -4,11 +4,26 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { pinScript } from './lh/app.mjs';
 import { idle } from './lh/measure.mjs';
+import { advance } from './lh/flows/wilds.mjs';
 
 function storage(entries = {}) {
   const values = new Map(Object.entries(entries));
   return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), clear: () => values.clear() };
 }
+
+test('the Wilds flow advances the complete fractional duration and waits for its final frame', async () => {
+  const window = { __littleHours: { wilds: { diagnostics: () => ({ now: window.__lhFrozenAt }) } }, __lhFrozenAt: 1000 };
+  const frames = [];
+  const app = {
+    async js(expression) { return vm.runInNewContext(expression, { window }); },
+    async waitFor(expression) { assert.equal(vm.runInNewContext(expression, { window }), true); frames.push(window.__lhFrozenAt); },
+  };
+  await advance(app, 127.5);
+  assert.deepEqual(frames, [1050, 1100, 1127.5]);
+  await advance(app, 0);
+  await advance(app, 2.5);
+  assert.deepEqual(frames, [1050, 1100, 1127.5, 1130]);
+});
 
 test('Wilds browser fixtures seed only the independent key and preserve reload changes', () => {
   const localStorage = storage({ 'little-hours-v1': 'production sentinel', other: 'keep' });
@@ -47,6 +62,7 @@ test('the performance sample divides rendered frames by measured elapsed time', 
   assert.equal(result.rafPerSecond, 1.5);
   assert.equal(result.slowGaps, 0);
   assert.equal(result.p95GapMs, 17);
+  assert.equal(result.maxGapMs, 17);
   assert.match(evaluations[0], /stats\("wilds"\)/);
   assert.match(evaluations[1], /stats\("wilds"\)/);
 });

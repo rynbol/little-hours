@@ -1,0 +1,15 @@
+{
+  "reachMs": 120,
+  "riseMetres": 0.55,
+  "liftMs": 247.5,
+  "normal": {
+    "durationMs": 450,
+    "transferMs": 382.5,
+    "advanceMetres": 0.46
+  },
+  "wide": {
+    "durationMs": 650,
+    "transferMs": 500,
+    "advanceMetres": 1.18
+  }
+}

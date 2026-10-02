@@ -146,3 +146,64 @@ test('a forward ring meets the rings around it without cracks on every side', ()
     assert.ok(!(xs.every(x => x >= -64 && x <= 64) && zs.every(z => z >= -96 && z <= 32)), 'no triangle inside the forward ring');
   }
 });
+
+test('the surface sampler reads actual triangles and their upward normals, including holes', async () => {
+  const { sampleTerrainSurface } = await import('./terrain-mesh.js');
+  const ring = { positions: new Float32Array([0, 3, 0, 0, 7, 2, 2, 5, 0, 2, 11, 2]), indices: new Uint16Array([0, 1, 2, 2, 1, 3]) };
+  const low = sampleTerrainSurface([ring], 0.5, 0.5), high = sampleTerrainSurface([ring], 1.5, 1.5);
+  assert.equal(low.height, 4.5); assert.equal(high.height, 8.5);
+  assert.deepEqual(low.normal, { x: -1 / Math.sqrt(6), y: 1 / Math.sqrt(6), z: -2 / Math.sqrt(6) });
+  for (const [key, expected] of Object.entries({ x: -2 / Math.sqrt(14), y: 1 / Math.sqrt(14), z: -3 / Math.sqrt(14) })) assert.ok(Math.abs(high.normal[key] - expected) < 1e-12);
+  assert.equal(sampleTerrainSurface([{ ...ring, indices: new Uint16Array([0, 2, 1]) }], 0.5, 0.5).height, 4.5);
+  assert.equal(sampleTerrainSurface([{ ...ring, indices: new Uint16Array([0, 2, 1]) }], 1.5, 1.5), null);
+  assert.equal(sampleTerrainSurface([ring], -0.01, 0), null);
+  assert.equal(sampleTerrainSurface([ring], NaN, 0), null);
+  assert.equal(sampleTerrainSurface([ring], 2, 2).height, 11);
+});
+
+test('defined terrain translates on a common grid and collision follows final stitched vertices', async () => {
+  const { buildTerrainRings, sampleTerrainSurface } = await import('./terrain-mesh.js');
+  const { WILDS_WORLD } = await import('../../core/wilds/world-definition.js');
+  const { createTerrainField } = await import('../../core/world-terrain.js');
+  const definition = { ...WILDS_WORLD, terrain: { base: 0, noise: [], hills: [{ x: 48, z: -60, radiusX: 4, radiusZ: 4, height: 10 }] }, clearings: [] };
+  const data = await buildTerrainRings({ rings: RINGS, definition, center: { x: 32, z: -64 }, workers: false });
+  const point = sampleTerrainSurface(data, 48, -60), raw = createTerrainField(definition).heightAt(48, -60);
+  assert.ok(Math.abs(point.height - Math.fround(10 / Math.E)) < 1e-6);
+  assert.ok(raw - point.height > 6);
+  const adjacent = sampleTerrainSurface(data, 48.00001, -60);
+  assert.ok(Math.abs(adjacent.height - point.height) < 1e-4);
+  assert.equal(data[0].positions[0], 16);
+  assert.equal(data[0].positions[2], -80);
+  assert.equal(sampleTerrainSurface(data, 1000, 1000), null);
+});
+
+test('aborted terrain work releases its worker without accepting a later result', async () => {
+  const { inWorker } = await import('./terrain-mesh.js');
+  const original = globalThis.Worker, active = [];
+  globalThis.Worker = class {
+    constructor() { active.push(this); }
+    postMessage(job) { this.job = job; }
+    terminate() { this.terminated = true; }
+  };
+  try {
+    const controller = new AbortController(), result = inWorker({ job: 'ring', index: 0 }, { signal: controller.signal });
+    assert.equal(active[0].job.index, 0); controller.abort();
+    await assert.rejects(result, { name: 'AbortError' });
+    assert.equal(active[0].terminated, true);
+    active[0].onmessage({ data: 'late' });
+    const cancelled = new AbortController(); cancelled.abort();
+    await assert.rejects(inWorker({ job: 'ring' }, { signal: cancelled.signal }), { name: 'AbortError' });
+    assert.equal(active.length, 1);
+  } finally { globalThis.Worker = original; }
+});
+
+test('Wilds vista hills keep the rendered slope within 35 cm of the shaped land', async () => {
+  const { WILDS_WORLD, WILDS_RINGS } = await import('../../core/wilds/world-definition.js');
+  const { createTerrainField } = await import('../../core/world-terrain.js');
+  const { buildTerrainRings, sampleTerrainSurface } = await import('./terrain-mesh.js');
+  const field = createTerrainField(WILDS_WORLD), rings = await buildTerrainRings({ definition: WILDS_WORLD, rings: WILDS_RINGS, workers: false });
+  let maximum = 0;
+  for (let x = -430; x <= 450; x += 13.7) for (let z = -550; z >= -950; z -= 11.7) maximum = Math.max(maximum, Math.abs(sampleTerrainSurface(rings, x, z).height - field.heightAt(x, z)));
+  assert.ok(maximum < .35, `vista terrain departs by ${maximum.toFixed(3)} m`);
+  assert.ok(rings.reduce((sum, ring) => sum + ring.indices.length / 3, 0) < 190000);
+});
