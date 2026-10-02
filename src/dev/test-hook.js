@@ -11,8 +11,9 @@ async function until(test, timeout, what) {
   }
 }
 
+const AMBIENT_ANIMATIONS = '#timer-progress';
 function runningAnimations() {
-  return document.getAnimations().filter(animation => animation.playState === 'running' && Number.isFinite(animation.effect?.getComputedTiming().endTime));
+  return document.getAnimations().filter(animation => animation.playState === 'running' && Number.isFinite(animation.effect?.getComputedTiming().endTime) && !animation.effect.target?.matches?.(AMBIENT_ANIMATIONS));
 }
 
 function animationName(animation) {
