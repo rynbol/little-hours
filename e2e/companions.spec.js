@@ -73,6 +73,7 @@ test('completion awards the pet that began focusing and the room stays usable', 
   await page.clock.install({ time: new Date('2026-09-27T12:00:00') });
   await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await page.locator('#start-button').click();
+  await expect(page.locator('#start-button')).toHaveText(/Pause/);
   await page.clock.fastForward('01:00');
   await page.locator('#pet-button').click(); await page.locator('#pet-collection > summary').click(); await page.locator('[data-pet-choice="dog"]').click(); await page.locator('#close-panel').click();
   await page.clock.fastForward('24:01');
@@ -94,6 +95,7 @@ test('an open care card shows completed focus while a control has focus', async 
   await page.clock.install({ time: new Date('2026-09-27T12:00:00') });
   await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
   await page.locator('#start-button').click();
+  await expect(page.locator('#start-button')).toHaveText(/Pause/);
   await page.locator('#pet-button').click();
   await expect(page.locator('#close-panel')).toBeFocused();
   await page.clock.fastForward('25:01');
