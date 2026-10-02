@@ -4,12 +4,6 @@ import { petEntry } from '../../core/pets.js';
 import { $ } from '../../ui/dom.js';
 import { icon } from '../../ui/icons.js';
 
-const themeCopy = {
-  dusk: 'The candles are lit. Stay a little longer.',
-  rain: 'Raindrops, candlelight, and nowhere else to be.',
-  day: 'Sunlight on the books. A fresh little chapter.',
-};
-
 export function createRoomUI(app) {
   let compact = false, quality = 'auto', performanceStats = null, namingRoom = null, nameDraft = '';
 
@@ -18,18 +12,15 @@ export function createRoomUI(app) {
     $('#room-title-form').hidden = true;
     $('.room-title-row').hidden = false;
     $('#rename-room').setAttribute('aria-expanded', 'false');
-    if (restoreFocus) (app.nav.connected ? $('#room-title') : $('#rename-room')).focus({ preventScroll: true });
+    if (restoreFocus) $('#rename-room').focus({ preventScroll: true });
   }
 
   function renderHeading() {
-    const { state } = app, connected = app.nav.connected;
-    const design = roomDesign(state.layout), entry = activeHouseRoom(state.house);
-    $('#room-title').textContent = connected ? state.house.name : roomDisplayName(entry);
-    $('#rename-room').hidden = Boolean(connected);
+    const entry = activeHouseRoom(app.state.house);
+    $('#room-title').textContent = roomDisplayName(entry);
     $('#rename-room').disabled = app.nav.travelling;
-    if (namingRoom && (namingRoom !== entry.id || connected)) closeNameEditor($('#room-title-form').contains(document.activeElement));
+    if (namingRoom && namingRoom !== entry.id) closeNameEditor($('#room-title-form').contains(document.activeElement));
     if (namingRoom && $('#room-title-input').value !== nameDraft) $('#room-title-input').value = nameDraft;
-    $('#room-subtitle').textContent = connected ? 'Your rooms, together. Choose a corner to step inside.' : design.style ? ({ sakura: 'Soft light. Cherry blossoms. Room to breathe.', cloud: 'Head in the clouds. Feet on a soft little rug.', metro: 'The city hums. Your little corner is quiet.' })[design.style] : themeCopy[state.theme];
   }
 
   // The room's accessible name says how to use it, with the current pet.
@@ -55,9 +46,11 @@ export function createRoomUI(app) {
       app.room?.setTheme(state.theme);
       const [symbol, label] = state.theme === 'day' ? ['sun', 'Daylight'] : state.theme === 'rain' ? ['rain', 'Rain'] : ['moon', 'Night'];
       const nextLabel = state.theme === 'day' ? 'Switch to night' : 'Switch to daylight';
-      $('#time-toggle').innerHTML = `${icon(symbol)}<span>${label}</span>`;
-      $('#time-toggle').setAttribute('aria-label', nextLabel);
-      $('#time-toggle').title = nextLabel;
+      for (const toggle of document.querySelectorAll('[data-time-toggle]')) {
+        toggle.innerHTML = `${icon(symbol)}<span>${label}</span>`;
+        toggle.setAttribute('aria-label', nextLabel);
+        toggle.title = nextLabel;
+      }
     }
   }
 
@@ -104,7 +97,7 @@ export function createRoomUI(app) {
   function onStats(stats) { performanceStats = stats; renderPerformance(); }
 
   $('#rename-room').addEventListener('click', () => {
-    if (app.nav.travelling || app.nav.connected) return;
+    if (app.nav.travelling) return;
     const entry = activeHouseRoom(app.state.house);
     namingRoom = entry.id; nameDraft = roomDisplayName(entry);
     $('#room-title-input').value = nameDraft;
@@ -120,7 +113,7 @@ export function createRoomUI(app) {
   $('#room-title-form').addEventListener('submit', event => {
     event.preventDefault();
     if (!namingRoom || !nameDraft.trim() || app.nav.travelling) return;
-    if (namingRoom !== app.state.house.activeId || app.nav.connected) { closeNameEditor(); return; }
+    if (namingRoom !== app.state.house.activeId) { closeNameEditor(); return; }
     const id = namingRoom, value = nameDraft.trim();
     closeNameEditor(false); app.acceptUpdate(app.store.renameRoom(id, value));
     $('#rename-room').focus({ preventScroll: true });
@@ -130,7 +123,7 @@ export function createRoomUI(app) {
   });
   $('#cancel-room-title').addEventListener('click', () => closeNameEditor());
 
-  $('#time-toggle').addEventListener('click', () => {
+  for (const toggle of document.querySelectorAll('[data-time-toggle]')) toggle.addEventListener('click', () => {
     app.acceptUpdate(app.store.update(draft => { draft.theme = draft.theme === 'day' ? 'dusk' : 'day'; }));
   });
   $('#reset-view').addEventListener('click', () => app.room?.resetView());

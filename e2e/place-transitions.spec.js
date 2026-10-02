@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-const openGarden = async page => { if (await page.locator('#focus-progress').getAttribute('open') === null) await page.locator('#focus-progress > summary').click(); await page.locator('#focus-garden').click(); };
-
 const ready = page => expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
 const settled = page => expect(page.locator('html')).not.toHaveAttribute('data-place-transition', { timeout: 30000 });
+const openGarden = async page => { await page.locator('#rooms-button').click(); await settled(page); await page.locator('#house-open-garden').click(); };
 async function transition(page, click, destination) {
   await page.evaluate(() => {
     window.__placeTransitionEvidence = null;
@@ -28,14 +27,16 @@ async function transition(page, click, destination) {
 test('garden and pond entrances and exits fade, including the path home and study exit', async ({ page }) => {
   test.slow();
   await page.goto('/'); await ready(page);
-  await transition(page, () => openGarden(page), 'garden');
+  await transition(page, () => page.locator('#rooms-button').click(), 'island');
+  await transition(page, () => page.locator('#house-open-garden').click(), 'garden');
   await expect(page.getByRole('button', { name: 'Back to island', exact: true })).toBeVisible();
   await transition(page, () => page.locator('#garden-back').click(), 'island');
   await transition(page, () => page.locator('#house-open-garden').click(), 'garden');
   await transition(page, () => page.getByRole('button', { name: 'Back to island', exact: true }).click(), 'island');
   await transition(page, () => page.locator('#back-to-room').click(), 'home');
   await expect(page.locator('#room-section')).toBeVisible();
-  await transition(page, () => openGarden(page), 'garden');
+  await transition(page, () => page.locator('#rooms-button').click(), 'island');
+  await transition(page, () => page.locator('#house-open-garden').click(), 'garden');
   await page.locator('#garden-spot-0').click();
   await page.locator('#garden-plant-seed').click();
   await transition(page, () => page.locator('#garden-study').click(), 'home');

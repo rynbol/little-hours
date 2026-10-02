@@ -27,6 +27,7 @@ import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
 import { createBuddyUI } from './features/buddy/index.js';
+import './ui/room-screen.css';
 import { installTestHook } from './dev/test-hook.js';
 import { stockBait } from './core/fishing.js';
 
@@ -72,13 +73,13 @@ function applyState(next, force = false) {
   document.body.dataset.design = design.style || 'retreat';
 
   $('#coin-balance').textContent = state.house.coins;
-  $('#coin-wallet').setAttribute('aria-label', `${state.house.coins} coins · Visit your house`);
+  $('#house-coin-balance').textContent = state.house.coins;
+  $('#house-coin-wallet').setAttribute('aria-label', `${state.house.coins} coins · Visit your house`);
   app.timer.renderFocusReward();
   app.houseUI?.render();
   app.lake.render();
   app.room?.setHouse(state.house);
   if (force || previous.pond.tank.join() !== state.pond.tank.join()) app.room?.setTankFish(state.pond.tank);
-  app.nav.renderConnections();
   app.roomUI.applyTheme(previous, force);
   if (document.activeElement !== $('#task') && !app.timer.taskPending && $('#task').value !== state.task) $('#task').value = state.task;
   if (force || previous.pet !== state.pet) { app.room?.setPet?.(state.pet); app.pet.renderName(); app.decorate.renderInspector(); }
@@ -149,7 +150,7 @@ try {
   const speechLayer = document.createElement('div'); speechLayer.className = 'speech-layer';
   $('#room-canvas').appendChild(speechLayer);
   app.speech = createSpeech(speechLayer, { anchor: who => app.room?.anchor(who), reducedMotion: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
-  app.delights = createDelights($('#room-canvas'), { room: app.room, signal: listeners.signal, unavailable: () => app.decorate.active || app.avatar.active || app.nav.houseOpen || Boolean(app.nav.connected) || app.nav.travelling || app.roomUI.compact });
+  app.delights = createDelights($('#room-canvas'), { room: app.room, signal: listeners.signal, unavailable: () => app.decorate.active || app.avatar.active || app.nav.houseOpen || app.nav.travelling || app.roomUI.compact });
 } catch (error) {
   $('#loading-note').textContent = 'The room couldn’t load. Try reloading; your focus timer is still ready.';
   console.error('Could not create the room:', error);
@@ -163,6 +164,8 @@ app.houseUI = createHouseUI($('#house-page'), {
   onFocus: () => travelTo('home', () => { app.nav.setHouseOpen(false); app.timer.expand(); $('#start-button').focus(); }),
   onPond: () => app.lake.open(),
 });
+$('#house-coin-wallet').addEventListener('click', () => app.nav.setHouseOpen(false), { signal: listeners.signal });
+$('#house-focus').addEventListener('click', async () => { await app.nav.setHouseOpen(false); app.timer.expand(); if (!app.nav.houseOpen) $('#focus-card').showPopover(); }, { signal: listeners.signal });
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !event.isComposing && app.timer.leaveFocusMode({ animate: true })) { event.preventDefault(); return; }
   if (event.key === 'Escape' && app.nav.houseOpen && !event.target.closest('input')) { app.nav.setHouseOpen(false); return; }
@@ -198,10 +201,10 @@ document.addEventListener('visibilitychange', () => {
 }, { signal: listeners.signal });
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
-if (import.meta.env.DEV) installTestHook({ get pet() { return app.pet; }, get buddy() { return app.buddy; }, get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get connected() { return app.nav.connected; } });
+if (import.meta.env.DEV) installTestHook({ get pet() { return app.pet; }, get buddy() { return app.buddy; }, get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; } });
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
-  document.body.classList.remove('is-connected', 'is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');
+  document.body.classList.remove('is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');
   clearInterval(tickInterval);
   toast.dispose();
   app.feedback.dispose();

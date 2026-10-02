@@ -1,3 +1,4 @@
+import { steps } from '../steps.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -86,7 +87,7 @@ const round = value => Number(value.toFixed(4));
 async function seat(app) {
   await app.settle();
   await app.waitFor(`(${SEAT}.seat.world.outdoor !== false || ${SEAT}.seat.world.buildsAhead === false)`, { what: 'the outdoor world to be built, where the renderer builds it ahead', timeout: 30000 });
-  await app.clickSel('#focus-mode-enter');
+  await steps.openTimer(app); await app.clickSel('#focus-mode-enter');
   await app.waitFor(`${SEAT}.seat.state === 'seated' && ${SEAT}.seat.world.outdoor`, { what: 'the chair view with the outdoor world', timeout: 30000 });
   await app.js(INSTALL);
 }

@@ -65,7 +65,7 @@ export default {
     t.check('coins, name, hearts, meal cooldown and belongings survive reload', await app.js(`${bond('cat')}.name === 'Maple & Me' && ${bond('cat')}.affection === 4 && ${bond('cat')}.care.fabric === 'rose' && ${bond('cat')}.care.meals === 1 && document.querySelector('#pet-feed').textContent.includes('Full') && window.__littleHours.state.house.coins === 100`));
     await app.clickSel('#pet-collection > summary'); await app.clickSel('[data-pet-choice="panda"]'); await app.clickSel('#pet-wish');
     await app.waitFor(`window.__littleHours.state.petWish === 'panda'`, { what: 'the saving target to save' });
-    t.check('a saving target survives and reaches the timer', (await app.saved()).petWish === 'panda' && (await app.text('#focus-reward')).includes('Kiki'));
+    t.check('a saving target survives', (await app.saved()).petWish === 'panda');
     await app.clickSel('[data-pet-choice="fox"]'); await type(app, '#pet-adopt-name', 'Juniper'); await app.clickSel('#pet-adopt-button');
     await app.waitFor(`window.__littleHours.state.pet === 'fox'`, { what: 'the fox adoption to save' });
     t.check('welcoming a named fox spends its price once', await app.js(`window.__littleHours.state.pet === 'fox' && ${bond('fox')}.name === 'Juniper' && window.__littleHours.state.house.coins === 10`));
@@ -79,7 +79,8 @@ export default {
     await finish.clickSel('#start-button');
     await finish.waitFor(`document.querySelector('#session-celebration').open`, { timeout: 12000, what: 'the focus celebration' });
     t.check('focus grows the starting pet’s bond and unlocks its ribbon', await finish.js(`${bond('cat')}.affection === 8 && ${bond('cat')}.ribbon === 1`));
-    t.check('completion keeps the room interactive and celebrates overhead', await finish.js(`!document.querySelector('#session-celebration').matches(':modal') && ${diagnostics}.celebrationAge < 3.2 && Boolean(document.querySelector('.room-delight[data-kind="finish"]'))`));
+    const celebrated = await finish.js(`({ modal: document.querySelector('#session-celebration').matches(':modal'), age: ${diagnostics}.celebrationAge, delight: Boolean(document.querySelector('.room-delight[data-kind="finish"]')) })`);
+    t.check('completion keeps the room interactive and celebrates overhead', !celebrated.modal && celebrated.age < 3.2 && celebrated.delight, celebrated);
     t.check('completed study gives a daisy to the pet and displays its physical gift', await finish.js(`document.querySelector('#celebration-gift')?.textContent.includes('A daisy for you') && ${bond('cat')}.gift === 'daisy' && ${diagnostics}.petBelongings.gift.selected === 'daisy'`));
     await t.shot(finish, 'finish'); await finish.clickSel('#session-celebration .start-button'); await finish.clickSel('#pet-button');
     t.check('the unlocked ribbon is visible on the room pet', await finish.js(`${diagnostics}.petModel.ribbon === 1`));

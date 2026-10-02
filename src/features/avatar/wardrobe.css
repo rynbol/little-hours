@@ -2,7 +2,7 @@
 .avatar-stage-heading, .portrait-backdrop, .avatar-preview-controls { display: none; }
 /* Let the returning portrait settle below the room heading before controls
    reappear, especially on phones where those two surfaces trade places. */
-body:has(canvas[data-portrait='leaving']) :is(.room-heading, .home-connections, .room-bottom, #focus-card) {
+body:has(canvas[data-portrait='leaving']) :is(.room-heading, .room-bottom, #focus-card) {
   animation: wardrobe-controls-return .88s both;
   pointer-events: none;
 }
@@ -12,9 +12,8 @@ canvas[data-portrait='leaving'] { pointer-events: none; }
 .is-avatar-editing { overflow: hidden; }
 .is-avatar-editing .workspace { display: block; padding-top: 18px; }
 .is-avatar-editing .room-section { display: grid; grid-template-columns: minmax(0, 1fr) 376px; grid-template-rows: 42px minmax(0, 1fr); column-gap: 24px; height: calc(100svh - 95px); min-height: 0; }
-.is-avatar-editing .room-heading, .is-avatar-editing .home-connections, .is-avatar-editing .room-bottom, .is-avatar-editing #focus-card, .is-avatar-editing .app-footer, .is-avatar-editing .stage-presence, .is-avatar-editing .companion-status { display: none; }
+.is-avatar-editing .room-heading, .is-avatar-editing .room-bottom, .is-avatar-editing #focus-card, .is-avatar-editing .stage-presence, .is-avatar-editing .companion-status { display: none; }
 .is-avatar-editing .avatar-stage-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; padding: 3px 12px; grid-column: 1; grid-row: 1; }
-.avatar-stage-heading .eyebrow { font-size: 9px; letter-spacing: 1.8px; color: #c9b4a7; }
 .avatar-pause-note { font-size: 10px; color: #c3b3c7; text-align: right; max-width: 180px; }
 .is-avatar-editing .stage { grid-column: 1; grid-row: 2; height: auto; min-height: 0; }
 .is-avatar-editing .stage::before { inset: 5% 0 5%; background: radial-gradient(ellipse, #9e789d27, transparent 70%); }
@@ -105,7 +104,6 @@ canvas[data-portrait='leaving'] { pointer-events: none; }
   .is-avatar-editing .workspace { padding-top: 0; }
   .is-avatar-editing .room-section { height: calc(100svh - 63px); grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(200px, 40%) minmax(0, 1fr); gap: 0; }
   .is-avatar-editing .avatar-stage-heading { position: absolute; z-index: 3; top: 10px; left: 0; right: 0; display: block; pointer-events: none; }
-  .avatar-stage-heading .eyebrow { display: none; }
   .avatar-pause-note { max-width: none; text-align: center; font-size: 9px; }
   .is-avatar-editing .stage { grid-column: 1; grid-row: 1; min-height: 0; }
   .is-avatar-editing .portrait-backdrop { inset: 8% 14% 8%; }

@@ -11,13 +11,14 @@ const serious = results => results.violations.filter(v => ['serious', 'critical'
 
 test('the focus card has no serious automated accessibility issues', async ({ page }) => {
   await page.goto('/');
+  await page.locator('#timer-sheet-toggle').click();
   await expect(page.locator('#timer')).toBeVisible();
   expect(serious(await scan(page))).toEqual([]);
 });
 
 test('the saves panel has no serious automated accessibility issues', async ({ page }) => {
   await page.goto('/');
-  await page.locator('#save-status').click();
+  await page.locator('#room-more-toggle').click(); await page.locator('#save-status').click();
   await expect(page.locator('#download-backup')).toBeVisible();
   expect(serious(await scan(page))).toEqual([]);
 });

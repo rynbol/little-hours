@@ -172,7 +172,7 @@ label.house-choice-label { margin: 16px 0 8px; }
   .house-detail { padding: 20px; }
   .house-preview-bar { flex-wrap: wrap; gap: 5px; }
 }
-@media (prefers-reduced-motion: reduce) { .house-page *, .coin-wallet { animation: none !important; transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .house-page * { animation: none !important; transition: none !important; } }
 .house-next-note .text-link { display: flex; }
 .house-see-preview { display: none; }
 .house-postcard-dialog { width: min(780px, calc(100% - 32px)); max-height: calc(100svh - 40px); padding: 24px; border: 1px solid #decbb0; border-radius: 20px; background: #f6ecdc; color: #665044; box-shadow: 0 24px 120px #09050b80; }
@@ -191,3 +191,18 @@ label.house-choice-label { margin: 16px 0 8px; }
 .house-postcard-actions svg { width: 14px; height: 14px; }
 @media (max-width: 800px) { .house-see-preview { display: flex; text-decoration: underline; text-underline-offset: 3px; } }
 @media (max-width: 420px) { .house-postcard-dialog { padding: 16px; } .house-postcard-actions { flex-direction: column; align-items: stretch; } .house-postcard-actions a { justify-content: center; } }
+.house-bar { display: none; }
+body.is-house:not(.is-garden) .house-bar { height: 58px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.house-bar .brand { display: flex; align-items: center; color: var(--chrome-muted); font-family: 'Manrope', sans-serif; font-size: 18px; font-weight: 500; letter-spacing: -.7px; text-decoration: none; }
+.house-bar .brand-dot { color: inherit; }
+.house-bar .header-right { display: flex; align-items: center; gap: 4px; }
+.house-bar :is(.coin-wallet, .time-toggle, .focus-toggle) { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 13px; background: transparent; box-shadow: none; color: var(--chrome-muted); font-size: 11px; }
+.house-bar .coin-wallet { font-weight: 700; }
+.house-bar .coin-wallet .ui-art { width: 21px; height: 21px; }
+.house-bar :is(.time-toggle, .focus-toggle) svg { width: 15px; height: 15px; }
+.house-bar .time-toggle { width: 44px; justify-content: center; padding: 0; }
+.house-bar .time-toggle > span { display: none; }
+.house-bar .coin-wallet > span:last-child { display: none; }
+.house-bar :is(.coin-wallet, .time-toggle, .focus-toggle):is(:hover, :focus-visible) { color: var(--chrome-ink); background: var(--chrome-hover); }
+.house-bar #dock-timer { padding-left: 8px; border-left: 1px solid var(--chrome-line); color: var(--chrome-muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 599px) { .house-bar .focus-toggle > span:first-of-type { display: none; } }

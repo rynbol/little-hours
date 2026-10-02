@@ -44,6 +44,7 @@ import { floorBoards, woodGrain } from './floorboards.js';
 import { createRoomRoof } from '../../models/room-roofs.js';
 import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createBuddyFlight } from '../../core/buddy-flight.js';
+import { renderRatioCeiling } from '../../core/render-scale.js';
 import { createBuddyModel } from '../../models/buddy.js';
 import { createPainterly } from '../../models/painterly.js';
 import { ROOM_LIGHTS, seatedDim, windowSun, deskLamp, gradeFocus, roomBloom, bloomEmission, lampPool } from './room-lighting.js';
@@ -692,7 +693,7 @@ export function createRoom(container, options = {}) {
   let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true, suspended = false;
   // Adaptive and Crisp both start at the display's own density (capped at 2×),
   // so one canvas pixel lands on one screen pixel; only Adaptive steps down.
-  const nativeRatio = () => Math.min(window.devicePixelRatio || 1, 2);
+  const nativeRatio = () => renderRatioCeiling(window.devicePixelRatio, engine.getGlInfo?.()?.renderer);
   let quality = 'auto', pixelRatio = nativeRatio(), ratioCeiling = pixelRatio, raisedAt = -Infinity, statsStart = 0, intervalTotal = 0, sampleFrames = 0, slowSamples = 0, steadySamples = 0;
   let rafCalls = 0, lastRafAt = 0, fastRafFrames = 0, onScreen = true;
   const intervals = [], submissions = [];
@@ -1657,7 +1658,8 @@ export function createRoom(container, options = {}) {
   function roomFraming() {
     const view = camera.getViewMatrix(true); let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const corner of passages && !editing ? connectedCorners : roomCorners) { Vector3.TransformCoordinatesToRef(corner, view, projectedCorner); minX = Math.min(minX, projectedCorner.x); maxX = Math.max(maxX, projectedCorner.x); minY = Math.min(minY, projectedCorner.y); maxY = Math.max(maxY, projectedCorner.y); }
-    const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2, viewHeight = Math.max(maxY - minY, (maxX - minX) / canvasAspect) / 0.94;
+    const portraitZoom = canvasAspect < 1 && !editing ? 0.8 : 1;
+    const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2, viewHeight = Math.max(maxY - minY, (maxX - minX) / canvasAspect) * portraitZoom / 0.94;
     return { centerX, centerY, height: viewHeight };
   }
   scene.onBeforeRenderObservable.add(() => { if (fitAlpha !== camera.alpha || fitBeta !== camera.beta) fitRoom(); });

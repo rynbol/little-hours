@@ -45,7 +45,8 @@ test('meals and belongings spend earned coins once and fullness survives reload'
   await page.locator('#pet-belongings > summary').click();
   await page.locator('#pet-fabric-rose').click();
   await expect(page.locator('#coin-balance')).toHaveText('0');
-  await page.locator('#pet-fabric-linen').click(); await page.locator('#pet-fabric-rose').click();
+  await page.locator('#pet-fabric-linen').click(); await expect(page.locator('#pet-fabric-linen')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#pet-fabric-rose').click(); await expect(page.locator('#pet-fabric-rose')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#coin-balance')).toHaveText('0');
   await page.reload(); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 }); await page.locator('#pet-button').click();
   await expect(page.locator('#pet-feed')).toContainText('Full');
@@ -65,7 +66,7 @@ test('the phone care card keeps the cutaway visible and the focus timer reachabl
   });
   expect(bounds.fits).toBe(true); expect(bounds.room.top).toBeGreaterThanOrEqual(0); expect(bounds.room.bottom).toBeLessThan(bounds.action.top); expect(bounds.action.bottom).toBeLessThanOrEqual(844);
   expect((await new AxeBuilder({ page }).include('#room-panel').analyze()).violations).toEqual([]);
-  await page.locator('#focus-toggle').click(); await expect(page.locator('#room-panel')).toBeHidden(); await expect(page.locator('#start-button')).toBeVisible();
+  await page.locator('#close-panel').click(); await expect(page.locator('#room-panel')).toBeHidden(); await expect(page.locator('#start-button')).toBeVisible();
 });
 
 test('completion awards the pet that began focusing and the room stays usable', async ({ page }) => {
@@ -82,8 +83,7 @@ test('completion awards the pet that began focusing and the room stays usable', 
   expect(accessibility.violations).toEqual([]);
   expect(await page.locator('#session-celebration').evaluate(el => el.matches(':modal'))).toBe(false);
   await page.locator('#session-celebration .start-button').click();
-  await expect(page.locator('#focus-reward .focus-hearts b')).toHaveText('+5 ♡');
-  await expect(page.locator('#focus-reward .focus-hearts > span')).toHaveText('Mochi');
+  await expect(page.locator('#start-button')).toBeEnabled();
   const state = await saved(page);
   expect(state.petBonds.cat.minutes).toBe(25); expect(state.petBonds.dog.minutes).toBe(0);
   await page.reload();
@@ -147,15 +147,14 @@ test('a meal requested at the focus deadline takes precedence over celebration',
   await page.clock.resume();
 });
 
-test('care opens centred with a collapsed timer and closes for room view changes', async ({ page }) => {
+test('care opens centred and closes for room view changes', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/'); await expect(page.locator('#loading-note')).toBeHidden({ timeout: 30000 });
-  await page.locator('#focus-toggle').click(); await expect(page.locator('body')).toHaveClass(/focus-collapsed/);
   await page.locator('#pet-button').click();
   const offset = await page.evaluate(() => { const card = document.querySelector('#room-panel').getBoundingClientRect(); return Math.round(Math.abs(card.left + card.width / 2 - innerWidth / 2) + Math.abs(card.top + card.height / 2 - innerHeight / 2)); });
   expect(offset).toBeLessThanOrEqual(2);
-  await page.locator('.home-wide').click(); await expect(page.locator('#room-panel')).toBeHidden();
-  await page.locator('.home-wide').click(); await page.locator('#pet-button').click(); await page.locator('#room-more-toggle').click(); await page.locator('#mini-button').click();
+  await page.locator('#rooms-button').click(); await expect(page.locator('#room-panel')).toBeHidden();
+  await page.locator('#back-to-room').click(); await page.locator('#pet-button').click(); await page.locator('#room-more-toggle').click(); await page.locator('#mini-button').click();
   await expect(page.locator('#room-panel')).toBeHidden(); await expect(page.locator('#stage')).toHaveClass(/is-mini/);
 });
 

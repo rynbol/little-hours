@@ -6,33 +6,22 @@
 .house-camera-controls button:active { transform: scale(.96); }
 .house-camera-controls button[aria-pressed='true'] { background: #d5e0c8; color: #3e5042; box-shadow: 0 2px 5px #17101c1a; }
 .house-camera-controls button:focus-visible, .house-room-tag:focus-visible { outline: 2px solid #f1d2a4; outline-offset: 3px; }
-.house-camera-controls .house-camera-turn { width: 34px; padding: 6px; font-size: 17px; }
 .house-camera-note { position: absolute; bottom: 9px; left: 50%; translate: -50% 0; width: max-content; max-width: calc(100% - 24px); color: #c6b8aa; text-align: center; font-size: 10px; pointer-events: none; }
-.house-canvas, .house-in-room { position: relative; }
-.house-in-room { position: absolute; }
-.house-canvas canvas, .house-in-room canvas { touch-action: pan-y; }
-.house-canvas canvas:focus, .house-in-room canvas:focus { outline: none; }
-.is-connected .stage-presence { top: 15px; }
+.house-canvas { position: relative; }
+.house-canvas canvas { touch-action: pan-y; }
+.house-canvas canvas:focus { outline: none; }
 @media (max-width: 640px) {
   .house-camera-controls { top: 7px; right: 7px; max-width: calc(100% - 14px); gap: 4px; }
   .house-camera-controls button { padding: 6px 10px; font-size: 10px; min-height: 36px; }
   .house-camera-note { font-size: 9px; }
-  .is-connected .stage-presence { top: auto; bottom: 7px; left: 7px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .house-camera-controls button { transition: none; } }
-.is-connected .loading-note { display: none; }
-@media (max-width: 640px) { .is-connected .house-camera-note { display: none; } }
 /* A home is the main canvas. Give its furniture enough room to read. */
 body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(450px, calc(100svh - 240px), 980px); }
-body.is-connected:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(480px, calc(100svh - 240px), 980px); }
 @media (max-width: 640px) {
   body:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(375px, 53svh, 580px); }
-  body.is-connected:not(.is-avatar-editing):not(.is-decorating) .stage { height: clamp(440px, 57svh, 640px); }
 }
 .house-canvas .house-camera-note { display: none; }
-@media (max-width: 640px) {
-  body.is-connected:not(.is-avatar-editing) .stage-presence { top: auto; bottom: 7px; left: 7px; }
-}
 
 .house-room-tag { --pin-bg: #f7efe1; --pin-ink: #5b6b4f; --pin-edge: #fffaf0; --pin-half: 17px; position: absolute; left: 0; top: 0; z-index: 1; pointer-events: auto; transform: translate(calc(var(--pin-half) * -1), -100%); display: flex; align-items: center; gap: 0; padding: 0 0 9px; border: 0; background: none; color: #4f473e; font: inherit; }
 .house-room-tag::after { content: ''; position: absolute; left: var(--pin-half); bottom: 3px; width: 10px; height: 10px; margin-left: -5px; border-radius: 0 0 3px 0; background: var(--pin-bg); transform: rotate(45deg); box-shadow: 2px 2px 3px #2a1f2e26; }

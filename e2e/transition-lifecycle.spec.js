@@ -59,3 +59,14 @@ test('replacement, reduced motion and hidden-page events clean up travel @dev-di
   await expect(page.locator('.place-transition')).toHaveCount(0);
   expect(await page.evaluate(() => window.arrivals)).toEqual(['island', 'home', 'pond']);
 });
+
+test('a settle timeout names what was still busy when it gave up @dev-diagnostics', async ({ page }) => {
+  await ready(page);
+  const message = await page.evaluate(async () => {
+    await window.__littleHours.settled();
+    document.getElementById('stage').animate([{ opacity: 1 }, { opacity: 0.99 }], 300);
+    const late = setTimeout(() => document.getElementById('room-canvas').animate([{ opacity: 1 }, { opacity: 0.99 }], 60000), 150);
+    try { await window.__littleHours.settled(3000); return 'settled'; } catch (error) { return error.message; } finally { clearTimeout(late); }
+  });
+  expect(message).toBe('Timed out after 3000 ms waiting for the page to settle (css animation: script on #room-canvas)');
+});

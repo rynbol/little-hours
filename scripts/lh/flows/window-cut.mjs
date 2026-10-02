@@ -1,3 +1,4 @@
+import { steps } from '../steps.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -50,7 +51,7 @@ export default {
     const save = (label, frame) => { if (frame?.shot) { writeFileSync(join(t.out, `window-cut-${label}.jpg`), Buffer.from(frame.shot.split(',')[1], 'base64')); frame.shot = undefined; } return frame; };
     const sound = frame => frame.outside <= frame.outsideLimit;
     const flightIn = app.js(`window.__windowFlight('entering')`);
-    await app.clickSel('#focus-mode-enter');
+    await steps.openTimer(app); await app.clickSel('#focus-mode-enter');
     const entering = (await flightIn).map((frame, i) => save(i ? '' : 'flight-in', frame));
     await app.waitFor(`${SEAT}.seat.state === 'seated'`, { what: 'the view to settle in the chair', timeout: 30000 });
     check('the fly-in reaches the chair with the outdoor world drawing for some frames', entering.length > 0, entering.length);

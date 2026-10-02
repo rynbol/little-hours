@@ -1,3 +1,4 @@
+import { steps } from './steps.mjs';
 import { createWriteStream, writeFileSync } from 'node:fs';
 import { sleep } from './chrome.mjs';
 
@@ -83,7 +84,7 @@ export async function focusTrip(app, { width, height }) {
   const theme = next => app.js(`(() => { const saved = JSON.parse(localStorage.getItem('little-hours-v1')); saved.theme = '${next}'; localStorage.setItem('little-hours-v1', JSON.stringify(saved)); window.dispatchEvent(new StorageEvent('storage', { key: 'little-hours-v1' })); })()`);
   await mark('load');
   await app.waitFor(`(${SEAT}.seat.world.outdoor !== false || ${SEAT}.seat.world.buildsAhead === false)`, { what: 'the outdoor world to be built, where the renderer builds it ahead', timeout: 30000 }); await sleep(1000);
-  await mark('prepare'); await app.clickSel('#focus-mode-enter');
+  await mark('prepare'); await steps.openTimer(app); await app.clickSel('#focus-mode-enter');
   await app.waitFor(`${SEAT}.seat.state === 'seated'`, { what: 'the view to settle in the chair', timeout: 30000 });
   await mark('seated'); await sleep(3000);
   await mark('look-around');

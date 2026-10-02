@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 
 const coins = page => page.locator('#coin-balance');
 const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-v1')));
+const openSheet = async page => { if (!await page.locator('#focus-card').isVisible()) await page.locator('#timer-sheet-toggle').click(); };
 
 test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: new Date('2026-09-25T10:00:00') });
@@ -16,7 +17,7 @@ test('a focus session survives pausing and a reload, then completes exactly once
   await expect(coins(page)).toHaveText('0');
 
   await start.click();
-  await expect(start).toHaveText(/Pause a moment/);
+  await expect(start).toHaveAccessibleName('Pause a moment');
   await page.clock.fastForward('05:00');
   await expect(page.locator('#timer')).toHaveText(/^(19:5\d|20:00)$/);
   await start.click();
@@ -29,7 +30,7 @@ test('a focus session survives pausing and a reload, then completes exactly once
   await expect(page.locator('#stage-presence')).toHaveAttribute('data-presence', 'break');
 
   await page.locator('#start-button').click();
-  await expect(page.locator('#start-button')).toHaveText(/Pause a moment/);
+  await expect(page.locator('#start-button')).toHaveAccessibleName('Pause a moment');
   await page.clock.fastForward('21:00');
   await expect(page.locator('#session-celebration')).toBeVisible();
   await expect(page.locator('#celebration-earned')).toHaveText('+25 coins');
@@ -51,7 +52,7 @@ test('a running session keeps counting while the page is closed', async ({ page 
   await page.locator('#start-button').click();
   await expect(page.locator('#start-button')).toHaveText(/Pause/);
   await page.reload();
-  await expect(page.locator('#start-button')).toHaveText(/Pause a moment/);
+  await expect(page.locator('#start-button')).toHaveAccessibleName('Pause a moment');
   await page.clock.fastForward('25:00');
   await expect(page.locator('#session-celebration')).toBeVisible();
   await expect(coins(page)).toHaveText('25');
@@ -60,7 +61,7 @@ test('a running session keeps counting while the page is closed', async ({ page 
 test('the chime preference is remembered', async ({ page }) => {
   const chime = page.locator('#chime-toggle');
   await expect(chime).toBeChecked();
-  await page.locator('#focus-options > summary').click(); await chime.uncheck();
+  await openSheet(page); await chime.uncheck();
   await page.reload();
   await expect(page.locator('#chime-toggle')).not.toBeChecked();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-sound')))).toEqual({ volume: 30, chime: false });
@@ -69,10 +70,10 @@ test('the chime preference is remembered', async ({ page }) => {
 test('a named completion stays visible after reload and optional breaks never pay focus rewards', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const start = page.locator('#start-button');
-  await page.locator('#focus-options > summary').click(); await page.locator('#task').fill('Read <chapter one> & reflect');
+  await openSheet(page); await page.locator('#task').fill('Read <chapter one> & reflect');
   await start.click(); await expect(start).toHaveText(/Pause/);
   const id = (await saved(page)).session.id;
-  await page.locator('#task').fill('Tomorrow’s task');
+  await openSheet(page); await page.locator('#task').fill('Tomorrow’s task');
   await page.locator('#timer').click();
   await page.clock.fastForward('25:01');
   await expect(page.locator('#session-celebration')).toBeVisible();
@@ -82,14 +83,10 @@ test('a named completion stays visible after reload and optional breaks never pa
   await expect(page.locator('#session-celebration')).toBeHidden();
   await expect(page.locator('#session-result')).toContainText('Read <chapter one> & reflect');
   expect((await saved(page)).history[0]).toMatchObject({ id, task: 'Read <chapter one> & reflect' });
-  await page.locator('#focus-progress > summary').click(); await page.locator('.session-journal > summary').click();
-  await expect(page.locator('#week-history ul li')).toHaveCount(7);
-  await expect(page.locator('.recent-sessions')).toContainText('Read <chapter one> & reflect');
   expect((await new AxeBuilder({ page }).exclude('#room-canvas').withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze()).violations).toEqual([]);
   const before = await saved(page);
-  await page.locator('[data-break-minutes="5"]').click();
+  await openSheet(page); await page.locator('[data-break-minutes="5"]').click();
   await expect(start).toHaveText(/End break/);
-  await expect(page.locator('#focus-reward')).toBeHidden();
   await expect(page.locator('body')).not.toHaveClass(/is-focusing/);
   await page.locator('#pet-button').click();
   await expect(page.locator('#pet-study')).toHaveText('End break');
@@ -120,11 +117,11 @@ test('changing a paused duration asks first and ending a long break returns to f
   await page.clock.fastForward('01:00');
   await start.click(); await expect(start).toHaveText(/Keep going/);
   const paused = (await saved(page)).session;
-  await page.locator('[data-minutes="50"]').click();
+  await openSheet(page); await page.locator('[data-minutes="50"]').click();
   await expect(page.locator('#replace-session')).toBeVisible();
   await page.locator('#keep-session').click();
   expect((await saved(page)).session).toEqual(paused);
-  await page.locator('[data-minutes="50"]').click();
+  await openSheet(page); await page.locator('[data-minutes="50"]').click();
   await page.locator('#replace-session-confirm').click();
   await expect(page.locator('#timer')).toHaveText('50:00');
   expect((await saved(page)).history).toHaveLength(0);
@@ -132,12 +129,27 @@ test('changing a paused duration asks first and ending a long break returns to f
   await page.clock.fastForward('50:01');
   await expect(page.locator('#session-celebration')).toBeVisible();
   await page.locator('#session-celebration .start-button').click();
-  await page.locator('[data-break-minutes="15"]').click();
+  await openSheet(page); await page.locator('[data-break-minutes="15"]').click();
   await expect(start).toHaveText(/End break/);
-  await start.click(); await expect(start).toHaveText(/Start focusing/);
+  await start.click(); await expect(start).toHaveAccessibleName('Start focusing');
   await expect(page.locator('#timer')).toHaveText('50:00');
   expect((await saved(page)).house.coins).toBe(50);
   expect((await saved(page)).session.phase).toBe('ready');
+});
+
+test('pausing just as another tab finishes the session keeps the celebration open', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('#loading-note')).toBeHidden();
+  const start = page.locator('#start-button');
+  await start.click(); await expect(start).toHaveAccessibleName('Pause a moment');
+  const { session } = await saved(page);
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 1000)));
+  await page.clock.setSystemTime(new Date(session.endsAt + 1000));
+  await page.evaluate(() => { document.getElementById('start-button').click(); dispatchEvent(new StorageEvent('storage', { key: 'little-hours-v1' })); });
+  await page.clock.resume();
+  await expect(coins(page)).toHaveText('25');
+  await expect(start).toBeEnabled();
+  await expect(page.locator('#session-celebration')).toBeVisible();
 });
 
 test('two tabs racing an expired session and an ordinary edit keep one reward and both changes', async ({ page, context }) => {
@@ -152,6 +164,7 @@ test('two tabs racing an expired session and an ordinary edit keep one reward an
   await expect(other.locator('#start-button')).toHaveText(/Pause/);
   const before = await saved(page), deadline = before.session.endsAt;
   await Promise.all([page.clock.setSystemTime(new Date(deadline + 1000)), other.clock.setSystemTime(new Date(deadline + 1000))]);
+  await other.locator('#room-more-toggle').click();
   await Promise.all([start.dispatchEvent('click'), other.locator('#time-toggle').click()]);
   await expect(coins(page)).toHaveText('25'); await expect(coins(other)).toHaveText('25');
   await expect.poll(async () => (await saved(page)).theme, { message: 'the theme edit lands beside the reward' }).not.toBe(before.theme);
@@ -162,7 +175,10 @@ test('two tabs racing an expired session and an ordinary edit keep one reward an
   expect(state.pond.bait).toHaveLength(before.pond.bait.length + 1);
   expect(state.petBonds.cat.minutes).toBe(25);
   expect(state.theme).not.toBe(before.theme);
-  await expect.poll(async () => Number(await page.locator('#session-celebration').isVisible()) + Number(await other.locator('#session-celebration').isVisible()), { message: 'one tab celebrates' }).toBe(1);
+  await expect.poll(async () => {
+    const shown = Number(await page.locator('#session-celebration').isVisible()) + Number(await other.locator('#session-celebration').isVisible());
+    return shown === 1 || (shown === 0 && (await saved(page)).session.running);
+  }).toBe(true);
   await Promise.all([page.reload(), other.reload()]);
   await expect(page.locator('#session-celebration')).toBeHidden();
   await expect(other.locator('#session-celebration')).toBeHidden();

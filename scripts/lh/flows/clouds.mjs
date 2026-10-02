@@ -1,3 +1,4 @@
+import { steps } from '../steps.mjs';
 import { join } from 'node:path';
 import { launch, sleep, slow } from '../chrome.mjs';
 
@@ -162,7 +163,7 @@ export default {
     }
     const app = await t.open({ seed: 'three-rooms', theme: 'day', width: 960, height: 640, reducedMotion: true });
     await app.waitFor(`(window.__littleHours.room.diagnostics().seat.world.outdoor !== false || window.__littleHours.room.diagnostics().seat.world.buildsAhead === false)`, { what: 'the outdoor world to be built, where the renderer builds it ahead', timeout: 30000 });
-    await app.clickSel('#focus-mode-enter');
+    await steps.openTimer(app); await app.clickSel('#focus-mode-enter');
     await app.waitFor(`window.__littleHours.room.diagnostics().seat.state === 'seated'`, { what: 'the view to settle in the chair', timeout: 30000 });
     const box = await app.box('#room-canvas'), slivers = [];
     for (const turn of [0, -30, 30, 35]) {

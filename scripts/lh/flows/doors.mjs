@@ -21,7 +21,7 @@ async function tapDoor(app, id, sleep, { timeout = 20000, slow = 1 } = {}) {
 }
 
 export default {
-  about: 'doors in the room: tapping a built door walks the companion through it, stairs reach the loft, an unbuilt door peeks then plans, reduced motion is instant',
+  about: 'doors in the room: tapping a built door walks the companion through it, stairs reach the loft, an unbuilt door peeks then plans, a walk can be cancelled, reduced motion is instant',
   async run(t) {
     const { check, steps } = t;
     let app = await t.open({ seed: 'three-rooms' });
@@ -41,6 +41,18 @@ export default {
     await t.shot(app, 'loft');
     walk = await tapDoor(app, 'studio', t.sleep, { slow: t.slow });
     check('from the loft, a door leads back down to the studio', walk.walked && walk.end?.active === 'studio' && !walk.end?.travelling, walk.end);
+    await app.settle();
+    await app.clickTarget({ door: 'garden' });
+    await app.waitFor('document.body.classList.contains("is-door-walking")', { what: 'the scenic walk' });
+    check('the scenic walk has a touch-sized cancel control', (await app.box('#cancel-room-travel')).width >= 44);
+    await app.clickSel('#cancel-room-travel');
+    await t.sleep(500);
+    check('cancel stops the walk without changing rooms', (await app.saved()).house.activeId === 'studio' && !await app.js('document.body.classList.contains("is-travelling")') && !await app.visible('#room-travel'));
+    await app.settle();
+    await app.clickTarget({ door: 'garden' });
+    await app.waitFor('document.body.classList.contains("is-door-walking")', { what: 'a second scenic walk' });
+    await app.key('Escape');
+    check('Escape can cancel a second walk', (await app.saved()).house.activeId === 'studio' && !await app.js('document.body.classList.contains("is-travelling")'));
     await app.settle();
     const saved = await app.saved();
     check('the active room is saved after the walks', saved?.house?.activeId === 'studio', saved?.house?.activeId);

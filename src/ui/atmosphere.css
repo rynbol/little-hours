@@ -38,16 +38,13 @@ body[data-theme='rain'] {
 body .app-header, body[data-theme] .app-header { border-color: var(--chrome-line); background: transparent; }
 body .brand, body .brand-dot, body h1 { color: var(--chrome-ink); }
 body .brand-mark { color: var(--chrome-muted); border-color: var(--chrome-line); background: var(--chrome-surface); }
-body .coin-wallet, body .time-toggle, body .focus-toggle, body .heading-actions > .mode-button:not(#decorate-button), body .house-heading > .mode-button, body .house-underworld .mode-button {
+body .time-toggle, body .focus-toggle, body .heading-actions > .mode-button:not(#decorate-button), body .house-heading > .mode-button, body .house-underworld .mode-button {
   color: var(--chrome-ink); background: var(--chrome-surface); border-color: var(--chrome-line); box-shadow: inset 0 1px #ffffff09;
 }
 body .time-toggle:hover, body .focus-toggle:hover, body .focus-toggle[aria-expanded='true'] { color: var(--chrome-ink); background: var(--chrome-hover); border-color: var(--chrome-line); }
 body #dock-timer { color: var(--chrome-ink); border-color: var(--chrome-line); }
 body .heading-actions .icon-button, body #rename-room, body .house-title-row .icon-button { color: var(--chrome-muted); }
-body .room-route { background: var(--chrome-surface); border-color: var(--chrome-line); }
-body #home-connections button, body #room-route-count { color: var(--chrome-muted); }
-body #home-connections button:hover:not(:disabled), body #rename-room:hover { color: var(--chrome-ink); background: var(--chrome-hover); }
-body .room-route-map .is-current { background: var(--chrome-muted); border-color: var(--chrome-muted); }
+body #rename-room:hover { color: var(--chrome-ink); background: var(--chrome-hover); }
 body .room-tools { background: var(--chrome-surface); border-color: var(--chrome-line); box-shadow: 0 10px 28px #1c172611; }
 body .tool, body .tool svg { color: var(--chrome-muted); }
 body .tool:hover, body .tool[aria-expanded='true'], body .tool[aria-pressed='true'] { color: var(--chrome-ink); background: var(--chrome-hover); }
@@ -65,7 +62,7 @@ body[data-theme='day'] #decorate-button[aria-pressed='true'] { background: #6376
 body[data-theme='day'] .room-title-form input, body[data-theme='day'] .house-name-form input { background: #fffaf0; color: #46534b; border-color: #bdc4b2; }
 body[data-theme='day'] .room-title-form #cancel-room-title { color: #626e62; }
 body[data-theme='day'] .house-name-form { background: #fff9ec80; color: #46534b; }
-body[data-theme='day'] #home-connections button:focus-visible, body[data-theme='day'] #rename-room:focus-visible { outline-color: #64785c; }
+body[data-theme='day'] #rename-room:focus-visible { outline-color: #64785c; }
 body[data-theme='day'] .house-title-row .icon-button { border-color: var(--chrome-line); }
 @media (max-width: 640px) {
   body:not(.is-avatar-editing):not(.is-decorating) #stage::before { inset-inline: 0; opacity: .7; }

@@ -58,7 +58,7 @@ document.querySelector('#advance').onclick = () => { offset += 25 * 60_000; sess
 document.querySelector('#reset-check').onclick = () => { sessionStorage.removeItem('polish-check-save'); sessionStorage.removeItem('polish-check-clock'); location.reload(); };
 document.querySelector('#reduce-motion').onclick = event => { testMotion.matches = !testMotion.matches; testMotion.dispatchEvent(new Event('change')); event.target.setAttribute('aria-pressed', String(testMotion.matches)); };
 document.querySelector('#measure').onclick = async () => {
-  const app = window.__littleHours, overview = app.connected || app.house, start = overview.diagnostics(), roomFrame = app.room.diagnostics().scene.getFrameId();
+  const app = window.__littleHours, overview = app.house, start = overview.diagnostics(), roomFrame = app.room.diagnostics().scene.getFrameId();
   if (!start) { document.querySelector('#measurement').textContent = 'Open the house first'; return; }
   await new Promise(resolve => setTimeout(resolve, 2000));
   const end = overview.diagnostics();
