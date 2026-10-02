@@ -4,7 +4,7 @@ The active specification is the owner's `wilds-assets/GOAL.md`, revised on 2026-
 
 ## Current step
 
-Step 0 is verified. The merge includes `origin/codex/botw-look` at `d447e42`. The rejected character generators, GLBs, style view, tests and reviews are removed. A plain 1.7 metre capsule keeps the playable view working. The old Warden's vertex data is frozen unchanged, and the existing pet stays unchanged. Neither is a visual acceptance claim.
+Step 0 is verified and pushed as `799288c`. Step 1 has four provisional reference stills. The merge includes `origin/codex/botw-look` at `d447e42`. The rejected character generators, GLBs, style view, tests and reviews are removed. A plain 1.7 metre capsule keeps the playable view working. The old Warden's vertex data is frozen unchanged, and the existing pet stays unchanged. Neither is a visual acceptance claim.
 
 The existing thirty fight checks are regression checks only. They do not prove the fight works for a player. No manual combat verdict has been reached. `OWNER-BUGS.md` was absent when checked on 2026-10-02.
 
@@ -34,5 +34,7 @@ The Feature playbook is adapted to the explicit goal. `how` is performed locally
 - Base checks passed. 897 unit tests, guard against `d447e42`, and all 30 `lh run wilds` checks.
 - Capsule fight performance against `642cdc3`, two 15-second rounds at 1280 by 800, measured 60.0 rendered frames per second in both builds. Median GPU cost fell from 2.30 to 1.65 ms and draw calls from 35 to 20. One new-build run had a frame gap over 20 ms; median maximum gap was 25.1 ms. This is not a zero-stutter claim. Evidence is `.lh/out/2026-10-02T22-08-43-perf/perf.json`.
 - The local preview now uses a separate Vite cache from `lh`. Simultaneous servers sharing the test cache caused shader source requests to return HTML during the first run. The isolated rerun had no page errors.
+- Four target stills were generated with the built-in image tool and inspected. They are in `docs/openworld/reference/`, with their prompts and provisional status. These are concept targets, not gameplay evidence.
+- Female Ranger is selected for its clear hood, short tunic and bracer silhouette. The pack already supplies the required adult body and shared rig.
 - Visual scores are not yet available. No piece has passed the new review rule.
 - The player, motion, camera, combat audit and grass remain unfinished. The cat and Warden retain the old rough look deliberately.
