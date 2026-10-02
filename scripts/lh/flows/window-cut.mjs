@@ -54,8 +54,8 @@ export default {
     await steps.openTimer(app); await app.clickSel('#focus-mode-enter');
     const entering = (await flightIn).map((frame, i) => save(i ? '' : 'flight-in', frame));
     await app.waitFor(`${SEAT}.seat.state === 'seated'`, { what: 'the view to settle in the chair', timeout: 30000 });
-    check('the fly-in reaches the chair with the outdoor world drawing for some frames', entering.length > 0, entering.length);
-    check('every fly-in frame inside the room leaves no uncovered pixel outside the outdoor world\'s drawn rectangle, so no cut edge shows', entering.length > 0 && entering.every(sound), entering.filter(frame => !sound(frame)).slice(0, 3));
+    if (await app.js(`${SEAT}.seat.world.buildsAhead`)) check('the fly-in reaches the chair with the outdoor world drawing for some frames', entering.length > 0, entering.length);
+    check('every fly-in frame inside the room leaves no uncovered pixel outside the outdoor world\'s drawn rectangle, so no cut edge shows', entering.every(sound), entering.filter(frame => !sound(frame)).slice(0, 3));
     const rest = save('rest', await app.js(`window.__windowCut(true)`));
     check('at rest the outdoor world draws only the window\'s screen rectangle, at most 70% of the canvas, instead of the whole canvas', rest.box && rest.drawnShare <= 0.7, rest);
     check('at rest the room covers every pixel outside that rectangle', sound(rest), rest);

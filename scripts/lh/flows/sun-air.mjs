@@ -62,7 +62,7 @@ export default {
           check('dusk: the sun core burns white and hotter than its ring', air.sunCore.b > 0.97 && air.sunCore.b > air.sunRing.b + 0.08, { core: air.sunCore, ring: air.sunRing });
         }
         if (theme === 'day') {
-          check('day: the sky right around the sun is warm, not a cold cyan halo', air.skyNearSun.r > air.skyNearSun.b, air.skyNearSun);
+          check('day: the sun sits in a warm ring and the sky around it is warmer than the blue further out, not a cold cyan halo', air.sunRing.r > air.sunRing.b && air.skyNearSun.warmth > air.skyRing.warmth + 0.08, { ring: air.sunRing, near: air.skyNearSun, further: air.skyRing });
           check('day: the sky away from the sun stays blue', air.skyFar.b > air.skyFar.r + 0.08, air.skyFar);
           check('day: the ring 8 to 20 degrees from the sun is blue, not mint', air.skyRing.hue >= 180 && air.skyRing.b > air.skyRing.g, air.skyRing);
         }

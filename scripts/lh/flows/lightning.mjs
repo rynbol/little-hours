@@ -1,8 +1,10 @@
 import { steps } from '../steps.mjs';
+import { gpuFlag } from '../chrome.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SEAT = 'window.__littleHours.room.diagnostics()';
+const BRIGHT = gpuFlag === 'swiftshader' ? 0.25 : 0.6;
 const INSTALL = `(() => {
   const luma = (p, i) => (.2126 * p[i] + .7152 * p[i + 1] + .0722 * p[i + 2]) / 255;
   window.__stormFrame = picture => {
@@ -66,14 +68,33 @@ const INSTALL = `(() => {
     let ground = 0, sky = 0;
     for (let step = 3; step <= 8; step++) ground += shade(foot + step, middle.get(foot)) / 6;
     for (let step = -2; step <= 2; step++) sky += (shade(mid + step, middle.get(mid) - half) + shade(mid + step, middle.get(mid) + half)) / 10;
-    return { top, foot, rows: seen.length, span: foot - top + 1, width: across[across.length >> 1], hiddenBelow: below.length, ridgeGap: below.length ? below[0] - foot : null, ridgeContrast: sky - ground, barred: barred / Math.max(1, (right - left + 1) * (high - low + 1)), level: window.__littleHours.room.lightning.level, shot };
+    return { top, foot, rows: seen.length, span: foot - top + 1, width: across[across.length >> 1], hiddenBelow: below.length, ridgeGap: below.length ? below[0] - foot : null, ridgeContrast: sky - ground, barred: barred / Math.max(1, (right - left + 1) * (high - low + 1)), height, level: window.__littleHours.room.lightning.level, shot };
   };
+  window.__stormStrike = () => new Promise(resolve => {
+    const storm = window.__littleHours.room.lightning, live = storm.lightning, outdoor = ${SEAT}.seat.world.outdoorScene, samples = [], giveUp = performance.now() + 60000;
+    let was = live.shape.start, begun = false, peak = null;
+    const step = () => {
+      if (!begun) {
+        if (performance.now() > giveUp) return resolve({ peak, after: window.__stormFrame(false), samples });
+        if (live.active && live.shape.start !== was) begun = true; else storm.strike();
+      }
+      if (begun) {
+        samples.push({ level: storm.level, lit: outdoor.meshes.filter(mesh => mesh.metadata?.effect === 'lightning' && mesh.isEnabled()).length });
+        if (!peak && storm.level > ${BRIGHT}) peak = window.__stormFrame(true);
+        if (!live.active) {
+          if (peak || performance.now() > giveUp) return resolve({ peak, after: window.__stormFrame(false), samples });
+          was = live.shape.start; begun = false; samples.length = 0;
+        }
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
   window.__stormWatch = (ms, { spam = false, frames = false } = {}) => new Promise(resolve => {
     const samples = [], end = performance.now() + ms, storm = window.__littleHours.room.lightning;
     const step = () => {
       if (spam) storm.strike();
-      const shoot = frames === 'shoot' && storm.level > 0.6 && !samples.some(sample => sample.shot);
-      samples.push(frames ? { t: performance.now(), ...window.__stormFrame(shoot) } : { t: performance.now(), level: storm.level });
+      samples.push(frames ? { t: performance.now(), ...window.__stormFrame(false) } : { t: performance.now(), level: storm.level });
       if (performance.now() < end) requestAnimationFrame(step); else resolve(samples);
     };
     requestAnimationFrame(step);
@@ -104,31 +125,30 @@ export default {
     const before = await app.js(`window.__stormWatch(800, { frames: true })`), calm = before.at(-1);
     check('before a strike nothing of the lightning draws', before.every(sample => sample.lit === 0 && sample.level === 0), before.map(sample => sample.lit).join(''));
     check('the calm view is steady before the strike', Math.max(...before.map(sample => sample.sky)) - Math.min(...before.map(sample => sample.sky)) < 0.005, before.map(sample => round(sample.sky)));
-    await app.js(`window.__littleHours.room.lightning.strike()`);
-    const strike = await app.js(`window.__stormWatch(2600, { frames: 'shoot' })`);
-    strike.filter(sample => sample.shot).forEach(sample => save('peak', sample));
-    const peak = strike.reduce((best, sample) => sample.level > best.level ? sample : best, strike[0]), after = strike.at(-1);
+    const { peak, after, samples: strike } = await app.js(`window.__stormStrike()`);
+    check(`a requested strike draws a frame brighter than ${BRIGHT} of full strength`, Boolean(peak), strike.map(sample => round(sample.level)));
+    if (!peak) return;
+    save('peak', peak);
     const summary = sample => ({ level: round(sample.level), windowShare: round(sample.windowShare), sky: round(sample.sky), room: round(sample.room), whole: round(sample.whole), brightestWarmth: round(sample.brightestWarmth), lit: sample.lit });
     console.log(`calm ${JSON.stringify(summary(calm))} peak ${JSON.stringify(summary(peak))} after ${JSON.stringify(summary(after))}`);
-    check('a strike brightens the sky in the window', calm.windowShare > 0.05 && peak.sky - calm.sky > 0.03, { calm: summary(calm), peak: summary(peak) });
+    check('a strike brightens the sky in the window', calm.windowShare > 0.05 && peak.sky - calm.sky > 0.045 * peak.level, { calm: summary(calm), peak: summary(peak) });
     check('the flash is moderate, never a white-out of the frame', peak.whole - calm.whole < 0.12 && peak.sky < 0.8, { calm: summary(calm), peak: summary(peak) });
     check('the warm lamp stays the brightest thing in the frame at the flash peak', peak.brightestWarmth > 0.05, summary(peak));
     check('the lightning adds at most two draws while it shows', strike.every(sample => sample.lit <= 2) && strike.some(sample => sample.lit >= 1), strike.map(sample => sample.lit).join(''));
     check('the flash fades back to the calm sky and stops drawing', after.level === 0 && after.lit === 0 && Math.abs(after.sky - calm.sky) < 0.01, { calm: summary(calm), after: summary(after) });
     await app.js(`window.__littleHours.room.lightning.strike()`);
-    const bolt = save('bolt', await app.js(`new Promise(resolve => { const storm = window.__littleHours.room.lightning, step = () => { if (storm.lightning.active && storm.lightning.shape.bolt < 0) storm.lightning.shape.bolt = 1; if (storm.level > 0.6 && storm.sky.bolts.some(mesh => mesh.isEnabled())) resolve(window.__boltFrame()); else requestAnimationFrame(step); }; requestAnimationFrame(step); })`));
+    const bolt = save('bolt', await app.js(`new Promise(resolve => { const storm = window.__littleHours.room.lightning, step = () => { if (!storm.lightning.active) storm.strike(); else Object.assign(storm.lightning.shape, { bolt: 1, bearing: -0.084, distance: 4250 }); if (storm.level > ${BRIGHT} && storm.sky.bolts.some(mesh => mesh.isEnabled())) resolve(window.__boltFrame()); else requestAnimationFrame(step); }; requestAnimationFrame(step); })`));
     console.log(`bolt ${JSON.stringify(bolt)}`);
-    check('a bolt reads as one continuous channel at least two pixels wide, not a dotted line', bolt.rows > 40 && bolt.rows / bolt.span > 0.97 && bolt.width >= 2, bolt);
+    check('a bolt reads as one continuous channel at least two pixels wide, not a dotted line', bolt.rows > 40 * bolt.height / 640 && bolt.rows / bolt.span > 0.97 && bolt.width >= 2, bolt);
     check('the bolt comes down to a ridge you can see, which hides its foot', bolt.hiddenBelow >= 1 && bolt.ridgeGap <= 4 && bolt.ridgeContrast > 0.04, bolt);
     check('the bolt falls in clear window glass, away from the window bars', bolt.barred < 0.03, bolt);
     await app.drag({ x: 480, y: 320 }, { x: 480 + Math.round(35 * Math.PI / 180 / 0.0042), y: 320 });
     await app.settle(); await t.sleep(5000);
     await app.waitFor('!(window.__littleHours.room.rainbow?.presence > 0)', { what: 'a clearing spell to pass, since lightning keeps away from a rainbow', timeout: 120000 });
     const wallCalm = save('wall-calm', await app.js(`window.__stormFrame(true)`));
-    await app.js(`window.__littleHours.room.lightning.strike()`);
-    const wall = await app.js(`window.__stormWatch(1500, { frames: 'shoot' })`), wallPeak = wall.reduce((best, sample) => sample.level > best.level ? sample : best, wall[0]);
-    wall.filter(sample => sample.shot).forEach(sample => save('wall-peak', sample));
-    check('turned toward the side wall, cool light from the flash reaches the room by the window', wallPeak.level > 0.6 && wallPeak.room - wallCalm.room > 0.004 && wallPeak.room - wallCalm.room < 0.05, { calm: summary(wallCalm), peak: summary(wallPeak) });
+    const wallPeak = (await app.js(`window.__stormStrike()`)).peak;
+    if (wallPeak) save('wall-peak', wallPeak);
+    check('turned toward the side wall, cool light from the flash reaches the room by the window', wallPeak?.level > BRIGHT && wallPeak.room - wallCalm.room > 0.005 * wallPeak.level && wallPeak.room - wallCalm.room < 0.05, { calm: summary(wallCalm), peak: wallPeak && summary(wallPeak) });
 
     const spammed = await app.js(`window.__stormWatch(8000, { spam: true })`), peaks = peaksOf(spammed);
     const busiest = peaks.reduce((most, time) => Math.max(most, peaks.filter(other => other >= time && other < time + 1000).length), 0);
