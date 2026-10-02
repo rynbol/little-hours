@@ -48,7 +48,7 @@ export function createPanels(app) {
     if (event.newState !== 'open') return;
     const box = $('#room-more-toggle').getBoundingClientRect(), menu = $('#room-more');
     menu.style.left = `${Math.max(16, Math.min(innerWidth - 226, box.right - 210))}px`;
-    menu.style.bottom = `${Math.max(16, Math.min(innerHeight - 240, innerHeight - box.top + 8))}px`;
+    menu.style.top = `${box.bottom + 8}px`;
   }, { signal: app.signal });
   $('#room-more').addEventListener('click', event => {
     if (event.target.closest('button')) { $('#room-more').hidePopover(); if (event.target.closest('#mini-button, #reset-view')) $('#room-more-toggle').focus(); }
@@ -59,7 +59,6 @@ export function createPanels(app) {
     if (app.nav.travelling && ['avatar', 'pet'].includes(button.dataset.panel) && current !== button.dataset.panel) return;
     if (['avatar', 'pet'].includes(button.dataset.panel) && current !== button.dataset.panel) {
       if (app.decorate.active) app.decorate.setEditMode(false);
-      if (app.nav.connected) app.nav.setConnectedView(false);
       app.roomUI.leaveMini();
     }
     open(current === button.dataset.panel ? null : button.dataset.panel);

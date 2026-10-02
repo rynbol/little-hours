@@ -40,9 +40,10 @@ export default {
     check('pressing on the bite hooks the fish and shows the line tension', hooked.phase === 'reel' && hooked.fight?.line <= 1 && await app.visible('#lake-tension'), hooked);
     check('the journal waits until the fight is over', await app.js(`document.querySelector('#lake-journal-button').disabled`));
     let held = true, strain = 0, onFish = 0, polls = 0, fought = null;
+    await app.js(`(() => { const now = performance.now.bind(performance); let at = now(); window.__fightClock = { now, tick: () => (at += 100) }; performance.now = () => at; return true; })()`);
     const began = Date.now();
     for (const end = Date.now() + 90000 * slow; Date.now() < end;) {
-      fought = await app.js(LAKE);
+      fought = await app.js(`(__fightClock.tick(), ${LAKE})`);
       if (!fought.fight) break;
       polls++;
       const { tension, zone } = fought.fight;
@@ -53,7 +54,7 @@ export default {
       await new Promise(resolve => setTimeout(resolve, 30));
     }
     if (held) await app.release(reel.x, reel.y);
-    await app.js(`(window.__slowFrames = false, true)`);
+    await app.js(`(window.__slowFrames = false, performance.now = __fightClock.now, true)`);
     check('reeling while the float is under the fish and easing off above it lands it without a snap, even with 0.7 s frames', onFish > 0 && strain < 1.2 && fought.ui !== 'idle', { strain, onFish, poll: Math.round((Date.now() - began) / polls), fought });
     await app.waitFor(`document.querySelector('#lake-card').open`, { what: 'the catch card', timeout: 30000 }).catch(async error => { throw new Error(error.message + JSON.stringify(fought)); });
     const after = await app.js(POND), name = await app.text('#lake-card-name');

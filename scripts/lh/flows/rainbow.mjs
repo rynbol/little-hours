@@ -1,3 +1,4 @@
+import { steps } from '../steps.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -39,7 +40,7 @@ const MEASURE = `(() => {
 async function seat(app) {
   await app.settle();
   await app.waitFor(`${SEAT}.seat.world.outdoor !== false`, { what: 'the outdoor world to be built', timeout: 30000 });
-  await app.clickSel('#focus-mode-enter');
+  await steps.openTimer(app); await app.clickSel('#focus-mode-enter');
   await app.waitFor(`${SEAT}.seat.state === 'seated' && ${SEAT}.seat.world.outdoor`, { what: 'the chair view with the outdoor world', timeout: 30000 });
 }
 

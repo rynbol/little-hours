@@ -5,12 +5,10 @@
 .focus-mode-button:disabled { opacity: .48; }
 body.is-focus-mode { overflow: hidden; }
 body.is-focus-mode .app-shell { width: 100%; max-width: none; min-height: 100svh; padding: 0; }
-body.is-focus-mode .app-header,
 body.is-focus-mode .room-section > :not(#stage),
 body.is-focus-mode #house-page,
 body.is-focus-mode #room-panel,
 body.is-focus-mode .focus-card,
-body.is-focus-mode .app-footer,
 body.is-focus-mode .skip-link { display: none !important; }
 body.is-focus-mode .workspace { display: block; min-height: 0; padding: 0; }
 body.is-focus-mode #stage { position: fixed; inset: 0; z-index: 40; width: 100vw; height: 100vh; height: 100svh; border: 0; border-radius: 0; background: radial-gradient(ellipse at 25% 30%, var(--world-glow), transparent 60%), linear-gradient(165deg, var(--world-top), var(--world-bottom)); }
@@ -29,7 +27,6 @@ body.is-focus-mode .room-travel { display: none; }
 .focus-mode-exit svg { width: 17px; height: 17px; }
 .focus-mode-exit:hover, .focus-mode-exit:focus-visible { background: #403643e8; }
 @media (max-width: 999px) {
-  .focus-mode-button { grid-column: 1 / -1; }
   .focus-mode-timer { bottom: max(18px, env(safe-area-inset-bottom)); font-size: 16px; }
   .focus-mode-exit { top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); }
 }

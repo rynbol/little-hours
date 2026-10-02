@@ -26,11 +26,11 @@
   .ui-motion-enabled:not(.is-avatar-editing) #app #builder-panel { transition: opacity .2s ease, translate .22s ease, display .2s allow-discrete; translate: 0 0; }
   .ui-motion-enabled:not(.is-avatar-editing) #app #builder-panel[hidden] { translate: 0 14px; transition-duration: .18s, .2s, .2s; transition-timing-function: ease-in; }
   .ui-motion-enabled:not(.is-avatar-editing) #app #focus-card { transition: opacity .2s ease, translate .22s ease; }
-  .ui-motion-enabled:not(.is-avatar-editing) #app :is(.home-connections, .room-bottom, .room-heading .eyebrow, .room-subtitle) { transition: opacity .35s var(--soft-ease); }
+  .ui-motion-enabled:not(.is-avatar-editing) #app .room-bottom { transition: opacity .35s var(--soft-ease); }
   @starting-style {
     .ui-motion-enabled:not(.is-avatar-editing) #app #builder-panel:not([hidden]) { opacity: 0; translate: 0 10px; }
     .ui-motion-enabled:not(.is-avatar-editing) #app #focus-card:not([hidden]) { opacity: 0; translate: 0 10px; }
-    .ui-motion-enabled:not(.is-avatar-editing) #app :is(.home-connections, .room-bottom, .room-heading .eyebrow, .room-subtitle) { opacity: 0; }
+    .ui-motion-enabled:not(.is-avatar-editing) #app .room-bottom { opacity: 0; }
   }
 }
 @media (prefers-reduced-motion: reduce) {

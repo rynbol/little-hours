@@ -13,7 +13,7 @@ import { remainingAt, formatTime, sessionStarted } from '../../core/session.js';
 export function createPetUI(app) {
   const name = () => petName(app.state), drafts = new Map();
   let offered = null, signature = '', careSignature = '', closeup = null, closeupHost = null;
-  const available = () => !app.nav.travelling && !app.nav.houseOpen && !app.nav.connected && !app.roomUI.compact && !app.decorate.active && !app.avatar.active;
+  const available = () => !app.nav.travelling && !app.nav.houseOpen && !app.roomUI.compact && !app.decorate.active && !app.avatar.active;
   async function feedback({ species = app.state.pet, by = 'you' } = {}) {
     const bond = app.state.petBonds[species];
     if (by === 'you' && available()) {
@@ -158,9 +158,5 @@ export function createPetUI(app) {
     if (focus) { $('#pet-adopt-name').focus({ preventScroll: true }); box.scrollIntoView({ block: 'nearest', behavior: 'instant' }); }
   }
   function welcome() { if (bondLevel(app.state.petBonds[app.state.pet]).index >= 1 && available()) app.room?.invitePet(); }
-  function previewAdoption(id) {
-    if (!available() || !PETS[id] || app.state.pets.includes(id)) return;
-    app.panels.open('pet'); offered = id; $('#pet-collection').open = true; offer(id);
-  }
-  return { name, feedback, renderName, onPetCarry, renderPanel, sync, refreshCare, welcome, previewAdoption, close, diagnostics: () => closeup?.diagnostics() || null };
+  return { name, feedback, renderName, onPetCarry, renderPanel, sync, refreshCare, welcome, close, diagnostics: () => closeup?.diagnostics() || null };
 }

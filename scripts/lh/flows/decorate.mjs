@@ -34,7 +34,7 @@ export default {
     const start = await app.room();
     await steps.openDecorate(app);
     check('Decorate opens the builder panel', await app.visible('#builder-panel') && await app.attr('#decorate-button', 'aria-pressed') === 'true' && (await app.room()).editing);
-    check('the timer card steps aside while decorating', !await app.visible('#focus-card'));
+    check('the timer pill steps aside while decorating', !await app.visible('#focus-quickbar'));
     check('Undo starts disabled', await app.js(`document.getElementById('undo-layout').disabled`));
 
     const name = await app.text('[data-furniture="plant"] .furniture-name');
@@ -61,14 +61,16 @@ export default {
 
     await app.key('Escape'); await frames(app);
     check('Escape deselects the piece', (await app.room()).selectedId === null);
+    await app.settle();
     const where = await app.point({ item: id });
     check('the new piece is on screen', where?.visible, where);
     await app.click(where.x, where.y); await frames(app);
-    check('clicking the piece in the room selects it', (await app.room()).selectedId === id);
+    const pointed = async () => ({ where, now: await app.point({ item: id }), page: await app.js(`(() => { const d = window.__littleHours.room.diagnostics(), e = d.engine, r = e.getRenderingCanvas().getBoundingClientRect(), under = document.elementFromPoint(${where.x}, ${where.y}); return { under: under?.id || under?.tagName, selectedId: d.selectedId, dragging: d.dragging?.id, render: [e.getRenderWidth(), e.getRenderHeight(), e.getHardwareScalingLevel()], rect: [r.left, r.top, r.width, r.height], fps: e.getFps(), busy: window.__littleHours.busy() }; })()`) });
+    check('clicking the piece in the room selects it', (await app.room()).selectedId === id, await pointed());
 
     const target = spots.slice(1).sort((a, b) => Math.hypot(b.fx - spot.fx, b.fz - spot.fz) - Math.hypot(a.fx - spot.fx, a.fz - spot.fz))[0];
     const held = await press(app, where, { x: where.x + (target.x - spot.x), y: where.y + (target.y - spot.y) });
-    check('dragging the piece lifts it', (await app.room()).dragging?.id === id);
+    check('dragging the piece lifts it', (await app.room()).dragging?.id === id, await pointed());
     await app.key('Escape'); await frames(app);
     await held.release(); await app.settle();
     room = await app.room();
@@ -96,7 +98,7 @@ export default {
 
     await steps.closeDecorate(app);
     check('Done decorating leaves Decorate', !await app.visible('#builder-panel') && await app.attr('#decorate-button', 'aria-pressed') === 'false' && !(await app.room()).editing);
-    check('the timer card comes back', await app.visible('#focus-card'));
+    check('the timer pill comes back', await app.visible('#focus-quickbar'));
     check('the change is saved in the browser', same(((await app.saved()).layout.items || []).find(item => item.id === id), turned), ((await app.saved()).layout.items || []).find(item => item.id === id));
     await app.reload(); await app.settle();
     check('after a reload the new piece is where it was left', same(itemOf(await app.room(), id), turned), itemOf(await app.room(), id));
@@ -109,7 +111,7 @@ export default {
     const still = await app.js(`(() => { const panel = document.getElementById('builder-panel'); return { shown: !panel.hidden, opacity: getComputedStyle(panel).opacity, moving: [panel, document.getElementById('stage'), document.getElementById('room-canvas')].flatMap(el => el.getAnimations({ subtree: true })).filter(a => a.playState === 'running').length }; })()`);
     check('reduced motion: the panel appears at once, with nothing moving', still.shown && still.opacity === '1' && still.moving === 0, still);
     await app.clickSel('#decorate-button'); await frames(app);
-    check('reduced motion: leaving is instant too', !await app.visible('#builder-panel') && await app.visible('#focus-card'));
+    check('reduced motion: leaving is instant too', !await app.visible('#builder-panel') && await app.visible('#focus-quickbar'));
     await t.close(app);
 
     app = await t.open({ seed: 'three-rooms', width: 390, height: 844, scale: 2, label: 'phone' });

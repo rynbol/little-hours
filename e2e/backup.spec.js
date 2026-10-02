@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('little-hours-v1')));
 
 async function openSaves(page) {
-  await page.locator('#save-status').click();
+  await page.locator('#room-more-toggle').click(); await page.locator('#save-status').click();
   await expect(page.locator('#room-panel')).toContainText('Keep your home safe');
 }
 
