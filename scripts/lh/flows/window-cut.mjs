@@ -4,11 +4,14 @@ import { join } from 'node:path';
 const SEAT = 'window.__littleHours.room.diagnostics()';
 const INSTALL = `(() => {
   window.__windowCut = picture => {
-    const d = ${SEAT}, { scene, engine } = d, gl = engine._gl, outdoor = d.seat.world.outdoorScene, width = engine.getRenderWidth(), height = engine.getRenderHeight();
-    let box = null;
-    const watch = outdoor.onAfterRenderObservable.add(() => { box = gl.isEnabled(gl.SCISSOR_TEST) ? Array.from(gl.getParameter(gl.SCISSOR_BOX)) : [0, 0, width, height]; });
+    const d = ${SEAT}, { scene, engine } = d, gl = engine._gl, width = engine.getRenderWidth(), height = engine.getRenderHeight();
+    let box = null, drawPhase = false;
+    const enable = engine.enableScissor;
+    engine.enableScissor = function (x, y, w, h) { if (drawPhase && !box) box = [x, y, w, h]; return enable.call(this, x, y, w, h); };
+    const before = scene.onBeforeDrawPhaseObservable.add(() => { drawPhase = true; }, undefined, true);
+    const after = scene.onAfterDrawPhaseObservable.add(() => { drawPhase = false; });
     engine.beginFrame(); d.draw();
-    outdoor.onAfterRenderObservable.remove(watch);
+    engine.enableScissor = enable; scene.onBeforeDrawPhaseObservable.remove(before); scene.onAfterDrawPhaseObservable.remove(after);
     const shot = picture ? engine.getRenderingCanvas().toDataURL('image/jpeg', 0.92) : null;
     engine.clear(new scene.clearColor.constructor(0, 0, 0, 0), true, true, true);
     const autoClear = scene.autoClear; scene.autoClear = false; scene.render(); scene.autoClear = autoClear;
