@@ -6,11 +6,11 @@ import { RenderTargetTexture } from '@babylonjs/core/Materials/Textures/renderTa
 import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import { EffectRenderer, EffectWrapper } from '@babylonjs/core/Materials/effectRenderer.js';
 import { buildOutdoorWorld, buildGrassBlades, buildTerrainRings } from '../../models/world/world.js';
+import { isSoftwareRenderer } from '../../core/render-tier.js';
 
 export const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
 export const WINDOW_WORLD_DEPTH = Object.freeze({ near: 0.5, far: 20000 });
 export const WINDOW_WORLD_SCALE = 0.75;
-const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|software|basic render driver/i;
 const COPY_VERTEX = 'attribute vec2 position; varying vec2 vUV; void main() { vUV = position * 0.5 + 0.5; gl_Position = vec4(position, 0.0, 1.0); }';
 const COPY_FRAGMENT = `varying vec2 vUV; uniform sampler2D view; uniform vec2 texel;
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
@@ -58,7 +58,7 @@ export function createWindowWorld(engine, anchor, { workers } = {}) {
   });
   const reach = (x, y, w) => { bounds[0] = Math.min(bounds[0], x / w); bounds[1] = Math.max(bounds[1], x / w); bounds[2] = Math.min(bounds[2], y / w); bounds[3] = Math.max(bounds[3], y / w); };
   let world = null, building = null, theme = 'day', still = false, disposed = false;
-  const buildsAhead = !SOFTWARE_RENDERER.test(engine.getGlInfo?.().renderer ?? '');
+  const buildsAhead = !isSoftwareRenderer(engine.getGlInfo?.().renderer);
 
   function prepare(options = {}) {
     theme = options.theme ?? theme; still = options.still ?? still;

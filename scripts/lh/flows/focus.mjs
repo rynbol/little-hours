@@ -8,10 +8,15 @@ export default {
     const build = await app.js(`(() => { const { engine, seat } = window.__littleHours.room.diagnostics(); return { renderer: engine.getGlInfo().renderer, buildsAhead: seat.world.buildsAhead, started: seat.world.started }; })()`);
     if (/swiftshader/i.test(build.renderer)) check('on a software renderer the outdoor world waits for the chair, so building it never stalls the dollhouse view', build.buildsAhead === false && !build.started, build);
     else check('on a GPU the outdoor world starts building in the dollhouse view, ahead of the chair', build.buildsAhead === true && build.started, build);
+    const tier = await app.js(`(() => { const { engine, pixelRatio, quality } = window.__littleHours.room.diagnostics(); return { renderer: engine.getGlInfo().renderer, pixelRatio, quality, devicePixelRatio }; })()`);
+    if (/swiftshader/i.test(tier.renderer)) check('on a software renderer Adaptive quality draws at most 0.75 canvas pixels per CSS pixel, so the CPU rasteriser keeps up', tier.quality === 'auto' && tier.pixelRatio <= 0.75, tier);
+    else check('on a GPU Adaptive quality starts at the display density', tier.quality === 'auto' && tier.pixelRatio === Math.min(tier.devicePixelRatio, 2), tier);
     const effects = `Object.keys(window.__littleHours.room.diagnostics().engine._compiledEffects)`;
     await app.js(`(() => { const { scene } = window.__littleHours.room.diagnostics(); window.__flyInEffects = null; const watch = scene.onBeforeRenderObservable.add(() => { if (window.__littleHours.room.diagnostics().seat.state !== 'entering') return; window.__flyInEffects = ${effects}; scene.onBeforeRenderObservable.remove(watch); }); })()`);
+    const effectsAtRest = (await app.js(effects)).length, sitAt = Date.now();
     await app.clickSel('#focus-mode-enter');
     await app.waitFor(`window.__littleHours.room.diagnostics().seat.state === 'seated'`, { what: 'the chair view to be prepared and the view to settle in the chair', timeout: 30000 });
+    console.log(`sitting took ${Date.now() - sitAt} ms and compiled ${(await app.js(effects)).length - effectsAtRest} shaders on top of ${effectsAtRest}`);
     const effectsBefore = await app.js(`window.__flyInEffects`), effectsAfter = await app.js(effects);
     const owners = await app.js(`(() => { const { scene, engine } = window.__littleHours.room.diagnostics(), owners = {}; for (const mesh of scene.meshes) for (const subMesh of mesh.subMeshes ?? []) for (const [key, effect] of Object.entries(engine._compiledEffects)) if (subMesh.effect === effect) (owners[key] ??= []).push(mesh.name + ':' + subMesh.getMaterial()?.name); return owners; })()`);
     const newEffects = (effectsBefore ? effectsAfter.filter(key => !effectsBefore.includes(key)) : ['no frame drawn at the start of the fly-in']).map(key => `${(owners[key] ?? ['no mesh']).slice(0, 4).join(', ')} ${key.slice(0, 120)}`);

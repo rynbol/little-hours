@@ -56,6 +56,7 @@ import { createFirstPersonView, seatEye } from './first-person.js';
 import { createStorybook } from '../../models/storybook.js';
 import { createSeatWorld, SEAT_WINDOW } from './seat-world.js';
 import { createWindowWorld, yieldToBrowser } from './window-world.js';
+import { pixelRatioCeiling } from '../../core/render-tier.js';
 import { createWindowLightning } from './window-lightning.js';
 import { createRainbow } from '../../models/world/rainbow.js';
 
@@ -692,8 +693,8 @@ export function createRoom(container, options = {}) {
   let frame = 0, lastFrame = 0, lastRenderedAt = 0, visible = !document.hidden, needsRender = true, suspended = false;
   // Adaptive and Crisp both start at the display's own density (capped at 2×),
   // so one canvas pixel lands on one screen pixel; only Adaptive steps down.
-  const nativeRatio = () => Math.min(window.devicePixelRatio || 1, 2);
-  let quality = 'auto', pixelRatio = nativeRatio(), ratioCeiling = pixelRatio, raisedAt = -Infinity, statsStart = 0, intervalTotal = 0, sampleFrames = 0, slowSamples = 0, steadySamples = 0;
+  const renderer = engine.getGlInfo?.().renderer ?? '', ceilingFor = value => pixelRatioCeiling({ quality: value, devicePixelRatio: window.devicePixelRatio, renderer });
+  let quality = 'auto', pixelRatio = ceilingFor('auto'), ratioCeiling = pixelRatio, raisedAt = -Infinity, statsStart = 0, intervalTotal = 0, sampleFrames = 0, slowSamples = 0, steadySamples = 0;
   let rafCalls = 0, lastRafAt = 0, fastRafFrames = 0, onScreen = true;
   const intervals = [], submissions = [];
   engine.setHardwareScalingLevel(1 / pixelRatio);
@@ -1866,7 +1867,7 @@ export function createRoom(container, options = {}) {
     requestRender();
   }
   function applyPixelRatio(value) { pixelRatio = value; engine.setHardwareScalingLevel(1 / pixelRatio); slowSamples = 0; steadySamples = 0; resize(); }
-  function setQuality(value) { quality = ['auto', 'battery', 'high'].includes(value) ? value : 'auto'; ratioCeiling = quality === 'battery' ? Math.min(window.devicePixelRatio || 1, 1) : nativeRatio(); raisedAt = -Infinity; bloom.isEnabled = quality !== 'battery'; applyPixelRatio(ratioCeiling); }
+  function setQuality(value) { quality = ['auto', 'battery', 'high'].includes(value) ? value : 'auto'; ratioCeiling = ceilingFor(quality); raisedAt = -Infinity; bloom.isEnabled = quality !== 'battery'; applyPixelRatio(ratioCeiling); }
   const observer = new ResizeObserver(resize); observer.observe(container);
   // Moving the window to a screen with another density changes the native
   // ratio without any CSS resize, so follow the display itself.
