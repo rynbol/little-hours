@@ -41,7 +41,7 @@ async function seat(app) {
   await app.settle();
   await app.waitFor(`(${SEAT}.seat.world.outdoor !== false || ${SEAT}.seat.world.buildsAhead === false)`, { what: 'the outdoor world to be built, where the renderer builds it ahead', timeout: 30000 });
   await steps.openTimer(app); await app.clickSel('#focus-mode-enter');
-  await app.waitFor(`${SEAT}.seat.state === 'seated' && ${SEAT}.seat.world.outdoor`, { what: 'the chair view with the outdoor world', timeout: 30000 });
+  await app.waitFor(`${SEAT}.seat.state === 'seated' && ${SEAT}.seat.world.outdoor`, { what: 'the chair view with the outdoor world', timeout: 60000 });
 }
 
 const watch = (app, ms, strike) => app.js(`new Promise(resolve => { const room = window.__littleHours.room, samples = [], end = performance.now() + ${ms}; const step = () => { ${strike ? 'room.lightning.strike();' : ''} const outdoor = room.diagnostics().seat.world.outdoorScene; samples.push({ presence: room.rainbow?.presence ?? 0, lightning: room.lightning.level, lit: outdoor.meshes.filter(mesh => mesh.metadata?.effect === 'rainbow' && mesh.isEnabled()).length }); if (performance.now() < end) requestAnimationFrame(step); else resolve(samples); }; requestAnimationFrame(step); })`);

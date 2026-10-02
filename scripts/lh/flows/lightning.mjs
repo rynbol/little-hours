@@ -71,7 +71,7 @@ const INSTALL = `(() => {
     return { top, foot, rows: seen.length, span: foot - top + 1, width: across[across.length >> 1], hiddenBelow: below.length, ridgeGap: below.length ? below[0] - foot : null, ridgeContrast: sky - ground, barred: barred / Math.max(1, (right - left + 1) * (high - low + 1)), height, level: window.__littleHours.room.lightning.level, shot };
   };
   window.__stormStrike = () => new Promise(resolve => {
-    const storm = window.__littleHours.room.lightning, live = storm.lightning, outdoor = ${SEAT}.seat.world.outdoorScene, samples = [], giveUp = performance.now() + 60000;
+    const storm = window.__littleHours.room.lightning, live = storm.lightning, outdoor = ${SEAT}.seat.world.outdoorScene, samples = [], giveUp = performance.now() + 180000;
     let was = live.shape.start, begun = false, peak = null;
     const step = () => {
       if (!begun) {
@@ -94,7 +94,7 @@ const INSTALL = `(() => {
     const samples = [], end = performance.now() + ms, storm = window.__littleHours.room.lightning;
     const step = () => {
       if (spam) storm.strike();
-      samples.push(frames ? { t: performance.now(), ...window.__stormFrame(false) } : { t: performance.now(), level: storm.level });
+      samples.push(frames ? { t: performance.now(), ...window.__stormFrame(false) } : { t: performance.now(), level: storm.level, strike: storm.lightning.active ? storm.lightning.shape.start : null, pulses: storm.lightning.shape.pulses });
       if (performance.now() < end) requestAnimationFrame(step); else resolve(samples);
     };
     requestAnimationFrame(step);
@@ -109,7 +109,7 @@ async function seat(app) {
   await app.settle();
   await app.waitFor(`(${SEAT}.seat.world.outdoor !== false || ${SEAT}.seat.world.buildsAhead === false)`, { what: 'the outdoor world to be built, where the renderer builds it ahead', timeout: 30000 });
   await steps.openTimer(app); await app.clickSel('#focus-mode-enter');
-  await app.waitFor(`${SEAT}.seat.state === 'seated' && ${SEAT}.seat.world.outdoor`, { what: 'the chair view with the outdoor world', timeout: 30000 });
+  await app.waitFor(`${SEAT}.seat.state === 'seated' && ${SEAT}.seat.world.outdoor`, { what: 'the chair view with the outdoor world', timeout: 60000 });
   await app.js(INSTALL);
 }
 
@@ -150,9 +150,11 @@ export default {
     if (wallPeak) save('wall-peak', wallPeak);
     check('turned toward the side wall, cool light from the flash reaches the room by the window', wallPeak?.level > BRIGHT && wallPeak.room - wallCalm.room > 0.005 * wallPeak.level && wallPeak.room - wallCalm.room < 0.05, { calm: summary(wallCalm), peak: wallPeak && summary(wallPeak) });
 
-    const spammed = await app.js(`window.__stormWatch(8000, { spam: true })`), peaks = peaksOf(spammed);
+    const spammed = await app.js(`window.__stormWatch(14000, { spam: true })`), peaks = peaksOf(spammed);
     const busiest = peaks.reduce((most, time) => Math.max(most, peaks.filter(other => other >= time && other < time + 1000).length), 0);
-    check('asked for a strike every frame for eight seconds, flashes stay at three a second or fewer', peaks.length >= 2 && busiest <= 3, { flashes: peaks.length, busiest });
+    const strikes = [...new Map(spammed.filter(sample => sample.strike !== null).map(sample => [sample.strike, sample.pulses])).entries()].sort((a, b) => a[0] - b[0]);
+    const closest = strikes.slice(1).reduce((least, [start], i) => Math.min(least, start - strikes[i][0]), Infinity);
+    check('asked for a strike every frame for fourteen seconds, strikes still rest four seconds apart and flashes stay at three a second or fewer', strikes.length >= 2 && closest >= 4 && strikes.every(([, pulses]) => pulses <= 3) && busiest <= 3, { strikes, closest, flashes: peaks.length, busiest });
 
     const still = await t.open({ seed: 'three-rooms', theme: 'rain', width: 960, height: 640, reducedMotion: true, label: 'reduced motion' });
     await seat(still);

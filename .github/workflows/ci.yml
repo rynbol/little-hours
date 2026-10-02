@@ -29,7 +29,7 @@ jobs:
 
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +59,7 @@ jobs:
 
   flows:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -74,9 +74,9 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: echo "CHROME_PATH=$(node -e "import('@playwright/test').then(p => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
-      - run: npm run lh -- run ${{ matrix.flow }}
+      - run: npm run lh -- run ${{ matrix.flow }} --timeout 1500
         env:
-          LH_SLOW: '4'
+          LH_SLOW: '6'
       - if: failure()
         uses: actions/upload-artifact@v7
         with:

@@ -70,6 +70,7 @@ export default {
     const corners = await app.js(`(() => { const inner = getComputedStyle(document.querySelector('.buddy-album-inner')), scroll = document.querySelector('.buddy-album-scroll'); return { radius: inner.borderTopRightRadius, overflow: inner.overflow, scrolls: scroll.scrollHeight > scroll.clientHeight, card: getComputedStyle(document.querySelector('#buddy-card')).borderTopLeftRadius }; })()`);
     check('the album and card have rounded corners that clip the scrollbar too', corners.radius === '28px' && corners.overflow === 'hidden' && corners.card === '26px', corners);
     await press(app, sleep, '#buddy-album [data-color="sky"]');
+    await app.waitFor(`${MOVED('#buddy-album [data-color="sky"]')} > 0`, { what: 'the picked swatch to redraw', timeout: 3000 }).catch(() => null);
     check('a colour swatch squishes when picked', await app.js(MOVED('#buddy-album [data-color="sky"]')) === 1);
     await t.shot(app, 'album');
 
