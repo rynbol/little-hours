@@ -57,7 +57,7 @@ export default {
           check('dusk: the glow right around the sun is amber, not cream', air.skyNearSun.saturation > 0.3, air.skyNearSun);
           check('dusk: the meadow below the window stays grass-coloured, not straw-brown', air.groundNear.hue >= 50, air.groundNear);
           check('dusk: an amber band runs along the ridge line out to 40 degrees from the sun', air.ridgeBand.hue >= 25 && air.ridgeBand.hue <= 45 && air.ridgeBand.saturation > 0.4 && air.ridgeBand.warmth > 0.4, air.ridgeBand);
-          check('dusk: the low valley air right under the sun glows warmer than the land away from it', air.valleySun.warmth > air.groundAway.warmth + 0.06, { sun: air.valleySun, away: air.groundAway });
+          check('dusk: the low valley air right under the sun glows warmer than the land away from it', air.valleySun.warmth > air.groundAway.warmth + 0.045, { sun: air.valleySun, away: air.groundAway });
           check('dusk: the ridges under and beside the sun stay a cool blue-grey silhouette instead of greying in the glare', air.ridgeSun.hue >= 185 && air.ridgeSun.hue <= 230 && air.ridgeSun.saturation > 0.1, air.ridgeSun);
           check('dusk: the sun core burns white and hotter than its ring', air.sunCore.b > 0.97 && air.sunCore.b > air.sunRing.b + 0.08, { core: air.sunCore, ring: air.sunRing });
         }

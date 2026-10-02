@@ -31,7 +31,7 @@ export const SEEDS = {
   'pet-finish': { ...house(1), petBonds: { cat: { affection: 3 } }, session: { duration: 1500000, remaining: 6000, running: false, endsAt: null, petId: 'cat' } },
   pond: { ...house(3), history: studyDays, pond: { bait: [{ minutes: 10, at: 1 }, { minutes: 20, at: 2 }, { minutes: 35, at: 3 }, { minutes: 35, at: 4 }, { minutes: 60, at: 5 }, { minutes: 95, at: 6 }], journal: { minnow: { count: 3, best: 7.4, first: 1 }, perch: { count: 1, best: 18.2, first: 2 }, koi: { count: 1, best: 41, first: 3 } }, log: [] } },
   buddy: { ...house(3), buddy: { name: 'Pip', color: 'peach', minutes: 420, finds: { clover: { count: 3, first: 1 }, pebble: { count: 2, first: 2 }, acorn: { count: 1, first: 3 }, 'sea-glass': { count: 1, first: 4 }, 'owl-feather': { count: 1, first: 5 }, 'fairy-cap': { count: 1, first: 6 } }, log: [{ find: 'fairy-cap', place: 'garden', minutes: 50, at: 6, opened: false }] } },
-  'buddy-finish': { ...house(3), buddy: { name: 'Pip', color: 'peach', minutes: 90, finds: {}, log: [] }, session: { duration: 1500000, remaining: 4000, running: false, endsAt: null } },
+  'buddy-finish': { ...house(3), buddy: { name: 'Pip', color: 'peach', minutes: 90, finds: {}, log: [] }, session: { duration: 1500000, remaining: 12000, running: false, endsAt: null } },
   aquarium: { ...house(3), layout: undefined, house: { ...house(3).house, activeId: 'loft' }, pond: { bait: [], journal: { koi: { count: 1, best: 40, first: 1 }, starfish: { count: 1, best: 20, first: 2 }, jelly: { count: 1, best: 30, first: 3 } }, log: [], tank: ['koi', 'starfish', 'jelly'] } },
   'pond-empty': { ...house(3), pond: { bait: [], journal: {}, log: [] } },
 };
