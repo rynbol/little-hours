@@ -145,7 +145,7 @@ export function createHouseModel(scene, house, selectedId, theme = 'day', avatar
   }
   });
   batch('island', 'island', () => buildIsland({ ...outside, cylinder }), 'grounds');
-  batch('pond', 'pond', () => buildPond({ ...outside, cylinder }));
+  batch('pond', theme, () => buildPond({ ...outside, cylinder }, theme));
   const trees = house.garden || [], plants = house.plants || [];
   batch('orchard', JSON.stringify([theme, trees.map(tree => [tree.date, Math.round(tree.growth * 20)]), plants.map(plant => [plant.slot, plant.species, gardenGrowth(plant)])]), () => buildGarden({ ...outside, cylinder }, trees, theme, plants));
   if (selectedId === 'orchard' || previous?.pieces.has('retreat-grounds')) {
