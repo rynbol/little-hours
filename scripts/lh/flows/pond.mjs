@@ -71,10 +71,10 @@ export default {
     await app.key('Escape');
     await app.waitFor(`!document.querySelector('#lake-card').open`, { what: 'the card to close' });
     check('Escape puts the fish in the basket and stays at the lake', (await app.js(LAKE)).open);
-    await app.clickSel('#lake-cast');
-    await app.waitFor(`window.__littleHours.lake.diagnostics()?.ui === 'wait'`, { what: 'the float to settle', timeout: 30000 });
     const drawn = await app.js(drawnRatio('lake'));
     check('the pond draws at the screen pixel ratio, capped at 2, or at 0.6 on a software renderer', Math.abs(drawn.drawn - ratioCeiling(drawn)) < 1e-6, drawn);
+    await app.clickSel('#lake-cast');
+    await app.waitFor(`window.__littleHours.lake.diagnostics()?.ui === 'wait'`, { what: 'the float to settle', timeout: 30000 });
     const stage = await app.js(`(() => { const r = document.querySelector('.lake-stage').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height * .4 }; })()`);
     await app.press(stage.x, stage.y); await app.release(stage.x, stage.y);
     check('striking before the bite spooks the fish and keeps the bait', (await app.js(LAKE)).ui === 'idle' && /Too soon/.test(await app.text('#lake-status')) && (await app.js(POND)).bait.length === after.bait.length);

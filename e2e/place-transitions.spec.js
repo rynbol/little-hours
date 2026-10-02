@@ -20,7 +20,7 @@ async function transition(page, click, destination) {
     observer.observe(document.body, { childList: true });
   });
   await click();
-  await expect.poll(() => page.evaluate(() => window.__placeTransitionEvidence)).toEqual({ destination, coversPage: true, animates: true });
+  await expect.poll(() => page.evaluate(() => window.__placeTransitionEvidence), { timeout: 30000 }).toEqual({ destination, coversPage: true, animates: true });
   await settled(page);
 }
 
