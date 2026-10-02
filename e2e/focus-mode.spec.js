@@ -104,7 +104,11 @@ test('another tab can pause the timer or replace the room without leaving focus 
   await expect(focusing(page)).toHaveCount(0); expect((await state(page)).session.running).toBe(false);
   await page.locator('#focus-mode-enter').click();
   await expect(focusing(page)).toHaveCount(1);
+  const theme = await page.locator('body').getAttribute('data-theme');
   await other.locator('#time-toggle').click();
+  await expect(page.locator('body')).not.toHaveAttribute('data-theme', theme);
+  await expect(focusing(page)).toHaveCount(1);
+  await other.evaluate(() => { const saved = JSON.parse(localStorage.getItem('little-hours-v1')), spare = saved.layout.items.findLastIndex(item => !/desk/.test(item.type)); saved.layout.items.splice(spare, 1); localStorage.setItem('little-hours-v1', JSON.stringify(saved)); });
   await expect(focusing(page)).toHaveCount(0); expect((await state(page)).session.running).toBe(true);
   await other.close();
 });
