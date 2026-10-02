@@ -20,7 +20,7 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
   lh flows                          list the flows
   lh run <flow...|all>              run flows with real input; exits 1 on any failure
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
-  lh perf [--view house|garden|lake|room|decorate|pet|focus|focus-trip|trips]
+  lh perf [--view house|garden|lake|room|decorate|pet|focus|focus-trip|trips|wilds]
                                     idle cost, frame gaps, click-to-paint, GPU time, draw calls
   lh trace <cycle>                  Chrome performance trace of one cycle (--cold: the first run, without a warm-up run)
   lh alloc <cycle>                  sampled allocations during one cycle, by allocating function (--cold as for trace)
@@ -210,7 +210,7 @@ async function runFlows(names) {
 }
 
 async function perfOnce(url, view) {
-  const app = await openApp(url, { ...viewport, scale: Number(options.scale || 2), seed: options.seed || 'three-rooms', theme: options.theme });
+  const app = await openApp(url, { ...viewport, ...views[view]?.settings, scale: Number(options.scale || 2), seed: options.seed || 'three-rooms', theme: options.theme });
   try {
     await sleep(2500);
     const result = { readyMs: app.readyMs };
@@ -223,8 +223,9 @@ async function perfOnce(url, view) {
     if (view === 'focus-trip') { Object.assign(result, await focusTrip(app, viewport)); result.pageErrors = app.errors.length; return result; }
     if (view === 'trips') { await app.settle(); Object.assign(result, await placeTrips(app)); result.pageErrors = app.errors.length; return result; }
     if (view === 'decorate') { await app.clickSel('#decorate-button'); result.openMs = await takeEvents(app, 3000); }
-    if (options.before) await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; ${options.before}; })()`);
-    Object.assign(result, await idle(app, Number(options.seconds || 5)));
+    const sceneView = view === 'wilds' ? 'wilds' : 'room';
+    if (options.before) await app.js(`(() => { const scene = window.__littleHours.${sceneView}.diagnostics().scene; ${options.before}; })()`);
+    Object.assign(result, await idle(app, Number(options.seconds || 5), view === 'wilds' ? { view } : {}));
     if (view === 'house') {
       const tags = await app.js(`[...document.querySelectorAll('button.house-room-tag:not(.is-site):not(.is-garden):not(.is-pond)')].map(tag => tag.dataset.room)`);
       for (const id of tags) { await app.clickSel(`.house-room-tag[data-room="${id}"]`); result[`tapMs ${id}`] = await takeEvents(app, 1500); }
@@ -238,7 +239,7 @@ async function perfOnce(url, view) {
       })()`);
       Object.assign(result, gpu);
     } else if (app.hook && await app.js(`typeof window.__littleHours.gpuFrame === 'function'`)) {
-      const which = view === 'house' || view === 'garden' ? 'house' : 'room';
+      const which = view === 'wilds' ? 'wilds' : view === 'house' || view === 'garden' ? 'house' : 'room';
       const gpu = await app.js(`window.__littleHours.gpuFrame('${which}')`), stats = await app.js(`window.__littleHours.stats('${which}')`);
       Object.assign(result, { gpuFrameMs: gpu.ms, drawCalls: stats.drawCalls, triangles: stats.triangles, renderPixels: gpu.width * gpu.height });
       if (view === 'focus') Object.assign(result, await gpuCosts(app));
@@ -272,7 +273,7 @@ async function shots() {
   const names = positional.length ? positional : ['room', 'house'], list = await sides(), out = outDir('shot');
   for (const side of list) for (const name of names) {
     if (!views[name]) throw new Error(`Unknown view "${name}". Views: ${Object.keys(views).join(', ')}`);
-    const app = await openApp(side.url, { ...viewport, scale: Number(options.scale || 1), seed: options.seed || 'three-rooms', theme: options.theme });
+    const app = await openApp(side.url, { ...viewport, ...views[name].settings, scale: Number(options.scale || 1), seed: options.seed || 'three-rooms', theme: options.theme });
     try {
       await sleep(800); await app.settle(); await views[name].go(app);
       for (let i = 0; i < Math.abs(Number(options.turn || 0)); i++) { await app.clickSel(Number(options.turn) < 0 ? '#house-turn-left' : '#house-turn-right'); await sleep(60); }
@@ -287,17 +288,18 @@ async function shots() {
       }
       if (options.turn || options.closed || options.look || options.pitch) await app.settle();
       if (options.backdrop) await app.js(`window.__littleHours.room.diagnostics().seat.world.setBackdrop(true)`);
-      if (options.before) await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; ${options.before}; })()`);
+      const sceneView = name === 'wilds' ? 'wilds' : 'room';
+      if (options.before) await app.js(`(() => { const scene = window.__littleHours.${sceneView}.diagnostics().scene; ${options.before}; })()`);
       if (options.freeze) await app.js(`window.__lhFrozenAt = window.__lhStartAt + ${Number(options.freeze)}`);
       await sleep(Number(options.wait || 600));
       const file = await app.shot(join(out, `${name}-${list.length > 1 ? (side === list[0] ? 'this' : String(options.against).replace(/[^\w.-]+/g, '_')) : 'this'}.jpg`));
       console.log(`${side.label} ${name}: ${file}${app.errors.length ? `  page errors: ${app.errors.join(' | ').slice(0, 200)}` : ''}`);
       if (options.pick) for (const point of String(options.pick).split(';')) {
         const [x, y] = point.split(',').map(Number);
-        const hit = await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene, hit = scene.pick(${x}, ${y}, mesh => mesh.isEnabled() && mesh.isVisible); const mesh = hit?.pickedMesh; return mesh ? [mesh.name, mesh.material?.name, mesh.parent?.name].join(' | ') : 'nothing'; })()`);
+        const hit = await app.js(`(() => { const scene = window.__littleHours.${sceneView}.diagnostics().scene, hit = scene.pick(${x}, ${y}, mesh => mesh.isEnabled() && mesh.isVisible); const mesh = hit?.pickedMesh; return mesh ? [mesh.name, mesh.material?.name, mesh.parent?.name].join(' | ') : 'nothing'; })()`);
         console.log(`  pick ${x},${y}: ${hit}`);
       }
-      if (options.probe) console.log(`  probe: ${await app.js(`(async () => { const scene = window.__littleHours.room.diagnostics().scene; return JSON.stringify(await (${options.probe})); })()`)}`);
+      if (options.probe) console.log(`  probe: ${await app.js(`(async () => { const scene = window.__littleHours.${sceneView}.diagnostics().scene; return JSON.stringify(await (${options.probe})); })()`)}`);
     } finally { await app.close(); }
   }
   return 0;

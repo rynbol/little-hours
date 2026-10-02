@@ -1,0 +1,8 @@
+ts	phase	decision	why	evidence	result
+2026-10-02T10:00:00Z	M0	Create isolated codex/wilds worktree from 13fc9ee	Keep island work untouched	docs/openworld/progress.md	worktree created
+2026-10-02T08:56:48.128812+00:00	M0	Use updated brief with blind reviews and Astra workers	Owner changed the goal while M0 was in progress	docs/openworld-brief.md	active; gates and review pending
+2026-10-02T08:59:15.909966+00:00	M0	Retrieve Nintendo guide directly after web-reader timeout	Verify mechanics from primary text	docs/openworld/design.md	printed pages 15-18 and 35-36 read
+2026-10-02T08:59:43.182283+00:00	M0	Correct first-row timestamp to 2026-10-02T08:47:52Z	The initial row used a placeholder timestamp; git reflog records branch creation	git reflog show --date=iso codex/wilds -1	first row action is valid; its timestamp is superseded
+2026-10-02T09:02:34.359109+00:00	M0	Resolve terrain, transaction, timing, and pet-lure gaps in design	Independent design review found contradictions before implementation	docs/openworld/design.md	accepted and specified; implementation remains milestone-gated
+2026-10-02T09:13:25.914570+00:00	M0	Increase guard Git buffer to16MiB with a large-diff regression	The inherited diff overflowed the default before policies could run	scripts/guard.test.mjs	guard passes; source policies unchanged
+2026-10-02T09:23:35.659593+00:00	M0	Accept scoped preliminary infrastructure review and independent code audit	Section 6 starts mandatory numerical quality scoring at M1; absent gameplay stays Pending	docs/openworld/reviews/m0-round-1.md; evidence/m0-gates.json	M0 verified; commit and push pending

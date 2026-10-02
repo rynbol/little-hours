@@ -1,6 +1,67 @@
-import { test } from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installTestHook } from './test-hook.js';
+
+function environment(t) {
+  const previous = { window: globalThis.window, document: globalThis.document };
+  globalThis.window = {};
+  globalThis.document = {
+    getAnimations: () => [],
+    body: { classList: { contains: () => false } },
+    documentElement: { dataset: {} },
+    getElementById: () => ({ hidden: true }),
+    querySelectorAll: () => ['canvas'],
+  };
+  t.after(() => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
+    }
+  });
+}
+
+test('the shared test hook waits for Wilds rendering and exposes its diagnostic stats', async t => {
+  environment(t);
+  let ready = false;
+  const scene = { getActiveIndices: () => 0, meshes: [], materials: [], textures: [], geometries: [] };
+  const wilds = { ready: () => ready, diagnostics: () => ({ scene, drawCalls: 0, renderCount: 12, pixelRatio: 2 }) };
+  installTestHook({ wilds, state: { theme: 'day' } });
+  await assert.rejects(window.__littleHours.ready(0), /view to be ready/);
+  ready = true;
+  assert.equal(await window.__littleHours.ready(), true);
+  assert.equal(window.__littleHours.wilds, wilds);
+  assert.deepEqual(window.__littleHours.stats('wilds'), { drawCalls: 0, triangles: 0, renderCount: 12, pixelRatio: 2, quality: null });
+  assert.deepEqual(window.__littleHours.counts().wilds, { meshes: 0, materials: 0, textures: 0, geometries: 0 });
+  assert.equal(await window.__littleHours.settled(), true);
+});
+
+test('Wilds GPU sampling uses the existing shared measurement path', t => {
+  environment(t);
+  let renders = 0, readbacks = 0;
+  const engine = {
+    _gl: { RGBA: 6408, UNSIGNED_BYTE: 5121, readPixels() { readbacks++; } },
+    beginFrame() {}, endFrame() {},
+    getRenderWidth: () => 960,
+    getRenderHeight: () => 640,
+  };
+  const scene = { render() { renders++; }, getActiveIndices: () => 0 };
+  installTestHook({ wilds: { diagnostics: () => ({ engine, scene }) } });
+  const sample = window.__littleHours.gpuFrame('wilds', 4);
+  assert.equal(sample.width, 960);
+  assert.equal(sample.height, 640);
+  assert.equal(sample.triangles, 0);
+  assert.equal(renders, 9);
+  assert.equal(readbacks, 9);
+  assert.ok(Number.isFinite(sample.ms));
+});
+
+test('room readiness and diagnostics still work without a Wilds controller', async t => {
+  environment(t);
+  installTestHook({ room: { diagnostics: () => ({ scene: { getActiveIndices: () => 36 }, drawCalls: 3, renderCount: 10, pixelRatio: 1, quality: 'high' }) } });
+  assert.equal(await window.__littleHours.ready(), true);
+  assert.deepEqual(window.__littleHours.stats(), { drawCalls: 3, triangles: 12, renderCount: 10, pixelRatio: 1, quality: 'high' });
+  assert.throws(() => window.__littleHours.stats('wilds'), /wilds view is not built/);
+});
 
 const element = (id, selector = `#${id}`) => ({ id, tagName: 'CIRCLE', classList: [], matches: wanted => wanted.split(',').map(part => part.trim()).includes(selector) });
 const transition = (target, property = 'stroke-dashoffset') => ({ playState: 'running', transitionProperty: property, effect: { target, getComputedTiming: () => ({ endTime: 550 }) } });

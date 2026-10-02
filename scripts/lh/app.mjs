@@ -3,7 +3,7 @@ import { seedState } from './seeds.mjs';
 
 const START = Date.parse('2026-01-10T16:30:00');
 
-function pinScript({ state, seed, startAt }) {
+export function pinScript({ state, seed, startAt, storageKey = 'little-hours-v1' }) {
   return `(() => {
     const realNow = Date.now.bind(Date), began = realNow();
     let a = ${seed} >>> 0;
@@ -11,28 +11,29 @@ function pinScript({ state, seed, startAt }) {
     window.__littleHoursTest = { now: () => window.__lhFrozenAt ?? ${startAt} + (realNow() - began), random }; window.__lhStartAt = ${startAt};
     try {
       if (location.protocol.startsWith('http') && !sessionStorage.getItem('lh-seeded')) {
-        localStorage.clear();
-        ${state ? `localStorage.setItem('little-hours-v1', ${JSON.stringify(JSON.stringify(state))});` : ''}
+        ${storageKey === 'little-hours-v1' ? 'localStorage.clear();' : ''}
+        ${state ? `localStorage.setItem(${JSON.stringify(storageKey)}, ${JSON.stringify(JSON.stringify(state))});` : ''}
         sessionStorage.setItem('lh-seeded', '1');
       }
     } catch {}
   })();`;
 }
 
-export async function openApp(url, { seed = 'three-rooms', theme, reducedMotion = false, width = 1440, height = 1000, scale = 2, headed = false, randomSeed = 7, startAt = START, pins = true } = {}) {
+export async function openApp(url, { seed = 'three-rooms', theme, reducedMotion = false, width = 1440, height = 1000, scale = 2, headed = false, randomSeed = 7, startAt = START, pins = true, path = '/', storageKey = 'little-hours-v1' } = {}) {
   const browser = await launch({ width, height, scale, headed, reducedMotion });
   try {
-    if (pins) await browser.send('Page.addScriptToEvaluateOnNewDocument', { source: pinScript({ state: seedState(seed, { theme }), seed: randomSeed, startAt }) });
+    if (pins) await browser.send('Page.addScriptToEvaluateOnNewDocument', { source: pinScript({ state: seedState(seed, { theme }), seed: randomSeed, startAt, storageKey }) });
     const began = performance.now();
-    await browser.navigate(url + '/');
+    await browser.navigate(url + path);
     let hook = false;
     for (let i = 0; i < 600; i++) {
       const status = await browser.js(`({ hook: typeof window.__littleHours?.ready === 'function', ready: document.getElementById('loading-note')?.hidden === true })`).catch(() => ({}));
       hook = status.hook;
       if (status.ready) break;
-      if (i === 599) throw new Error('The room never reported ready');
+      if (i === 599) throw new Error(`The view at ${path} never reported ready`);
       await sleep(50);
     }
+    if (hook) await browser.js('window.__littleHours.ready()');
     const readyMs = performance.now() - began;
     const app = Object.assign(browser, {
       url, hook, readyMs,
@@ -55,7 +56,7 @@ export async function openApp(url, { seed = 'three-rooms', theme, reducedMotion 
       visible: async selector => Boolean(await browser.box(selector)),
       house: () => browser.js(`(() => { const d = window.__littleHours.house.diagnostics(); return d ? { open: d.open, closed: d.closed ?? null, builds: d.builds, renderCount: d.renderCount, activeRoomMotions: d.activeRoomMotions, drawCalls: d.drawCalls, angle: d.angle, tilt: d.tilt, trees: d.trees } : null; })()`),
       room: () => browser.js(`(() => { const d = window.__littleHours.room.diagnostics(); return { selectedId: d.selectedId, editing: d.editing, avatarEditing: d.avatarEditing, placement: d.placement, layout: d.layout, dragging: d.dragging, pixelRatio: d.pixelRatio, quality: d.quality, plantPhase: d.plantPhase }; })()`),
-      saved: () => browser.js(`JSON.parse(localStorage.getItem('little-hours-v1') || 'null')`),
+      saved: () => browser.js(`JSON.parse(localStorage.getItem(${JSON.stringify(storageKey)}) || 'null')`),
       async waitFor(expression, { timeout = 5000, what = expression } = {}) {
         const end = Date.now() + timeout * slow;
         let value;
@@ -66,8 +67,9 @@ export async function openApp(url, { seed = 'three-rooms', theme, reducedMotion 
         return value;
       },
       async reload() {
-        await browser.navigate(url + '/');
-        await browser.waitFor(`document.getElementById('loading-note')?.hidden === true`, { timeout: 30000, what: 'the room after reload' });
+        await browser.navigate(url + path);
+        await browser.waitFor(`document.getElementById('loading-note')?.hidden === true`, { timeout: 30000, what: `the view at ${path} after reload` });
+        if (hook) await browser.js('window.__littleHours.ready()');
       },
     });
     return app;

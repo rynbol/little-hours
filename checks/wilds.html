@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Little Hours · The Wilds check</title>
+  <style>
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#bfd9e8;font-family:system-ui,sans-serif;color:#283f43}
+    #wilds-stage{position:fixed;inset:0}
+    nav{position:fixed;top:16px;left:16px;display:flex;gap:8px;align-items:center}
+    button{min-height:44px;border:1px solid #ffffff80;border-radius:12px;padding:8px 16px;background:#fffffff0;color:inherit;font:inherit;cursor:pointer}
+    button:focus-visible{outline:3px solid #285d6b;outline-offset:3px}
+    button:disabled{opacity:.5;cursor:default}
+    #loading-note{position:fixed;bottom:16px;left:16px}
+  </style>
+</head>
+<body>
+  <main id="wilds-stage" aria-label="The Wilds scene"></main>
+  <nav aria-label="Scene lifecycle">
+    <button id="wilds-enter" disabled>Enter Wilds</button>
+    <button id="wilds-leave" disabled>Leave Wilds</button>
+  </nav>
+  <div id="loading-note" role="status">Loading the Wilds…</div>
+  <script type="module">
+    if (!import.meta.env.DEV) throw new Error('Development check only');
+    import { freshState, restoreState } from '../src/core/state.js';
+    import { enterWilds } from '../src/features/wilds/index.js';
+    import { installTestHook } from '../src/dev/test-hook.js';
+
+    const key = 'little-hours-wilds-check-v1';
+    let state;
+    try { state = restoreState(localStorage.getItem(key)); }
+    catch { state = freshState(); }
+    const theme = new URLSearchParams(location.search).get('theme');
+    if (['day', 'dusk', 'rain'].includes(theme)) state.theme = theme;
+    const save = () => { try { localStorage.setItem(key, JSON.stringify(state)); } catch {} };
+    save();
+    const app = { state, wilds: null };
+    const stage = document.getElementById('wilds-stage');
+    const enter = document.getElementById('wilds-enter'), leave = document.getElementById('wilds-leave');
+    const loading = document.getElementById('loading-note');
+    installTestHook(app);
+
+    function mount() {
+      if (app.wilds && app.wilds.diagnostics().phase !== 'disposed') return;
+      loading.hidden = false;
+      loading.textContent = 'Loading the Wilds…';
+      app.wilds = enterWilds(stage, state);
+      enter.disabled = true;
+      leave.disabled = false;
+      const view = app.wilds;
+      const ready = () => {
+        if (app.wilds !== view || view.diagnostics().phase === 'disposed') return;
+        if (view.ready()) loading.hidden = true;
+        else requestAnimationFrame(ready);
+      };
+      requestAnimationFrame(ready);
+    }
+
+    enter.addEventListener('click', mount);
+    leave.addEventListener('click', () => {
+      app.wilds.dispose();
+      save();
+      enter.disabled = false;
+      leave.disabled = true;
+      loading.hidden = true;
+      enter.focus();
+    });
+    addEventListener('pagehide', () => app.wilds?.dispose());
+    mount();
+  </script>
+</body>
+</html>

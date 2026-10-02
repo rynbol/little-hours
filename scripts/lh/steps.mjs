@@ -28,6 +28,7 @@ export const cycles = {
 };
 
 export const views = {
+  wilds: { about: 'the empty M0 Wilds scene', settings: { path: '/checks/wilds.html', storageKey: 'little-hours-wilds-check-v1' }, async go(app) { await app.waitFor('window.__littleHours.wilds.ready()', { what: 'the Wilds to render' }); } },
   garden: { about: 'the personal garden, or the whole house on older refs', async go(app) { await steps.openHouse(app); if (await app.visible('#house-open-garden')) await app.clickSel('#house-open-garden'); await app.settle(); } },
   focus: { about: 'the seated Focus view, or the room on older refs', async go(app) {
     const enter = await app.waitFor(`Boolean(document.getElementById('focus-mode-enter'))`, { what: 'the Focus button', timeout: 8000 }).then(() => true, () => false);

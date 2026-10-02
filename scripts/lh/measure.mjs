@@ -17,19 +17,21 @@ export async function taskMs(app) {
   return metrics.find(metric => metric.name === 'TaskDuration').value * 1000;
 }
 
-export async function idle(app, seconds = 5) {
+export async function idle(app, seconds = 5, { view } = {}) {
   await app.send('Performance.enable');
-  await app.js(`(() => { window.__lhGaps = []; let last = performance.now(); window.__lhRaf = true; const tick = now => { window.__lhGaps.push(now - last); last = now; if (window.__lhRaf) requestAnimationFrame(tick); }; requestAnimationFrame(tick); return true; })()`);
+  const started = await app.js(`(() => { window.__lhGaps = []; let last = performance.now(); window.__lhRaf = true; const tick = now => { window.__lhGaps.push(now - last); last = now; if (window.__lhRaf) requestAnimationFrame(tick); }; requestAnimationFrame(tick); return { at: performance.now(), renderCount: ${view ? `window.__littleHours.stats(${JSON.stringify(view)}).renderCount` : 'null'} }; })()`);
   const before = await taskMs(app);
   await sleep(seconds * 1000);
   const after = await taskMs(app);
-  const gaps = await app.js(`(() => { window.__lhRaf = false; return window.__lhGaps.slice(1); })()`);
+  const ended = await app.js(`(() => { window.__lhRaf = false; return { gaps: window.__lhGaps.slice(1), at: performance.now(), renderCount: ${view ? `window.__littleHours.stats(${JSON.stringify(view)}).renderCount` : 'null'} }; })()`);
+  const gaps = ended.gaps, elapsedSeconds = (ended.at - started.at) / 1000;
   const sorted = gaps.slice().sort((a, b) => a - b);
   return {
     idleMsPerSecond: (after - before) / seconds,
-    rafPerSecond: gaps.length / seconds,
+    rafPerSecond: gaps.length / elapsedSeconds,
     p95GapMs: sorted[Math.max(0, Math.ceil(sorted.length * .95) - 1)] || 0,
     slowGaps: gaps.filter(gap => gap > 50).length,
+    ...(view ? { renderPerSecond: (ended.renderCount - started.renderCount) / elapsedSeconds } : {}),
   };
 }
 

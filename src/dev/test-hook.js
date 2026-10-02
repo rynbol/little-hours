@@ -38,6 +38,7 @@ export function installTestHook(app) {
   const views = {
     room: () => app.room?.diagnostics(),
     house: () => app.house?.view?.diagnostics(),
+    wilds: () => app.wilds?.diagnostics(),
   };
   const view = name => {
     const found = views[name]?.();
@@ -136,7 +137,7 @@ export function installTestHook(app) {
 
   function counts() {
     const scene = diagnostics => diagnostics && { meshes: diagnostics.scene.meshes.length, materials: diagnostics.scene.materials.length, textures: diagnostics.scene.textures.length, geometries: diagnostics.scene.geometries.length };
-    return { engines: EngineStore.Instances.length, canvases: document.querySelectorAll('canvas').length, room: scene(views.room()), house: scene(views.house()) };
+    return { engines: EngineStore.Instances.length, canvases: document.querySelectorAll('canvas').length, room: scene(views.room()), house: scene(views.house()), wilds: scene(views.wilds()) };
   }
 
   function stats(name = 'room') {
@@ -154,7 +155,9 @@ export function installTestHook(app) {
     get house() { return app.house; },
     get lake() { return app.lake; },
     get forest() { return app.forest; },
-    ready: (timeout = 30000) => until(() => app.room && document.getElementById('loading-note')?.hidden, timeout, 'the room to be ready').then(() => true),
+    get wilds() { return app.wilds; },
+    get connected() { return app.connected; },
+    ready: (timeout = 30000) => until(() => app.wilds ? app.wilds.ready() : app.room && document.getElementById('loading-note')?.hidden, timeout, 'the view to be ready').then(() => true),
     busy,
     async settled(timeout = 10000) {
       await until(() => !busy().length, timeout, () => `the page to settle (${busy().join(', ')})`);

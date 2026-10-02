@@ -109,7 +109,7 @@ Gate them by recommended level so the order holds, but let a skilled player go e
 - **M5** The remaining biomes, landmarks and bosses two to six, one at a time, each finished before the next starts.
 - **M6** Polish pass: game feel (hit stop, camera shake that respects reduced motion, sound hooks), balance pass against the design numbers, perf pass, a full playthrough flow.
 
-If time runs out, stop at the last finished milestone. A finished M3 beats a broken M5.
+You cannot tell when this run will be cut off (a usage limit, or the owner pausing it). So do not start a milestone until the one before it is green, committed and pushed. A finished M3 beats a broken M5.
 
 ## 6. How to work
 
@@ -119,6 +119,28 @@ If time runs out, stop at the last finished milestone. A finished M3 beats a bro
 - Test hook only through `src/dev/test-hook.js`. Give flows a way to place the player, set level and gear, and step a fight on a fixed clock so boss flows repeat exactly.
 - Unit-test every rule in `src/core/wilds/` (damage, XP, unlocks, recipes, bond scaling, boss phase logic) with literal expected values.
 - If Blender or a tool is missing, write it down, build the nearest thing that keeps the pipeline honest, and carry on.
+- If `git push` or `npm install` fails because the sandbox blocks the network, keep committing locally, record it in `progress.md`, and carry on. Push when it works again. Do not stop the goal for it.
+
+### Subagents
+
+- Use the installed pstack workflow (start with poteto-mode and its host compatibility guide). The owner explicitly allows subagents here; this overrides the "keep subagent use limited" line in the global instructions.
+- The goal text sets how many subagents may run at the same time, reviewers included. If it gives no number, use three. They use the same model as you (Astra). Do not pick another model.
+- Give each builder subagent a narrow task with its own files, so that two never edit the same file. Good splits: one boss's Blender asset script, one biome's dressing, one set of rules in `src/core/wilds/`.
+- You own the result. When a subagent hands work back, rerun the gates yourself, read the diff, and confirm its test fails without its change. Do not trust its summary.
+- Pass every subagent the ground rules in section 2, including: no Docker, no port 5420, no killing processes it did not start.
+
+### Review loop: iterate until it passes
+
+Passing the gates is not enough. Each milestone from M1 on also has to pass a blind review before it counts as finished.
+
+1. Before M1, write `docs/openworld/rubric.md`. Score each line from 1 to 10. Lines for looks: BotW air (painterly light, haze, lifted shadows), originality, readable silhouettes, palette, detail up close, nothing that looks cheap or unfinished. Lines for animation: anticipation, readable hit frame, follow-through, weight, no foot sliding. Lines for play: telegraphs can be read, the boss mechanic is clear without text, controls respond, the HUD is legible.
+2. After the gates are green, capture evidence with `lh shot`: stills of each new biome, landmark, character and boss in day, dusk and rain, and frame sequences of each new animation clip and each boss attack.
+3. Someone other than the builder scores it. Spawn a fresh reviewer subagent that sees only the shots and the rubric. It does not see the code, your notes, the progress file or earlier scores. It returns a score for each rubric line for each item, with the single worst flaw for each.
+4. If you cannot spawn a reviewer, score against the rubric yourself and mark the review file as self-scored.
+5. Save each round to `docs/openworld/reviews/<milestone>-round-<n>.md`.
+6. An item passes when every rubric line scores 8 or more. Fix every item that fails, starting with the lowest score, then take new shots and run a new round with a new reviewer. Repeat until every item passes.
+7. If one item scores the same or lower for three rounds in a row, try a different approach to it once. If it still fails, record it in `progress.md` as a known weak point with its scores, and move on.
+8. After M6, run one last round over the whole game, every biome, landmark, character and boss together.
 
 ## 7. Done means
 
@@ -132,3 +154,4 @@ The goal is met when all of this is true on `codex/wilds`, pushed:
 6. Five or more biomes, eight or more landmarks and six bosses are in the world, with screenshots of each in `docs/openworld/shots/`.
 7. Old saves load, friendship code is untouched, gold earning is untouched, and nothing under `src/features/house/` changed.
 8. `progress.md` ends with an honest list of what is weak, what was cut and what to tweak first.
+9. `docs/openworld/rubric.md` exists, and the last review round in `docs/openworld/reviews/` covers every biome, landmark, character and boss. Every item scores 8 or more on every rubric line, or is listed in `progress.md` as a known weak point under rule 7 of the review loop.

@@ -106,7 +106,7 @@ export async function launch({ width = 1440, height = 1000, scale = 2, headed = 
       await sleep(40); await mouse('mouseReleased', to.x, to.y);
     },
     async key(key, code = key) {
-      const text = key.length === 1 ? key : undefined;
+      const text = key === 'Enter' ? '\r' : key.length === 1 ? key : undefined;
       await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, text, windowsVirtualKeyCode: key === 'Escape' ? 27 : key === 'Enter' ? 13 : key === 'Tab' ? 9 : undefined });
       await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code });
     },

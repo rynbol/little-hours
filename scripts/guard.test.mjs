@@ -1,5 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { checkSource, commentLines, untestedChange } from './guard.mjs';
 
 const rules = (file, code) => checkSource(file, code).map(problem => problem.rule);
@@ -49,4 +54,32 @@ test('game code changes come with a test, or a No-test trailer says why', () => 
   assert.equal(untestedChange(['src/features/house/whole-house.css', 'README.md'], ''), null);
   assert.equal(untestedChange(['src/features/room/room.js'], 'Tidy\n\nNo-test: rename only'), null);
   assert.equal(untestedChange(['src/features/room/room.js'], 'No-test:')?.rule, 'tests-with-changes');
+});
+
+test('guard checks comments after a Git diff larger than the default child-process buffer', t => {
+  const root = mkdtempSync(join(tmpdir(), 'little-hours-guard-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'scripts'));
+  mkdirSync(join(root, 'src/core'), { recursive: true });
+  copyFileSync(new URL('./guard.mjs', import.meta.url), join(root, 'scripts/guard.mjs'));
+  symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), join(root, 'node_modules'), 'dir');
+  const git = args => execFileSync('git', args, { cwd: root, stdio: 'ignore' });
+  git(['init', '--quiet']);
+  git(['-c', 'user.name=Guard Test', '-c', 'user.email=guard@example.test', 'commit', '--quiet', '--allow-empty', '-m', 'Baseline']);
+  const file = join(root, 'src/core/large.js');
+  const source = `export const payload = '${'x'.repeat(1200000)}';\n`;
+  writeFileSync(file, source + '// new comment after a large diff\n');
+  writeFileSync(join(root, 'src/core/large.test.js'), 'export const covered = true;\n');
+  git(['add', 'src/core/large.js', 'src/core/large.test.js']);
+  const run = () => spawnSync(process.execPath, ['scripts/guard.mjs', '--base=HEAD'], { cwd: root, encoding: 'utf8' });
+  const rejected = run();
+  assert.equal(rejected.status, 1);
+  assert.equal(rejected.stderr, '');
+  assert.match(rejected.stdout, /src\/core\/large\.js:2  no-new-comments/);
+  assert.match(rejected.stdout, /1 problem\(s\)/);
+  writeFileSync(file, source);
+  const accepted = run();
+  assert.equal(accepted.status, 0);
+  assert.equal(accepted.stderr, '');
+  assert.match(accepted.stdout, /0 problem\(s\), new comments checked against/);
 });

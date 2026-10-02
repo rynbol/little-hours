@@ -1,0 +1,45 @@
+{
+  "sourceFingerprintSha256": "ca64a6c3b35c1748089f81b34208d891da7e4ebe0aa0e8c525fe46083f8095ad",
+  "node": "24.16.0",
+  "commands": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "tests": 642,
+      "passed": 642
+    },
+    {
+      "command": "npm run guard",
+      "exitCode": 0,
+      "files": 333,
+      "problems": 0
+    },
+    {
+      "command": "npm run verify:room",
+      "exitCode": 0,
+      "result": "Babylon room checks passed"
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "result": "built; existing large chunk warning remains"
+    },
+    {
+      "command": "npm run lh -- run wilds",
+      "exitCode": 0,
+      "checks": 15,
+      "passed": 15
+    }
+  ],
+  "negativeChecks": [
+    {
+      "mutation": "ignore hidden document when selecting loop state",
+      "failedTests": 2
+    },
+    {
+      "mutation": "replace shared hook with original hook from13fc9ee",
+      "failedTests": 2
+    }
+  ],
+  "forbiddenPathsChanged": []
+}
