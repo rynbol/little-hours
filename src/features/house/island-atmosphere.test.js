@@ -26,6 +26,12 @@ test('a sky island has a flat crown over a hanging keel', () => {
   assert.ok(Math.max(...ys) > 250);
 });
 
+test('the sky art is well-formed SVG so postcards can decode it', () => {
+  for (const theme of ['day', 'dusk', 'rain']) for (const tag of islandSkyArt(theme, 1520, 850).match(/<[a-zA-Z][^>]*>/g)) {
+    assert.equal(tag.replace(/^<[\w-]+/, '').replace(/\s[\w:-]+="[^"]*"/g, '').replace(/\/?>$/, '').trim(), '', `${theme} ${tag.slice(0, 80)}`);
+  }
+});
+
 test('only the day sky casts sun rays', () => {
   assert.deepEqual(['day', 'dusk', 'rain'].map(theme => islandSkyArt(theme, 1200, 800).includes('data-sky="rays"')), [true, false, false]);
 });

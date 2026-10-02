@@ -73,7 +73,7 @@ function skyIslands(theme, r, width, height) {
   return SKY_ISLANDS.map(([x, y, size, seed]) => {
     const cx = x * width, cy = y * height, s = size * scale, fall = size > .55 ? `<rect x="${(cx + 22 * s).toFixed(1)}" y="${cy.toFixed(1)}" width="${(3 * s).toFixed(1)}" height="${(150 * s).toFixed(1)}" fill="url(#island-far-fall)"/>` : '';
     const trees = [-.42, -.3, .18, .34].filter((_, i) => size > .5 || i % 2).map((at, i) => `<ellipse cx="${(cx + at * 140 * s).toFixed(1)}" cy="${(cy - (12 + i % 2 * 3) * s).toFixed(1)}" rx="${(7 + skyHash(seed + i) * 4) * s}" ry="${(9 + skyHash(seed + i * 2) * 5) * s}" fill="${paint.tree}"/>`).join('');
-    return `<g data-sky-island="${seed}" opacity="${(.72 + size * .28).toFixed(2)}">${fall}<path d="${skyIsland(cx, cy, s, seed)}" fill="url(#island-sky-rock)"/><path d="${skyIsland(cx, cy, s, seed)}" fill="url(#island-sky-side)"/>${trees}<path data-sky-cap d="${skyCap(cx, cy, s, seed)}" fill="url(#island-sky-grass)"/><ellipse cx="${cx.toFixed(1)}" cy="${(cy + 30 * s).toFixed(1)}" rx="${(95 * s).toFixed(1)}" ry="${(9 * s).toFixed(1)}" fill="${r.cloud}" opacity=".4" filter="url(#island-wisp)"/></g>`;
+    return `<g data-sky-island="${seed}" opacity="${(.72 + size * .28).toFixed(2)}">${fall}<path d="${skyIsland(cx, cy, s, seed)}" fill="url(#island-sky-rock)"/><path d="${skyIsland(cx, cy, s, seed)}" fill="url(#island-sky-side)"/>${trees}<path data-sky-cap="${seed}" d="${skyCap(cx, cy, s, seed)}" fill="url(#island-sky-grass)"/><ellipse cx="${cx.toFixed(1)}" cy="${(cy + 30 * s).toFixed(1)}" rx="${(95 * s).toFixed(1)}" ry="${(9 * s).toFixed(1)}" fill="${r.cloud}" opacity=".4" filter="url(#island-wisp)"/></g>`;
   }).join('');
 }
 
