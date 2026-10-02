@@ -4,6 +4,10 @@ export default {
     const { check } = t;
     const app = await t.open({ seed: 'three-rooms' });
     await app.settle();
+    await t.sleep(2500);
+    const build = await app.js(`(() => { const { engine, seat } = window.__littleHours.room.diagnostics(); return { renderer: engine.getGlInfo().renderer, buildsAhead: seat.world.buildsAhead, started: seat.world.started }; })()`);
+    if (/swiftshader/i.test(build.renderer)) check('on a software renderer the outdoor world waits for the chair, so building it never stalls the dollhouse view', build.buildsAhead === false && !build.started, build);
+    else check('on a GPU the outdoor world starts building in the dollhouse view, ahead of the chair', build.buildsAhead === true && build.started, build);
     const effects = `Object.keys(window.__littleHours.room.diagnostics().engine._compiledEffects)`;
     await app.js(`(() => { const { scene } = window.__littleHours.room.diagnostics(); window.__flyInEffects = null; const watch = scene.onBeforeRenderObservable.add(() => { if (window.__littleHours.room.diagnostics().seat.state !== 'entering') return; window.__flyInEffects = ${effects}; scene.onBeforeRenderObservable.remove(watch); }); })()`);
     await app.clickSel('#focus-mode-enter');

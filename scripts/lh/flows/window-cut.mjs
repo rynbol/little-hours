@@ -45,7 +45,7 @@ export default {
     const { check } = t;
     const app = await t.open({ seed: 'three-rooms' });
     await app.settle();
-    await app.waitFor(`${SEAT}.seat.world.outdoor !== false`, { what: 'the outdoor world to be built', timeout: 30000 });
+    await app.waitFor(`(${SEAT}.seat.world.outdoor !== false || ${SEAT}.seat.world.buildsAhead === false)`, { what: 'the outdoor world to be built, where the renderer builds it ahead', timeout: 30000 });
     await app.js(INSTALL);
     const save = (label, frame) => { if (frame?.shot) { writeFileSync(join(t.out, `window-cut-${label}.jpg`), Buffer.from(frame.shot.split(',')[1], 'base64')); frame.shot = undefined; } return frame; };
     const sound = frame => frame.outside <= frame.outsideLimit;

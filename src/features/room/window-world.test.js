@@ -90,3 +90,16 @@ test('closing the room while the window world builds stops the build and leaves 
   assert.equal(windowWorld.ready, false);
   assert.equal(windowWorld.scene.meshes.length, 0);
 });
+
+test('the outdoor world builds ahead of the chair on a GPU, but waits for the chair on a software renderer, where its build would stall the dollhouse view', () => {
+  const renderers = ['ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Pro, Unspecified Version)', 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)', 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)', 'llvmpipe (LLVM 15.0.7, 256 bits)', 'ANGLE (Microsoft, Microsoft Basic Render Driver Direct3D11 vs_5_0 ps_5_0, D3D11)'];
+  const ahead = renderers.map(renderer => {
+    const engine = uploadingEngine(), anchor = new TransformNode('seat-world', new Scene(engine));
+    engine.getGlInfo = () => ({ vendor: '', renderer, version: '' });
+    const windowWorld = createWindowWorld(engine, anchor, { workers: false });
+    const result = [windowWorld.buildsAhead, windowWorld.started];
+    windowWorld.dispose(); engine.dispose();
+    return result;
+  });
+  assert.deepEqual(ahead, [[true, false], [true, false], [false, false], [false, false], [false, false]]);
+});
