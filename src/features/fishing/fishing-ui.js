@@ -3,6 +3,7 @@ import { BAIT_RANGES, FIGHT, SPECIES, TANK_LIMIT, TIERS, baitRange, onFish, roll
 import { clockRandom } from '../../core/test-pins.js';
 import { fishArt } from './fish-art.js';
 import { createLakeScene } from './lake-scene.js';
+import { islandSkyArt } from '../house/index.js';
 import './fishing.css';
 
 const BAIT_ART = {
@@ -29,7 +30,7 @@ export function createFishingUI(app, { onClose } = {}) {
 
   function build() {
     root = document.createElement('section'); root.className = 'lake'; root.id = 'lake-page'; root.hidden = true; root.setAttribute('aria-label', 'Willow Pond');
-    root.innerHTML = `<div class="lake-stage"></div><div class="lake-vignette" aria-hidden="true"></div>
+    root.innerHTML = `<div class="lake-sky" aria-hidden="true"></div><div class="lake-stage"></div><div class="lake-vignette" aria-hidden="true"></div>
       <button class="house-room-tag lake-exit" id="lake-exit" type="button" aria-label="Back to island" hidden><span class="house-pin" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 5 7 12l9 7M7 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="house-pin-label"><strong>Island</strong></span></button>
       <header class="lake-top"><button class="lake-chip" id="lake-back" type="button" aria-label="Back to the island"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lake-wide">Island</span></button>
         <div class="lake-title"><h1>Willow Pond</h1></div>
@@ -268,6 +269,7 @@ export function createFishingUI(app, { onClose } = {}) {
     if (disposed || (root && !root.hidden)) return;
     travelTo('pond', openPond, () => Boolean(scene?.diagnostics().scene.isReady()));
   }
+  const paintSky = () => { $('.lake-sky').innerHTML = islandSkyArt(app.state.theme, Math.max(1, window.innerWidth), Math.max(1, window.innerHeight)); };
   function openPond() {
     if (disposed) return;
     if (!root) build();
@@ -276,7 +278,7 @@ export function createFishingUI(app, { onClose } = {}) {
     phase = 'idle'; caught = null; chosen = null;
     root.hidden = false; document.body.classList.add('is-lake'); document.getElementById('app').inert = true;
     building = requestAnimationFrame(() => { building = setTimeout(() => { building = 0; if (!root.hidden) scene = createLakeScene(root.querySelector('.lake-stage'), { theme: app.state.theme, avatar: app.state.avatar, pet: app.state.pet, exitTag: $('#lake-exit'), reducedMotion: reduced() }); }); });
-    root.dataset.theme = app.state.theme;
+    root.dataset.theme = app.state.theme; paintSky(); window.addEventListener('resize', paintSky);
     status(''); $('#lake-chances').open = false; renderTray();
     $('#lake-card').close(); $('#lake-journal').close(); $('#lake-bite').hidden = true;
     document.addEventListener('keydown', onKey, true); document.addEventListener('keyup', onKeyUp, true);
@@ -290,7 +292,7 @@ export function createFishingUI(app, { onClose } = {}) {
     if (!root || root.hidden) return;
     $('#lake-tackle').hidePopover(); $('#lake-card').close(); $('#lake-journal').close(); journalReturn = null;
     cancelAnimationFrame(building); clearTimeout(building); building = 0;
-    clearTimers(); cancelAnimationFrame(loop); letGo(); fight = null; hooked = null; document.removeEventListener('keydown', onKey, true); document.removeEventListener('keyup', onKeyUp, true);
+    clearTimers(); cancelAnimationFrame(loop); letGo(); fight = null; hooked = null; document.removeEventListener('keydown', onKey, true); document.removeEventListener('keyup', onKeyUp, true); window.removeEventListener('resize', paintSky);
     scene?.dispose(); scene = null; phase = 'idle';
     root.hidden = true; document.body.classList.remove('is-lake'); document.getElementById('app').inert = false;
     onClose?.(); returnFocus?.focus?.({ preventScroll: true });

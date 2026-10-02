@@ -16,7 +16,7 @@ import '@babylonjs/core/Culling/ray.js';
 import { createHouseModel, HOUSE_POSITIONS } from './house-model.js';
 import { gardenPlantName } from '../../core/garden-plants.js';
 import { PLANT_SPOTS, gardenPlotAt } from './garden-model.js';
-import { RETREAT_SPOTS, RETREAT_BOUNDS, GARDEN_EXIT_TAG, RETREAT_LIGHT } from './garden-retreat.js';
+import { RETREAT_SPOTS, RETREAT_BOUNDS, GARDEN_EXIT_TAG, RETREAT_LIGHT, GARDEN_LAMPS, gardenBlades } from './garden-retreat.js';
 import { createGardenButterflies } from './garden-butterflies.js';
 import { GARDEN_TAG } from './house-garden.js';
 import { POND_TAG } from './house-pond.js';
@@ -82,7 +82,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   const smoke = createChimneySmoke(scene, theme), smokeAt = new Vector3(), smokeLocal = new Vector3();
   const rain = createIslandRain(scene, theme);
   const water = createIslandWater(scene, theme);
-  const grass = createIslandGrass(scene, theme);
+  const grass = createIslandGrass(scene, theme), gardenGrass = createIslandGrass(scene, theme, { name: 'garden-grass', blades: gardenBlades(), lamps: GARDEN_LAMPS });
   const forest = createIslandForest(scene, theme);
   const butterflies = createGardenButterflies(scene);
   const moteMatrices = new Float32Array(24 * 16);
@@ -129,7 +129,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     const seconds = motion.matches ? 0 : now / 1000;
     const wasReacting = roomMotion.activeCount > 0;
     roomMotion.restore();
-    model.animate(seconds, focused, motion.matches); water.animate(seconds, camera); grass.animate(seconds); forest.animate(seconds); butterflies.animate(seconds, selectedId === 'orchard' && !motion.matches);
+    model.animate(seconds, focused, motion.matches); water.animate(seconds, camera); grass.animate(seconds); gardenGrass.animate(seconds); forest.animate(seconds); butterflies.animate(seconds, selectedId === 'orchard' && !motion.matches);
     for (const root of model.live) root.metadata.avatar?.setEnabled(focused);
     stroll.setVisible(!focused || selectedId === 'orchard');
     if (!focused || selectedId === 'orchard') stroll.animate(seconds, motion.matches, selectedId === 'orchard' ? focused ? 'garden-rest' : 'garden' : 'island');
@@ -176,8 +176,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
   function resize() {
     if (disposed || suspended) return;
     engine.resize();
-    backdrop.hidden = selectedId === 'orchard';
-    if (backdrop.isConnected && !backdrop.hidden) backdrop.innerHTML = islandSkyArt(theme, Math.max(1, window.innerWidth), Math.max(1, window.innerHeight));
+    if (backdrop.isConnected) backdrop.innerHTML = islandSkyArt(theme, Math.max(1, window.innerWidth), Math.max(1, window.innerHeight));
     if (model) { roomMotion.restore(); present(); }
   }
   function fitCamera() {
@@ -231,7 +230,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     roomMotion.stop();
     house = next; selectedId = selected; theme = atmosphere; avatar = appearance;
     water.mesh.setEnabled(selectedId !== 'orchard');
-    grass.mesh.setEnabled(container.id === 'house-canvas' && selectedId !== 'orchard');
+    grass.mesh.setEnabled(container.id === 'house-canvas' && selectedId !== 'orchard'); gardenGrass.mesh.setEnabled(selectedId === 'orchard');
     forest.setEnabled(selectedId !== 'orchard');
     gardenRing.setEnabled(selectedId === 'orchard' && gardenPlot !== null); if (gardenPlot !== null) gardenRing.position.set(RETREAT_SPOTS[gardenPlot][0], .18, RETREAT_SPOTS[gardenPlot][1]);
     const island = container.id === 'house-canvas' && selectedId !== 'orchard', light = island ? ISLAND_ATMOSPHERES[theme] : selectedId === 'orchard' ? RETREAT_LIGHT[theme]
@@ -239,7 +238,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
     sky.intensity = light.fill; sun.intensity = light.key;
     sky.diffuse = Color3.FromHexString(light.sky); sky.groundColor = Color3.FromHexString(light.ground);
     sun.diffuse = Color3.FromHexString(light.sun); water.setTheme(theme); smoke.setTheme(theme); rain.setTheme(theme);
-    painterly.setTheme(theme); grass.setTheme(theme); forest.setTheme(theme);
+    painterly.setTheme(theme); grass.setTheme(theme); gardenGrass.setTheme(theme); forest.setTheme(theme);
     const previous = model;
     builds++;
     model = createHouseModel(scene, house, selectedId, theme, avatar, previous);
@@ -341,7 +340,7 @@ export function createHouseView(container, { house, selectedId, theme, avatar, o
       // Copy immediately after rendering: WebGL's default buffer need not be
       // preserved between frames (which would cost memory on every visit).
       engine.beginFrame(); scene.render(); engine.endFrame();
-      return createHousePostcard(canvas, name, caption, theme, selectedId !== 'orchard');
+      return createHousePostcard(canvas, name, caption, theme);
     },
     setClosed,
     // Keep the house built while its page is away; it arrives closed again.

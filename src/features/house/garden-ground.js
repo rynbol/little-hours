@@ -1,8 +1,15 @@
+import { rgba, ringGrid, strataBody, strataSteps, spire, shadeBody } from '../../models/landform.js';
+
 const origin = [-1.2, -1.4];
 const outlines = [[0, .05, 6, 5.4], [-3.4, -4.2, 3.4, 4.4]];
-const profile = [[0, .985, '#a0b282'], [-.1, 1, '#a0b282'], [-.26, 1.004, '#829765'], [-.52, 1, '#baae91'], [-1.2, .99, '#b1a58c'], [-1.82, .97, '#a2987e'], [-2.15, .9, '#92917a'], [-2.24, .65, '#858b72']];
+const RINGS = 7, SEGMENTS = 128, TURF = .985;
+const lawn = ['#7aa046', '#8cb24e', '#6b9140', '#a3c35c'];
+const lip = [[-.1, 1, '#6f9640'], [-.26, 1.004, '#5b7f3a']];
+const SPIRES = Object.freeze([[-1.6, -1.2, 1.9, .95], [1.4, .5, 1.5, .8], [-3.4, -3.6, 1.3, .7], [.2, -3, 1.1, .6], [-3.2, .9, 1, .5]].map(Object.freeze));
+export const GARDEN_DEPTH = -3.3;
+export const TURF_LIGHT = Object.freeze({ day: [1, 1, 1], dusk: [.5, .56, .85], rain: [.68, .78, .9] });
 
-function edge(angle) {
+function reach(angle) {
   const dx = Math.cos(angle), dz = Math.sin(angle);
   const distance = Math.max(...outlines.map(([x, z, width, depth]) => {
     const ox = origin[0] - x, oz = origin[1] - z;
@@ -14,39 +21,33 @@ function edge(angle) {
   return distance * (1 + Math.sin(angle * 7 + 1) * .008 + Math.sin(angle * 11) * .005);
 }
 
-export function gardenGround() {
-  const segments = 128, positions = [], colors = [], indices = [], normals = [];
-  for (const [level, radius, hex] of profile) {
-    const rgb = [1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16) / 255);
-    for (let i = 0; i < segments; i++) {
-      const angle = i / segments * Math.PI * 2, reach = edge(angle) * radius;
-      const folds = level < -.3 ? Math.sin(angle * 9 + level * .8) * .045 + Math.sin(angle * 17 - level) * .018 : 0;
-      positions.push(origin[0] + Math.cos(angle) * (reach + folds), level, origin[1] + Math.sin(angle) * (reach + folds));
-      const light = level < -.3 ? 1 + Math.sin(angle * 5 + level * 1.3) * .035 : 1;
-      colors.push(...rgb.map(value => value * light), 1);
-    }
-  }
-  for (let row = 0; row < profile.length - 1; row++) for (let i = 0; i < segments; i++) {
-    const a = row * segments + i, b = row * segments + (i + 1) % segments, c = a + segments, d = b + segments;
-    indices.push(a, c, b, b, c, d);
-  }
-  const top = positions.length / 3;
-  positions.push(origin[0], 0, origin[1], origin[0], -2.24, origin[1]);
-  colors.push(...colors.slice(0, 4), ...colors.slice(-4));
-  for (let i = 0; i < segments; i++) {
-    indices.push(top, i, (i + 1) % segments);
-    indices.push(top + 1, (profile.length - 1) * segments + (i + 1) % segments, (profile.length - 1) * segments + i);
-  }
-  normals.push(...Array(positions.length).fill(0));
-  for (let i = 0; i < indices.length; i += 3) {
-    const a = indices[i] * 3, b = indices[i + 1] * 3, c = indices[i + 2] * 3;
-    const u = [0, 1, 2].map(k => positions[b + k] - positions[a + k]), v = [0, 1, 2].map(k => positions[c + k] - positions[a + k]);
-    const n = [u[2] * v[1] - u[1] * v[2], u[0] * v[2] - u[2] * v[0], u[1] * v[0] - u[0] * v[1]];
-    for (const at of [a, b, c]) for (let k = 0; k < 3; k++) normals[at + k] += n[k];
-  }
-  for (let i = 0; i < normals.length; i += 3) {
-    const size = Math.hypot(normals[i], normals[i + 1], normals[i + 2]);
-    for (let k = 0; k < 3; k++) normals[i + k] /= size;
-  }
-  return { positions, colors, normals, indices };
+export function gardenEdge(angle, scale = 1) {
+  const r = reach(angle) * scale;
+  return [origin[0] + Math.cos(angle) * r, origin[1] + Math.sin(angle) * r];
+}
+
+export function onGarden(x, z, margin = 0) {
+  return Math.hypot(x - origin[0], z - origin[1]) <= reach(Math.atan2(z - origin[1], x - origin[0])) - margin;
+}
+
+function patch(x, z) {
+  const n = Math.sin(x * .9 + z * .4) * .5 + Math.sin(z * 1.7 - x * .3 + 1) * .3 + Math.sin(x * 2.3 + z * 2.1) * .2;
+  return rgba(lawn[0]).map((v, i) => v + (rgba(n > .2 ? lawn[3] : n < -.25 ? lawn[2] : lawn[1])[i] - v) * .75);
+}
+
+export function gardenGround(theme = 'day') {
+  const light = TURF_LIGHT[theme] || TURF_LIGHT.day, lit = color => color.map((value, i) => i < 3 ? value * light[i] : value);
+  const ring = (y, scale, color) => Array.from({ length: SEGMENTS }, (_, j) => {
+    const [x, z] = gardenEdge(j / SEGMENTS * Math.PI * 2, scale);
+    return { p: [x, y, z], c: lit(color ? rgba(color) : patch(x, z)) };
+  });
+  return ringGrid([...Array.from({ length: RINGS + 1 }, (_, k) => ring(0, k / RINGS * TURF)), ...lip.map(([y, scale, color]) => ring(y, scale, color))]);
+}
+
+export function gardenCliff(theme = 'day') {
+  const rock = ['#8f8584', '#7a7579', '#8a8388', '#6b686f', '#5d5b63'];
+  return [
+    strataBody({ edge: a => gardenEdge(a, 1.004), segments: 96, strata: strataSteps(-.28, GARDEN_DEPTH), keel: [origin[0] + .5, origin[1] - .4, GARDEN_DEPTH], seed: 4 }),
+    ...SPIRES.map(([x, z, length, radius], i) => spire({ x, z, top: GARDEN_DEPTH * .62, length: length + .9, radius, colors: rock, seed: 5 + i * 2.7 })),
+  ].map(body => shadeBody(body, theme));
 }

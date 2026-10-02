@@ -48,6 +48,8 @@ export default {
       }
       const pair = await garden.js(`(() => { const d = window.__littleHours.house.diagnostics(); return { visible: d.scene.getTransformNodeByName('house-stroll').isEnabled(), avatar: Boolean(d.stroll), pet: Boolean(d.strollPet), home: d.scene.getMeshByName('house-retreat-exit').isEnabled() }; })()`);
       check(`${phone ? 'phone' : 'desktop'}: the garden includes you, your pet and the island gate`, pair.visible && pair.avatar && pair.pet && pair.home, pair);
+      const look = await garden.js(`(() => { const scene = window.__littleHours.house.diagnostics().scene, grass = scene.getMeshByName('garden-grass'), sky = document.querySelector('.island-sky'); return { blades: grass?.isEnabled() ? grass.getTotalVertices() / 3 : 0, sky: Boolean(sky?.querySelector('svg')) && !sky.hidden && getComputedStyle(sky).display !== 'none' }; })()`);
+      check(`${phone ? 'phone' : 'desktop'}: the garden floats under the island sky on a lawn of wind grass`, look.blades > 8000 && look.sky, look);
       await sleep(400); await t.shot(garden, phone ? 'phone-bloom' : 'bloom');
       if (phone) {
         await sleep(1600); const before = (await garden.house()).renderCount; await sleep(700);

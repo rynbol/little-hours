@@ -30,7 +30,12 @@ const measure = `(() => {
   };
   const arch = scene.getMeshByName('lake-exit'), screen = bounds([mesh, arch]), core = bounds([scene.getMeshByName('lake-water')]), exit = bounds([arch]);
   const tag = document.getElementById('lake-exit'), rect = tag.getBoundingClientRect();
-  return { triangles, longest, colorSlope, steepest, batches: scene.meshes.filter(m => m.name === 'lake-scenery').length, overflow: document.documentElement.scrollWidth > innerWidth, orthographic: scene.activeCamera.mode === 1, screen, core, exit: arch ? exit : null, house: Boolean(scene.getMeshByName('lake-house')), tag: { hidden: tag.hidden, left: parseFloat(tag.style.left), top: parseFloat(tag.style.top), rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, label: tag.textContent.trim() }, view: { width: innerWidth, height: innerHeight }, meshes: scene.meshes.filter(m => m.isEnabled() && m.getTotalIndices()).map(m => [m.name, m.getTotalIndices() / 3]).sort((a, b) => b[1] - a[1]).slice(0, 8) };
+  const cliff = scene.getMeshByName('lake-cliff'), blades = scene.getMeshByName('lake-grass'), sky = document.querySelector('.lake-sky'), turf = [0, 0, 0];
+  let floor = 0, counted = 0;
+  if (cliff) { const q = cliff.getVerticesData('position'); for (let i = 1; i < q.length; i += 3) floor = Math.min(floor, q[i]); }
+  for (let n = 0; n < p.length / 3; n++) if (Math.abs(p[n * 3 + 1] - .15) < .001) { counted++; for (let k = 0; k < 3; k++) turf[k] += c[n * 4 + k]; }
+  const look = { floor, blades: blades ? blades.getTotalVertices() / 3 : 0, wind: Boolean(blades?.material.pluginManager?.getPlugin('GrassWind')), painterly: Boolean(mesh.material.pluginManager?.getPlugin('Painterly')), sky: Boolean(sky?.querySelector('svg')), moon: Boolean(sky?.querySelector('[data-celestial="moon"]')), mirrored: sky ? getComputedStyle(sky).transform.startsWith('matrix(-1') : false, turf: turf.map(v => v / counted), backdrop: getComputedStyle(document.getElementById('lake-page')).backgroundImage };
+  return { look, triangles, longest, colorSlope, steepest, batches: scene.meshes.filter(m => m.name === 'lake-scenery').length, overflow: document.documentElement.scrollWidth > innerWidth, orthographic: scene.activeCamera.mode === 1, screen, core, exit: arch ? exit : null, house: Boolean(scene.getMeshByName('lake-house')), tag: { hidden: tag.hidden, left: parseFloat(tag.style.left), top: parseFloat(tag.style.top), rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, label: tag.textContent.trim() }, view: { width: innerWidth, height: innerHeight }, meshes: scene.meshes.filter(m => m.isEnabled() && m.getTotalIndices()).map(m => [m.name, m.getTotalIndices() / 3]).sort((a, b) => b[1] - a[1]).slice(0, 8) };
 })()`;
 
 export default {
@@ -41,6 +46,9 @@ export default {
       await steps.openLake(app);
       const ground = await app.js(measure), { screen, core, exit, tag, view } = ground, label = `${seed} ${theme} ${width}x${height}`;
       t.check(`${label}: foreground grass has no stretched triangles or radial color streaks`, ground.triangles > 200 && ground.longest < 1.55 && ground.colorSlope < .05, ground);
+      const { look } = ground, sky = { day: '79, 143, 216', dusk: '37, 43, 80', rain: '52, 78, 104' }[theme];
+      t.check(`${label}: the pond floats under the island sky on a banded rock cliff`, look.sky && look.mirrored && look.backdrop.includes(sky) && look.moon === (theme === 'dusk') && look.floor < -6, look);
+      t.check(`${label}: the meadow is island turf under a field of wind grass, painted like the island`, look.blades > 18000 && look.wind && look.painterly && look.turf[1] > look.turf[0] * 1.2 && look.turf[1] > look.turf[2] * 1.2, look);
       t.check(`${label}: meadow stays in one scenery batch without page overflow`, ground.batches === 1 && !ground.overflow, ground);
       const inside = box => box.left > -1 && box.right < 1 && box.bottom > -1 && box.top < 1, portrait = height > width;
       t.check(`${label}: an orthographic camera keeps the ${portrait ? 'pond and the exit arch' : 'whole plot and the exit arch'} on screen`, ground.orthographic && Boolean(exit) && inside(exit) && inside(portrait ? core : screen), ground);

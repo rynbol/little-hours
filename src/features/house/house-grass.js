@@ -84,9 +84,9 @@ export function lanternLights() {
   return [...LANTERNS.map(([x, z]) => [x, z]), ...lanternSpots().map(({ x, z }) => [x, z]), [ax, az]];
 }
 
-export function bladeColors(blades, tones, spill = 0) {
+export function bladeColors(blades, tones, spill = 0, lamps = lanternLights()) {
   const [root, blade, sunlit] = ['root', 'blade', 'sunlit'].map(key => Color3.FromHexString(tones[key]));
-  const colors = new Float32Array(blades.length * 12), tip = new Color3(), base = new Color3(), lights = spill ? lanternLights() : [];
+  const colors = new Float32Array(blades.length * 12), tip = new Color3(), base = new Color3(), lights = spill ? lamps : [];
   blades.forEach(({ x, z, tone, patch }, i) => {
     const warm = Math.min(1, Math.max(0, .5 + patch * .35 + (tone - .5) * .3)), shade = .9 + tone * .18;
     Color3.LerpToRef(blade, sunlit, warm, tip); tip.scaleToRef(shade, tip); root.scaleToRef(shade, base);
@@ -133,18 +133,18 @@ export const GRASS_TONES = Object.freeze({
   rain: { root: '#3f5c44', blade: '#6f9166', sunlit: '#a9c092', gust: '#c2d4ac' },
 });
 
-export function createIslandGrass(scene, theme = 'day') {
-  const blades = [...grassBlades(), ...woodlandBlades(), ...rimBlades()], { positions, shape, normals, indices } = bladeGeometry(blades);
-  const mesh = new Mesh('island-grass', scene);
-  const data = new VertexData(); Object.assign(data, { positions, normals, indices, colors: bladeColors(blades, GRASS_TONES[theme] || GRASS_TONES.day, LANTERN_SPILL[theme] || 0) }); data.applyToMesh(mesh, true);
+export function createIslandGrass(scene, theme = 'day', { name = 'island-grass', blades = [...grassBlades(), ...woodlandBlades(), ...rimBlades()], lamps = lanternLights() } = {}) {
+  const { positions, shape, normals, indices } = bladeGeometry(blades);
+  const mesh = new Mesh(name, scene);
+  const data = new VertexData(); Object.assign(data, { positions, normals, indices, colors: bladeColors(blades, GRASS_TONES[theme] || GRASS_TONES.day, LANTERN_SPILL[theme] || 0, lamps) }); data.applyToMesh(mesh, true);
   mesh.setVerticesData('grassBlade', shape, false, 3);
-  const material = new StandardMaterial('island-grass-paint', scene);
+  const material = new StandardMaterial(`${name}-paint`, scene);
   material.diffuseColor = Color3.White(); material.specularColor.setAll(0); material.emissiveColor.setAll(.08); material.backFaceCulling = false;
   const wind = new GrassWindPlugin(material);
   mesh.material = material; mesh.receiveShadows = true; mesh.isPickable = false; mesh.metadata = { castShadow: false }; mesh.alwaysSelectAsActiveMesh = true; mesh.freezeWorldMatrix();
   function setTheme(next) {
     const tones = GRASS_TONES[next] || GRASS_TONES.day;
-    mesh.updateVerticesData('color', bladeColors(blades, tones, LANTERN_SPILL[next] || 0));
+    mesh.updateVerticesData('color', bladeColors(blades, tones, LANTERN_SPILL[next] || 0, lamps));
     const gust = Color3.FromHexString(tones.gust); wind.gustTint = [gust.r, gust.g, gust.b];
   }
   setTheme(theme);

@@ -2,7 +2,8 @@ import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { buildPaths } from './house-paths.js';
 import { placeAsset } from '../../models/assets.js';
 import { buildForestEdge } from './island-forest.js';
-import { ISLAND, edgePoint, landmassEdge, onIsland, strataBody, strataSteps, spire, addBody, hangingRoots } from './island-landform.js';
+import { ISLAND, edgePoint, landmassEdge, onIsland } from './island-landform.js';
+import { strataBody, strataSteps, spire, addBody, hangingRoots } from '../../models/landform.js';
 
 export { ISLAND, edgePoint, onIsland };
 

@@ -3,10 +3,9 @@ body.is-garden { overflow: hidden; }
 body.is-garden > .app-footer, body.is-garden .app-header, body.is-garden #save-status, body.is-garden .skip-link { visibility: hidden; }
 .house-page.is-living-garden { --garden-paper: #fbf5ea; --garden-ink: #485840; position: fixed; inset: 0; width: 100%; height: 100svh; max-width: none; padding: 0; margin: 0; z-index: 50; overflow: hidden; background: #5b586a; color: var(--garden-ink); }
 .is-living-garden .house-layout, .is-living-garden .house-left, .is-living-garden .house-scene { display: contents; }
-.is-living-garden .house-world { position: absolute; inset: 0; border: 0; border-radius: 0; box-shadow: none; background: radial-gradient(ellipse at 35% 30%, #fcf4dfaa, transparent 65%), linear-gradient(155deg, #bdcdb6, #d4d9bf 55%, #e8d8bf); }
-body[data-theme='rain'] .is-living-garden .house-world { background: radial-gradient(ellipse at 40% 30%, #dfe9ec66, transparent 62%), linear-gradient(160deg, #5f7686, #8ba0aa 55%, #a9b9bb); }
-body[data-theme='dusk'] .is-living-garden .house-world { background: radial-gradient(ellipse at 50% 38%, #ffcf9a55, transparent 60%), linear-gradient(165deg, #3d3f6c, #6b6597 52%, #c99486); }
-.is-living-garden .house-world::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, #70836422); pointer-events: none; }
+.is-living-garden .house-world { position: absolute; inset: 0; border: 0; border-radius: 0; box-shadow: none; background: radial-gradient(ellipse at 15% 20%, #fffbe8aa, transparent 45%), linear-gradient(180deg, #4f8fd8, #8dbbe6 48%, #d9ebf1); }
+body[data-theme='rain'] .is-living-garden .house-world { background: radial-gradient(ellipse at 30% 60%, #c5e3e029, transparent 65%), linear-gradient(170deg, #344e68, #92adb4); }
+body[data-theme='dusk'] .is-living-garden .house-world { background: radial-gradient(ellipse at 80% 95%, #c394bd35, transparent 60%), radial-gradient(ellipse at 12% 25%, #99b7e21c, transparent 45%), linear-gradient(170deg, #252b50, #787bac); }
 .is-living-garden .house-heading, .is-living-garden .house-world-caption, .is-living-garden .house-rooms, .is-living-garden .house-garden-link, .is-living-garden .house-preview-bar, .is-living-garden .house-camera-controls, .is-living-garden .house-sky-mark { display: none; }
 .is-living-garden #house-canvas { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; }
 .is-living-garden #house-canvas::before { display: none; }
@@ -17,7 +16,7 @@ body[data-theme='dusk'] .is-living-garden .house-world { background: radial-grad
 .garden-heading { position: absolute; z-index: 3; top: calc(env(safe-area-inset-top, 0px) + 18px); left: 22px; right: 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; pointer-events: none; }
 .garden-heading > * { pointer-events: auto; }
 .garden-heading h2 { position: absolute; left: 50%; transform: translateX(-50%); margin: 0; padding: 0; color: #4b3b40; font: 25px Georgia, serif; white-space: nowrap; }
-body[data-theme='dusk'] .garden-heading h2 { color: #f6ead7; text-shadow: 0 1px 8px #2b2a4a66; }
+body[data-theme='dusk'] .garden-heading h2, body[data-theme='rain'] .garden-heading h2 { color: #f6ead7; text-shadow: 0 1px 8px #2b2a4a66; }
 .garden-chip { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; border: 1px solid #e5d8c1; border-radius: 99px; padding: 0 16px; background: var(--garden-paper, #fbf5ea); color: #485840; font-size: 13px; }
 .garden-chip > span:not(.garden-collection-label) { font-size: 26px; line-height: 1; }
 .garden-chip b { padding: 2px 7px; border-radius: 99px; background: #647952; color: #fff9ec; font-size: 11px; font-weight: 500; }
