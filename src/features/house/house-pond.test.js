@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { buildPond, pondLayout, inPond, DOCK, WATER } from './house-pond.js';
+import { placeAsset } from '../../models/assets.js';
 
 const layout = pondLayout();
 const apart = (a, b, gap) => Math.hypot(a.x - b.x, a.z - b.z) > gap;
@@ -74,4 +75,15 @@ test('the house rebuilds the pond when the time of day changes and keeps it othe
     assert.equal(again.pieces.get('pond').mesh, dusk.pieces.get('pond').mesh, 'the same time of day keeps the pond batch');
     scene.dispose(); engine.dispose();
   `], { cwd: new URL('../../../', import.meta.url), timeout: 30000, stdio: 'pipe' });
+});
+
+test('the boat floats clear of the shore', () => {
+  const { x, z, yaw } = layout.boat, hull = placeAsset('rowboat', { x, y: 0, z, yaw, scale: .44 }).positions;
+  for (let i = 0; i < hull.length; i += 3) assert.ok(inPond(hull[i], hull[i + 2], -.25), `hull point ${hull[i].toFixed(2)}, ${hull[i + 2].toFixed(2)} is over open water`);
+});
+
+test('lily pads take on the dusk and rain light instead of glowing', () => {
+  const pads = theme => { const greens = []; buildPond({ shape(p, c) { for (let i = 0; i < p.length / 3; i++) if (Math.abs(p[i * 3 + 1] - (WATER + .016)) < 1e-6) greens.push(c[i * 4 + 1] - Math.max(c[i * 4], c[i * 4 + 2])); }, box() {}, ball() {}, cylinder() {} }, theme); return Math.max(...greens); };
+  const day = pads('day');
+  for (const theme of ['dusk', 'rain']) assert.ok(pads(theme) < day * .75, `${theme} pads are muted (${pads(theme).toFixed(2)} vs ${day.toFixed(2)})`);
 });
