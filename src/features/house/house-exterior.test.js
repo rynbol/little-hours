@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildClosedHouse, buildExteriorPart, exteriorPlan, FRONT, BACK, HALF, WALL_TOP } from './house-exterior.js';
+import { buildClosedHouse, buildExteriorPart, exteriorPlan, roofY, FRONT, BACK, HALF, WALL_TOP, RISE, EAVE, PALETTE } from './house-exterior.js';
 
-function boxesOf(house, id) {
+function boxesOf(house, id, theme = 'day', only = null) {
   const boxes = [], { parts, options } = exteriorPlan(house, id);
   const api = new Proxy({}, { get: (_, name) => (...args) => { if (name === 'box') boxes.push(args); } });
-  for (const part of parts) buildExteriorPart(api, part, id, 'day', options);
+  for (const part of parts) if (!only || part === only) buildExteriorPart(api, part, id, theme, options);
   return { boxes, options };
 }
 
@@ -27,9 +27,9 @@ test('the closed house follows the rooms in the save', () => {
     buildClosedHouse(api, { rooms: ids.map(id => ({ id })) }, 'dusk');
     return { width: +(Math.max(...xs) - Math.min(...xs)).toFixed(2), top: +Math.max(...ys).toFixed(2) };
   };
-  assert.deepEqual(extent(['studio']), { width: 5.64, top: 5.18 });
-  assert.deepEqual(extent(['studio', 'garden']), { width: 10.74, top: 5.18 });
-  assert.deepEqual(extent(['studio', 'garden', 'loft']), { width: 11.44, top: 7.86 });
+  assert.deepEqual(extent(['studio']), { width: 5.84, top: 5.29 });
+  assert.deepEqual(extent(['studio', 'garden']), { width: 10.94, top: 5.29 });
+  assert.deepEqual(extent(['studio', 'garden', 'loft']), { width: 11.64, top: 7.92 });
 });
 
 test('the cottage front is laid in separate stones and the roof in separate shingles', () => {
@@ -43,7 +43,28 @@ test('the cottage front is laid in separate stones and the roof in separate shin
 
 test('the left end wall is framed in timber like the front', () => {
   const { boxes, options } = boxesOf({ rooms: [{ id: 'studio' }] }, 'studio'), left = -HALF - options.bay;
-  const frame = boxes.filter(([x, y, z, w, h, d, hex]) => x < left - .14 && x > left - .22 && y > .5 && hex === '#6b4a36');
+  const frame = boxes.filter(([x, y, z, w, h, d, hex]) => x < left - .14 && x > left - .22 && y > .5 && hex === PALETTE.timber);
   assert.ok(frame.length >= 6, `only ${frame.length} timbers on the end wall`);
   assert.ok(frame.some(box => Array.isArray(box[7]) && box[7][0] !== 0), 'the end wall has no braces');
+});
+
+test('each front roof slope carries a dormer whose window glows at dusk', () => {
+  for (const id of ['studio', 'garden']) {
+    const house = { rooms: [{ id: 'studio' }, { id: 'garden' }] };
+    const lit = theme => boxesOf(house, id, theme, 'lid').boxes.filter(([x, y, z, w, h, d, hex, tilt, strength]) => y > WALL_TOP + .4 && z > 1 && strength > 1.5);
+    assert.ok(lit('dusk').length >= 1, `no lit dormer window on the ${id} roof at dusk`);
+    assert.equal(lit('day').length, 0);
+  }
+});
+
+test('the roof sweeps out flatter at the eaves than at the ridge', () => {
+  const pitch = (a, b) => (roofY(a) - roofY(b)) / (b - a);
+  assert.ok(pitch(FRONT + EAVE - .15, FRONT + EAVE) < pitch(.2, .35) * .8);
+  assert.equal(+roofY(0).toFixed(2), +(WALL_TOP + RISE).toFixed(2));
+});
+
+test('plain wall panels between posts are braced in timber', () => {
+  const { boxes } = boxesOf({ rooms: [{ id: 'studio' }, { id: 'garden' }, { id: 'loft' }] }, 'loft', 'day', 'front');
+  const braces = boxes.filter(([x, y, z, w, h, d, hex, tilt]) => hex === PALETTE.timber && typeof tilt === 'number' && Math.abs(tilt) > .2 && z > FRONT);
+  assert.ok(braces.length >= 1, 'the loft front has no braces');
 });
