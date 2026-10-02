@@ -386,14 +386,28 @@ void main() {
   gl_FragColor = vec4(treeAir(color), 1.);
 }`;
 
-export function createWorldTrees(scene, { root, still, rings }) {
-  const planted = plantTrees(rings);
-  const paint = new ShaderMaterial('world-trees-paint', scene, { vertexSource: TREE_VERTEX, fragmentSource: TREE_FRAGMENT }, {
+export const treeModel = form => TREE_KINDS[form].near();
+
+export function createTreePaint(scene, { name = 'world-trees-paint', still }) {
+  const paint = new ShaderMaterial(name, scene, { vertexSource: TREE_VERTEX, fragmentSource: TREE_FRAGMENT }, {
     attributes: ['position', 'normal', 'color', 'uv'],
     uniforms: ['world', 'viewProjection', ...AIR_UNIFORMS, ...RIDGE_UNIFORMS, 'sunStrength', 'shadowLift', 'goldenHour', ...LIGHT_COLORS, ...FOLIAGE_COLORS],
   });
   paint.backFaceCulling = false;
   followEye(scene, paint, still);
+  return {
+    paint,
+    setTheme(atmosphere) {
+      applyAir(paint, atmosphere); applyRidges(paint, atmosphere);
+      for (const key of [...FOLIAGE_COLORS, ...LIGHT_COLORS]) paint.setColor3(key, Color3.FromHexString(atmosphere[key]));
+      paint.setFloat('sunStrength', atmosphere.sunStrength); paint.setFloat('shadowLift', atmosphere.shadowLift); paint.setFloat('goldenHour', atmosphere.goldenHour);
+    },
+  };
+}
+
+export function createWorldTrees(scene, { root, still, rings }) {
+  const planted = plantTrees(rings);
+  const { paint, setTheme } = createTreePaint(scene, { still });
   const matrices = new Float32Array(planted.count * 16);
   for (let i = 0; i < planted.count; i++) {
     const w = planted.width[i], c = Math.cos(planted.turn[i]) * w, s = Math.sin(planted.turn[i]) * w;
@@ -432,11 +446,6 @@ export function createWorldTrees(scene, { root, still, rings }) {
   paint.onDisposeObservable.add(() => scene.onBeforeRenderObservable.remove(watch));
   sortAround(0, 0);
   return {
-    planted, paint, meshes: tiers.map(tier => tier.mesh),
-    setTheme(atmosphere) {
-      applyAir(paint, atmosphere); applyRidges(paint, atmosphere);
-      for (const key of [...FOLIAGE_COLORS, ...LIGHT_COLORS]) paint.setColor3(key, Color3.FromHexString(atmosphere[key]));
-      paint.setFloat('sunStrength', atmosphere.sunStrength); paint.setFloat('shadowLift', atmosphere.shadowLift); paint.setFloat('goldenHour', atmosphere.goldenHour);
-    },
+    planted, paint, meshes: tiers.map(tier => tier.mesh), setTheme,
   };
 }

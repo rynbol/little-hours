@@ -5,7 +5,7 @@ import { Scene } from '@babylonjs/core/scene.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
-import { createWorldTrees, plantTrees, NEAR_TREES, HERO_TREES, WINDOW_EYE, VISTA, TREE_FORMS, CROWN_TOPS } from './trees.js';
+import { createWorldTrees, createTreePaint, treeModel, plantTrees, NEAR_TREES, HERO_TREES, WINDOW_EYE, VISTA, TREE_FORMS, CROWN_TOPS } from './trees.js';
 import { WORLD_ATMOSPHERES } from './atmosphere.js';
 import { WORLD, riverDistance, pathDistance } from '../../core/world-terrain.js';
 import { TERRAIN_RINGS, terrainRing, ringAt } from './terrain-mesh.js';
@@ -303,4 +303,21 @@ test('dusk swaps in its own foliage and a still world never advances the wind', 
   scene.render(); scene.render();
   assert.equal(trees.paint._floats.time, 0);
   scene.dispose();
+});
+
+test('a tree paint takes its foliage colours and light from the atmosphere it is given', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), { paint, setTheme } = createTreePaint(scene, { name: 'grove-paint', still: true });
+  assert.equal(paint.name, 'grove-paint');
+  setTheme({ ...WORLD_ATMOSPHERES.day, leafTop: '#ff0000', sunStrength: .4 });
+  assert.deepEqual(paint._colors3.leafTop.asArray(), [1, 0, 0]);
+  assert.equal(paint._floats.sunStrength, .4);
+  engine.dispose();
+});
+
+test('each tree form has a near model with one colour per vertex', () => {
+  for (const form of Object.values(TREE_FORMS)) {
+    const { positions, colors, indices } = treeModel(form);
+    assert.equal(colors.length / 4, positions.length / 3);
+    assert.ok(indices.length > 300, `form ${form} has ${indices.length} indices`);
+  }
 });

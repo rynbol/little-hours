@@ -1,6 +1,8 @@
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { buildPaths } from './house-paths.js';
 import { placeAsset } from '../../models/assets.js';
+import { buildForestEdge } from './island-forest.js';
+import { strataBody, strataSteps, spire, addBody, hangingRoots } from './island-landform.js';
 
 export const ISLAND = Object.freeze({ cx: 2.85, cz: .1, rx: 10.15, rz: 5.2, power: 2.9 });
 export const STREAMS = Object.freeze([
@@ -9,6 +11,8 @@ export const STREAMS = Object.freeze([
   [[10.55, -2.7], [11, -2.88], [11.45, -3.05], [12.25, -3.42]],
 ]);
 const TOP = -.175, SEGMENTS = 72, RINGS = 7;
+export const ISLAND_DEPTH = -5.4;
+const SPIRES = Object.freeze([[-1.5, -.4, 2.4, .9], [4.2, 1.1, 2.9, 1.1], [8.4, -.6, 2, .8], [1.4, -1.7, 1.6, .7], [-4.3, .9, 1.4, .6], [10.7, .8, 1.3, .55]].map(Object.freeze));
 const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const lawn = ['#7aa046', '#8cb24e', '#6b9140', '#a3c35c'];
 const rim = '#6f9640', lip = '#5b7f3a';
@@ -67,7 +71,8 @@ export function buildIsland(api) {
   }
   api.shape(positions.splice(0), colors.splice(0), normals.splice(0));
   const asset = (name, at) => { const { positions: p, colors: c, normals: n, indices } = placeAsset(name, at); api.shape(p, c, n, indices); };
-  asset('island-cliff');
+  for (const body of islandCliff()) addBody(api, body);
+  hangingRoots(api, { edge: a => edgePoint(a, .998), top: TOP - .26, count: 110 });
   asset('islet-a', { x: -8.3, y: -1, z: 2.6, yaw: .4, scale: 1.1 });
   asset('islet-b', { x: 13.9, y: -1.9, z: -1, yaw: 2, scale: 1 });
 
@@ -92,10 +97,18 @@ export function buildIsland(api) {
   });
 
   buildPaths(api);
-
+  buildForestEdge(api);
 }
 
-export function waterfalls(drop = 3.3) {
+export function islandCliff() {
+  const { cx, cz } = ISLAND, rock = ['#8f8584', '#7a7579', '#8a8388', '#6b686f', '#5d5b63'];
+  return [
+    strataBody({ edge: a => edgePoint(a, 1.004), segments: SEGMENTS, strata: strataSteps(TOP - .28, ISLAND_DEPTH), keel: [cx + .3, cz - .2, ISLAND_DEPTH] }),
+    ...SPIRES.map(([x, z, length, radius], i) => spire({ x, z, top: ISLAND_DEPTH * .62, length: length + 1.2, radius, colors: rock, seed: i * 2.7 })),
+  ];
+}
+
+export function waterfalls(drop = 4.4) {
   return STREAMS.map(course => {
     const points = course.map(([x, z]) => [x, TOP + .016, z]), [x, z] = course.at(-1), [px, pz] = course.at(-2), l = Math.hypot(x - px, z - pz), dx = (x - px) / l, dz = (z - pz) / l;
     for (let i = 1; i <= 10; i++) { const t = i / 10, out = .75 * t ** .35 + .3 * t; points.push([x + dx * out, TOP - drop * t, z + dz * out]); }

@@ -4,7 +4,8 @@ import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { Constants } from '@babylonjs/core/Engines/constants.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
-import { waterfalls } from './house-island.js';
+import { waterfalls, edgePoint } from './house-island.js';
+import { forestEdgePoint } from './island-forest.js';
 import { pondPoint, WATER } from './house-pond.js';
 import { ISLAND_ATMOSPHERES } from './island-atmosphere.js';
 
@@ -13,7 +14,11 @@ attribute vec3 position; attribute vec2 uv, uv2; uniform mat4 viewProjection; un
 varying vec2 vUv; varying float vKind, vFade;
 void main() {
   vUv = uv; vKind = uv2.x; vFade = 1.; vec3 p = position;
-  if (uv2.x < -4.5) {
+  if (uv2.x < -9.5) {
+    float seed = -10. - uv2.x, breathe = 1. + .05 * sin(time * .21 + seed * 31.);
+    p += vec3(sin(time * .045 + seed * 17.) * .5, sin(time * .08 + seed * 23.) * .12, cos(time * .037 + seed * 11.) * .3);
+    p += (right * uv.x * 1.45 + up * uv.y) * uv2.y * breathe;
+  } else if (uv2.x < -4.5) {
     float seed = -5. - uv2.x, age = fract(time * .18 + seed), size = uv2.y * (.5 + age * 1.3);
     p += vec3(sin(seed * 40.) * .9, .15 + age * .5, cos(seed * 40.) * .9) * age;
     p += (right * uv.x + up * uv.y) * size;
@@ -22,11 +27,19 @@ void main() {
   gl_Position = viewProjection * vec4(p, 1.);
 }`;
 const FRAGMENT = `precision highp float;
-varying vec2 vUv; varying float vKind, vFade; uniform float time, light; uniform vec3 deep, shallow, foam;
+varying vec2 vUv; varying float vKind, vFade; uniform float time, light; uniform vec3 deep, shallow, foam, cloudLit, cloudShade;
 vec4 premultiply(vec3 rgb, float a) { return vec4(rgb * a, a); }
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(hash(i), hash(i + vec2(1., 0.)), f.x), mix(hash(i + vec2(0., 1.)), hash(i + vec2(1., 1.)), f.x), f.y); }
 void main() {
+  if (vKind < -9.5) {
+    float seed = -10. - vKind, r = length(vUv * vec2(1., 1.15));
+    float billow = noise(vUv * 2.2 + seed * 9. + vec2(time * .02, 0.)) * .6 + noise(vUv * 5.1 - seed * 4.) * .4;
+    float body = 1. - smoothstep(.45, 1., r + (billow - .5) * .55);
+    vec3 col = mix(cloudShade, cloudLit, smoothstep(-.7, .55, vUv.y + (billow - .5) * .5)) * light;
+    gl_FragColor = premultiply(col, body * .9);
+    return;
+  }
   if (vKind < -4.5) {
     float r = length(vUv), wisp = noise(vUv * 2.5 + vec2(vKind * 7., time * .3));
     gl_FragColor = premultiply(foam * light * (1.02 + .06 * wisp), (1. - smoothstep(.05, 1., r + (wisp - .5) * .3)) * vFade * .26);
@@ -45,6 +58,30 @@ void main() {
   gl_FragColor = premultiply(mix(col, foam, white) * light, side * mix(.95, .92 * (1. - smoothstep(.7, 1., t)), falling));
 }`;
 const LIGHT = { dusk: .82, rain: .9, day: 1 };
+export const COLLAR_PUFFS = 34;
+const veil = n => { const s = Math.sin(n * 47.9 + 2.3) * 43758.5453; return s - Math.floor(s); };
+
+export function cloudCollar() {
+  const puffs = [];
+  for (let i = 0; i < COLLAR_PUFFS; i++) {
+    const a = (i + veil(i) * .6) / COLLAR_PUFFS * Math.PI * 2, under = i % 3 === 0;
+    const [x, z] = edgePoint(a, under ? .5 + veil(i * 2.3) * .2 : 1 + veil(i * 3.1) * .2);
+    puffs.push({ x, y: (under ? -6.4 : -3.6) - veil(i * 1.7) * 1.1, z, size: (under ? 1.3 : .9) + veil(i * 4.4) * .55, seed: veil(i * 5.9) });
+  }
+  for (let i = 0; i < 6; i++) {
+    const [x, z] = forestEdgePoint(Math.PI * (.9 + i * .27), .95);
+    puffs.push({ x, y: -3.4 - veil(i * 8.1) * 1.1, z, size: .85 + veil(i * 6.3) * .45, seed: veil(i * 7.7 + 1) });
+  }
+  return puffs;
+}
+
+function collarShape(shape) {
+  for (const { x, y, z, size, seed } of cloudCollar()) {
+    const start = shape.positions.length / 3;
+    for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { shape.positions.push(x, y, z); shape.uvs.push(u, v); shape.uv2s.push(-10 - seed, size); }
+    shape.indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+  }
+}
 
 function streamShape(shape) {
   for (const { points, rim } of waterfalls()) {
@@ -52,7 +89,7 @@ function streamShape(shape) {
     let run = 0;
     points.forEach(([x, y, z], i) => {
       const [nx, , nz] = points[Math.min(points.length - 1, i + 1)], [px, , pz] = points[Math.max(0, i - 1)], l = Math.hypot(nx - px, nz - pz) || 1;
-      const falling = i >= rim, t = falling ? (i - rim) / (points.length - 1 - rim) : 0, width = falling ? .42 + t * .3 : .4;
+      const falling = i >= rim, t = falling ? (i - rim) / (points.length - 1 - rim) : 0, width = falling ? .44 + t * .6 : .4;
       if (i) run += Math.hypot(x - points[i - 1][0], y - points[i - 1][1], z - points[i - 1][2]);
       for (let c = 0; c <= COLS; c++) {
         const u = c / COLS, side = (u - .5) * width, bow = falling ? Math.sin(u * Math.PI) * .08 * t : 0;
@@ -94,17 +131,17 @@ function pondShape(shape) {
 
 export function createIslandWater(scene, theme) {
   const shape = { positions: [], uvs: [], uv2s: [], indices: [] };
-  streamShape(shape); pondShape(shape); sprayShape(shape);
+  collarShape(shape); streamShape(shape); pondShape(shape); sprayShape(shape);
   const mesh = new Mesh('island-water', scene), data = new VertexData();
   Object.assign(data, { positions: shape.positions, uvs: shape.uvs, uvs2: shape.uv2s, indices: shape.indices }); data.applyToMesh(mesh);
-  const paint = new ShaderMaterial('island-water-paint', scene, { vertexSource: VERTEX, fragmentSource: FRAGMENT }, { attributes: ['position', 'uv', 'uv2'], uniforms: ['viewProjection', 'time', 'light', 'deep', 'shallow', 'foam', 'right', 'up'], needAlphaBlending: true });
+  const paint = new ShaderMaterial('island-water-paint', scene, { vertexSource: VERTEX, fragmentSource: FRAGMENT }, { attributes: ['position', 'uv', 'uv2'], uniforms: ['viewProjection', 'time', 'light', 'deep', 'shallow', 'foam', 'cloudLit', 'cloudShade', 'right', 'up'], needAlphaBlending: true });
   paint.setColor3('foam', Color3.FromHexString('#f3fbf8'));
-  paint.setFloat('time', 0); paint.backFaceCulling = false; paint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF;
+  paint.setFloat('time', 0); paint.backFaceCulling = false; paint.disableDepthWrite = true; paint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF;
   mesh.material = paint; mesh.isPickable = false; mesh.alwaysSelectAsActiveMesh = true; mesh.freezeWorldMatrix();
   const right = new Vector3(1, 0, 0), up = new Vector3(0, 1, 0); paint.setVector3('right', right); paint.setVector3('up', up);
   const water = {
     mesh,
-    setTheme(next) { const colors = ISLAND_ATMOSPHERES[next]; paint.setFloat('light', LIGHT[next] ?? 1); paint.setColor3('deep', Color3.FromHexString(colors.deep)); paint.setColor3('shallow', Color3.FromHexString(colors.shallow)); },
+    setTheme(next) { const colors = ISLAND_ATMOSPHERES[next]; paint.setFloat('light', LIGHT[next] ?? 1); paint.setColor3('deep', Color3.FromHexString(colors.deep)); paint.setColor3('shallow', Color3.FromHexString(colors.shallow)); paint.setColor3('cloudLit', Color3.FromHexString(colors.cloud)); paint.setColor3('cloudShade', Color3.FromHexString(colors.cloudShade)); },
     animate(seconds, camera) {
       paint.setFloat('time', seconds);
       if (camera) { camera.getDirectionToRef(Vector3.RightReadOnly, right); camera.getDirectionToRef(Vector3.UpReadOnly, up); paint.setVector3('right', right); paint.setVector3('up', up); }

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { FOREST_PATH } from './island-forest.js';
 import { bladeColors, grassBlades, grassy, rimBlades, GRASS_TONES, RIM_BLADES } from './house-grass.js';
 import { HOUSE_POSITIONS } from './house-model.js';
 import { inPond, POND } from './house-pond.js';
@@ -44,4 +45,9 @@ test('each blade is darker at the root than at its sunlit tip', () => {
   assert.equal(colors.length, blades.length * 12);
   const light = at => colors[at] + colors[at + 1] + colors[at + 2];
   blades.forEach((_, i) => assert.ok(light(i * 12) < light(i * 12 + 8), `blade ${i} root is as bright as its tip`));
+});
+
+test('no blade grows on the forest path or under the grove', () => {
+  for (const [x, z] of FOREST_PATH.filter(([x, z]) => onIsland(x, z, .22))) assert.equal(grassy(x, z), false, `${x}, ${z}`);
+  for (const [x, z] of [[4.5, -4.9], [7.4, -4.6]]) assert.equal(grassy(x, z), false, `${x}, ${z} is under the grove`);
 });
