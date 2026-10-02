@@ -6,14 +6,16 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(test, timeout, what) {
   const end = performance.now() + timeout;
   while (!test()) {
-    if (performance.now() > end) throw new Error(`Timed out after ${timeout} ms waiting for ${what}`);
+    if (performance.now() > end) throw new Error(`Timed out after ${timeout} ms waiting for ${typeof what === 'function' ? what() : what}`);
     await wait(16);
   }
 }
 
+const AMBIENT_ANIMATIONS = '#timer-progress';
 function runningAnimations() {
-  return document.getAnimations().filter(animation => animation.playState === 'running' && Number.isFinite(animation.effect?.getComputedTiming().endTime)).length;
+  return document.getAnimations().filter(animation => animation.playState === 'running' && Number.isFinite(animation.effect?.getComputedTiming().endTime) && !animation.effect.target?.matches?.(AMBIENT_ANIMATIONS));
 }
+const describeAnimation = animation => { const target = animation.effect?.target; return `${animation.animationName || animation.transitionProperty || 'script'} on ${target ? target.id ? `#${target.id}` : `${target.tagName?.toLowerCase()}${target.classList?.length ? `.${[...target.classList].join('.')}` : ''}` : 'nothing'}`; };
 
 function itemId(mesh) {
   for (let node = mesh; node; node = node.parent) if (node.metadata?.itemId) return node.metadata.itemId;
@@ -52,7 +54,8 @@ export function installTestHook(app) {
     if (house && house.open !== (house.closed ? 0 : 1)) reasons.push('house opening');
     if (house?.activeRoomMotions) reasons.push('house room motion');
     if (house?.turning) reasons.push('house camera');
-    if (runningAnimations()) reasons.push('css animation');
+    const animations = runningAnimations();
+    if (animations.length) reasons.push(`css animation (${[...new Set(animations.slice(0, 3).map(describeAnimation))].join('; ')})`);
     return reasons;
   }
 
@@ -148,7 +151,7 @@ export function installTestHook(app) {
     ready: (timeout = 30000) => until(() => app.room && document.getElementById('loading-note')?.hidden, timeout, 'the room to be ready').then(() => true),
     busy,
     async settled(timeout = 10000) {
-      await until(() => !busy().length, timeout, `the page to settle (${busy().join(', ')})`);
+      await until(() => !busy().length, timeout, () => `the page to settle (${busy().join(', ')})`);
       await wait(50);
       return true;
     },
