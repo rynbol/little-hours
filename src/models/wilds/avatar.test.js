@@ -8,9 +8,32 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { AVATAR_OPTIONS } from '../../core/avatar.js';
 import { createMovementState, stepMovement, obstacleRadiusBetween, WILDS_MOVEMENT } from '../../core/wilds/movement.js';
-import { WILDS_WORLD } from '../../core/wilds/world-definition.js';
 import { loadWildsAvatar, wildsAvatarClip } from './avatar.js';
-import { createWildsWorld } from './world.js';
+import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
+import { VertexData } from '@babylonjs/core/Meshes/mesh.vertexData.js';
+import { CreateCylinder } from '@babylonjs/core/Meshes/Builders/cylinderBuilder.js';
+import { meadowRocks, rockCollider } from '../world/rocks.js';
+
+const ROCK_PROFILES = [
+  { x: 5.5, z: -8, size: [1.9, 1.15, 1.6], seat: true, climbable: true, turn: .4 },
+  { x: 20, z: -8, size: [1.8, 1.2, 1.5], climbable: true, turn: 3 },
+  { x: 35, z: -8, size: [2.6, 1.4, 2], climbable: true, turn: 2.2 },
+];
+
+function climbingFixture(scene) {
+  const surfaceAt = () => ({ height: 0, normal: { x: 0, y: 1, z: 0 } });
+  const material = new StandardMaterial('fixture-stone', scene);
+  const outcrop = CreateCylinder('fixture-outcrop', { diameterBottom: 5, diameterTop: 5.2, height: 5.5, tessellation: 64 }, scene);
+  outcrop.material = material;
+  outcrop.position.set(-9, 2.75, -42); outcrop.computeWorldMatrix(true);
+  const rocks = new Mesh('fixture-rocks', scene);
+  rocks.material = material;
+  Object.assign(new VertexData(), meadowRocks(ROCK_PROFILES, surfaceAt)).applyToMesh(rocks);
+  const obstacles = ROCK_PROFILES.map((rock, index) => ({ id: `profile-${index}`, x: rock.x, z: rock.z, ...rockCollider(rock, index), baseY: 0, climbable: true }));
+  obstacles.push({ id: 'fixture-outcrop', x: -9, z: -42, radius: 2.5, height: 5.5, baseY: 0, climbable: true });
+  return { surfaceAt, obstacles, dispose() { outcrop.dispose(); rocks.dispose(); material.dispose(); } };
+}
 
 const avatarManifest = JSON.parse(readFileSync(new URL('../../../public/wilds/avatar-manifest.json', import.meta.url)));
 const assetSource = new Uint8Array(readFileSync(new URL('../../../public/wilds/avatar.glb', import.meta.url)));
@@ -334,14 +357,14 @@ test('running carries the torso forward and brakes with hips back over an interr
 
 test('all stop anchors and both blended leads keep the upper body clear of the actual outcrop triangles', async t => {
   const { scene, avatar } = await fixture(t);
-  const world = await createWildsWorld(scene, { workers: false, still: true });
+  const world = climbingFixture(scene);
   t.after(() => world.dispose());
   let player = createMovementState({ position: { x: -9, y: world.surfaceAt(-9, -31).height, z: -31 } });
   for (let frame = 1; frame <= 102; frame++) player = stepMovement(player, { forward: -1, cameraYaw: Math.PI }, world, 1000 / 60, frame * 1000 / 60).state;
   assert.ok(Math.abs(player.position.z + 39.16) < .01);
   avatar.root.position.set(player.position.x, player.position.y, player.position.z);
   avatar.root.rotation.y = 0;
-  const stone = scene.getMeshByName('world-landmarks');
+  const stone = scene.getMeshByName('fixture-outcrop');
   function clearUpperBody(label) {
     scene._animate(0);
     for (const node of scene.transformNodes) node.computeWorldMatrix(true);
@@ -640,9 +663,9 @@ test('the skirt hem stays a continuous drape while alternating knees rise', asyn
 
 test('both mantle grips and the supporting boot contact the actual rock triangles while the controller lifts', async t => {
   const { scene, avatar } = await fixture(t);
-  const world = await createWildsWorld(scene, { workers: false, still: true });
+  const world = climbingFixture(scene);
   t.after(() => world.dispose());
-  const supportMeshes = scene.meshes.filter(mesh => ['world-landmarks', 'world-rocks'].includes(mesh.name));
+  const supportMeshes = scene.meshes.filter(mesh => ['fixture-outcrop', 'fixture-rocks'].includes(mesh.name));
   for (const [x, z] of [[-9, -38.98], [5.5, -5.7]]) {
     let player = createMovementState({ position: { x, y: world.surfaceAt(x, z).height, z } });
     avatar.reset();
@@ -670,7 +693,7 @@ test('both mantle grips and the supporting boot contact the actual rock triangle
 
 test('the complete outcrop observation reaches the mantle endpoint and settles before its end', async t => {
   const { scene, avatar } = await fixture(t);
-  const world = await createWildsWorld(scene, { workers: false, still: true });
+  const world = climbingFixture(scene);
   t.after(() => world.dispose());
   let player = createMovementState({ position: { x: -9, y: world.surfaceAt(-9, -38.98).height, z: -38.98 } });
   let mantleStart = null, mantleEnd = 0, finalFrame = 0;
@@ -696,9 +719,9 @@ test('the complete outcrop observation reaches the mantle endpoint and settles b
 
 test('the outcrop release fixtures distinguish interrupted transfer from completed ascent', async t => {
   const { scene, avatar } = await fixture(t);
-  const world = await createWildsWorld(scene, { workers: false, still: true });
+  const world = climbingFixture(scene);
   t.after(() => world.dispose());
-  for (const releaseAt of [3800, 4300]) await t.test(`release at ${releaseAt}ms`, () => {
+  for (const releaseAt of [3600, 4300]) await t.test(`release at ${releaseAt}ms`, () => {
     let player = createMovementState({ position: { x: -9, y: world.surfaceAt(-9, -38.98).height, z: -38.98 } });
     let beforeRelease, afterRelease, finalFrame = 0;
     avatar.reset();
@@ -712,7 +735,7 @@ test('the outcrop release fixtures distinguish interrupted transfer from complet
       scene._animate(0);
       for (const animation of avatar.diagnostics().animation) if (animation.name === 'mantle') finalFrame = Math.max(finalFrame, animation.frame);
     }
-    if (releaseAt === 3800) {
+    if (releaseAt === 3600) {
       assert.equal(beforeRelease.mode, 'mantling');
       assert.equal(afterRelease.mode, 'airborne');
       assert.equal(afterRelease.mantle, null);
@@ -728,13 +751,12 @@ test('the outcrop release fixtures distinguish interrupted transfer from complet
 });
 
 
-test('production mantle contacts stay planted across every supplied rock profile and approach direction', async t => {
+test('mantle contacts stay planted across varied rock profiles and four approach directions', async t => {
   const { scene, avatar } = await fixture(t);
-  const world = await createWildsWorld(scene, { workers: false, still: true });
+  const world = climbingFixture(scene);
   t.after(() => world.dispose());
-  const supportMeshes = scene.meshes.filter(mesh => mesh.name === 'world-rocks');
-  for (const spec of WILDS_WORLD.rocks.filter(rock => rock.climbable)) {
-    world.refreshObstacles(spec);
+  const supportMeshes = scene.meshes.filter(mesh => mesh.name === 'fixture-rocks');
+  for (const spec of ROCK_PROFILES) {
     const rock = world.obstacles.find(obstacle => obstacle.x === spec.x && obstacle.z === spec.z && obstacle.climbable);
     assert.ok(rock?.radiusProfile?.length);
     for (let angle = 0; angle < 4; angle++) await t.test(`${rock.id} approach ${angle}`, () => {

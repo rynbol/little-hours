@@ -8,6 +8,18 @@ const flat = { surfaceAt: () => ({ height: 0, normal: { x: 0, y: 1, z: 0 } }), o
 const start = options => createMovementState({ position: { x: 0, y: 0, z: 0 }, ...options });
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < .000001, `${actual} should equal ${expected}`);
 
+test('forced horizontal velocity respects collision and gravity without duplicating sprint costs', () => {
+  const obstacle = { x: 2, z: 0, radius: .6, baseY: 0, height: 3 };
+  const result = stepMovement(start(), { sprint: true }, { ...flat, obstacles: [obstacle] }, 500, 500, { forcedVelocity: { x: 9, z: 0 } });
+  close(result.state.position.x, 1.06);
+  close(result.state.position.y, 0);
+  close(result.state.stamina, 100);
+  const airborne = start({ position: { x: 0, y: 5, z: 0 } }); airborne.mode = 'airborne'; airborne.grounded = false;
+  const falling = stepMovement(airborne, {}, flat, 500, 500, { forcedVelocity: { x: 9, z: 0 } });
+  close(falling.state.position.x, 4.5);
+  close(falling.state.position.y, 2.5);
+});
+
 test('walking is camera relative, normalizes diagonal input and leaves the prior state untouched', () => {
   const original = start(), before = structuredClone(original);
   const north = stepMovement(original, { forward: 1, cameraYaw: 0 }, flat, 1000, 1000).state;

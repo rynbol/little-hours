@@ -1,3 +1,4 @@
+import '@babylonjs/core/Culling/ray.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine.js';
@@ -305,4 +306,51 @@ test('the recorded close side climb keeps a continuous view through the summit t
       controller.dispose();
     }
   } finally { world.dispose(); scene.dispose(); engine.dispose(); }
+});
+
+test('locking the Warden frames both combatants and unlock restores the exploration target', () => {
+  const f = fixture({ still: true });
+  try {
+    const boss = { position: { x: 8, y: 0, z: -6 } };
+    f.controller.update(player, {}, 16, boss);
+    const locked = f.controller.diagnostics();
+    close(locked.target.x, 2.8);
+    close(locked.target.z, -2.1);
+    close(locked.distance, 11);
+    close(locked.yaw, Math.atan2(-8, 6));
+    assert.equal(locked.recovering, false);
+    const camera = f.controller.camera;
+    for (const point of [new Vector3(0, 1.25, 0), new Vector3(8, 1.8, -6)]) {
+      const direction = point.subtract(camera.position).normalize();
+      assert.ok(Vector3.Dot(direction, camera.getForwardRay().direction) > Math.cos(camera.fov / 2));
+    }
+    f.controller.update(player, {}, 16);
+    assert.deepEqual(f.controller.diagnostics().target, { x: 0, y: 1.25, z: 0 });
+    close(f.controller.diagnostics().distance, 6.5);
+  } finally { f.dispose(); }
+});
+
+test('the locked combat camera still reroutes around scenery and stays above the ground', () => {
+  const f = fixture({ still: true, world: { obstacles: [{ x: 0, z: 4, radius: 1.1, baseY: 0, height: 7 }] } });
+  try {
+    f.controller.update(player, {}, 16, { position: { x: 0, y: 0, z: -8 } });
+    assert.equal(f.controller.diagnostics().occluded, true);
+    assert.equal(f.controller.diagnostics().recovering, false);
+    assertView(f.controller, f.world, player);
+  } finally { f.dispose(); }
+});
+
+test('lock acquisition and release move smoothly while a frozen clock holds the same view', () => {
+  const f = fixture();
+  try {
+    f.controller.update(player, {}, 16);
+    let previous = f.controller.camera.position.clone();
+    for (let frame = 0; frame < 80; frame++) {
+      f.controller.update(player, {}, 16, frame < 40 ? { position: { x: 7, y: 0, z: -8 } } : null);
+      assert.ok(Vector3.Distance(previous, f.controller.camera.position) < 1, `Camera stepped ${Vector3.Distance(previous, f.controller.camera.position)} metres`);
+      previous = f.controller.camera.position.clone();
+      f.controller.update(player, {}, 0, frame < 40 ? { position: { x: 7, y: 0, z: -8 } } : null);
+      assert.deepEqual(f.controller.camera.position.asArray(), previous.asArray());
+    }
+  } finally { f.dispose(); }
 });

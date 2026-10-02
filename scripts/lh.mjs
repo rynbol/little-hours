@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { chromePath, closeAll, gpuFlag, killAllNow, launch, sleep, slow } from './lh/chrome.mjs';
 import { captureSequence, dispatchSequenceInput, validateSequence } from './lh/sequence.mjs';
 import { openApp } from './lh/app.mjs';
+import { prepareFight, driveFight } from './lh/wilds-fight.mjs';
 import { serve } from './lh/server.mjs';
 import { SEEDS } from './lh/seeds.mjs';
 import { cycles, steps, views } from './lh/steps.mjs';
@@ -53,6 +54,7 @@ Options:
   --still            prefers-reduced-motion: reduce
   --headed           show the browser window
   --hold <codes>     wilds perf: hold real keys during measurement, e.g. KeyW,ShiftLeft
+  --fight            wilds perf: fight the Warden with real sword, dodge and pet input
   --rounds <n>       perf rounds per side (default 1, or 2 with --against)
   --timeout <s>      hard time limit for the whole command (default 600, or 600 per flow for run)
 Evidence goes to .lh/out/<time>-<command>/.`;
@@ -213,6 +215,7 @@ async function runFlows(names) {
 }
 
 async function perfOnce(url, view) {
+  if (options.fight && (view !== 'wilds' || options.hold)) throw new Error('--fight requires --view wilds without --hold');
   const app = await openApp(url, { ...viewport, ...views[view]?.settings, scale: Number(options.scale || 2), seed: options.seed || 'three-rooms', theme: options.theme });
   try {
     await sleep(2500);
@@ -236,7 +239,14 @@ async function perfOnce(url, view) {
       await app.js(`document.getElementById('wilds-canvas').focus()`);
       for (const code of held) await dispatchSequenceInput(app, { type: 'keyDown', code });
     }
-    try { Object.assign(result, await idle(app, Number(options.seconds || 5), view === 'wilds' ? { view } : {})); }
+    try {
+      const seconds = Number(options.seconds || (options.fight ? 15 : 5));
+      if (options.fight) {
+        await prepareFight(app);
+        const [sample, fight] = await Promise.all([idle(app, seconds, { view }), driveFight(app, { durationMs: seconds * 1000 })]);
+        Object.assign(result, sample, { fight });
+      } else Object.assign(result, await idle(app, seconds, view === 'wilds' ? { view } : {}));
+    }
     finally { for (const code of held) await dispatchSequenceInput(app, { type: 'keyUp', code }); }
     if (view === 'wilds') result.world = { ...await app.js('window.__littleHours.wilds.diagnostics().world'), before: worldBefore };
 
@@ -280,7 +290,8 @@ async function perf() {
   console.log(`\nClick and open times are Event Timing durations; 16 means "16 ms or less". Lower is better everywhere except rafPerSecond.`);
   writeFileSync(join(out, 'perf.json'), JSON.stringify({ view, sides: list.map(side => side.label), runs }, null, 2));
   console.log(`evidence: ${join(out, 'perf.json')}`);
-  return runs.flat().some(result => result.pageErrors) ? 1 : 0;
+  if (options.fight) for (const result of runs.flat()) console.log(`Fight: player ${result.fight.playerDamage} damage, pet ${result.fight.petDamage} damage, Warden ${result.fight.bossHealthBefore} → ${result.fight.bossHealthAfter} health.`);
+  return runs.flat().some(result => result.pageErrors || (options.fight && !result.fight.active)) ? 1 : 0;
 }
 
 async function shots() {

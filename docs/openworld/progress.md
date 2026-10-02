@@ -6,20 +6,16 @@
 
 ## Current checkpoint
 
-M1 round 3 was integrated and pushed as `38e79f6`, then rebased onto the requested Forest branch as `6060f94`. Rebase conflicts retained both Forest and Wilds hooks, tests and world APIs.
+M1 round 3 was pushed, rebased onto the requested Forest branch and pushed again. The old staging/capture archives and bulk catalog were removed. The playable slice is complete and is being committed and pushed.
 
-The rebased checkpoint passed 891 unit tests, guard, room verification and production build. Existing room skeleton and build-size warnings remain. Combat and final visual quality are not established by these checks.
-
-Old staging copies and capture archives were deleted. `.lh` is approximately 22 MB. The obsolete bulk capture catalog and numerical rubric are being retired.
-
-## In progress: playable slice
-
-- Reuse the actual Forest route terrain, trees, grass, sky and palette. Keep the Wilds avatar, movement and camera.
-- Pure encounter reducer owns one player stamina pool, sword combo, dodge, pet actions, Warden phases and once-only rewards.
-- Scene connects actual input, lock camera, health/XP/pet/boss HUD and persistence.
-- Temporary combat models establish readable actions before the Blender art step.
-- Fixed-clock `lh wilds` must walk the forest path, defeat the Warden with pet damage, receive materials/trophy and level up.
-- Root owns browser validation and commits. Agents own separate rules, scene and model files.
+- Uses the actual Forest route builders and atmosphere, preserving the Wilds avatar, movement and camera.
+- Sword combo, lock, dodge and shared stamina work with a fighting companion and the Warden’s charge/stone exposure, phase-two roots and reward.
+- The fixed-clock browser flow passes all 30 checks from the forest start through pet-assisted victory, level three, first vista, persistence and remount.
+- 919 unit tests pass. Guard passes with 377 files and no problems. Room verification and production build pass.
+- `lh perf --view wilds --fight --seconds 15 --size 1280x800 --scale 1 --theme day --rounds 2` measured 60 fps, maximum frame gap 16.8 ms and zero gaps over 20 ms in both rounds. Each fight recorded 270 sword damage and 150 pet damage, defeating the Warden.
+- The home save/backup retains Wilds progress. Legacy saves, study-earned gold and friendship are unchanged. Protected source paths have no diff against the new base.
+- Existing room skeleton and build-size warnings remain.
+- Combat models are temporary static art. Character body attacks are not animated yet. This is the playable checkpoint, not visual acceptance.
 
 ## Next: style frame only
 
@@ -39,6 +35,6 @@ Fix the named defects after each failed round. Save one short review file per ro
 - Use Node 24, pinned time/randomness, headless lh checks and the in-app browser for visible work.
 - No Docker, port 5420 or termination of unowned processes.
 
-Combat is in progress; the first playable flow and fight performance remain unverified. The style frame and blind A/B reviews are not started. Do not apply the style beyond the single frame or add other biomes/bosses.
+The playable flow and fight performance pass. The style frame and blind A/B reviews are not started. Do not apply the style beyond the single frame or add other biomes/bosses.
 
 Done requires pet-assisted Warden victory and level-up in the lh flow, all gates passing, measured 60 fps in the fight, both blind A/B tests passing, passing shots saved and everything pushed.

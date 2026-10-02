@@ -24,8 +24,8 @@ export const cycles = {
     async setup(app) {
       await app.waitFor('window.__littleHours.wilds.ready()', { what: 'the Wilds to render', timeout: 30000 });
       await app.waitFor('!window.__littleHours.wilds.diagnostics().world.pending && !window.__littleHours.wilds.diagnostics().world.lighting?.pending', { what: 'the Wilds terrain and lighting to settle', timeout: 30000 });
-      const placed = await app.js('window.__littleHours.wilds.place({position:{x:0,z:0},yaw:0,stamina:100,camera:{yaw:0}})');
-      if (!placed) throw new Error('The Wilds clearing is outside loaded terrain');
+      const placed = await app.js('window.__littleHours.wilds.place({position:{x:-106.5,z:-180},yaw:.6,stamina:100,camera:{yaw:.6}})');
+      if (!placed) throw new Error('The Forest start is outside loaded terrain');
       await app.js("document.getElementById('wilds-canvas').focus()");
     },
     async run(app) {

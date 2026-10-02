@@ -1,5 +1,6 @@
 const ACTION_KEYS = Object.freeze({
   Space: 'jump',
+  KeyF: 'attack',
   ControlLeft: 'dodge',
   ControlRight: 'dodge',
   Tab: 'lock',
@@ -109,7 +110,7 @@ export function createWildsInput(canvas) {
       jump: pressed.has('jump'),
       lookX,
       lookY,
-      attackHeld: attacking,
+      attackHeld: attacking || held.has('KeyF'),
       block: blocking,
       actions: [...pressed],
     };

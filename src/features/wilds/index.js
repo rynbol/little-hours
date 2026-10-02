@@ -2,7 +2,7 @@ import './wilds.css';
 import { Engine } from '@babylonjs/core/Engines/engine.js';
 import { createWildsView } from './scene.js';
 
-export function enterWilds(container, state) {
+export function enterWilds(container, state, { onProgress } = {}) {
   const canvas = container.ownerDocument.createElement('canvas');
   canvas.id = 'wilds-canvas';
   canvas.tabIndex = 0;
@@ -13,7 +13,7 @@ export function enterWilds(container, state) {
   try {
     engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: false });
     engine.setHardwareScalingLevel(1 / Math.min(2, container.ownerDocument.defaultView.devicePixelRatio || 1));
-    return createWildsView(engine, canvas, state);
+    return createWildsView(engine, canvas, state, undefined, undefined, { onProgress });
   } catch (error) {
     engine?.dispose();
     canvas.remove();

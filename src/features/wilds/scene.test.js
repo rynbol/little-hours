@@ -6,8 +6,9 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { EngineStore } from '@babylonjs/core/Engines/engineStore.js';
 import { createWildsView } from './scene.js';
+import { WARDEN_ARENA } from '../../core/wilds/combat.js';
 
-async function fixture({ hidden = false, theme = 'day', deferAssets = false, failAsset = null, failHud = false } = {}) {
+async function fixture({ hidden = false, theme = 'day', deferAssets = false, failAsset = null, failHud = false, progress, petId = 'cat', spawn = { x: 0, y: 0, z: 0, yaw: 0 }, terrainHeight = () => 0 } = {}) {
   const engine = new NullEngine({ renderWidth: 800, renderHeight: 600 });
   const owner = new EventTarget(), host = new EventTarget();
   let render, observer, time = 1000;
@@ -21,10 +22,11 @@ async function fixture({ hidden = false, theme = 'day', deferAssets = false, fai
   engine.runRenderLoop = callback => { render = callback; };
   engine.stopRenderLoop = () => { render = null; };
   const canvas = { ownerDocument: owner, parentElement: { id: 'stage' }, removed: false, remove() { this.removed = true; } };
-  const state = { theme, house: { coins: 84 }, petBonds: { cat: { affection: 10 } } };
-  let controls = {}, actorFrame = null, worldDisposed = 0, avatarDisposed = 0, inputReads = 0, worldSignal;
+  const state = { theme, pet: petId, house: { coins: 84 }, petBonds: { cat: { affection: 10 }, dog: { affection: 45 } }, ...(progress ? { wilds: progress } : {}) };
+  const saved = structuredClone(state), progressChanges = [];
+  let controls = {}, actorFrame = null, worldDisposed = 0, avatarDisposed = 0, inputReads = 0, worldSignal, combatFrame, modelOptions, modelDisposed = 0, hudFrame, lockedTarget;
   const worldGate = Promise.withResolvers(), avatarGate = Promise.withResolvers();
-  const world = { spawn: { x: 0, y: 0, z: 0, yaw: 0 }, surfaceAt: () => ({ height: 0, normal: { x: 0, y: 1, z: 0 } }), obstacles: [], update() {}, diagnostics: () => ({ location: 'Fixture' }), dispose() { worldDisposed++; } };
+  const world = { spawn, surfaceAt: (x, z) => ({ height: terrainHeight(x, z), normal: { x: 0, y: 1, z: 0 } }), obstacles: [], update() {}, diagnostics: () => ({ location: 'Fixture' }), dispose() { worldDisposed++; } };
   const dependencies = {
     createWorld: async (scene, { signal }) => {
       worldSignal = signal;
@@ -39,19 +41,25 @@ async function fixture({ hidden = false, theme = 'day', deferAssets = false, fai
       return avatar;
     },
     createInput: () => ({
-      read() { inputReads++; const snapshot = controls; controls = { ...controls, jump: false }; return snapshot; },
+      read() { inputReads++; const snapshot = controls; controls = { ...controls, jump: false, actions: [] }; return snapshot; },
       dispose() {},
     }),
     createCamera: scene => {
       const camera = new FreeCamera('fixture-camera', new Vector3(0, 2, 6), scene);
-      return { camera, update: () => ({ cameraYaw: 0, cameraPitch: 0 }), diagnostics: () => ({}), setPose() {}, dispose() { camera.dispose(); } };
+      let yaw = 0;
+      return { camera, update(player, input, delta, target) { lockedTarget = target; return { cameraYaw: yaw, cameraPitch: 0 }; }, diagnostics: () => ({ yaw }), setPose(pose) { yaw = pose.yaw; }, dispose() { camera.dispose(); } };
     },
-    createHud: () => ({ update() { if (failHud) throw new Error('Fixture HUD failed'); }, dispose() {} }),
+    createHud: () => ({ update(frame) { hudFrame = frame; if (failHud) throw new Error('Fixture HUD failed'); }, dispose() {} }),
+    createCombatModels: async (scene, options) => { modelOptions = options; return { update(frame) { combatFrame = frame; }, diagnostics: () => combatFrame, dispose() { modelDisposed++; } }; },
   };
-  const view = createWildsView(engine, canvas, state, () => time, dependencies);
+  const view = createWildsView(engine, canvas, state, () => time, dependencies, { onProgress: progress => progressChanges.push(structuredClone(progress)) });
   if (!deferAssets) await view.initialization;
   return {
-    view, engine, canvas, state, world,
+    view, engine, canvas, state, saved, world, progressChanges,
+    get modelOptions() { return modelOptions; },
+    get modelDisposed() { return modelDisposed; },
+    get hudFrame() { return hudFrame; },
+    get lockedTarget() { return lockedTarget; },
     input(value) { controls = value; },
     resolveAssets() { worldGate.resolve(); avatarGate.resolve(); return view.initialization; },
     disposals: () => ({ world: worldDisposed, avatar: avatarDisposed }),
@@ -78,7 +86,7 @@ test('the loaded Wilds scene becomes ready only after rendering and preserves ca
     assert.equal(d.scene.meshes.length, 0);
     assert.equal(d.elapsedMs, 16);
     assert.equal(d.now, 1016);
-    assert.deepEqual(f.state, { theme: 'day', house: { coins: 84 }, petBonds: { cat: { affection: 10 } } });
+    assert.deepEqual(f.state, f.saved);
   } finally { f.view.dispose(); }
 });
 
@@ -372,7 +380,7 @@ test('the avatar sun follows the world direction while a cool side fill preserve
   try {
     const { scene } = f.view.diagnostics();
     const sun = scene.getLightByName('wilds-sun'), sky = scene.getLightByName('wilds-sky-light'), bounce = scene.getLightByName('wilds-sky-bounce');
-    assert.deepEqual(sun.direction.asArray(), [.45, -.72, .528]);
+    assert.deepEqual(sun.direction.asArray(), [.01947202970421168, -.2279775235351884, .9734716682173965]);
     assert.equal(sun.diffuse.toHexString(), '#FFF4DC');
     assert.equal(sky.diffuse.toHexString(), '#A9C4D6');
     assert.equal(sky.groundColor.toHexString(), '#8A9A5C');
@@ -380,5 +388,131 @@ test('the avatar sun follows the world direction while a cool side fill preserve
     assert.equal(bounce.diffuse.toHexString(), '#BED6E3');
     assert.ok(sun.intensity > bounce.intensity && bounce.intensity > 0);
     assert.ok(bounce.direction.z < 0 && sun.direction.z > 0);
+  } finally { f.view.dispose(); }
+});
+
+test('the scene selects the existing pet and bond without changing protected save slices', async () => {
+  const f = await fixture({ petId: 'dog', progress: { totalXp: 260 } });
+  try {
+    f.frame(1000);
+    assert.equal(f.modelOptions.petId, 'dog');
+    assert.equal(f.view.diagnostics().combat.pet.id, 'dog');
+    assert.equal(f.view.diagnostics().combat.pet.maxHealth, 91);
+    assert.equal(f.view.diagnostics().player.maxHealth, 124);
+    assert.equal(f.view.diagnostics().player.maxStamina, 108);
+    assert.deepEqual(f.state, f.saved);
+    assert.deepEqual(f.progressChanges, []);
+    assert.equal(f.hudFrame.combat.pet.id, 'dog');
+  } finally { f.view.dispose(); }
+  assert.equal(f.modelDisposed, 1);
+});
+
+test('locking, attacking and placing keep combat models and camera synchronized without changing progress', async () => {
+  const f = await fixture({ progress: { totalXp: 260 } });
+  try {
+    f.frame(1000);
+    const center = WARDEN_ARENA.center;
+    f.view.place({ position: { x: center.x, z: center.z + 3 }, stamina: 70 });
+    f.input({ actions: ['lock', 'attack'] });
+    f.frame(1100);
+    let d = f.view.diagnostics();
+    assert.equal(d.combat.targetId, 'mossback-warden');
+    assert.equal(d.combat.playerAction.kind, 'attack');
+    assert.equal(f.lockedTarget.id, 'mossback-warden');
+    assert.equal(d.combatModels.playerAction.kind, 'attack');
+    assert.equal(d.events.find(event => event.type === 'attack').at, 0);
+    const health = d.player.health, maxStamina = d.player.maxStamina, progress = structuredClone(d.combat.progress);
+    f.view.place({ position: { x: 12, z: 9 }, stamina: 11 });
+    d = f.view.diagnostics();
+    assert.deepEqual(d.player.position, { x: 12, y: 0, z: 9 });
+    assert.deepEqual(d.combat.pet.position, { x: 13.2, y: 0, z: 9.8 });
+    assert.equal(d.combat.targetId, null);
+    assert.equal(d.combat.playerAction, null);
+    assert.equal(f.lockedTarget, null);
+    assert.equal(d.player.health, health);
+    assert.equal(d.player.maxStamina, maxStamina);
+    assert.equal(d.player.stamina, 11);
+    assert.deepEqual(d.combat.progress, progress);
+    assert.deepEqual(f.state, f.saved);
+  } finally { f.view.dispose(); }
+});
+
+test('earned boss rewards update only Wilds persistence once and remain observable after later frames', async () => {
+  const f = await fixture({ progress: { totalXp: 9000 } });
+  try {
+    f.frame(1000);
+    for (let frame = 1; frame <= 600 && !f.progressChanges.length; frame++) {
+      const d = f.view.diagnostics();
+      if (!d.combat.playerAction) {
+        f.view.place({ position: { x: d.combat.boss.position.x, z: d.combat.boss.position.z + 2 }, yaw: 0 });
+        f.input({ actions: ['lock', 'attack', 'skill'] });
+      } else f.input({ actions: ['attack'] });
+      f.frame(1000 + frame * 100);
+    }
+    const d = f.view.diagnostics();
+    assert.equal(d.combat.boss.mode, 'defeated');
+    assert.equal(f.progressChanges.length, 1);
+    assert.equal(f.state.wilds.totalXp, 9260);
+    assert.deepEqual(f.state.wilds.materials, { heartwood: 1 });
+    assert.deepEqual(f.state.wilds.trophies, ['mossback-warden']);
+    assert.deepEqual(f.state.house, f.saved.house);
+    assert.deepEqual(f.state.petBonds, f.saved.petBonds);
+    assert.ok(d.eventHistory.some(event => event.type === 'progress-changed'));
+    f.frame(d.now + 100);
+    assert.equal(f.progressChanges.length, 1);
+    assert.ok(f.view.diagnostics().eventHistory.some(event => event.type === 'boss-defeated'));
+  } finally { f.view.dispose(); }
+});
+
+test('recent combat history stays bounded while frozen and hidden frames preserve combat time', async () => {
+  const f = await fixture();
+  try {
+    f.frame(1000);
+    f.view.place({ position: { x: WARDEN_ARENA.center.x, z: WARDEN_ARENA.center.z + 32 } });
+    for (let frame = 1; frame <= 50; frame++) {
+      f.input({ actions: ['lock'] });
+      f.frame(1000 + frame * 20);
+    }
+    const before = f.view.diagnostics();
+    assert.equal(before.eventHistory.length, 40);
+    assert.equal(before.eventHistory.at(-1).type, 'lock-changed');
+    const snapshot = structuredClone(before.combat);
+    f.frame(2000);
+    f.visibility(true);
+    f.frame(9000);
+    f.visibility(false);
+    f.frame(10000);
+    assert.deepEqual(f.view.diagnostics().combat, snapshot);
+    assert.equal(f.view.diagnostics().elapsedMs, 1000);
+    assert.equal(f.view.diagnostics().eventHistory.length, 40);
+  } finally { f.view.dispose(); }
+});
+
+test('the Forest spawn orients the initial player and camera along the shared path', async () => {
+  const f = await fixture({ spawn: { x: -106.5, y: 12, z: -180, yaw: -.6 } });
+  try {
+    f.frame(1000);
+    const d = f.view.diagnostics();
+    assert.deepEqual(d.player.position, { x: -106.5, y: 12, z: -180 });
+    assert.equal(d.player.yaw, -.6);
+    assert.equal(d.cameraYaw, -.6);
+    assert.equal(d.cameraState.yaw, -.6);
+  } finally { f.view.dispose(); }
+});
+
+
+test('the first frozen frame places the boss and companion on their own terrain heights', async () => {
+  const f = await fixture({ spawn: { x: -106.5, y: 12, z: -180, yaw: -.6 }, terrainHeight: (x, z) => z < -200 ? 37 : 12 + (x + 106.5) * .1 });
+  try {
+    f.frame(1000);
+    const d = f.view.diagnostics();
+    assert.equal(d.elapsedMs, 0);
+    assert.equal(d.deltaMs, 0);
+    assert.equal(d.combat.arena.center.y, 37);
+    assert.equal(d.combat.boss.position.y, 37);
+    assert.deepEqual(d.combat.pet.position, { x: -105, y: 12.15, z: -178.5 });
+    assert.equal(d.combatModels.boss.position.y, 37);
+    assert.equal(d.player.position.y, 12);
+    assert.deepEqual(f.state, f.saved);
   } finally { f.view.dispose(); }
 });

@@ -151,3 +151,28 @@ test('future action keys have edges and disposal removes every gameplay listener
   const disposed = f.input.read();
   assert.deepEqual([disposed.forward, disposed.lookX, disposed.lookY, disposed.block], [0, 0, 0, false]);
 });
+
+test('combat controls distinguish attack edges, guard holds, target locking and pet commands', () => {
+  const f = fixture();
+  try {
+    f.key('keydown', 'KeyF');
+    f.send(f.canvas, 'pointerdown', { pointerId: 1, button: 2, clientX: 0, clientY: 0 });
+    f.key('keydown', 'Tab');
+    f.key('keydown', 'ControlLeft');
+    f.key('keydown', 'KeyR');
+    f.key('keydown', 'KeyT');
+    const first = f.input.read();
+    assert.deepEqual(first.actions, ['attack', 'lock', 'dodge', 'recall', 'command']);
+    assert.deepEqual([first.attackHeld, first.block], [true, true]);
+    const held = f.input.read();
+    assert.deepEqual([held.actions, held.attackHeld, held.block], [[], true, true]);
+    f.key('keyup', 'KeyF');
+    f.send(f.host, 'pointerup', { pointerId: 1, button: 2 });
+    const released = f.input.read();
+    assert.deepEqual([released.attackHeld, released.block], [false, false]);
+    f.send(f.canvas, 'pointerdown', { pointerId: 1, button: 2, clientX: 0, clientY: 0 });
+    assert.equal(f.input.read().block, true);
+    f.send(f.host, 'blur');
+    assert.equal(f.input.read().block, false);
+  } finally { f.input.dispose(); }
+});

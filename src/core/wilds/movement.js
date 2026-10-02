@@ -174,7 +174,7 @@ function leaveClimb(state, events, blocked = false) {
   events.push({ type: 'climb-end' });
 }
 
-export function stepMovement(previous, input, world, deltaMs, now) {
+export function stepMovement(previous, input, world, deltaMs, now, { forcedVelocity = null } = {}) {
   const state = { ...previous, position: { ...previous.position }, velocity: { ...previous.velocity }, safePosition: { ...previous.safePosition }, mantle: previous.mantle ? { ...previous.mantle, start: { ...previous.mantle.start }, end: { ...previous.mantle.end } } : null };
   const events = [], duration = Math.max(0, deltaMs);
   if (!duration) return { state, events };
@@ -267,10 +267,12 @@ export function stepMovement(previous, input, world, deltaMs, now) {
         }
       } else {
         const dt = milliseconds / 1000;
-        const running = input.sprint && moving && state.mode === 'grounded' && state.stamina > 0 && !state.sprintExhausted;
+        const running = !forcedVelocity && input.sprint && moving && state.mode === 'grounded' && state.stamina > 0 && !state.sprintExhausted;
         const runSeconds = running ? Math.min(dt, state.stamina / WILDS_MOVEMENT.sprintCost) : 0;
         const distance = WILDS_MOVEMENT.walkSpeed * dt + (WILDS_MOVEMENT.sprintSpeed - WILDS_MOVEMENT.walkSpeed) * runSeconds;
-        const old = { ...state.position }, candidate = collide(world, old, old.x + direction.x * distance, old.z + direction.z * distance);
+        const old = { ...state.position }, candidate = collide(world, old,
+          old.x + (forcedVelocity ? forcedVelocity.x * dt : direction.x * distance),
+          old.z + (forcedVelocity ? forcedVelocity.z * dt : direction.z * distance));
         state.position.x = candidate.x; state.position.z = candidate.z;
         const support = surfaceUnder(world, candidate.x, candidate.z, old.y);
         if (state.mode === 'grounded' && support && old.y - support.height <= WILDS_MOVEMENT.stepHeight) {

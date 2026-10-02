@@ -7,7 +7,7 @@ import { buildGroveField, createGroveLight } from './grove-light.js';
 import { createTerrainPaint } from './terrain-paint.js';
 import { createWorldGrass, grassBlades } from './grass.js';
 import { WILDS_WORLD } from '../../core/wilds/world-definition.js';
-import { wildsAtmosphere } from '../wilds/world.js';
+import { worldAtmosphere } from './atmosphere.js';
 
 const trees = { count: 1, x: [0], z: [0], y: [-.5], width: [1], height: [1], kind: [0], turn: [0] };
 const definition = { ...WILDS_WORLD, trees: { ...WILDS_WORLD.trees, canopyShade: 0 }, rocks: [], landmarks: [] };
@@ -43,7 +43,7 @@ test('removing the tree removes its shadows without changing the forest-region a
 });
 
 test('terrain, grass, and rocks share one field and a camera-boundary refresh swaps every receiver together', async () => {
-  const engine = new NullEngine(), scene = new Scene(engine), root = new TransformNode('world', scene), atmosphere = wildsAtmosphere('day');
+  const engine = new NullEngine(), scene = new Scene(engine), root = new TransformNode('world', scene), atmosphere = { ...worldAtmosphere('day'), theme: 'day' };
   const grove = createGroveLight(scene, { definition, atmosphere, surface: flat });
   try {
     const terrain = createTerrainPaint(scene, { definition, grove, still: true });
@@ -67,7 +67,7 @@ test('terrain, grass, and rocks share one field and a camera-boundary refresh sw
       assert.deepEqual(paint._vectors4.groveBounds.asArray(), [-48, -96, 192, 1]);
     }
     const painted = grove.diagnostics().painted;
-    grove.setTheme(wildsAtmosphere('dusk'));
+    grove.setTheme({ ...worldAtmosphere('dusk'), theme: 'dusk' });
     assert.equal(grove.diagnostics().pending, true);
     await settled(grove);
     assert.equal(grove.diagnostics().painted, painted + 1);

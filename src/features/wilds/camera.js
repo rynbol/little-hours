@@ -55,19 +55,34 @@ export function createWildsCamera(scene, canvas, { world, still = false }) {
   camera.maxZ = 4000;
   camera.fov = .88;
   camera.inputs.clear();
-  const target = new Vector3(), previousTarget = new Vector3();
+  const target = new Vector3(), previousTarget = new Vector3(), lockOffset = new Vector3(), lockGoal = new Vector3();
   let yaw = 0, pitch = INITIAL_PITCH, distance = DISTANCE, desiredDistance = DISTANCE, resolvedYaw = 0, resolvedPitch = INITIAL_PITCH;
   let occluded = false, recovering = false, initialized = false, disposed = false, explicitYaw = false, snap = false, settled = false;
 
-  function update(player, input = {}, deltaMs = 0) {
+  function update(player, input = {}, deltaMs = 0, lockTarget = null) {
     if (disposed) return { cameraYaw: yaw, cameraPitch: pitch };
     if (!initialized && !explicitYaw) yaw = player.yaw || 0;
     if (input.lookX && initialized && occluded) yaw = resolvedYaw;
     if (input.lookY && initialized && occluded) pitch = clamp(resolvedPitch, -.15, 1.1);
     yaw -= (input.lookX || 0) * .003;
     pitch = clamp(pitch + (input.lookY || 0) * .0025, -.15, 1.1);
+    const opponent = lockTarget?.position || lockTarget;
+    const separation = opponent ? Math.hypot(opponent.x - player.position.x, opponent.z - player.position.z) : 0;
+    const framingDistance = opponent ? clamp(desiredDistance + separation * .45, desiredDistance, 14) : desiredDistance;
+    if (opponent && separation > .01) {
+      const facing = Math.atan2(player.position.x - opponent.x, player.position.z - opponent.z);
+      yaw += angleDifference(facing, yaw) * (!initialized || still || snap ? 1 : 1 - Math.exp(-Math.max(0, deltaMs) / 160));
+      pitch = Math.max(.24, pitch);
+    }
     previousTarget.copyFrom(target);
     target.set(player.position.x, player.position.y + TARGET_HEIGHT, player.position.z);
+    lockGoal.setAll(0);
+    if (opponent) {
+      const weight = Math.min(.35, 4 / Math.max(1, separation));
+      lockGoal.set((opponent.x - player.position.x) * weight, ((opponent.y ?? player.position.y) + 1.8 - target.y) * weight, (opponent.z - player.position.z) * weight);
+    }
+    Vector3.LerpToRef(lockOffset, lockGoal, !initialized || still || snap ? 1 : 1 - Math.exp(-Math.max(0, deltaMs) / 160), lockOffset);
+    target.addInPlace(lockOffset);
     const stationary = initialized && Vector3.DistanceSquared(target, previousTarget) < 1e-12 && !input.lookX && !input.lookY;
     if (stationary && !snap && deltaMs <= 0) return { cameraYaw: yaw, cameraPitch: pitch };
     const frameScale = clamp(deltaMs / (1000 / 60), .25, 3);
@@ -76,7 +91,7 @@ export function createWildsCamera(scene, canvas, { world, still = false }) {
       const radius = obstacle.cameraRadius ?? obstacle.radiusProfile?.reduce((maximum, point) => Math.max(maximum, point.radius), 0) ?? obstacle.radius;
       return Math.hypot(obstacle.x - target.x, obstacle.z - target.z) < reach + radius;
     }) };
-    const requested = viewAt(nearby, target, yaw, pitch, desiredDistance);
+    const requested = viewAt(nearby, target, yaw, pitch, framingDistance);
     const followed = camera.position.add(target.subtract(previousTarget));
     const feet = new Vector3(player.position.x, player.position.y + .12, player.position.z);
     const approachingFeet = feet.clone();
@@ -122,7 +137,7 @@ export function createWildsCamera(scene, canvas, { world, still = false }) {
       return penalty;
     };
     const reachable = position => !initialized || snap || travelClear(nearby, target, camera.position, position);
-    const requestedClear = requested.distance >= desiredDistance && bodyVisible(requested.position) && approachPenalty(requested.position) < .00001;
+    const requestedClear = requested.distance >= framingDistance && bodyVisible(requested.position) && approachPenalty(requested.position) < .00001;
     occluded = !requestedClear;
     recovering = false;
     let position;
@@ -136,15 +151,15 @@ export function createWildsCamera(scene, canvas, { world, still = false }) {
       let goal = requested, goalScore = Infinity;
       for (const turn of [0, .3, -.3, .6, -.6, .9, -.9, 1.2, -1.2, Math.PI / 2, -Math.PI / 2, 2.1, -2.1, Math.PI]) {
         for (const rise of [pitch, Math.max(pitch, 0), Math.max(pitch, .2), Math.max(pitch, .45), Math.max(pitch, .8), Math.max(pitch, 1.1), MAX_PITCH]) {
-          const view = viewAt(nearby, target, yaw + turn, rise, desiredDistance);
-          const score = turn ** 2 * .35 + (rise - pitch) ** 2 * 1.2 + Math.max(0, rise - Math.max(.75, pitch)) ** 2 * 10 + (view.distance - desiredDistance) ** 2 * .6 + approachPenalty(view.position) * 30 + angleDifference(view.yaw, resolvedYaw) ** 2 * .08;
+          const view = viewAt(nearby, target, yaw + turn, rise, framingDistance);
+          const score = turn ** 2 * .35 + (rise - pitch) ** 2 * 1.2 + Math.max(0, rise - Math.max(.75, pitch)) ** 2 * 10 + (view.distance - framingDistance) ** 2 * .6 + approachPenalty(view.position) * 30 + angleDifference(view.yaw, resolvedYaw) ** 2 * .08;
           if (view.distance >= MIN_DISTANCE && score < goalScore && bodyVisible(view.position)) { goal = view; goalScore = score; }
         }
       }
       let best = null, bestScore = Infinity, limitTravel = true;
       const consider = point => {
         const offset = point.subtract(target), length = offset.length();
-        if (length < MIN_DISTANCE - .000001 || length > desiredDistance + .00001) return;
+        if (length < MIN_DISTANCE - .000001 || length > framingDistance + .00001) return;
         if (limitTravel && initialized && !snap && !still && Vector3.DistanceSquared(camera.position, point) > (.9 * frameScale) ** 2) return;
         const candidateYaw = Math.atan2(offset.x, offset.z), candidatePitch = Math.atan2(offset.y, Math.hypot(offset.x, offset.z));
         const score = angleDifference(candidateYaw, goal.yaw) ** 2 * 3 + (candidatePitch - goal.pitch) ** 2 * 3 + (length - goal.distance) ** 2 * .6 + (initialized && !snap && !still ? Vector3.DistanceSquared(followed, point) * 2 / frameScale ** 2 : 0) + approachPenalty(point) * 30;
@@ -152,7 +167,7 @@ export function createWildsCamera(scene, canvas, { world, still = false }) {
         best = point; bestScore = score;
       };
       const testOrbit = (candidateYaw, candidatePitch) => {
-        const view = viewAt(nearby, target, candidateYaw, candidatePitch, desiredDistance);
+        const view = viewAt(nearby, target, candidateYaw, candidatePitch, framingDistance);
         if (view.distance < MIN_DISTANCE) return;
         consider(view.position);
         if (initialized && distance < view.distance) consider(target.add(view.position.subtract(target).scale(Math.max(MIN_DISTANCE, Math.min(view.distance, distance + .2 * frameScale)) / view.distance)));

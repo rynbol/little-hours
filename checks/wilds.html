@@ -45,7 +45,7 @@
       if (app.wilds && app.wilds.diagnostics().phase !== 'disposed') return;
       loading.hidden = false;
       loading.textContent = 'Loading the Wilds…';
-      app.wilds = enterWilds(stage, state);
+      app.wilds = enterWilds(stage, state, { onProgress: save });
       enter.disabled = true;
       leave.disabled = false;
       const view = app.wilds;

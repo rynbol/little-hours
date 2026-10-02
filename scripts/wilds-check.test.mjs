@@ -4,7 +4,23 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { pinScript } from './lh/app.mjs';
 import { idle } from './lh/measure.mjs';
-import { advance } from './lh/flows/wilds.mjs';
+import { advance, steeringKeys, fightInput } from './lh/flows/wilds.mjs';
+
+test('the Forest route driver steers with real camera-relative keys and stops at its destination', () => {
+  assert.deepEqual(steeringKeys({ x: 0, z: 0 }, { x: 0, z: -10 }, 0), ['KeyW']);
+  assert.deepEqual(steeringKeys({ x: 0, z: 0 }, { x: 0, z: -10 }, Math.PI / 2), ['KeyD']);
+  assert.deepEqual(steeringKeys({ x: -106.5, z: -180 }, { x: -120, z: -200 }, .6), ['KeyW']);
+  assert.deepEqual(steeringKeys({ x: 1, z: 1 }, { x: 1.5, z: 1.5 }, 0), []);
+});
+
+test('the fight driver uses attack, lock and pet keys and reacts to a charge with a sideways dodge', () => {
+  const state = { player: { position: { x: 0, z: 0 }, stamina: 100 }, cameraYaw: 0, elapsedMs: 1000, combat: { targetId: null, playerAction: null, pet: { health: 70, mode: 'follow', position: { x: 1, z: 0 }, skillReadyAt: 0 }, boss: { position: { x: 0, z: -3 }, health: 420, mode: 'recovery', nextActionAt: 2000 } } };
+  assert.deepEqual(fightInput(state), { keys: [], actions: ['Tab', 'KeyT', 'KeyQ', 'KeyF'] });
+  state.combat.targetId = 'mossback-warden';
+  state.combat.pet.mode = 'fight'; state.combat.pet.skillReadyAt = 5000;
+  Object.assign(state.combat.boss, { mode: 'telegraph', move: 'charge', nextActionAt: 1200 });
+  assert.deepEqual(fightInput(state), { keys: ['KeyD'], actions: ['ControlLeft'] });
+});
 
 function storage(entries = {}) {
   const values = new Map(Object.entries(entries));

@@ -98,7 +98,7 @@ test('lh trace wilds-traversal --cold opens the isolated Wilds route and records
   const result = runTrace();
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.browser.settings, { width: 960, height: 640, headed: false, reducedMotion: false, path: '/checks/wilds.html', storageKey: 'little-hours-wilds-check-v1', scale: 1, seed: 'one-room', theme: 'day' });
-  assert.deepEqual(result.browser.placements, [{ value: { position: { x: 0, z: 0 }, yaw: 0, stamina: 100, camera: { yaw: 0 } }, at: 1800 }]);
+  assert.deepEqual(result.browser.placements, [{ value: { position: { x: -106.5, z: -180 }, yaw: .6, stamina: 100, camera: { yaw: .6 } }, at: 1800 }]);
   assert.deepEqual(result.browser.holds, [{ milliseconds: 20000, keys: ['KeyW', 'ShiftLeft'], focused: true }]);
   assert.deepEqual(result.browser.inputs.map(({ type, code, at }) => ({ type, code, at })), [
     { type: 'keyDown', code: 'ShiftLeft', at: 1800 },
@@ -127,10 +127,10 @@ for (const failure of ['hold', 'keyDown', 'keyUp']) test(`an interrupted Wilds t
   assert.deepEqual(result.browser.held, []);
 });
 
-test('a missing clearing prevents a traversal from being recorded', () => {
+test('a missing Forest start prevents a traversal from being recorded', () => {
   const result = runTrace({ failure: 'place' });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /clearing is outside loaded terrain/);
+  assert.match(result.stderr, /Forest start is outside loaded terrain/);
   assert.equal(result.browser.placements.length, 1);
   assert.deepEqual(result.browser.inputs, []);
   assert.equal(result.browser.traceStart, null);
