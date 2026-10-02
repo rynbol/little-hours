@@ -39,7 +39,7 @@ export default {
       t.check(`${width}px night has one non-interactive sky with a legible crescent`, moon.present && moon.width > 36 && moon.left > 0 && moon.right < moon.viewport && moon.pointer === 'none' && moon.count === 1 && moon.gradient.includes('37, 43, 80'), moon);
       await t.shot(view, `island-night-${width}`);
       await view.clickSel('#house-open-garden'); await view.settle();
-      t.check(`${width}px the garden retains its own atmosphere`, await view.js(`document.querySelector('.island-sky').hidden && getComputedStyle(document.querySelector('.house-world')).backgroundImage.includes('189, 205, 182')`));
+      t.check(`${width}px the garden at night keeps its own dusk backdrop, with the island sky hidden`, await view.js(`document.querySelector('.island-sky').hidden && getComputedStyle(document.querySelector('.house-world')).backgroundImage.includes('61, 63, 108')`));
       await view.clickSel('#garden-back'); await view.settle();
       t.check(`${width}px moon returns when leaving the garden`, await view.visible('.island-sky [data-celestial="moon"]'));
       await t.steps.backToRoom(view);
