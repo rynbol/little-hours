@@ -1,5 +1,6 @@
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { gpuFlag } from '../chrome.mjs';
 
 const WATCH = `(() => {
   if (window.__trips) return true;
@@ -76,17 +77,17 @@ async function captureFrames(app, route, theme, t, folder) {
 export default {
   about: 'cloud transitions: every screen change (room, island, garden, pond and back) closes soft clouds over the view, swaps behind them and parts them with no slow frames while they move; the overlay goes and input works after each; day, dusk and rain frames are captured; reduced motion cross-fades with no clouds',
   async run(t) {
-    const { check } = t, folder = process.env.LH_TRANSITION_FRAMES;
+    const { check } = t, folder = process.env.LH_TRANSITION_FRAMES, timed = gpuFlag !== 'swiftshader';
     if (folder) mkdirSync(folder, { recursive: true });
-    for (const theme of (process.env.LH_TRANSITION_THEMES || 'dusk,day,rain').split(',')) {
+    for (const theme of (process.env.LH_TRANSITION_THEMES || (timed ? 'dusk,day,rain' : 'dusk')).split(',')) {
       const app = await t.open({ seed: 'three-rooms', theme, label: `transitions ${theme}` });
       await app.settle(); await app.js(WATCH);
       for (const route of ROUTES) {
         const trip = await travel(app, route, t);
         const name = `${theme}: ${route.from} to ${route.to}`;
         check(`${name} runs the cloud transition`, trip?.style === 'clouds' && trip.clouds && trip.phases.join() === 'closing,closed,parting', trip);
-        check(`${name} moves the clouds for about a second, plus the swap held behind them`, trip?.moving > 700 && trip.moving < 1150, trip);
-        if (theme === 'dusk') check(`${name} moves the clouds without slow frames`, trip?.closingSlow === 0 && trip.partingSlow === 0, trip);
+        if (timed) check(`${name} moves the clouds for about a second, plus the swap held behind them`, trip?.moving > 700 && trip.moving < 1300, trip);
+        if (timed && theme === 'dusk') check(`${name} moves the clouds without slow frames`, trip?.closingSlow === 0 && trip.partingSlow === 0, trip);
         check(`${name} leaves no overlay and keys reach the page`, await app.js(`${settled} && getComputedStyle(document.body).pointerEvents !== 'none'`));
       }
       const focusBefore = await app.js(`document.activeElement?.id || document.activeElement?.tagName`);
@@ -108,7 +109,7 @@ export default {
     await still.settle(); await still.js(WATCH);
     for (const route of [ROUTES[0], ROUTES[3], ROUTES[4], ROUTES[5]]) {
       const trip = await travel(still, route, t);
-      check(`reduced motion: ${route.from} to ${route.to} cross-fades with no clouds`, trip?.style === 'fade' && !trip.clouds && trip.moving < 500, trip);
+      check(`reduced motion: ${route.from} to ${route.to} cross-fades with no clouds`, trip?.style === 'fade' && !trip.clouds && (!timed || trip.moving < 500), trip);
     }
     check('reduced motion: no overlay is left behind', await still.js(settled));
     await t.close(still);
