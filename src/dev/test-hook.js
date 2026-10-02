@@ -104,9 +104,11 @@ export function installTestHook(app) {
     const top = Math.max(0, Math.min(...flat.map(p => p.y))), bottom = Math.min(rect.height, Math.max(...flat.map(p => p.y)));
     const miss = { x: rect.left + (left + right) / 2, y: rect.top + (top + bottom) / 2, visible: false, hits: 0 };
     if (right <= left || bottom <= top) return miss;
-    const step = Math.max(3, Math.min(right - left, bottom - top) / 14), hits = [];
-    for (let y = top + step / 2; y < bottom; y += step) for (let x = left + step / 2; x < right; x += step) if (isHit(x, y)) hits.push({ x, y });
-    if (!hits.length) return miss;
+    const step = Math.max(3, Math.min(right - left, bottom - top) / 14), found = [];
+    const canvas = scene.getEngine().getRenderingCanvas(), reachable = (x, y) => document.elementFromPoint(rect.left + x, rect.top + y) === canvas;
+    for (let y = top + step / 2; y < bottom; y += step) for (let x = left + step / 2; x < right; x += step) if (isHit(x, y)) found.push({ x, y });
+    if (!found.length) return miss;
+    const onCanvas = found.filter(({ x, y }) => reachable(x, y)), hits = onCanvas.length ? onCanvas : found;
     const mean = hits.reduce((sum, hit) => ({ x: sum.x + hit.x / hits.length, y: sum.y + hit.y / hits.length }), { x: 0, y: 0 });
     const best = hits.reduce((a, b) => Math.hypot(a.x - mean.x, a.y - mean.y) <= Math.hypot(b.x - mean.x, b.y - mean.y) ? a : b);
     return { x: rect.left + best.x, y: rect.top + best.y, visible: true, hits: hits.length };
