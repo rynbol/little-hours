@@ -46,6 +46,13 @@ test('cumulus quads hug the bank between its feathered base and its top, so the 
   });
 });
 
+test('each card hands the shader its seed as a coarse part and an exact rest, so a software rasterizer that interpolates the coarse part a few ulps off still hashes the exact seed instead of speckling the cloud', () => {
+  const cards = cloudCards(), { uvs2, uvs3 } = cloudShape(cards), f = Math.fround;
+  const shaderSeed = (coarse, rest) => f(f(Math.floor(f(coarse * 256) + 0.5)) / 256 + rest);
+  const reached = cards.flatMap((card, c) => [-8, -1, 0, 1, 8].map(ulps => shaderSeed(f(uvs2[c * 8] * (1 + ulps * 2 ** -23)), uvs3[c * 8]) === f(card.seed)));
+  assert.deepEqual([...new Set(reached)], [true]);
+});
+
 test('no cloud or wisp starts in front of the volcano plume, and the shader keeps it clear as they drift', () => {
   const sky = cloudCards().filter(card => card.kind !== CLOUD_KINDS.mist);
   assert.ok(sky.every(card => clearsPlume(card)));

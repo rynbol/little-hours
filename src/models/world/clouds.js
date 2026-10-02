@@ -99,23 +99,26 @@ export function cloudCards(seed = WORLD.seed, height = heightAt) {
 }
 
 export function cloudShape(cards) {
-  const positions = new Float32Array(cards.length * 12), uvs = new Float32Array(cards.length * 8), seeds = new Float32Array(cards.length * 8), sizes = new Float32Array(cards.length * 16), indices = new Uint16Array(cards.length * 6);
+  const positions = new Float32Array(cards.length * 12), uvs = new Float32Array(cards.length * 8), seeds = new Float32Array(cards.length * 8), seedRests = new Float32Array(cards.length * 8), sizes = new Float32Array(cards.length * 16), indices = new Uint16Array(cards.length * 6);
   cards.forEach((card, c) => {
     const [low, high] = card.kind === CLOUD_KINDS.cumulus ? CUMULUS_ROWS : [-1, 1];
+    const seed = Math.fround(card.seed), coarse = Math.round(seed * SEED_GRID) / SEED_GRID;
     [[-1, low], [1, low], [1, high], [-1, high]].forEach(([u, v], k) => {
       const i = c * 4 + k;
-      positions.set([card.x, card.y, card.z], i * 3); uvs.set([u, v], i * 2); seeds.set([card.seed, card.kind], i * 2);
+      positions.set([card.x, card.y, card.z], i * 3); uvs.set([u, v], i * 2); seeds.set([coarse, card.kind], i * 2); seedRests.set([seed - coarse, 0], i * 2);
       sizes.set([card.halfWidth, card.halfHeight, card.spin, card.stretch], i * 4);
     });
     indices.set([0, 1, 2, 0, 2, 3].map(k => c * 4 + k), c * 6);
   });
-  return { positions, uvs, uvs2: seeds, colors: sizes, indices };
+  return { positions, uvs, uvs2: seeds, uvs3: seedRests, colors: sizes, indices };
 }
 
+const SEED_GRID = 256;
+
 const CLOUD_VERTEX = `precision highp float;
-attribute vec3 position; attribute vec2 uv, uv2; attribute vec4 color;
+attribute vec3 position; attribute vec2 uv, uv2, uv3; attribute vec4 color;
 uniform mat4 world, viewProjection; uniform vec3 eye; uniform vec4 plume; uniform float time;
-varying vec3 vWorld; varying vec2 vUv, vSeed; varying float vAspect, vClear, vStretch;
+varying vec3 vWorld; varying vec2 vUv, vSeed; varying float vAspect, vClear, vStretch, vSeedRest;
 void main() {
   float spin = time * color.z, s = sin(spin), c = cos(spin);
   vec3 center = (world * vec4(c * position.x - s * position.z, position.y, s * position.x + c * position.z, 1.)).xyz;
@@ -125,12 +128,12 @@ void main() {
   float apart = acos(clamp(dot(toCard / range, normalize(toPlume)), -1., 1.)), reach = color.x / range + plume.z;
   float above = step(plume.w / length(toPlume), (center.y - eye.y) / range);
   vClear = uv2.y > 1.5 ? 1. : 1. - above * (1. - smoothstep(reach, reach * 1.25 + .03, apart));
-  vAspect = color.x / color.y; vUv = vec2(uv.x * vAspect, uv.y); vSeed = uv2; vStretch = color.w;
+  vAspect = color.x / color.y; vUv = vec2(uv.x * vAspect, uv.y); vSeed = uv2; vSeedRest = uv3.x; vStretch = color.w;
   gl_Position = viewProjection * vec4(vWorld, 1.);
 }`;
 
 const CLOUD_FRAGMENT = `precision highp float;
-varying vec3 vWorld; varying vec2 vUv, vSeed; varying float vAspect, vClear, vStretch;
+varying vec3 vWorld; varying vec2 vUv, vSeed; varying float vAspect, vClear, vStretch, vSeedRest;
 uniform vec3 eye, fogNear, cloudLit, cloudShade, cloudRim;
 uniform float time, fogDensity, fogHeight, cloudCover, sunStrength;
 ${WORLD_GLSL}
@@ -158,7 +161,7 @@ float bankField(vec2 p, float seed, float aspect, float stretch, out float top) 
   return smoothstep(-.7, -.3, p.y) * (1. - smoothstep(crest - .35, crest + .05, p.y)) * (1. - smoothstep(.4, 1., abs(x) + (swell - .5) * .4)) * 1.2;
 }
 void main() {
-  vec2 p = vUv; float seed = vSeed.x, kind = vSeed.y, a;
+  vec2 p = vUv; float seed = floor(vSeed.x * ${SEED_GRID}. + .5) / ${SEED_GRID}. + vSeedRest, kind = vSeed.y, a;
   float x = p.x / vAspect, lean = worldHash(vec2(seed, 31.)) * .7 - .15;
   vec2 s = vec2(p.x - lean * (p.y + .1) * .45, p.y);
   float top = 1., banked = step(1.01, vStretch), f = kind > .5 ? 1. : banked > .5 ? bankField(s, seed, vAspect, vStretch, top) : cloudField(s, seed, vAspect, top);
@@ -194,7 +197,7 @@ void main() {
 }`;
 
 export function createWorldClouds(scene, { root, still }) {
-  const paint = new ShaderMaterial('world-cloud-paint', scene, { vertexSource: CLOUD_VERTEX, fragmentSource: CLOUD_FRAGMENT }, { attributes: ['position', 'uv', 'uv2', 'color'], uniforms: [...new Set(['world', 'viewProjection', 'plume', 'cloudCover', 'sunStrength', ...CLOUD_COLORS, ...SKY_UNIFORMS, ...AIR_UNIFORMS])], needAlphaBlending: true });
+  const paint = new ShaderMaterial('world-cloud-paint', scene, { vertexSource: CLOUD_VERTEX, fragmentSource: CLOUD_FRAGMENT }, { attributes: ['position', 'uv', 'uv2', 'uv3', 'color'], uniforms: [...new Set(['world', 'viewProjection', 'plume', 'cloudCover', 'sunStrength', ...CLOUD_COLORS, ...SKY_UNIFORMS, ...AIR_UNIFORMS])], needAlphaBlending: true });
   paint.backFaceCulling = false; paint.disableDepthWrite = true; paint.alphaMode = Constants.ALPHA_PREMULTIPLIED_PORTERDUFF;
   followEye(scene, paint, still);
   paint.setVector4('plume', new Vector4(PLUME_COLUMN.x, PLUME_COLUMN.z, PLUME_COLUMN.reach, PLUME_COLUMN.summit));
