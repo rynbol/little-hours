@@ -66,7 +66,8 @@ test('the garden reuses the house engine, keeps room batches and stops drawing w
   expect(await page.evaluate(() => window.__littleHours.house.diagnostics().scene.getMeshByName('house-retreat-grounds').isEnabled())).toBe(true);
   expect(await page.evaluate(() => window.__littleHours.house.diagnostics().scene.getMeshByName('garden-butterfly-wings').isEnabled())).toBe(false);
   await page.locator('#garden-back').click();
-  expect(await page.evaluate(() => window.__littleHours.house.diagnostics().scene.getMeshByName('house-retreat-grounds').isEnabled())).toBe(false);
+  await expect.poll(() => page.evaluate(() => window.__littleHours.house.diagnostics().scene.getMeshByName('house-retreat-grounds').isEnabled())).toBe(false);
+  await expect(page.locator('html')).not.toHaveAttribute('data-place-transition');
   await page.locator('#back-to-room').click();
   await page.locator('.home-wide').click(); await page.locator('#house-in-room [data-room="orchard"]').click();
   await expect(page.locator('#house-detail h2')).toHaveText('Your garden');
@@ -143,6 +144,7 @@ test('the immersive garden keeps its overlays, keyboard exits and name editor in
   await page.keyboard.press('Escape');
   await expect(page.locator('#house-open-garden')).toBeVisible();
   await expect(page.locator('#house-open-garden')).toBeFocused();
+  await expect(page.locator('html')).not.toHaveAttribute('data-place-transition');
   await page.keyboard.press('Escape');
   await expect(page.locator('#room-section')).toBeVisible();
   await expect(page.locator('body')).not.toHaveClass(/is-garden/);

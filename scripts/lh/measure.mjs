@@ -148,3 +148,45 @@ export async function gpuCosts(app, pairs = 40) {
     return { gpuOutdoorMs: result['outdoor all'] ?? null, gpuRoomMs: result['room all'], passes: Object.fromEntries(Object.entries(result).sort((a, b) => b[1] - a[1])) };
   })()`);
 }
+
+const PLACE_TRIPS = ['#rooms-button', '#house-open-garden', '#garden-back', '[data-room="pond"]', '#lake-back', '#back-to-room'];
+
+export async function placeTrips(app) {
+  await app.js(`(() => {
+    const record = window.__lhPlaceTrips = { frames: [], trips: 0 };
+    let last = performance.now(), seen = null, closed = false;
+    const tick = now => {
+      const veil = document.querySelector('.place-transition');
+      if (veil !== seen) { seen = veil; closed = false; if (veil) record.trips++; }
+      if (veil) {
+        const opacity = Number(getComputedStyle(veil).opacity);
+        if (opacity >= 0.999) closed = true;
+        const phase = veil.dataset.phase || (opacity >= 0.999 ? 'closed' : closed ? 'parting' : 'closing');
+        record.frames.push([now - last, phase, record.trips]);
+      }
+      last = now;
+      if (window.__lhPlaceTrips === record) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return true;
+  })()`);
+  for (const selector of PLACE_TRIPS) {
+    await app.waitFor(`!document.querySelector('.place-transition')`, { what: 'the previous trip to end', timeout: 20000 });
+    await app.clickSel(selector, { timeout: 10000 });
+    await app.waitFor(`Boolean(document.querySelector('.place-transition'))`, { what: `the trip from ${selector} to start`, timeout: 5000 }).catch(() => null);
+    await app.waitFor(`!document.querySelector('.place-transition')`, { what: `the trip from ${selector} to end`, timeout: 20000 });
+    await app.settle();
+  }
+  return app.js(`(() => {
+    const { frames, trips } = window.__lhPlaceTrips; window.__lhPlaceTrips = null;
+    const pick = test => frames.filter(test).map(([gap]) => gap).sort((a, b) => a - b);
+    const p95 = list => list.length ? list[Math.min(list.length - 1, Math.floor(list.length * 0.95))] : 0;
+    const moving = pick(([, phase]) => phase !== 'closed'), closed = pick(([, phase]) => phase === 'closed'), all = pick(() => true);
+    const span = phase => { const per = {}; for (const [gap, at, trip] of frames) if (!phase || phase(at)) per[trip] = (per[trip] || 0) + gap; const list = Object.values(per).sort((a, b) => a - b); return list[list.length >> 1] || 0; };
+    return {
+      trips, 'trip p95 gap ms': p95(all), 'moving p95 gap ms': p95(moving), 'moving worst gap ms': moving.at(-1) || 0,
+      'moving gaps>20': moving.filter(gap => gap > 20).length, 'moving gaps>34': moving.filter(gap => gap > 34).length,
+      'closed worst gap ms': closed.at(-1) || 0, 'trip ms (median)': span(), 'moving ms (median)': span(phase => phase !== 'closed'),
+    };
+  })()`);
+}
