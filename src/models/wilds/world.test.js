@@ -7,11 +7,12 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { createWildsWorld } from './world.js';
 import { buildTerrainRings, sampleTerrainSurface } from '../world/terrain-mesh.js';
 import { plantTrees } from '../world/trees.js';
-import { worldAtmosphere } from '../world/atmosphere.js';
+import { wildsAtmosphere } from './atmosphere.js';
+import { WILDS_GRASS } from './grass.js';
 import { createMovementState, stepMovement } from '../../core/wilds/movement.js';
 import { FOREST_WALK } from '../../features/forest/forest-walk.js';
 
-test('Wilds renders the Forest terrain, trees, grass and atmosphere without a separate world definition', async () => {
+test('Wilds renders the Forest terrain and trees with its own grass, ground paint and palette', async () => {
   const engine = new NullEngine(), scene = new Scene(engine), camera = new FreeCamera('test-camera', new Vector3(-106.5, -25, -180), scene);
   const world = await createWildsWorld(scene, { workers: false, still: true });
   try {
@@ -19,7 +20,10 @@ test('Wilds renders the Forest terrain, trees, grass and atmosphere without a se
     assert.deepEqual([world.spawn.x, world.spawn.z, world.spawn.yaw], [-106.5, -180, .6]);
     assert.deepEqual([world.spawn.x, world.spawn.z, world.spawn.yaw], [FOREST_WALK.start.x, FOREST_WALK.start.z, -FOREST_WALK.start.yaw]);
     assert.equal(world.diagnostics().trees, 2434);
-    assert.equal(world.diagnostics().grassBlades, 88000);
+    const blades = WILDS_GRASS.rings.reduce((sum, ring) => sum + Math.round(ring.period * Math.sqrt(ring.density)) ** 2, 0), grass = scene.getMeshByName('wilds-grass');
+    assert.equal(world.diagnostics().grassBlades, blades);
+    assert.equal(grass.forcedInstanceCount, blades);
+    assert.equal(scene.getMeshByName('world-grass').isEnabled(), false);
     for (const [index, ring] of rings.entries()) {
       const mesh = scene.getMeshByName(`world-terrain-${index}`);
       assert.deepEqual(mesh.getVerticesData('position'), ring.positions);
@@ -29,10 +33,15 @@ test('Wilds renders the Forest terrain, trees, grass and atmosphere without a se
     assert.equal(world.spawn.y, world.surfaceAt(-106.5, -180).height);
     for (const theme of ['day', 'dusk', 'rain']) {
       world.setTheme(theme); scene.render();
-      assert.deepEqual(world.atmosphere, worldAtmosphere(theme));
-      assert.equal(scene.getMeshByName('world-terrain-0').material._colors3.grass.toHexString().toLowerCase(), worldAtmosphere(theme).grass);
-      assert.equal(scene.getMeshByName('world-grass').material._floats.time, 0);
+      assert.deepEqual(world.atmosphere, wildsAtmosphere(theme));
+      for (const mesh of [scene.getMeshByName('world-terrain-0'), scene.getMeshByName('world-terrain-1'), grass]) assert.equal(mesh.material._colors3.grass.toHexString().toLowerCase(), wildsAtmosphere(theme).grass);
+      assert.equal(scene.getMeshByName('world-terrain-0').material.name, 'wilds-terrain-paint');
+      assert.equal(grass.material._floats.time, 0);
     }
+    world.update({ position: { x: -120, y: world.surfaceAt(-120, -190).height, z: -190 } });
+    assert.deepEqual(grass.material._vectors4.walker.asArray(), [-120, world.surfaceAt(-120, -190).height, -190, 1]);
+    assert.deepEqual(grass.material._vectors4.contactShadow.asArray().slice(0, 2), [-120, -190]);
+    assert.deepEqual(scene.getMeshByName('world-terrain-0').material._vectors4.contactShadow.asArray(), grass.material._vectors4.contactShadow.asArray());
     assert.equal(world.surfaceAt(13000, 13000), null);
   } finally { world.dispose(); camera.dispose(); scene.dispose(); engine.dispose(); }
 });

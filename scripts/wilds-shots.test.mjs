@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { wildsShotView, captureWildsCrop } from './lh/wilds-shots.mjs';
 
 test('piece views pin seed, time, player and camera independently of gameplay camera changes', async () => {
-  for (const piece of ['player', 'grass']) {
+  for (const piece of ['player', 'grass', 'meadow', 'vista']) {
     const calls = [], view = wildsShotView(piece);
     await view.go({ async waitFor() {}, async js(code) { calls.push(code); } });
     assert.equal(view.settings.randomSeed, 7);

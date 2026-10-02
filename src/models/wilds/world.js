@@ -1,11 +1,13 @@
-import { buildTerrainRings, buildGrassBlades, buildOutdoorWorld } from '../world/world.js';
+import { buildTerrainRings, buildOutdoorWorld } from '../world/world.js';
 import { TERRAIN_RINGS } from '../world/terrain-mesh.js';
-import { GRASS } from '../world/grass-blades.js';
-import { worldAtmosphere } from '../world/atmosphere.js';
+import { grassBlades } from '../world/grass-blades.js';
+import { wildsAtmosphere } from './atmosphere.js';
+import { createWildsTerrainPaint } from './ground.js';
+import { createWildsGrass } from './grass.js';
 import { LANDMARKS } from '../world/landmarks.js';
 import { WARDEN_ARENA } from '../../core/wilds/combat.js';
 
-export const wildsAtmosphere = worldAtmosphere;
+export { wildsAtmosphere } from './atmosphere.js';
 const FOREST_START = Object.freeze({ x: -106.5, z: -180, yaw: .6 });
 
 const nextFrame = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -17,11 +19,8 @@ export async function createWildsWorld(scene, { theme = 'day', still = false, wo
   if (signal?.aborted || scene.isDisposed) controller.abort();
   let outdoor;
   try {
-    const [rings, blades] = await Promise.all([
-      buildTerrainRings({ workers, signal: controller.signal }),
-      buildGrassBlades({ workers, signal: controller.signal }),
-    ]);
-    const build = buildOutdoorWorld(scene, { theme, still, rings, blades });
+    const rings = await buildTerrainRings({ workers, signal: controller.signal });
+    const build = buildOutdoorWorld(scene, { theme, still, rings, blades: grassBlades([{ period: 16, blades: 1 }]), atmosphereFor: wildsAtmosphere });
     for (;;) {
       if (controller.signal.aborted) throw new DOMException('World creation cancelled', 'AbortError');
       const step = build.next();
@@ -35,6 +34,12 @@ export async function createWildsWorld(scene, { theme = 'day', still = false, wo
     throw error;
   }
   let disposed = false;
+  scene.getMeshByName('world-grass').setEnabled(false);
+  const ground = createWildsTerrainPaint(scene, { still });
+  outdoor.terrain[0].material.dispose();
+  for (const mesh of outdoor.terrain) mesh.material = ground.paint;
+  const grass = createWildsGrass(scene, { root: outdoor.root, atmosphere: outdoor.atmosphere, still, surface: outdoor.surfaceAt });
+  ground.setTheme(outdoor.atmosphere);
   const forest = outdoor.layers.find(layer => layer.planted), trees = outdoor.trees;
   const allObstacles = Array.from({ length: trees.count }, (_, index) => ({
     id: `forest-tree-${index}`, x: trees.x[index], z: trees.z[index],
@@ -55,7 +60,7 @@ export async function createWildsWorld(scene, { theme = 'day', still = false, wo
     root: outdoor.root, spawn, obstacles, landmarks, bounds: TERRAIN_RINGS.at(-1), refreshObstacles,
     get atmosphere() { return outdoor.atmosphere; },
     surfaceAt: outdoor.surfaceAt,
-    setTheme: outdoor.setTheme,
+    setTheme(next) { outdoor.setTheme(next); ground.setTheme(outdoor.atmosphere); grass.setTheme(outdoor.atmosphere); },
     update({ position }) {
       if (disposed || !position) return;
       refreshObstacles(position);
@@ -67,13 +72,16 @@ export async function createWildsWorld(scene, { theme = 'day', still = false, wo
         if (top > supportHeight && top <= feetY + 0.001 && (position.x - obstacle.x) ** 2 + (position.z - obstacle.z) ** 2 < obstacle.radius ** 2) supportHeight = top;
       }
       const above = Math.max(0, feetY - supportHeight);
-      outdoor.setContactShadow(position.x, position.z, 0.58 + above * 0.18, support ? 0.29 / (1 + above * 0.8) : 0);
+      const radius = 0.58 + above * 0.18, strength = support ? 0.29 / (1 + above * 0.8) : 0;
+      outdoor.setContactShadow(position.x, position.z, radius, strength);
+      ground.setContactShadow(position.x, position.z, radius, strength); grass.setContactShadow(position.x, position.z, radius, strength);
+      grass.setWalker(position.x, feetY, position.z, 1);
     },
     diagnostics() {
       return {
         location: 'Forest trail', scenery: 'forest', lighting: null, center: { x: 0, z: 0 }, pending: false, builds: 1, failures: 0,
         terrainTriangles: outdoor.terrain.reduce((sum, mesh) => sum + mesh.getTotalIndices() / 3, 0),
-        trees: trees.count, grassBlades: GRASS.layers.reduce((sum, layer) => sum + layer.blades, 0),
+        trees: trees.count, grassBlades: grass.blades,
         landmarks: landmarks.length, obstacles: obstacles.length, totalObstacles: allObstacles.length, disposed,
       };
     },
