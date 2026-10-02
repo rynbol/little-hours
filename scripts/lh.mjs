@@ -45,7 +45,7 @@ Options:
   --pitch <degrees>  focus shots: drag the view up (positive) or down by this many degrees first
   --backdrop         focus shots: show the painted fallback valley the window falls back to when the outdoor world cannot build
   --probe "<expr>"   shots: print an expression evaluated with the live Babylon scene bound to scene
-  --before "<expr>"  shots and world: evaluate an expression with scene bound before the picture is taken
+  --before "<expr>"  shots, world and perf: evaluate an expression with scene bound before the picture is taken
   --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
   --freeze <ms>      shots: stop the game clock at this many ms after the start, so two shots can be compared pixel for pixel
   --still            prefers-reduced-motion: reduce
@@ -222,6 +222,7 @@ async function perfOnce(url, view) {
     if (view === 'focus') { await views.focus.go(app); result.openMs = await takeEvents(app, 1500); }
     if (view === 'focus-trip') { Object.assign(result, await focusTrip(app, viewport)); result.pageErrors = app.errors.length; return result; }
     if (view === 'decorate') { await app.clickSel('#decorate-button'); result.openMs = await takeEvents(app, 3000); }
+    if (options.before) await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; ${options.before}; })()`);
     Object.assign(result, await idle(app, Number(options.seconds || 5)));
     if (view === 'house') {
       const tags = await app.js(`[...document.querySelectorAll('button.house-room-tag:not(.is-site):not(.is-garden):not(.is-pond)')].map(tag => tag.dataset.room)`);
