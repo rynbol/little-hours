@@ -6,6 +6,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { buildOutdoorWorld, buildGrassBlades, buildTerrainRings } from '../../models/world/world.js';
 import { renderRatioCeiling } from '../../core/render-scale.js';
 import { terrainMeshHeight } from '../../models/world/water.js';
+import { createIslandRain } from '../house/index.js';
 import { FOREST_WALK, createWalker, stepWalk, trunkGrid } from './forest-walk.js';
 
 export const FOREST_VIEW = Object.freeze({ fov: 1.1, near: 0.15, far: 16000, longestStep: 0.1 });
@@ -27,6 +28,7 @@ export function createForestScene(container, { theme = 'day', reducedMotion = fa
   camera.fov = FOREST_VIEW.fov; camera.minZ = FOREST_VIEW.near; camera.maxZ = FOREST_VIEW.far;
   const place = () => { camera.position.set(walker.x, walker.y, walker.z); camera.rotation.set(walker.pitch, -walker.yaw, 0); };
   place();
+  const rain = createIslandRain(scene, theme);
   let world = null, disposed = false, last = performance.now(), drawn = 0, pending = 2;
 
   const building = Promise.all([buildTerrainRings({ workers }), buildGrassBlades({ workers })]).then(async ([rings, blades]) => {
@@ -45,6 +47,7 @@ export function createForestScene(container, { theme = 'day', reducedMotion = fa
     const active = input.moving || walker.vx !== 0 || walker.vz !== 0;
     if (active) { stepWalk(walker, input.read(seconds), seconds, ground); place(); pending = 2; }
     if (reducedMotion && pending <= 0) return;
+    if (rain.mesh.isEnabled()) rain.animate(now / 1000, engine.getRenderWidth() / engine.getRenderHeight());
     pending--; scene.render(); drawn++;
   });
   const resize = () => { engine.resize(); pending = 2; };
@@ -53,8 +56,8 @@ export function createForestScene(container, { theme = 'day', reducedMotion = fa
   return {
     canvas,
     get ready() { return Boolean(world) && scene.isReady(); },
-    setTheme(next) { world?.setTheme(next); scene.clearColor.set(...(SKY[next] || SKY.day), 1); pending = 2; },
-    diagnostics: () => ({ scene, engine, camera, drawn, start: FOREST_WALK.start, ready: Boolean(world), walker: { x: walker.x, y: walker.y, z: walker.z, yaw: walker.yaw, pitch: walker.pitch }, trees: world?.trees.count ?? 0 }),
+    setTheme(next) { world?.setTheme(next); rain.setTheme(next); scene.clearColor.set(...(SKY[next] || SKY.day), 1); pending = 2; },
+    diagnostics: () => ({ scene, engine, camera, drawn, start: FOREST_WALK.start, ready: Boolean(world), walker: { x: walker.x, y: walker.y, z: walker.z, yaw: walker.yaw, pitch: walker.pitch, speed: Math.hypot(walker.vx, walker.vz) }, trees: world?.trees.count ?? 0, raining: rain.mesh.isEnabled() }),
     dispose() {
       disposed = true; window.removeEventListener('resize', resize); engine.stopRenderLoop();
       scene.dispose(); engine.dispose(); canvas.remove();

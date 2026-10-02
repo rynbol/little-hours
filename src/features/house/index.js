@@ -6,3 +6,4 @@ export { gableData } from './house-model.js';
 export { buildGardenTree } from './garden-trees.js';
 export { buildRoseArch } from './garden-retreat.js';
 export { houseFrame } from './house-framing.js';
+export { createIslandRain } from './house-rain.js';

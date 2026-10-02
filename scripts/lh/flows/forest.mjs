@@ -1,7 +1,7 @@
 import { steps } from '../steps.mjs';
 import { drawnRatio, ratioCeiling } from '../chrome.mjs';
 
-const FOREST = `(() => { const forest = window.__littleHours.forest, d = forest.diagnostics(); return { open: forest.isOpen, ready: Boolean(d?.ready), walker: d?.walker ?? null, trees: d?.trees ?? 0, drawn: d?.drawn ?? 0, start: d?.start ?? null, eye: d ? [d.camera.position.x, d.camera.position.y, d.camera.position.z] : null }; })()`;
+const FOREST = `(() => { const forest = window.__littleHours.forest, d = forest.diagnostics(); return { open: forest.isOpen, ready: Boolean(d?.ready), walker: d?.walker ?? null, trees: d?.trees ?? 0, raining: d?.raining ?? null, drawn: d?.drawn ?? 0, start: d?.start ?? null, eye: d ? [d.camera.position.x, d.camera.position.y, d.camera.position.z] : null }; })()`;
 const ENGINES = `window.__littleHours.counts().engines`;
 const hold = (app, key, code, down) => app.send('Input.dispatchKeyEvent', { type: down ? 'keyDown' : 'keyUp', key, code });
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -9,7 +9,7 @@ const arrive = app => app.waitFor(`(() => { const f = window.__littleHours.fores
 const leave = app => app.waitFor(`!window.__littleHours.forest.isOpen && !document.body.classList.contains('is-forest')`, { what: 'the island after the forest', timeout: 20000 });
 
 const frames = async (app, count) => { const from = (await app.js(FOREST)).drawn; await app.waitFor(`window.__littleHours.forest.diagnostics().drawn >= ${from + count}`, { what: `${count} more forest frames`, timeout: 30000 }); };
-const STOPPED = `new Promise(done => { const read = () => { const d = window.__littleHours.forest.diagnostics(); return [d.walker.x, d.walker.z, d.drawn]; }; let last = read(), since = performance.now(); const poll = () => { const now = read(); if (now[0] !== last[0] || now[1] !== last[1]) { last = now; since = performance.now(); } else if (now[2] >= last[2] + 2 || performance.now() - since > 3000) return done(true); setTimeout(poll, 60); }; poll(); })`;
+const STOPPED = `window.__littleHours.forest.diagnostics().walker.speed === 0`;
 
 async function walk(app, key, code, ms, least) {
   const from = (await app.js(FOREST)).walker;
@@ -69,7 +69,7 @@ export default {
     check('no errors were logged', app.errors.length === 0, app.errors);
     await app.close();
 
-    const still = await t.open({ seed: 'three-rooms', reducedMotion: true });
+    const still = await t.open({ seed: 'three-rooms', reducedMotion: true, theme: 'rain' });
     await still.settle();
     await steps.openHouse(still);
     await still.clickSel('[data-room="forest"]');
@@ -81,6 +81,7 @@ export default {
     check('reduced motion: a still forest draws no further frames', later.drawn === rest.drawn, { rest: rest.drawn, later: later.drawn });
     const stepped = await walk(still, 'w', 'KeyW', 800, 0.8);
     check('reduced motion: walking still moves the view and draws it', stepped.far > 0.5 && (await still.js(FOREST)).drawn > later.drawn, stepped);
+    check('rain falls in the forest in the rain theme and in no other', rest.raining === true && start.raining === false, { rain: rest.raining, fair: start.raining });
     await still.close();
   },
 };
