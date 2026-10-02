@@ -46,10 +46,10 @@ export function encodeSequence(folder, frames, { executable = process.env.LH_FFM
   }
 }
 
-export async function captureSequence(app, rawSequence, folder) {
+export async function captureSequence(app, rawSequence, folder, { drive } = {}) {
   const sequence = validateSequence(rawSequence);
   mkdirSync(folder, { recursive: true });
-  await app.js(`document.getElementById('wilds-canvas').focus()`);
+  await app.js(`document.getElementById('wilds-canvas')?.focus()`);
   if (sequence.fixture) {
     const placed = await app.js(`window.__littleHours.wilds.place(${JSON.stringify(sequence.fixture)})`);
     if (!placed) throw new Error('The sequence fixture is outside loaded terrain');
@@ -104,12 +104,15 @@ export async function captureSequence(app, rawSequence, folder) {
       });
       await app.send('Page.startScreencast', { format: 'jpeg', quality: 78, maxWidth: app.width, maxHeight: app.height, everyNthFrame: 1, maxFramesInFlight: 1 });
       screencasting = true;
-      const began = performance.now();
-      while (performance.now() - began < sequence.durationMs) {
-        while (next < inputs.length && inputs[next].at <= performance.now() - began) await dispatch(inputs[next++]);
-        await sleep(5);
+      if (drive) await drive();
+      else {
+        const began = performance.now();
+        while (performance.now() - began < sequence.durationMs) {
+          while (next < inputs.length && inputs[next].at <= performance.now() - began) await dispatch(inputs[next++]);
+          await sleep(5);
+        }
+        while (next < inputs.length) await dispatch(inputs[next++]);
       }
-      while (next < inputs.length) await dispatch(inputs[next++]);
     }
   } finally {
     try {
