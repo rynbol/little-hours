@@ -1,4 +1,4 @@
-import { AdditiveBlending, CatmullRomCurve3, CircleGeometry, Color, TubeGeometry, ConeGeometry, CylinderGeometry, DodecahedronGeometry, DoubleSide, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, Quaternion, RingGeometry, SphereGeometry, Vector3 } from 'three';
+import { AdditiveBlending, CatmullRomCurve3, CircleGeometry, Color, TubeGeometry, ConeGeometry, CylinderGeometry, DodecahedronGeometry, DoubleSide, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, Quaternion, RingGeometry, ShaderMaterial, SphereGeometry, Vector3 } from 'three';
 import { STAG, STAG_ATTACKS } from '../../core/wilds/stag.js';
 import { part, merge } from './shapes.js';
 
@@ -37,10 +37,48 @@ function rootGeometry() {
   ]);
 }
 
-function decal(geometry, colour, opacity) {
-  const mesh = new Mesh(geometry, new MeshBasicMaterial({ color: colour, transparent: true, opacity, depthWrite: false, side: DoubleSide, blending: AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2 }));
-  mesh.rotation.x = -Math.PI / 2; mesh.visible = false; mesh.renderOrder = 5;
+const DECAL = `varying vec2 vUv;
+void main() {
+  vUv = uv;
+  vec4 at = vec4(position, 1.0);
+  #ifdef USE_INSTANCING
+  at = instanceMatrix * at;
+  #endif
+  gl_Position = projectionMatrix * modelViewMatrix * at;
+}`;
+const band = inner => `smoothstep(${inner.toFixed(2)}, ${((inner + 1) / 2).toFixed(3)}, r) * smoothstep(1.0, ${((inner + 1) / 2).toFixed(3)}, r)`;
+const FADE = Object.freeze({ disc: 'smoothstep(1.0, 0.72, r) * (0.55 + 0.45 * smoothstep(0.2, 0.95, r))', lane: 'smoothstep(0.0, 0.25, vUv.x) * smoothstep(1.0, 0.75, vUv.x) * smoothstep(0.0, 0.1, vUv.y) * smoothstep(1.0, 0.8, vUv.y)' });
+
+function decalMaterial(colour, opacity, fade) {
+  return new ShaderMaterial({
+    uniforms: { colour: { value: new Color(colour) }, opacity: { value: opacity } },
+    vertexShader: DECAL,
+    fragmentShader: `uniform vec3 colour;
+uniform float opacity;
+varying vec2 vUv;
+void main() {
+  float r = length(vUv * 2.0 - 1.0);
+  gl_FragColor = vec4(colour, opacity * ${fade});
+}`,
+    transparent: true, depthWrite: false, side: DoubleSide, blending: AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2,
+  });
+}
+
+function decal(geometry, colour, opacity, fade) {
+  const mesh = new Mesh(geometry, decalMaterial(colour, opacity, fade));
+  mesh.rotation.x = -Math.PI / 2; mesh.visible = false; mesh.renderOrder = 5; mesh.frustumCulled = false;
   return mesh;
+}
+
+const point = new Vector3();
+function drape(mesh, ground) {
+  mesh.updateMatrixWorld();
+  const position = mesh.geometry.attributes.position, flat = mesh.userData.flat ??= position.array.slice();
+  for (let i = 0; i < position.count; i++) {
+    point.set(flat[i * 3], flat[i * 3 + 1], 0).applyMatrix4(mesh.matrixWorld);
+    position.setZ(i, (ground(point.x, point.z) + 0.06 - point.y) / mesh.scale.z);
+  }
+  position.needsUpdate = true;
 }
 
 const matrix = new Matrix4(), place = new Vector3(), size = new Vector3(), spin = new Quaternion(), upright = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2), axisY = new Vector3(0, 1, 0);
@@ -53,12 +91,12 @@ export function buildRing(sim, painterly) {
   const carving = new Mesh(spiralGeometry(layout.ring.places, layout.ring, layout.stone, ground), new MeshBasicMaterial({ color: SPIRAL.dark, toneMapped: false }));
   carving.name = 'wilds-spirals';
 
-  const slam = decal(new RingGeometry(0.86, 1, 48), HIDE.warn, 0.5);
-  const wave = decal(new RingGeometry(0.8, 1, 64), '#ffe2b0', 0.7);
-  const lane = decal(new PlaneGeometry(1, 1), HIDE.warn, 0.35);
-  const arc = decal(new CircleGeometry(1, 24, 0, STAG_ATTACKS.sweep.arc * 2), HIDE.warn, 0.32);
+  const slam = decal(new RingGeometry(0.86, 1, 48), HIDE.warn, 0.5, band(0.86));
+  const wave = decal(new RingGeometry(0.8, 1, 64), '#ffe2b0', 0.7, band(0.8));
+  const lane = decal(new PlaneGeometry(1, 1, 2, 10), HIDE.warn, 0.35, FADE.lane);
+  const arc = decal(new RingGeometry(0.001, 1, 24, 6, 0, STAG_ATTACKS.sweep.arc * 2), HIDE.warn, 0.32, FADE.disc);
   const spikes = new InstancedMesh(rootGeometry(), painterly.material('#ffffff', { vertexColors: true }), ROOT_MAX);
-  const marks = new InstancedMesh(new CircleGeometry(1, 16), new MeshBasicMaterial({ color: HIDE.warn, transparent: true, opacity: 0.45, depthWrite: false, blending: AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2 }), ROOT_MAX);
+  const marks = new InstancedMesh(new CircleGeometry(1, 16), decalMaterial(HIDE.warn, 0.45, FADE.disc), ROOT_MAX);
   spikes.castShadow = true; spikes.count = 0; marks.count = 0; marks.renderOrder = 5; spikes.frustumCulled = false; marks.frustumCulled = false;
   root.add(stones, carving, slam, wave, lane, arc, spikes, marks);
 
@@ -70,19 +108,19 @@ export function buildRing(sim, painterly) {
     if (!attack) return;
     if (state.state === 'telegraph') {
       const s = ease(state.time / attack.telegraph);
-      if (state.attack === 'stomp') { slam.visible = true; slam.position.set(state.x, ground0, state.z); slam.scale.setScalar(attack.slam * (0.6 + 0.4 * s)); slam.material.opacity = 0.2 + s * 0.45; }
+      if (state.attack === 'stomp') { slam.visible = true; slam.position.set(state.x, ground0, state.z); slam.scale.setScalar(attack.slam * (0.6 + 0.4 * s)); slam.material.uniforms.opacity.value = 0.2 + s * 0.45; drape(slam, ground); }
       if (state.attack === 'charge') {
         const dx = state.aimX - state.x, dz = state.aimZ - state.z, angle = Math.atan2(dx, dz), length = attack.length * 0.6;
         lane.visible = true; lane.position.set(state.x + Math.sin(angle) * length / 2, ground0, state.z + Math.cos(angle) * length / 2);
-        lane.rotation.set(-Math.PI / 2, 0, angle); lane.scale.set(STAG.radius * 2, length, 1); lane.material.opacity = 0.1 + s * 0.3;
+        lane.rotation.set(-Math.PI / 2, 0, angle); lane.scale.set(STAG.radius * 2, length, 1); lane.material.uniforms.opacity.value = 0.1 + s * 0.3; drape(lane, ground);
       }
       if (state.attack === 'sweep') {
         arc.visible = true; arc.position.set(state.x, ground0, state.z); arc.scale.setScalar(attack.reach);
-        arc.rotation.set(-Math.PI / 2, 0, state.facing - Math.PI / 2 - attack.arc); arc.material.opacity = 0.08 + s * 0.24;
+        arc.rotation.set(-Math.PI / 2, 0, state.facing - Math.PI / 2 - attack.arc); arc.material.uniforms.opacity.value = 0.08 + s * 0.24; drape(arc, ground);
       }
     } else if (state.state === 'attack' && state.attack === 'stomp' && state.time < attack.active) {
       const s = state.time / attack.active, radius = attack.ring[0] + (attack.ring[1] - attack.ring[0]) * s;
-      wave.visible = true; wave.position.set(state.x, ground0, state.z); wave.scale.setScalar(radius); wave.material.opacity = 0.75 * (1 - s);
+      wave.visible = true; wave.position.set(state.x, ground0, state.z); wave.scale.setScalar(radius); wave.material.uniforms.opacity.value = 0.75 * (1 - s); drape(wave, ground);
     }
   }
 

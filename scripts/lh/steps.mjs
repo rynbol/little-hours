@@ -1,3 +1,5 @@
+import { WILDS, face, hold, sleep, until } from './wilds-moves.mjs';
+
 const VALLEY_VIEWS = Object.freeze({
   'wilds-camp': ['the camp clearing, bedroll, pot and merchant', { x: 1, z: 38, facing: -0.67, yaw: -0.67, pitch: 0.28, zoom: 8 }],
   'wilds-vista': ['the view down the valley from the vista rock', { x: 1, z: -39, facing: Math.PI, yaw: 3.12, pitch: 0.12, zoom: 7 }],
@@ -64,4 +66,19 @@ export const views = {
     await steps.openWilds(app); await steps.playWilds(app);
     await app.js(`window.__littleHours.wilds.visit(${JSON.stringify({ ...place, ...(options.hour ? { hour: Number(options.hour) } : {}) })})`);
   } }])),
+  'wilds-swing': { about: 'the Wilds: the stag fight mid-swing, after real keys walk into the ring, wake the stag, lock on and swing (--hour sets the time of day; pair with --wait 0)', async go(app, options = {}) {
+    await steps.openWilds(app); await steps.playWilds(app);
+    const { arena } = await app.js(WILDS);
+    await app.js(`window.__littleHours.wilds.visit(${JSON.stringify({ x: arena.x, z: arena.z + arena.radius - 2, facing: Math.PI, yaw: Math.PI, pitch: 0.15, zoom: 5, ...(options.hour ? { hour: Number(options.hour) } : {}) })})`);
+    await hold(app, 'w', 'KeyW', 700);
+    const awake = await until(app, `d.encounter === 'fight' && !['wake', 'dormant'].includes(d.stag.state)`, 'the stag to stand', 9000);
+    await face(app, Math.atan2(awake.stag.x - awake.player.x, awake.stag.z - awake.player.z));
+    await app.key('f', 'KeyF'); await sleep(150);
+    for (let i = 0; i < 12; i++) {
+      const d = await app.js(WILDS);
+      if (Math.hypot(d.stag.x - d.player.x, d.stag.z - d.player.z) < 3.4) break;
+      await hold(app, 'w', 'KeyW', 250);
+    }
+    await app.click(720, 450); await sleep(180);
+  } },
 };
