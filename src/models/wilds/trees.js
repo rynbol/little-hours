@@ -1,21 +1,80 @@
-import { Color, ConeGeometry, CylinderGeometry, Euler, Group, IcosahedronGeometry, InstancedMesh, Matrix4, PlaneGeometry, Quaternion, ShaderMaterial, Vector3 } from 'three';
+import { BufferAttribute, BufferGeometry, Color, CylinderGeometry, Euler, Group, IcosahedronGeometry, InstancedMesh, Matrix4, PlaneGeometry, Quaternion, ShaderMaterial, Vector3 } from 'three';
 import { part, merge } from './shapes.js';
 
-const BARK = Object.freeze({ oak: '#5f4532', beech: '#8a8576', pine: '#6a4936', birch: '#e7e1d3' });
-const LEAF = Object.freeze({ oak: ['#3f6d2f', '#6f9c3f'], beech: ['#4f7d32', '#86ad48'], pine: ['#2d5637', '#4a7b44'], birch: ['#7aa443', '#b3cf68'] });
-const leafShade = (low, high) => (_, y) => 0.82 + Math.min(1, Math.max(0, (y - low) / (high - low))) * 0.32;
+const BARK = Object.freeze({ oak: '#5f4532', beech: '#8a8576', pine: '#5b4a3e', birch: '#e7e1d3' });
+const LEAF = Object.freeze({ oak: ['#3f6d2f', '#7aa843'], beech: ['#4f7d32', '#93b84e'], pine: ['#2b5236', '#55854a'], birch: ['#7aa443', '#bcd46e'] });
+const leafShade = (low, high) => y => 0.78 + Math.min(1, Math.max(0, (y - low) / (high - low))) * 0.38;
+const hash = (i, k) => ((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
 
-function blobs(kind, list, detail) {
-  const [dark, light] = LEAF[kind], low = Math.min(...list.map(([, y, , r]) => y - r)), high = Math.max(...list.map(([, y, , r]) => y + r));
-  return list.map(([x, y, z, r, squash = 0.85], i) => part(new IcosahedronGeometry(r, detail), i % 3 === 2 ? light : dark, { position: [x, y, z], scale: [1, squash, 1], rotation: [i, i * 2, 0], shade: leafShade(low, high) }));
+export const CARD = Object.freeze({ core: 0.82, lift: 0.95, blend: 0.55, leaves: 5 });
+
+function build(positions, normals, colours, cards) {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
+  geometry.setAttribute('normal', new BufferAttribute(new Float32Array(normals), 3));
+  geometry.setAttribute('color', new BufferAttribute(new Float32Array(colours), 3));
+  geometry.setAttribute('card', new BufferAttribute(new Float32Array(cards), 4));
+  return geometry;
 }
+
+export function canopy([dark, light], list, { detail, cards, size }) {
+  const low = Math.min(...list.map(([, y, , r]) => y - r)), high = Math.max(...list.map(([, y, , r]) => y + r)), shade = leafShade(low, high);
+  const weight = list.reduce((sum, [, , , r]) => sum + r ** 3, 0), centre = new Vector3(...[0, 1, 2].map(axis => list.reduce((sum, blob) => sum + blob[axis] * blob[3] ** 3, 0) / weight));
+  const area = list.reduce((sum, [, , , r]) => sum + r * r, 0), positions = [], normals = [], colours = [], attributes = [], tone = new Color(), spot = new Vector3(), own = new Vector3(), whole = new Vector3();
+  const lean = (point, middle) => own.copy(point).sub(middle).normalize().lerp(whole.copy(point).sub(centre).normalize(), CARD.blend).normalize();
+  list.forEach(([x, y, z, r, squash = 0.85], b) => {
+    const middle = new Vector3(x, y, z), core = new IcosahedronGeometry(r * CARD.core, detail).toNonIndexed(), points = core.attributes.position;
+    for (let v = 0; v < points.count; v++) {
+      spot.set(points.getX(v), points.getY(v) * squash, points.getZ(v)).add(middle);
+      positions.push(spot.x, spot.y, spot.z);
+      const n = lean(spot, middle); normals.push(n.x, n.y, n.z);
+      tone.set(b % 3 === 2 ? light : dark).multiplyScalar(shade(spot.y) * 0.74);
+      colours.push(tone.r, tone.g, tone.b); attributes.push(0, 0, 0, 0);
+    }
+    core.dispose();
+    const count = Math.max(4, Math.round(cards * r * r / area));
+    for (let c = 0; c < count; c++) {
+      const seed = b * 97 + c * 13 + 1, u = hash(seed, 1) * Math.PI * 2, h = 1 - Math.pow(hash(seed, 2), 0.75) * 1.7, ring = Math.sqrt(Math.max(0, 1 - h * h)), out = r * (CARD.lift + hash(seed, 3) * 0.14);
+      spot.set(Math.cos(u) * ring * out, h * out * squash, Math.sin(u) * ring * out).add(middle);
+      const n = lean(spot, middle), half = size * (0.8 + hash(seed, 4) * 0.45), height = (spot.y - low) / (high - low);
+      tone.set(dark).lerp(new Color(light), Math.min(1, Math.max(0, height * 0.9 + (hash(seed, 5) - 0.4) * 0.5))).multiplyScalar(shade(spot.y) * (0.9 + n.y * 0.08));
+      for (const [cx, cy] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) {
+        positions.push(spot.x, spot.y, spot.z); normals.push(n.x, n.y, n.z); colours.push(tone.r, tone.g, tone.b);
+        attributes.push(cx, cy, half, 0.05 + hash(seed, 6) * 0.95);
+      }
+    }
+  });
+  return build(positions, normals, colours, attributes);
+}
+
+function tier(y, radius, height, points, droop, turn) {
+  const [dark, light] = LEAF.pine, positions = [], normals = [], colours = [], top = new Color(light).lerp(new Color(dark), 0.25), tip = new Color(light), valley = new Color(dark), under = new Color(dark).multiplyScalar(0.62);
+  const ring = Array.from({ length: points * 2 }, (_, k) => {
+    const a = k / (points * 2) * Math.PI * 2 + turn, sharp = k % 2 === 0, r = sharp ? radius * (0.86 + hash(k + turn * 31, 7) * 0.28) : radius * 0.52;
+    return { at: [Math.cos(a) * r, sharp ? y - droop * (0.8 + hash(k + turn * 31, 8) * 0.4) : y + height * 0.14, Math.sin(a) * r], colour: sharp ? tip : valley };
+  });
+  const apex = [0, y + height, 0], hub = [0, y + height * 0.2, 0], push = (at, normal, colour) => { positions.push(...at); normals.push(...normal); colours.push(colour.r, colour.g, colour.b); };
+  const outward = (at, up) => { const n = new Vector3(at[0], up, at[2]).normalize(); return [n.x, n.y, n.z]; };
+  ring.forEach((corner, k) => {
+    const next = ring[(k + 1) % ring.length], mid = [(corner.at[0] + next.at[0]) / 2, 0, (corner.at[2] + next.at[2]) / 2];
+    push(apex, outward(mid, radius * 1.4), top); push(next.at, outward(next.at, radius * 0.55), next.colour); push(corner.at, outward(corner.at, radius * 0.55), corner.colour);
+    push(hub, outward(mid, -radius * 0.1), under); push(corner.at, outward(corner.at, -radius * 0.05), under); push(next.at, outward(next.at, -radius * 0.05), under);
+  });
+  return build(positions, normals, colours, new Array(positions.length / 3 * 4).fill(0));
+}
+
+const plain = geometry => {
+  geometry.deleteAttribute('uv');
+  geometry.setAttribute('card', new BufferAttribute(new Float32Array(geometry.attributes.position.count * 4), 4));
+  return geometry;
+};
 
 export const ROOTS = Object.freeze({ dark: 0.58, rise: 0.9, spread: 1.7, opacity: 0.42, tint: '#1c2614' });
 const rootShade = y => ROOTS.dark + (1 - ROOTS.dark) * Math.min(1, Math.max(0, (y + 0.3) / ROOTS.rise));
 
 function trunk(kind, height, base, top, sides) {
   const bark = kind === 'birch' ? y => (Math.sin(y * 9.3) > 0.82 ? 0.35 : 1) : y => 0.85 + (y / height) * 0.2;
-  return part(new CylinderGeometry(top, base, height, sides, 6), BARK[kind], { position: [0, height / 2 - 0.3, 0], shade: (_, y) => bark(y) * rootShade(y) });
+  return plain(part(new CylinderGeometry(top, base, height, sides, 6), BARK[kind], { position: [0, height / 2 - 0.3, 0], shade: (_, y) => bark(y) * rootShade(y) }));
 }
 
 function roots(trees, ground) {
@@ -42,26 +101,31 @@ void main() { float r = dot(vSpot, vSpot); if (r > 1.0) discard; float fall = 1.
 function branch(kind, from, to, radius) {
   const dir = new Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]), length = dir.length();
   const tilt = new Euler().setFromQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), dir.normalize()));
-  return part(new CylinderGeometry(radius * 0.6, radius, length, 5), BARK[kind], { position: [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2], rotation: [tilt.x, tilt.y, tilt.z] });
+  return plain(part(new CylinderGeometry(radius * 0.6, radius, length, 5), BARK[kind], { position: [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2], rotation: [tilt.x, tilt.y, tilt.z] }));
 }
+
+const PINE = Object.freeze({
+  near: Object.freeze([[1.7, 2.8, 2.4], [3.3, 2.5, 2.4], [4.9, 2.15, 2.3], [6.4, 1.8, 2.2], [7.8, 1.4, 2], [9.1, 1, 1.8], [10.2, 0.6, 1.6]]),
+  far: Object.freeze([[2, 2.8, 3.4], [4.8, 2.2, 3.2], [7.4, 1.5, 2.8], [9.6, 0.8, 2.2]]),
+});
 
 const SHAPES = Object.freeze({
   oak: detail => detail ? merge([
     trunk('oak', 4.6, 0.42, 0.26, 8), branch('oak', [0, 3.6, 0], [1.4, 5.4, 0.3], 0.16), branch('oak', [0, 3.8, 0], [-1.2, 5.6, -0.6], 0.15),
-    ...blobs('oak', [[0, 6.4, 0, 2.6], [1.7, 5.8, 0.6, 2], [-1.6, 5.9, -0.7, 2.1], [0.4, 7.6, -0.9, 1.9], [-0.6, 7.4, 1.1, 1.8], [0.9, 5.2, -1.5, 1.6]], 1),
-  ]) : merge([trunk('oak', 4.6, 0.42, 0.26, 5), ...blobs('oak', [[0, 6.6, 0, 3.1, 0.8]], 0)]),
+    canopy(LEAF.oak, [[0, 6.4, 0, 2.6], [1.7, 5.8, 0.6, 2], [-1.6, 5.9, -0.7, 2.1], [0.4, 7.6, -0.9, 1.9], [-0.6, 7.4, 1.1, 1.8], [0.9, 5.2, -1.5, 1.6]], { detail: 1, cards: 150, size: 0.62 }),
+  ]) : merge([trunk('oak', 4.6, 0.42, 0.26, 5), canopy(LEAF.oak, [[0, 6.6, 0, 3.1, 0.8]], { detail: 0, cards: 26, size: 1 })]),
   beech: detail => detail ? merge([
     trunk('beech', 6, 0.34, 0.2, 8), branch('beech', [0, 4.8, 0], [1, 6.6, 0.4], 0.12),
-    ...blobs('beech', [[0, 7.6, 0, 2.3, 1.05], [0.9, 6.4, 0.5, 1.9], [-1, 6.6, -0.4, 1.9], [0.2, 9.1, -0.3, 1.6], [-0.5, 8.4, 0.9, 1.5]], 1),
-  ]) : merge([trunk('beech', 6, 0.34, 0.2, 5), ...blobs('beech', [[0, 7.8, 0, 2.6, 1.2]], 0)]),
+    canopy(LEAF.beech, [[0, 7.6, 0, 2.3, 1.05], [0.9, 6.4, 0.5, 1.9], [-1, 6.6, -0.4, 1.9], [0.2, 9.1, -0.3, 1.6], [-0.5, 8.4, 0.9, 1.5]], { detail: 1, cards: 130, size: 0.56 }),
+  ]) : merge([trunk('beech', 6, 0.34, 0.2, 5), canopy(LEAF.beech, [[0, 7.8, 0, 2.6, 1.2]], { detail: 0, cards: 24, size: 0.9 })]),
   pine: detail => merge([
     trunk('pine', detail ? 9 : 8, 0.3, 0.12, detail ? 7 : 5),
-    ...(detail ? [[3.4, 2.6, 3.2], [5.2, 2.1, 2.9], [7, 1.6, 2.5], [8.7, 1.1, 2.1], [10.2, 0.6, 1.6]] : [[3.4, 2.6, 4.6], [6.6, 1.7, 4.4], [9.4, 0.9, 3.2]]).map(([y, r, h], i) => part(new ConeGeometry(r, h, detail ? 9 : 6), LEAF.pine[i % 2], { position: [0, y + h / 2 - 0.4, 0], rotation: [0, i, 0], shade: (_, yy) => 0.78 + Math.min(1, Math.max(0, (yy - y + 0.4) / h)) * 0.35 })),
+    ...PINE[detail ? 'near' : 'far'].map(([y, r, h], i) => tier(y, r, h, detail ? 9 : 7, r * 0.32, i * 1.7)),
   ]),
   birch: detail => detail ? merge([
     trunk('birch', 6.2, 0.2, 0.12, 7), branch('birch', [0, 4.2, 0], [0.8, 5.6, 0.2], 0.07),
-    ...blobs('birch', [[0.2, 6.6, 0, 1.6, 1.2], [-0.6, 5.6, 0.4, 1.3], [0.7, 5.4, -0.4, 1.2], [0, 7.8, 0.2, 1.1]], 1),
-  ]) : merge([trunk('birch', 6.2, 0.2, 0.12, 5), ...blobs('birch', [[0, 6.6, 0, 1.9, 1.3]], 0)]),
+    canopy(LEAF.birch, [[0.2, 6.6, 0, 1.6, 1.2], [-0.6, 5.6, 0.4, 1.3], [0.7, 5.4, -0.4, 1.2], [0, 7.8, 0.2, 1.1]], { detail: 1, cards: 90, size: 0.42 }),
+  ]) : merge([trunk('birch', 6.2, 0.2, 0.12, 5), canopy(LEAF.birch, [[0, 6.6, 0, 1.9, 1.3]], { detail: 0, cards: 20, size: 0.7 })]),
 });
 
 const CLOSE = Object.freeze({ gone: 1.4, whole: 3.6 });
@@ -86,8 +150,39 @@ if (smoothstep(${CLOSE.gone.toFixed(2)}, ${CLOSE.whole.toFixed(2)}, length(vView
   return material;
 }
 
+function addLeaves(material) {
+  const before = material.onBeforeCompile;
+  material.onBeforeCompile = shader => {
+    before?.(shader);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec4 card;\nvarying vec4 vCard;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+vCard = card;
+float spin = card.w * 6.2832 + sin(windTime * 1.7 + card.w * 40.0) * 0.12;
+mvPosition.xy += mat2(cos(spin), sin(spin), -sin(spin), cos(spin)) * card.xy * card.z * length(instanceMatrix[0].xyz);
+gl_Position = projectionMatrix * mvPosition;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec4 vCard;')
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+if (vCard.w > 0.0) {
+  vec2 stem = vCard.xy * 1.08 - vec2(0.0, -0.92);
+  float leafy = 0.0;
+  for (int k = 0; k < ${CARD.leaves}; k++) {
+    float angle = (float(k) - ${((CARD.leaves - 1) / 2).toFixed(1)}) * 0.42 + (fract(vCard.w * (7.13 + float(k) * 3.1)) - 0.5) * 0.35;
+    vec2 along = vec2(sin(angle), cos(angle));
+    float t = dot(stem, along) / (1.45 + fract(vCard.w * (3.7 + float(k) * 1.3)) * 0.4), side = abs(dot(stem, vec2(along.y, -along.x)));
+    leafy = max(leafy, step(0.0, t) * step(t, 1.0) * step(side, 0.34 * sin(3.1416 * clamp(t, 0.0, 1.0)) * (1.0 - t * 0.35)));
+  }
+  if (leafy < 0.5) discard;
+}`);
+  };
+  return material;
+}
+
+export const leafyMaterial = (painterly, wind) => addLeaves(addSway(painterly.material('#ffffff', { vertexColors: true, rim: false }), wind));
+
 export function buildTrees(trees, painterly, { wind, ground, near = () => true }) {
-  const root = new Group(), material = addSway(painterly.material('#ffffff', { vertexColors: true }), wind);
+  const root = new Group(), material = leafyMaterial(painterly, wind);
   root.name = 'wilds-trees';
   const matrix = new Matrix4(), turn = new Quaternion(), lean = new Quaternion(), at = new Vector3(), size = new Vector3(), tint = new Color(), axis = new Vector3();
   for (const kind of Object.keys(SHAPES)) for (const detail of [true, false]) {

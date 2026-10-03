@@ -97,7 +97,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     ],
     sheets: SHEETS,
   });
-  const landmarks = buildLandmarks(VALLEY, ground, painterly), secrets = buildSecrets(sim, painterly), scatter = buildScatter(sim, painterly, wind);
+  const landmarks = buildLandmarks(VALLEY, ground, painterly, wind), secrets = buildSecrets(sim, painterly), scatter = buildScatter(sim, painterly, wind);
   scene.add(water.root, landmarks.root, secrets.root, ...scatter.meshes);
   scene.add(buildPosts(sim.posts, painterly.material('#ffffff', { vertexColors: true })));
   const dummyView = buildDummy(sim.dummy, painterly);

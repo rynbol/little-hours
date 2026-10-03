@@ -1,5 +1,6 @@
-import { AdditiveBlending, BoxGeometry, CapsuleGeometry, ConeGeometry, CylinderGeometry, DodecahedronGeometry, Euler, Group, IcosahedronGeometry, Mesh, MeshBasicMaterial, PointLight, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three';
+import { AdditiveBlending, BoxGeometry, CapsuleGeometry, ConeGeometry, CylinderGeometry, DodecahedronGeometry, Euler, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PointLight, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three';
 import { part, merge } from './shapes.js';
+import { canopy, leafyMaterial } from './trees.js';
 
 const C = Object.freeze({
   wood: '#8a5f3c', woodDark: '#5e3f2a', plank: '#b0814f', canvas: '#e9dcc0', wool: '#b65a42', woolLight: '#e2b46a', iron: '#4b4744', brass: '#d6a94a',
@@ -8,6 +9,7 @@ const C = Object.freeze({
   dome: '#d8cdb8', glass: '#9cc9d6', pearl: '#f6f1e6', shell: '#d9b6a0', feather: '#b9764a', featherTip: '#3d2f28', soil: '#6b4a32',
 });
 
+const CROWN = Object.freeze({ base: 27, cards: 700, size: 1.5 });
 const up = new Vector3(0, 1, 0);
 const tiltFor = (dx, dy, dz) => new Euler().setFromQuaternion(new Quaternion().setFromUnitVectors(up, new Vector3(dx, dy, dz).normalize()));
 
@@ -94,14 +96,14 @@ function greatOak(layout, ground) {
   const limbs = [[0.4, 31, 9], [2.2, 30, 10], [3.9, 31, 9], [5.3, 30.5, 8.5]].map(([a, top, reach]) => [oak.x + Math.sin(a) * reach, top, oak.z + Math.cos(a) * reach]);
   for (const limb of limbs) parts.push(rod([oak.x, oak.fork - 0.5, oak.z], limb, 0.55, C.bark, 8));
   const crown = [[0, 33.5, 0, 7.5], [7.5, 31.5, 2, 5.6], [-6.5, 32, 3, 5.8], [2, 32.5, -7.5, 5.8], [-3, 31.5, -6, 5.2], [4, 36, 3, 5], [-3, 36.5, 1.5, 5], [6.8, 30, -5.5, 4.4], [-7, 30.5, -3, 4.2], [0.5, 30, 7.8, 4.6]];
-  parts.push(...crown.map(([dx, y, dz, r], i) => part(new IcosahedronGeometry(r, 2), i % 3 === 1 ? C.leafLight : C.leaf, { position: [oak.x + dx, y, oak.z + dz], scale: [1, 0.72, 1], rotation: [i, i * 2, 0], shade: (_, yy) => 0.76 + Math.min(1, Math.max(0, (yy - 26) / 14)) * 0.4 })));
+  const crownAt = [oak.x, CROWN.base, oak.z], leaves = canopy([C.leaf, C.leafLight], crown.map(([dx, y, dz, r]) => [dx, y - CROWN.base, dz, r, 0.72]), { detail: 2, cards: CROWN.cards, size: CROWN.size });
   const sy = ground(swing.x, swing.z), seatY = sy + 0.55;
   const ropes = [-0.32, 0.32].map(offset => [Math.cos(swing.facing) * offset, Math.sin(swing.facing) * -offset]);
   const swingParts = [
     ...ropes.map(([ox, oz]) => rod([ox, 0, oz], [ox, -(arm[1] - seatY), oz], 0.018, C.canvas, 4)),
     part(new BoxGeometry(0.8, 0.06, 0.32), C.plank, { position: [0, -(arm[1] - seatY), 0], rotation: [0, -swing.facing + Math.PI / 2, 0] }),
   ];
-  return { parts, swing: { at: arm, geometry: merge(swingParts) } };
+  return { parts, crown: { at: crownAt, geometry: leaves }, swing: { at: arm, geometry: merge(swingParts) } };
 }
 
 function hollowLog(layout) {
@@ -218,7 +220,7 @@ function lakeside(layout, ground) {
   return parts;
 }
 
-export function buildLandmarks(layout, ground, painterly) {
+export function buildLandmarks(layout, ground, painterly, wind) {
   const root = new Group(), material = painterly.material('#ffffff', { vertexColors: true });
   root.name = 'wilds-landmarks';
   const campParts = camp(layout, ground), oak = greatOak(layout, ground);
@@ -226,6 +228,10 @@ export function buildLandmarks(layout, ground, painterly) {
   statics.castShadow = true; statics.receiveShadow = true; statics.name = 'wilds-landmark-statics';
   const far = new Mesh(merge(observatory(layout, ground)), material);
   far.name = 'wilds-observatory';
+  const crown = new InstancedMesh(oak.crown.geometry, leafyMaterial(painterly, wind), 1);
+  crown.setMatrixAt(0, new Matrix4().makeTranslation(...oak.crown.at));
+  crown.computeBoundingSphere();
+  crown.castShadow = true; crown.receiveShadow = true; crown.name = 'wilds-great-oak-crown';
   const swing = new Mesh(oak.swing.geometry, material);
   swing.position.set(...oak.swing.at); swing.castShadow = true; swing.name = 'wilds-swing';
   const glass = new Mesh(new SphereGeometry(0.09, 10, 8), new MeshBasicMaterial({ color: '#ffd18a' }));
@@ -234,7 +240,7 @@ export function buildLandmarks(layout, ground, painterly) {
   halo.position.copy(glass.position);
   const lamp = new PointLight('#ffb565', 0, 9, 1.8);
   lamp.position.copy(glass.position);
-  root.add(statics, far, swing, glass, halo, lamp);
+  root.add(statics, crown, far, swing, glass, halo, lamp);
   return {
     root,
     update(seconds, night, still) {
