@@ -61,6 +61,7 @@ export function checkSource(file, code) {
       if (name === '__littleHours' || name === '__littleHoursTest') add(node, 'test-hook', `${name} belongs only in ${HOOK_FILES.join(' or ')}`);
     }
     const source = (node.type === 'ImportDeclaration' || node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration' || node.type === 'ImportExpression') ? node.source?.value : null;
+    if (game && typeof source === 'string' && /^three(\/|$)/.test(source) && !/^src\/(features|models)\/wilds\//.test(file)) add(node, 'three', `three.js belongs to the Wilds only (src/features/wilds or src/models/wilds), not ${file}`);
     if (typeof source !== 'string' || !source.startsWith('.')) return;
     const target = relative(root, resolve(root, dirname(file), source));
     if (game && !target.startsWith('src/')) add(node, 'imports', `game code must not import ${target}`);

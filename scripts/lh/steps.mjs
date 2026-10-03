@@ -11,6 +11,8 @@ export const steps = {
   async closeDecorate(app) { await app.clickSel('#decorate-button'); await app.waitFor(`!document.body.classList.contains('is-decorating')`, { what: 'leaving Decorate' }); await app.settle(); },
   async openAvatar(app) { await steps.openMore(app); await app.clickSel('#avatar-button'); await app.waitFor(`document.body.classList.contains('is-avatar-editing')`, { what: 'the avatar editor' }); await app.settle(); },
   async openLake(app) { await steps.openHouse(app); await app.clickSel('[data-room="pond"]'); await app.waitFor(`Boolean(window.__littleHours.lake.isOpen && window.__littleHours.lake.diagnostics())`, { what: 'the lake', timeout: 10000 }); await app.settle(); },
+  async openWilds(app) { if (!await app.js(`document.body.classList.contains('is-house')`)) await steps.openHouse(app); await app.clickSel('[data-room="forest"]'); await app.waitFor(`window.__littleHours.wilds?.diagnostics()?.phase === 'menu' && !document.documentElement.dataset.placeTransition`, { what: 'the Wilds start card', timeout: 60000 }); },
+  async playWilds(app) { await app.clickSel('.wilds [data-wilds="play"]'); await app.waitFor(`window.__littleHours.wilds.diagnostics()?.phase === 'playing'`, { what: 'the Wilds to start' }); },
   async closeAvatar(app) { await app.clickSel('#avatar-done'); await app.waitFor(`!document.body.classList.contains('is-avatar-editing')`, { what: 'leaving the avatar editor' }); await app.settle(); },
 };
 
@@ -44,5 +46,5 @@ export const views = {
   decorate: { about: 'Decorate mode', async go(app) { await steps.openDecorate(app); } },
   avatar: { about: 'the avatar editor', async go(app) { await steps.openAvatar(app); } },
   lake: { about: 'fishing at Willow Pond, idle', async go(app) { await steps.openLake(app); } },
-  forest: { about: 'the walk-in forest, at the start of the path', async go(app) { await steps.openHouse(app); await app.clickSel('[data-room="forest"]'); await app.waitFor(`Boolean(window.__littleHours.forest.isOpen && window.__littleHours.forest.diagnostics()?.ready)`, { what: 'the forest', timeout: 90000 }); await app.settle(); } },
+  wilds: { about: 'the Wilds feel box, playing at the spawn', async go(app) { await steps.openWilds(app); await steps.playWilds(app); } },
 };

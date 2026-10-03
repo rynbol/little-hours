@@ -26,7 +26,7 @@ import './ui/calm-ui.css';
 import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
-import { createForestUI } from './features/forest/index.js';
+import { createWildsUI } from './features/wilds/index.js';
 import { createBuddyUI } from './features/buddy/index.js';
 import './ui/room-screen.css';
 import { installTestHook } from './dev/test-hook.js';
@@ -62,7 +62,7 @@ app.nav = createHouseNavigation(app);
 app.roomUI = createRoomUI(app);
 app.panels = createPanels(app);
 app.lake = createFishingUI(app);
-app.forest = createForestUI(app);
+app.wilds = createWildsUI(app);
 app.buddy = createBuddyUI(app);
 wireSoundControls(app);
 
@@ -80,7 +80,7 @@ function applyState(next, force = false) {
   app.timer.renderFocusReward();
   app.houseUI?.render();
   app.lake.render();
-  app.forest.render();
+  app.wilds.render();
   app.room?.setHouse(state.house);
   if (force || previous.pond.tank.join() !== state.pond.tank.join()) app.room?.setTankFish(state.pond.tank);
   app.roomUI.applyTheme(previous, force);
@@ -166,7 +166,7 @@ app.houseUI = createHouseUI($('#house-page'), {
   onEnter: app.nav.visitRoom,
   onFocus: () => travelTo('home', () => { app.nav.setHouseOpen(false); app.timer.expand(); $('#start-button').focus(); }),
   onPond: () => app.lake.open(),
-  onForest: () => app.forest.open(),
+  onForest: () => app.wilds.open(),
 });
 $('#house-coin-wallet').addEventListener('click', () => app.nav.setHouseOpen(false), { signal: listeners.signal });
 $('#house-focus').addEventListener('click', async () => { await app.nav.setHouseOpen(false); app.timer.expand(); if (!app.nav.houseOpen) $('#focus-card').showPopover(); }, { signal: listeners.signal });
@@ -205,7 +205,7 @@ document.addEventListener('visibilitychange', () => {
 }, { signal: listeners.signal });
 window.addEventListener('pagehide', markSeen, { signal: listeners.signal });
 
-if (import.meta.env.DEV) installTestHook({ get pet() { return app.pet; }, get buddy() { return app.buddy; }, get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get forest() { return app.forest; } });
+if (import.meta.env.DEV) installTestHook({ get pet() { return app.pet; }, get buddy() { return app.buddy; }, get room() { return app.room; }, get state() { return app.state; }, get speech() { return app.speech; }, get house() { return app.houseUI; }, get lake() { return app.lake; }, get wilds() { return app.wilds; } });
 if (import.meta.hot) import.meta.hot.dispose(() => {
   listeners.abort();
   document.body.classList.remove('is-travelling', 'is-door-walking', 'is-avatar-editing', 'is-decorating');
@@ -216,7 +216,7 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
   app.nav.dispose(); app.decorate.dispose();
   app.houseUI?.dispose();
   app.lake.dispose();
-  app.forest.dispose();
+  app.wilds.dispose();
   app.buddy.dispose();
   app.delights?.dispose();
   app.room?.dispose?.();

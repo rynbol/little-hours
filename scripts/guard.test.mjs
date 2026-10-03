@@ -24,6 +24,14 @@ test('import boundaries hold', () => {
   assert.deepEqual(rules('scripts/verify-room.mjs', "import { createRoom } from '../src/features/room/index.js';"), []);
 });
 
+test('only the Wilds imports three.js', () => {
+  assert.deepEqual(rules('src/features/wilds/game.js', "import { Scene } from 'three'; import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';"), []);
+  assert.deepEqual(rules('src/models/wilds/painterly.js', "import * as THREE from 'three';"), []);
+  assert.deepEqual(rules('src/features/room/room.js', "import { Scene } from 'three';"), ['three']);
+  assert.deepEqual(rules('src/core/wilds/player.js', "const three = await import('three/webgpu');"), ['three']);
+  assert.deepEqual(rules('src/features/house/house-view.js', "import { Scene } from 'threejs-extra';"), []);
+});
+
 test('comment lines are found, strings with slashes are not comments', () => {
   assert.deepEqual([...commentLines('a.js', "const url = 'https://x';\n// note\nconst b = 1; /* two\nlines */")], [2, 3, 4]);
 });

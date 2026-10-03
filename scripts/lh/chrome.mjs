@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { join } from 'node:path';
 import { ensureDir, lhDir, track, untrack } from './state.mjs';
 
+const KEY_CODES = Object.freeze({ KeyW: 87, KeyA: 65, KeyS: 83, KeyD: 68, KeyF: 70, KeyE: 69, KeyQ: 81, KeyM: 77, Space: 32, ShiftLeft: 16, ControlLeft: 17, Escape: 27 });
 export const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 export const slow = Math.max(1, Number(process.env.LH_SLOW) || 1);
 
@@ -105,6 +106,13 @@ export async function launch({ width = 1440, height = 1000, scale = 2, headed = 
       for (let i = 1; i <= steps; i++) { await sleep(16); await mouse('mouseMoved', from.x + (to.x - from.x) * i / steps, from.y + (to.y - from.y) * i / steps, 1); }
       await sleep(40); await mouse('mouseReleased', to.x, to.y);
     },
+    down: (key, code = key) => send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code, windowsVirtualKeyCode: KEY_CODES[code] }),
+    up: (key, code = key) => send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: KEY_CODES[code] }),
+    async rightClick(x, y) {
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'right', buttons: 2, clickCount: 1 });
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'right', buttons: 0, clickCount: 1 });
+    },
+    wheel: (x, y, deltaY) => send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY }),
     async key(key, code = key) {
       const text = key.length === 1 ? key : undefined;
       await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, text, windowsVirtualKeyCode: key === 'Escape' ? 27 : key === 'Enter' ? 13 : key === 'Tab' ? 9 : undefined });

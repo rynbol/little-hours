@@ -21,7 +21,7 @@ const roomTints = {
 };
 
 export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onFocus, onPond, onForest, art, icon, notice }) {
-  let view, firstBuild = 0, shown = false, selectedId = store.state.house.activeId, signature = '', modelSignature = '';
+  let view, firstBuild = 0, shown = false, released = false, selectedId = store.state.house.activeId, signature = '', modelSignature = '';
   let detailOpen = false, detailReturn = '#house-rooms-toggle', renaming = false;
   let preview = true, celebration = null, celebrationTimer, exporting = false, postcardUrl = null;
   const plans = new Map();
@@ -117,7 +117,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     view?.celebrate(entry.id);
   }
   function render() {
-    if (!shown) return;
+    if (!shown || released) return;
     view?.setFocused(isFocusing(store.state.session));
     const house = store.state.house, next = nextExpansion(house), plan = planFor(selectedId);
     const key = JSON.stringify([house, selectedId, detailOpen, plan.design, preview, celebration, store.state.theme, store.state.avatar, store.state.garden, store.state.session, store.state.pet, store.state.history]);
@@ -198,7 +198,7 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
       // The first build takes a moment: show the page first, then build the house.
       cancelAnimationFrame(firstBuild); clearTimeout(firstBuild);
       if (view) build();
-      else firstBuild = requestAnimationFrame(() => { firstBuild = setTimeout(() => { firstBuild = 0; if (shown && !view) build(); }); });
+      else firstBuild = requestAnimationFrame(() => { firstBuild = setTimeout(() => { firstBuild = 0; if (shown && !view && !released) build(); }); });
     }
     if (draftName && $(`#${focusId}`)) { $(`#${focusId}`).value = draftName.value; $(`#${focusId}`).setSelectionRange(draftName.start, draftName.end); }
     if (focusId && !$(`#${focusId}`)?.disabled) $(`#${focusId}`)?.focus({ preventScroll: true });
@@ -209,6 +209,8 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     // The house stays built while away, so coming back is instant.
     hide() { $('#house-room-menu').hidePopover(); gardenUI.close(); document.body.classList.remove('is-garden'); shown = false; postcardDialog.close(); root.hidden = true; view?.setSuspended(true); if (!view) modelSignature = ''; signature = ''; celebration = null; clearTimeout(celebrationTimer); $('#house-celebration').hidden = true; root.classList.remove('house-just-built'); $('#house-name-form').hidden = true; },
     render,
+    release() { released = true; cancelAnimationFrame(firstBuild); clearTimeout(firstBuild); firstBuild = 0; view?.dispose(); view = null; modelSignature = ''; signature = ''; },
+    restore() { if (!released) return; released = false; signature = ''; render(); },
     selectGardenPlant(id) { if (shown && selectedId === 'orchard') { gardenUI.selectPlant(id); $('#garden-card-title')?.focus({ preventScroll: true }); } },
     diagnostics: () => view?.diagnostics(),
     get view() { return view; },
