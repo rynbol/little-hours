@@ -98,7 +98,7 @@ export async function playFight(app, { out, limit = 110000, onState = () => {}, 
       } else if (game.action.kind !== 'dodge') {
         if (awaitingRoots && d < 7) await controls.toward(game, game.position.x + (game.position.x - b.x), game.position.z + (game.position.z - b.z));
         else if (awaitingRoots) await controls.stop();
-        else if (d > 2.5) await controls.toward(game, b.x, b.z);
+        else if (d > 2.15) await controls.toward(game, b.x, b.z);
         else {
           await controls.stop();
           if (!attackHeld && now > nextClick && ['idle', 'run', 'charge', 'land'].includes(game.action.kind) && game.stamina >= 12) {

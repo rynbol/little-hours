@@ -1,5 +1,6 @@
 import { heightAt } from '../world-terrain.js';
 import { DUMMY } from './feel.js';
+import { careReady } from './progression.js';
 
 export const ARENA = Object.freeze({ x: 0, z: -24, radius: 9, triggerRadius: 12, camp: Object.freeze({ x: 0, z: 2 }) });
 export const STONES = Object.freeze(Array.from({ length: 9 }, (_, index) => Object.freeze({ index, x: Math.sin(index * Math.PI * 2 / 9) * 9, z: -24 + Math.cos(index * Math.PI * 2 / 9) * 9, radius: 0.65, height: 3 })));
@@ -41,7 +42,7 @@ export function createEncounter({ bond = 0, checkpoint = () => ARENA.camp, stats
     action(state.boss, 'idle', 1.2); action(state.pet, 'follow');
     return state;
   }
-  const impact = (kind, actor, height = .8) => state.impacts.push({ serial: ++impactSerial, kind, x: actor.x, y: actor.y + height, z: actor.z, elapsed: 0 });
+  const impact = (kind, actor, height = .8, details = {}) => state.impacts.push({ serial: ++impactSerial, kind, x: actor.x, y: actor.y + height, z: actor.z, elapsed: 0, ...details });
   const target = () => state.status === 'fighting' ? state.boss : DUMMY;
   function start(sim) {
     state.status = 'fighting'; state.counts.starts++; lastHit = sim.lastHit?.serial ?? 0;
@@ -79,7 +80,7 @@ export function createEncounter({ bond = 0, checkpoint = () => ARENA.camp, stats
     if (isPlayer ? hurtAction === key || actor.invulnerable : petHurtAction === key || actor.health <= 0) return;
     if (isPlayer) hurtAction = key; else petHurtAction = key;
     actor.health = Math.max(0, actor.health - row.damage);
-    if (isPlayer) { actor.damageFlash = 0.45; actor.invulnerable = true; impact('playerHit', sim.player); }
+    if (isPlayer) { actor.damageFlash = 0.45; actor.invulnerable = true; impact('playerHit',sim.player,.8,{attack:state.boss.action.kind}); }
     else { actor.flash = 0.4; impact('petHit', actor); if (!actor.health) action(actor, 'knockedOut'); }
   }
   function bossStep(dt, sim) {
@@ -134,6 +135,15 @@ export function createEncounter({ bond = 0, checkpoint = () => ARENA.camp, stats
     if (input.petSkill && state.status === 'fighting' && pet.skillCooldown === 0) { action(pet, 'dash', 0.7); pet.skillCooldown = 12; tauntTime = 2.4; state.counts.petSkills++; impact('skill', pet); }
     const a = pet.action; a.elapsed += dt; a.progress = a.duration ? clamp(a.elapsed / a.duration, 0, 1) : 0;
     const details = exploration(), fighting = state.status === 'fighting', sniffing = !fighting && !details?.whistle && details?.sniff && Math.hypot(sim.player.vx,sim.player.vz)<.5;
+    if(!fighting && details?.petting>0 && careReady(sim.player,pet)) {
+      pet.heading=facing(pet,sim.player);pet.sniffing=false;
+      const previous={x:pet.x,y:pet.y,z:pet.z},gap=distance(pet,sim.player),travel=Math.min(Math.max(0,gap-.8),dt*1.2);
+      pet.x+=Math.sin(pet.heading)*travel;pet.z-=Math.cos(pet.heading)*travel;
+      pet.vx=(pet.x-previous.x)/Math.max(dt,.001);pet.vz=(pet.z-previous.z)/Math.max(dt,.001);
+      if(world)world.resolve(pet,previous);
+      pet.ground=world?world.floorAt(pet.x,pet.z,previous.y+.35):heightAt(pet.x,pet.z);pet.y=pet.ground;
+      pet.petting=travel<.001;a.kind=pet.petting?'pet':'follow';return;
+    }
     const aim = fighting ? state.boss : sniffing ? {x:sim.player.x+(details.sniff.x-sim.player.x)*.25,z:sim.player.z+(details.sniff.z-sim.player.z)*.25} : { x: sim.player.x - 0.9, z: sim.player.z + 0.8 };
     const previousPet = {x:pet.x,y:pet.y,z:pet.z}, wasSwimming=Boolean(pet.swimming);
     const d = distance(pet, aim); pet.heading = facing(pet, aim);
@@ -188,9 +198,9 @@ export function createEncounter({ bond = 0, checkpoint = () => ARENA.camp, stats
       pet.ground=pet.swimming || wasSwimming ? Math.max(floor,previousPet.y+clamp(support-previousPet.y,-3*dt,3*dt)) : floor;
     }
     pet.y = (world ? pet.ground : heightAt(pet.x, pet.z)) + (a.kind === 'pounce' ? Math.sin(a.progress * Math.PI) * 0.65 : 0);
-    pet.sniffing = Boolean(sniffing); pet.petting = !fighting && details?.petting>0;
+    pet.sniffing = Boolean(sniffing); pet.petting = !fighting && details?.petting>0 && careReady(sim.player,pet);
     pet.taunt = tauntTime > 0;
-    if (fighting && attacking && a.elapsed >= (a.kind === 'dash' ? 0.22 : 0.3) && distance(pet, aim) <= PET_CONTACT_RANGE && petHitAction !== a.serial) { petHitAction = a.serial; state.boss.health = Math.max(0, state.boss.health - (a.kind === 'spin' ? 10 : 7) * strength); state.boss.flash = 0.18; state.counts.petHits++; impact('petAttack', { x: pet.x + Math.sin(pet.heading) * .55, y: pet.y, z: pet.z - Math.cos(pet.heading) * .55 }, .45); }
+    if (fighting && attacking && a.elapsed >= (a.kind === 'dash' ? 0.22 : 0.3) && distance(pet, aim) <= PET_CONTACT_RANGE && petHitAction !== a.serial) { petHitAction = a.serial; state.boss.health = Math.max(0, state.boss.health - (a.kind === 'spin' ? 10 : 7) * strength); state.boss.flash = 0.18; state.counts.petHits++; sim.hitStop=Math.max(sim.hitStop||0,.03); impact('petAttack', { x: pet.x + Math.sin(pet.heading) * .55, y: pet.y, z: pet.z - Math.cos(pet.heading) * .55 }, .45); }
     if (a.duration && a.elapsed >= a.duration) { action(pet, 'follow'); pet.attackCooldown = 2; }
     else if (!attacking && fighting && d < 2.6 && pet.attackCooldown === 0) action(pet, ['pounce', 'swipe', 'spin'][petIndex++ % 3], 0.8);
     else if (!attacking) a.kind = pet.swimming ? 'swim' : pet.petting ? 'pet' : d > 0.3 ? 'follow' : sniffing ? 'sniff' : 'idle';

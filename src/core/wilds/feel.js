@@ -1,11 +1,12 @@
 import { heightAt, normalAt } from '../world-terrain.js';
+import { bladeContact } from './blade-contact.js';
 
 export const ATTACKS = Object.freeze(Object.fromEntries(Object.entries({
-  light1: { duration: 0.42, hitStart: 0.12, hitEnd: 0.23, range: 1.8, arc: 2.3, damage: 12, cost: 8, travel: 0.34 },
-  light2: { duration: 0.46, hitStart: 0.14, hitEnd: 0.26, range: 1.95, arc: 2.6, damage: 15, cost: 9, travel: 0.4 },
-  light3: { duration: 0.58, hitStart: 0.2, hitEnd: 0.34, range: 2.15, arc: 2.8, damage: 21, cost: 12, travel: 0.48 },
-  heavy: { duration: 0.82, hitStart: 0.25, hitEnd: 0.43, range: 2.4, arc: 2.5, damage: 35, cost: 24, travel: 0.6 },
-}).map(([kind, row]) => [kind, Object.freeze(row)])));
+  light1: { duration: 0.42, hitStart: 0.12, hitEnd: 0.23, range: 1.18, arc: 2.3, damage: 12, cost: 8, travel: 0, blade: [[0.3713,-0.22264,0.86328,-0.44281],[0.35689,-0.27087,0.82264,-0.54216],[0.30346,-0.37764,0.68509,-0.75825],[0.18317,-0.50718,0.40182,-0.99981],[-0.01796,-0.60359,-0.0226,-1.14237],[-0.26071,-0.57848,-0.48783,-1.06728],[-0.44757,-0.44657,-0.8304,-0.82592],[-0.54554,-0.31872,-1.01154,-0.58955],[-0.57598,-0.25777,-1.06796,-0.47795]] },
+  light2: { duration: 0.46, hitStart: 0.14, hitEnd: 0.26, range: 1.18, arc: 2.6, damage: 15, cost: 9, travel: 0, blade: [[-0.60803,-0.1688,-1.12738,-0.31298],[-0.58366,-0.24155,-1.08216,-0.44651],[-0.49183,-0.39533,-0.91194,-0.73301],[-0.29343,-0.56257,-0.54962,-1.03663],[-0.01142,-0.60348,-0.01142,-1.14248],[0.20288,-0.49645,0.44568,-0.97752],[0.33248,-0.33695,0.75259,-0.67463],[0.37714,-0.21634,0.87582,-0.42087],[0.38631,-0.16321,0.90567,-0.3074]] },
+  light3: { duration: 0.58, hitStart: 0.2, hitEnd: 0.34, range: 1.18, arc: 2.8, damage: 21, cost: 12, travel: 0, blade: [[0.38957,-0.11681,0.92073,-0.20842],[0.38433,-0.173,0.89992,-0.33012],[0.34414,-0.31042,0.78627,-0.61865],[0.21715,-0.48338,0.47764,-0.95516],[-0.01135,-0.60374,-0.01135,-1.14274],[-0.31502,-0.55191,-0.58756,-1.01684],[-0.51877,-0.36463,-0.96113,-0.67235],[-0.60401,-0.18509,-1.11959,-0.34223],[-0.62183,-0.10725,-1.15299,-0.19886]] },
+  heavy: { duration: 0.82, hitStart: 0.25, hitEnd: 0.43, range: 1.23, arc: 2.5, damage: 35, cost: 24, travel: 0, blade: [[0.38122,-0.18747,0.89272,-0.35743],[0.36986,-0.2376,0.85968,-0.46252],[0.31759,-0.35915,0.72523,-0.71177],[0.18925,-0.50553,0.42643,-0.98953],[-0.02676,-0.60848,-0.02676,-1.14748],[-0.30101,-0.60139,-0.54256,-1.08323],[-0.51546,-0.44609,-0.92402,-0.79764],[-0.61883,-0.28479,-1.10864,-0.50974],[-0.64627,-0.21474,-1.15778,-0.3847]] },
+}).map(([kind, row]) => [kind, Object.freeze({...row,blade:Object.freeze(row.blade.map(Object.freeze))})])));
 
 export const POSTS = Object.freeze([
   { x: -4, z: -4, radius: 0.48, height: 2.2 },
@@ -19,7 +20,6 @@ export const FEEL_BOUNDS = Object.freeze({ x: 0, z: -4, radius: 44 });
 const CHARGE_TIME = 0.38;
 const PLAYER_RADIUS = 0.32;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
-const angleDifference = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const movingActions = new Set(['idle', 'run', 'sprint', 'jump', 'land']);
 
 export function createFeelSimulation({ target = () => DUMMY, obstacles = [], world = null, bounds = FEEL_BOUNDS, posts = POSTS, stats = { stamina: 100, attack: 1 } } = {}) {
@@ -115,11 +115,8 @@ export function createFeelSimulation({ target = () => DUMMY, obstacles = [], wor
     if (!aim) return;
     const dx = aim.x - player.x, dz = aim.z - player.z, distance = Math.hypot(dx, dz);
     if (distance > row.range + aim.radius || Math.abs(player.y - (aim.y ?? floorAt(aim.x, aim.z))) > 1) return;
-    const bearing = angleDifference(Math.atan2(dx, -dz), player.heading);
-    const start = (clamp((from - row.hitStart) / (row.hitEnd - row.hitStart), 0, 1) - 0.5) * row.arc;
-    const end = (clamp((to - row.hitStart) / (row.hitEnd - row.hitStart), 0, 1) - 0.5) * row.arc;
-    const tolerance = Math.asin(Math.min(1, aim.radius / Math.max(distance, aim.radius))) + 0.12;
-    if (bearing < start - tolerance || bearing > end + tolerance) return;
+    const sin=Math.sin(player.heading),cos=Math.cos(player.heading);
+    if(!bladeContact(row,from,to,dx*cos+dz*sin,-dx*sin+dz*cos,aim.radius))return;
     attackHit = true;
     if ((aim.id ?? 'dummy') === 'dummy') state.dummy.hits++;
     state.counts.hits++;
@@ -244,9 +241,7 @@ export function createFeelSimulation({ target = () => DUMMY, obstacles = [], wor
       const speed = row.travel / row.hitEnd;
       targetX = Math.sin(player.heading) * speed;
       targetZ = -Math.cos(player.heading) * speed;
-    } else if (current.kind === 'charge') {
-      targetX = moveX * 0.7;
-      targetZ = moveZ * 0.7;
+
     }
     const blend = 1 - Math.exp(-dt * (canMove ? 28 : 45));
     player.vx += (targetX - player.vx) * blend;

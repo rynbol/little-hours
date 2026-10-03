@@ -13,7 +13,7 @@ const click = simulation => {
   simulation.step(1 / 120, { attackReleased: true });
 };
 const nearDummy = simulation => {
-  Object.assign(simulation.state.player, { x: 0, z: -3.1, y: heightAt(0, -3.1), heading: 0 });
+  Object.assign(simulation.state.player, { x: 0, z: -3.45, y: heightAt(0, -3.45), heading: 0 });
 };
 
 test('spawn and reset restore deterministic feet, stamina, actions and diagnostics', () => {
@@ -250,7 +250,7 @@ test('airborne dodge is ignored without stamina loss or a second action', () => 
 test('dynamic target redirects lock, collision and attack events without damaging the training dummy', () => {
   const boss = { id: 'mossheart', x: 5, z: -8, radius: 1.3, height: 4.5 };
   const simulation = createFeelSimulation({ target: () => boss });
-  Object.assign(simulation.state.player, { x: 5, z: -5.5, y: heightAt(5, -5.5), heading: Math.PI });
+  Object.assign(simulation.state.player, { x: 5, z: -5.85, y: heightAt(5, -5.85), heading: Math.PI });
   simulation.step(1 / 120, { attackPressed: true, locked: true });
   simulation.step(1 / 120, { attackReleased: true, locked: true });
   assert.equal(simulation.state.player.heading, 0);
@@ -396,7 +396,7 @@ test('mutable progression stats change stamina cap and damage without changing a
   assert.equal(simulation.state.lastHit.damage, ATTACKS.light1.damage * 1.5);
   assert.equal(simulation.state.dummy.health, 82);
   stats.stamina = 160; stats.attack = 2;
-  simulation.reset({ x: 0, z: -3.1, y: heightAt(0, -3.1) });
+  simulation.reset({ x: 0, z: -3.45, y: heightAt(0, -3.45) });
   assert.equal(simulation.state.player.maxStamina, 160);
   click(simulation); advance(simulation, .4);
   assert.equal(simulation.state.lastHit.damage, 24);
@@ -529,4 +529,25 @@ test('all eight secret positions have collectible-height support outside physica
       assert.ok(!inside || floor >= solid.top - .04 || floor + 1.45 < solid.bottom, `${secret.id} intersects ${solid.id}`);
     }
   }
+});
+
+
+test('the authored first slash contacts the right side first and planted attacks do not drift toward a distant target',()=>{
+  const target={id:'test',x:.9,z:-.45,radius:.08,height:1.5},sim=createFeelSimulation({target:()=>target,posts:[],bounds:null});
+  sim.reset({x:0,z:0});click(sim);advance(sim,.13);
+  assert.equal(sim.state.lastHit?.targetId,'test');
+  assert.equal(sim.state.player.x,0);assert.equal(sim.state.player.z,0);
+  const other=createFeelSimulation({target:()=>({...target,x:-.9}),posts:[],bounds:null});other.reset({x:0,z:0});click(other);advance(other,.13);
+  assert.equal(other.state.lastHit,null);
+  advance(other,.13);assert.equal(other.state.lastHit?.targetId,'test');
+});
+
+
+test('holding a heavy wind-up keeps planted feet while directional input is held',()=>{
+  const sim=createFeelSimulation({target:()=>null,posts:[],bounds:null});
+  sim.step(1/120,{attackPressed:true,attackHeld:true,moveX:1});
+  advance(sim,.5,{attackHeld:true,moveX:1});
+  assert.equal(sim.state.action.kind,'charge');assert.equal(sim.state.action.charge,1);
+  assert.equal(sim.state.player.x,0);assert.equal(sim.state.player.z,2);
+  sim.step(1/120,{attackReleased:true});assert.equal(sim.state.action.kind,'heavy');
 });

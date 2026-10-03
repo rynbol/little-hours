@@ -36,19 +36,14 @@ test('each threat has grounded anticipation geometry and impact geometry reuses 
   }
 });
 
-test('pet attacks keep one grounded root, expose distinct poses and allocate no replacement geometry', () => {
-  const { scene, shapes, encounter, sim } = fixture();
-  const pet = scene.getObjectByName('ginger-partner-blockout'), body = pet.children[0], geometries = new Set();
-  scene.traverse(object => { if (object.geometry) geometries.add(object.geometry); });
-  const poses = new Set();
-  for (const kind of ['idle', 'pounce', 'swipe', 'spin', 'dash', 'knockedOut']) {
-    Object.assign(encounter.state.pet.action, { kind, elapsed: .25, duration: 1, progress: .25 });
-    shapes.update(encounter.state, sim.state, 1 / 60, true);
-    assert.equal(pet.position.y, heightAt(pet.position.x, pet.position.z));
-    poses.add([body.position.y, body.rotation.x, body.rotation.y, body.rotation.z].join(','));
-    scene.traverse(object => { if (object.geometry) assert.ok(geometries.has(object.geometry)); });
-  }
-  assert.equal(poses.size, 6);
+test('contact shadows follow the pet support even when its attack is airborne', () => {
+  const { scene, shapes, encounter, sim } = fixture(), matrix = new Matrix4(), position = new Vector3();
+  const pet = encounter.state.pet, shadows = scene.getObjectByName('encounter-contact-shadows');
+  pet.ground = heightAt(pet.x, pet.z); pet.y = pet.ground + .65;
+  shapes.update(encounter.state, sim.state, 1 / 60, false);
+  shadows.getMatrixAt(1, matrix); position.setFromMatrixPosition(matrix);
+  assert.ok(Math.abs(position.y - pet.ground - .024) < .00001);
+  assert.equal(scene.getObjectByName('ginger-partner-blockout'), undefined);
 });
 
 test('phase roots remain planted on their local terrain samples', () => {

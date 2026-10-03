@@ -319,7 +319,6 @@ export function createValley(scene, { world = createValleyWorld() } = {}) {
   for(const x of [-1.1,1.1])propWood.push(limb([merchant.x+x,merchant.y,merchant.z+.35],[merchant.x+x,merchant.y+.8,merchant.z+.35],.075,.065,'#776c4e'));
   for(let i=0;i<4;i++){const x=merchant.x-.85+i*.25,z=merchant.z+.35,h=.22+i%2*.055,color=i%3===0?'#80a193':i%3===1?'#c0b18a':'#8199ad';propCloth.push(coloured(new CylinderGeometry(.061,.075,h,10,3).translate(x,merchant.y+.86+h/2,z),color),coloured(new CylinderGeometry(.023,.036,.11,8).translate(x,merchant.y+.86+h+.045,z),color),coloured(new TorusGeometry(.025,.008,5,12).rotateX(Math.PI/2).translate(x,merchant.y+.86+h+.10,z),'#d5cab0'));}
   propIron.push(coloured(new BoxGeometry(.06,.045,.8).rotateY(.4).translate(merchant.x+.65,merchant.y+.9,merchant.z+.3),'#d0d5bd'));
-  propCloth.push(coloured(new CylinderGeometry(.24,.4,.86,9).translate(merchant.x,merchant.y+.5,merchant.z-.45),'#738a7a'),coloured(new SphereGeometry(.21,10,7).translate(merchant.x,merchant.y+1.15,merchant.z-.45),'#bdad88'));
   const bridge=LANDMARKS.bridge;
   for(const side of [-1,1])for(const x of [-128,-125,-117,-114]){propStone.push(coloured(new BoxGeometry(.3,.55,.24).translate(x,bridge.y+.275,bridge.z+side*1),'#b5ad91'));}
   const shrine=LANDMARKS.shrine;

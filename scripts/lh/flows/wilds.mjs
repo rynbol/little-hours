@@ -47,6 +47,11 @@ export default {
     t.check('the companion visibly contributes attacks and a commanded dash', fight.counts.petHits > 0 && fight.counts.petSkills > 0, fight.counts);
     t.check('late dodges create a flurry opening', fight.counts.perfectDodges > 0, fight.counts);
     t.check('real play is recorded for frame review', result.frames.length > 20, result.frames.length);
+    await app.waitFor('window.__littleHours.forest.diagnostics().game.actors.hero.clip === "victory"', { what: 'the victory gesture', timeout: 2000 });
+    const victoryAttack = await inputResponse(app, () => app.press(canvas.x, canvas.y), 'game.actors.hero.clip === "charge"');
+    await app.release(canvas.x, canvas.y);
+    await app.waitFor('window.__littleHours.forest.diagnostics().game.actors.hero.clip.startsWith("light")', { what: 'a sword swing cancelling the victory gesture', timeout: 2000 });
+    t.check('new sword input cancels the victory pose within 100ms', victoryAttack.responded && victoryAttack.ms < 100, victoryAttack);
     const stopDefeatRecording=await recordFight(app,join(t.out,'defeat'));
     await t.sleep(3250);
     const defeatFrames=await stopDefeatRecording();

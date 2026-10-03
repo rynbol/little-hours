@@ -11,7 +11,11 @@ const setup = bond => {
   return { encounter, simulation };
 };
 const advance = (encounter, simulation, seconds, input = {}) => {
-  for (let t = 0; t < seconds - 1e-8; t += 1 / 120) encounter.step(Math.min(1 / 120, seconds - t), simulation.state, input);
+  for (let t = 0; t < seconds - 1e-8; t += 1 / 120) {
+    const dt=Math.min(1/120,seconds-t);
+    if(simulation.state.hitStop>0)simulation.step(dt);else simulation.state.hitStopped=false;
+    encounter.step(dt,simulation.state,input);
+  }
 };
 const bossAction = (encounter, kind, elapsed = 0) => {
   const boss = encounter.state.boss, row = BOSS_ATTACKS[kind];
@@ -104,6 +108,7 @@ test('unprotected sweep hurts once per attack and defeat requests a lossless cam
   bossAction(encounter, 'sweep', 0.85);
   advance(encounter, simulation, 0.2);
   assert.equal(encounter.state.player.health, 98);
+  assert.equal(encounter.state.impacts.find(event=>event.kind==='playerHit').attack,'sweep');
   encounter.state.player.health = 1;
   encounter.state.player.damageFlash = 0;
   bossAction(encounter, 'sweep', 0.85);
@@ -487,4 +492,42 @@ test('the final hit-stop frame freezes player, guardian and pet together before 
   assert.equal(simulation.state.hitStopped,false);
   assert.notEqual(simulation.state.player.z,before.player);
   assert.ok(encounter.state.boss.action.elapsed>before.time);
+});
+
+test('petting brings the companion into hand reach and holds it facing the player until the gesture ends',()=>{
+  const details={petting:2},encounter=createEncounter({exploration:()=>details}),simulation=createFeelSimulation();
+  Object.assign(encounter.state.pet,{x:simulation.state.player.x+1,z:simulation.state.player.z});
+  const before={x:encounter.state.pet.x,z:encounter.state.pet.z};
+  for(let i=0;i<120;i++)encounter.step(1/120,simulation.state);
+  assert.equal(encounter.state.pet.action.kind,'pet');
+  assert.equal(encounter.state.pet.heading,-Math.PI/2);
+  assert.ok(Math.abs(encounter.state.pet.x-simulation.state.player.x-.8)<.001);assert.equal(encounter.state.pet.z,before.z);
+  details.petting=0;encounter.step(1/60,simulation.state);
+  assert.equal(encounter.state.pet.petting,false);
+  assert.notEqual(encounter.state.pet.x,before.x);
+});
+
+
+test('a landed partner strike starts a short shared hit-stop and the simulation resumes normally',()=>{
+  const {encounter,simulation}=setup();
+  Object.assign(encounter.state.pet,{x:0,z:-22.8,attackCooldown:0});
+  let hit=false;
+  for(let i=0;i<120;i++){
+    simulation.step(1/120);encounter.step(1/120,simulation.state);
+    if(encounter.state.counts.petHits){hit=true;break;}
+  }
+  assert.equal(hit,true);assert.equal(simulation.state.hitStop,.03);
+  const before=encounter.state.pet.action.elapsed;
+  simulation.step(1/120);encounter.step(1/120,simulation.state);
+  assert.equal(simulation.state.hitStopped,true);assert.equal(encounter.state.pet.action.elapsed,before);
+  for(let i=0;i<10;i++){simulation.step(1/120);encounter.step(1/120,simulation.state);}
+  assert.equal(simulation.state.hitStopped,false);assert.ok(encounter.state.pet.action.elapsed>before);
+});
+
+test('an invalid swimming care request preserves paddling support instead of dropping to the lakebed',async()=>{
+  const {createValleyWorld}=await import('./world.js'),world=createValleyWorld(),details={petting:2.5},encounter=createEncounter({world,exploration:()=>details}),simulation=createFeelSimulation({world,bounds:null,posts:[]});
+  const water=world.waterAt(-180,-410);Object.assign(simulation.state.player,{x:-180,z:-410,y:water.height-.45,vx:0,vz:0,grounded:false,mode:'swim'});
+  Object.assign(encounter.state.pet,{x:-179.3,z:-410,y:water.height-.22,ground:water.height-.22,swimming:true});
+  const before=encounter.state.pet.y;encounter.step(1/60,simulation.state);
+  assert.ok(Math.abs(encounter.state.pet.y-before)<=3/60+1e-8);assert.equal(encounter.state.pet.swimming,true);assert.notEqual(encounter.state.pet.action.kind,'pet');assert.notEqual(encounter.state.pet.petting,true);
 });

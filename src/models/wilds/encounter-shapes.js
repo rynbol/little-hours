@@ -1,5 +1,4 @@
-import { BufferAttribute, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Quaternion, SphereGeometry, Vector3 } from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { BufferAttribute, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
 import { heightAt, normalAt } from '../../core/world-terrain.js';
 import { BOSS_ATTACKS } from '../../core/wilds/encounter.js';
 
@@ -23,36 +22,9 @@ function paint(color) {
   return material;
 }
 
-function ellipsoid(x, y, z, sx, sy, sz) {
-  return new SphereGeometry(1, 10, 6).scale(sx, sy, sz).translate(x, y, z);
-}
-
-function branch(a, b, radius, tip = radius * .65) {
-  const from = new Vector3(...a), to = new Vector3(...b), direction = to.clone().sub(from);
-  const geometry = new CylinderGeometry(tip, radius, direction.length(), 7);
-  const rotation = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), direction.normalize());
-  geometry.applyQuaternion(rotation).translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
-  return geometry;
-}
-
-function joined(parts, material, parent) {
-  const geometry = mergeGeometries(parts);
-  parts.forEach(part => part.dispose());
-  const mesh = new Mesh(geometry, material);
-  mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh);
-  return mesh;
-}
-
 export function createEncounterShapes(scene) {
-  const wood = paint('#766c50'), ginger = paint('#c98b50'), cream = paint('#efd8ac'), dark = paint('#514d43');
+  const wood = paint('#766c50');
   const matrix = new Matrix4(), rotation = new Quaternion(), scale = new Vector3(), position = new Vector3();
-  const pet = new Group(), catBody = new Group(), catTail = new Group(); pet.name = 'ginger-partner-blockout'; pet.add(catBody); scene.add(pet);
-  joined([ellipsoid(0, .35, 0, .21, .23, .4), ellipsoid(0, .48, -.35, .23, .23, .22), new CylinderGeometry(0, .115, .22, 3).rotateY(Math.PI / 6).translate(-.145, .71, -.33), new CylinderGeometry(0, .115, .22, 3).rotateY(-Math.PI / 6).translate(.145, .71, -.33)], ginger, catBody);
-  joined([ellipsoid(0, .42, -.52, .13, .1, .05)], cream, catBody);
-  joined([ellipsoid(0, .43, -.566, .035, .025, .018), ellipsoid(-.12, .52, -.53, .025, .04, .015), ellipsoid(.12, .52, -.53, .025, .04, .015)], dark, catBody);
-  catTail.position.set(0, .4, .31); catBody.add(catTail);
-  joined([branch([0, 0, 0], [.04, .26, .24], .055), branch([.04, .26, .24], [.09, .47, .2], .043)], ginger, catTail);
-  const paws = new InstancedMesh(new CylinderGeometry(.065, .075, .25, 6), ginger, 4); paws.castShadow = true; scene.add(paws);
   const roots = new InstancedMesh(new CylinderGeometry(.025, .16, 1, 6), wood, 12); roots.name = 'erupting-roots'; roots.castShadow = true; roots.visible = false; scene.add(roots);
   const petalGeometry=new BufferGeometry();
   petalGeometry.setAttribute('position',new BufferAttribute(new Float32Array([0,0,0,-.075,.09,.01,0,.18,-.018,0,0,0,0,.18,-.018,.075,.09,.01]),3));petalGeometry.computeVertexNormals();
@@ -61,7 +33,7 @@ export function createEncounterShapes(scene) {
   const petalColors=['#e9e3ce','#c9d5af','#829c68','#eddbcc'],petalAxis=new Vector3(.6,.3,.7).normalize();
   for(let i=0;i<blossoms.count;i++)blossoms.setColorAt(i,new Color(petalColors[i%petalColors.length]));
   const shadowMaterial = new MeshBasicMaterial({ color: '#263e36', transparent: true, opacity: .18, depthWrite: false });
-  const shadows = new InstancedMesh(new CircleGeometry(1, 24).rotateX(-Math.PI / 2), shadowMaterial, 2); scene.add(shadows);
+  const shadows = new InstancedMesh(new CircleGeometry(1, 24).rotateX(-Math.PI / 2), shadowMaterial, 2); shadows.name = 'encounter-contact-shadows'; scene.add(shadows);
   const telegraphMaterial = new MeshBasicMaterial({ color: '#e3ba77', transparent: true, opacity: .24, side: DoubleSide, depthWrite: false });
   const effectMaterial = new MeshBasicMaterial({ color: '#ffe0a1', transparent: true, opacity: .7, side: DoubleSide, depthWrite: false });
   const telegraphGeometry = new BufferGeometry(), effectGeometry = new BufferGeometry();
@@ -93,9 +65,8 @@ export function createEncounterShapes(scene) {
     }
     geometry.setDrawRange(0, vertices / 3); geometry.attributes.position.needsUpdate = true;
   }
-  const catFeet = [[-.14, -.23], [.14, -.23], [-.14, .23], [.14, .23]];
   const up = new Vector3(0, 1, 0), shadowNormal = new Vector3(), shadowYaw = new Quaternion();
-  paws.frustumCulled = false; roots.frustumCulled = false; shadows.frustumCulled = false;
+  roots.frustumCulled = false; shadows.frustumCulled = false;
   function instance(mesh, index, x, y, z, sx, sy, sz, heading = 0) {
     position.set(x, y, z); scale.set(sx, sy, sz); rotation.setFromAxisAngle(up, -heading); mesh.setMatrixAt(index, matrix.compose(position, rotation, scale));
   }
@@ -104,22 +75,7 @@ export function createEncounterShapes(scene) {
     const ground = heightAt(b.x, b.z), progress = action.progress ?? action.elapsed / Math.max(.001, action.duration);
     const anticipation = Boolean(attack && action.elapsed < attack.telegraph), windup = anticipation ? Math.min(1, action.elapsed / attack.telegraph) : 0;
     const phase = kind === 'phase';
-    const catAction = p.action.kind, catProgress = p.action.progress ?? p.action.elapsed / Math.max(.001, p.action.duration);
-    const leap = catAction === 'pounce' ? Math.sin(catProgress * Math.PI) * .65 : catAction === 'dash' ? .12 : 0;
     const catGround = Number.isFinite(p.ground) ? p.ground : heightAt(p.x,p.z);
-    pet.position.set(p.x, catGround, p.z); pet.rotation.y = -p.heading;
-    catBody.position.y = catAction === 'knockedOut' ? -.15 : leap;
-    catBody.rotation.set(catAction === 'pounce' ? -.25 * Math.sin(catProgress * Math.PI * 2) : 0, catAction === 'spin' ? catProgress * Math.PI * 2 : catAction === 'swipe' ? Math.sin(catProgress * Math.PI * 2) * .6 : 0, catAction === 'knockedOut' ? Math.PI / 2 : 0);
-    catTail.rotation.z = reducedMotion ? 0 : Math.sin(simState.elapsed * 5) * .22;
-    ginger.emissive.set(p.flash > 0 ? '#806230' : catAction === 'dash' ? '#754b15' : '#000000');
-    paws.visible = catAction !== 'knockedOut';
-    const catSin = Math.sin(p.heading), catCos = Math.cos(p.heading), catStride = reducedMotion || catAction === 'idle' ? 0 : Math.sin(simState.elapsed * 15) * .09;
-    catFeet.forEach(([lx, lz], i) => {
-      const stride = catStride * (i === 0 || i === 3 ? 1 : -1), x = p.x + lx * catCos - (lz + stride) * catSin, z = p.z + lx * catSin + (lz + stride) * catCos;
-      const lift = leap + Math.max(0, stride) * .6;
-      instance(paws, i, x, catGround + .125 + lift, z, 1, 1, 1, p.heading);
-    });
-    paws.instanceMatrix.needsUpdate = true;
     const originX = action.originX ?? b.x, originZ = action.originZ ?? b.z;
     roots.visible = kind === 'roots' && !anticipation || phase;
     if (roots.visible) {
@@ -155,7 +111,8 @@ export function createEncounterShapes(scene) {
     }
     const guardianShadow=kind==='defeat'?Math.max(0,1-action.elapsed/3):1;
     position.set(b.x,ground+.022,b.z);scale.set(.8*guardianShadow,1,1.45*guardianShadow);shadowNormal.fromArray(normalAt(b.x,b.z));rotation.setFromUnitVectors(up,shadowNormal).multiply(shadowYaw.setFromAxisAngle(up,-b.heading));shadows.setMatrixAt(0,matrix.compose(position,rotation,scale));
-    instance(shadows, 1, p.x, catGround + .024, p.z, .25, 1, .45, p.heading);
+    const petScale = 1 + Math.max(0, p.y - catGround) * .2;
+    position.set(p.x,catGround+.024,p.z);scale.set(.25*petScale,1,.45*petScale);shadowNormal.set(0,1,0);if(Math.abs(catGround-heightAt(p.x,p.z))<.1)shadowNormal.fromArray(normalAt(p.x,p.z));rotation.setFromUnitVectors(up,shadowNormal).multiply(shadowYaw.setFromAxisAngle(up,-p.heading));shadows.setMatrixAt(1,matrix.compose(position,rotation,scale));
     shadows.instanceMatrix.needsUpdate = true;
   }
   return { update };

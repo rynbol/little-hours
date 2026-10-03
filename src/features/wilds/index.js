@@ -5,6 +5,8 @@ import { createEncounter, STONES } from '../../core/wilds/encounter.js';
 import { createAdventure } from '../../core/wilds/progression.js';
 import { createValleyWorld, CAMPS, LANDMARKS } from '../../core/wilds/world.js';
 import { createValley } from '../../models/wilds/valley.js';
+import { loadHero } from '../../models/wilds/hero.js';
+import { loadPartner } from '../../models/wilds/partner.js';
 import { loadMossheart } from '../../models/wilds/mossheart.js';
 import { wildsMenu } from './menus.js';
 import { heightAt } from '../../core/world-terrain.js';
@@ -22,14 +24,17 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
   const avatar = normalizeAvatarAppearance(appearance), events = new AbortController();
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   let reducedMotion = motion.matches, paused = false, disposed = false, ready = false, frame = 0, lastTime = 0, lastFrame = 0;
-  let locked = false, muted = false, locks = 0, renderCount = 0, lastDisposal = null, impact = 0, lastHit = 0;
-  let renderer, scene, camera, model, shapes, valley, stag, rig, input, respawn = 0, lastVictory = 0, menuMode = 'controls', sun, herbsHealed=0;
+  let locked = false, muted = false, locks = 0, renderCount = 0, lastDisposal = null, impact = 0, lastHit = 0, lastPetImpact = 0;
+  let renderer, scene, camera, model, shapes, valley, stag, hero, partner, merchant, rig, input, respawn = 0, lastVictory = 0, menuMode = 'controls', sun, herbsHealed=0;
   const adventure = createAdventure({read:readSave,transact:updateSave}), world=createValleyWorld();
   const frameTimes = new Float64Array(3600), workTimes = new Float64Array(3600);
   let frameSamples = 0, maxFrame = 0, over20 = 0;
   const encounter = createEncounter({ bond, world, stats:adventure.stats, checkpoint:()=>adventure.checkpoint, exploration:()=>adventure.state }), sound = createWildsAudio();
   const sim = createFeelSimulation({ target: encounter.target, obstacles: STONES, world, bounds:null, posts:[], stats:adventure.stats }), projected = new Vector3();
   sim.reset(adventure.checkpoint);
+  const merchantSim=createFeelSimulation({target:()=>null,world,bounds:null,posts:[]});
+  merchantSim.reset({x:LANDMARKS.merchant.x,z:LANDMARKS.merchant.z-.65});merchantSim.state.player.heading=Math.PI;
+  const merchantEncounter={status:'dormant',impacts:[],victory:0};
   container.innerHTML = `<canvas id="wilds-canvas" tabindex="0" aria-label="The Wilds. Escape opens controls, your satchel and the return menu."></canvas>
     <div class="wilds-hud" aria-label="Adventure status">
       <div id="wilds-stamina" role="meter" aria-label="Stamina" aria-valuemin="0" aria-valuemax="100"><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="wilds-ring-track" cx="22" cy="22" r="18"/><circle class="wilds-ring-fill" cx="22" cy="22" r="18"/></svg></div>
@@ -132,10 +137,16 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
       respawn = encounter.state.respawn.serial; sim.reset(encounter.state.respawn); rig.reset(); input.release(); locked = false; lastHit = 0;
     }
     if (sim.state.lastHit?.serial !== lastHit && sim.state.lastHit) { lastHit = sim.state.lastHit.serial; impact = 1; }
+    if(encounter.state.elapsed<.1)lastPetImpact=0;
+    for(const event of encounter.state.impacts)if(event.kind==='petAttack' && event.serial>lastPetImpact){lastPetImpact=event.serial;impact=1;}
     impact = Math.max(0, impact - dt * 8);
-    model.update(sim.state, sim.state.hitStop || sim.state.hitStopped ? 0 : gameDt, reducedMotion);
-    shapes.update(encounter.state, sim.state, sim.state.hitStop || sim.state.hitStopped ? 0 : gameDt, reducedMotion);
-    stag.update(encounter.state, sim.state, sim.state.hitStop || sim.state.hitStopped ? 0 : gameDt, reducedMotion);
+    const actorDt=sim.state.hitStopped ? 0 : gameDt;
+    hero.update(encounter.state,sim.state,actorDt,reducedMotion);
+    partner.update(encounter.state,sim.state,actorDt,reducedMotion);
+    merchant.update(merchantEncounter,merchantSim.state,actorDt,reducedMotion);
+    model.update(sim.state,actorDt,reducedMotion,encounter.state);
+    shapes.update(encounter.state,sim.state,actorDt,reducedMotion);
+    stag.update(encounter.state,sim.state,actorDt,reducedMotion);
     sound.update(encounter.state, sim.state);
     valley.update(sim.state,encounter.state,adventure.state,gameDt,reducedMotion);
     sun.target.position.set(sim.state.player.x,sim.state.player.y,sim.state.player.z-10);
@@ -166,7 +177,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
     });
     for (const material of materials) for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
     for (const material of materials) for (const uniforms of material.userData.wildsUniforms || []) for (const uniform of Object.values(uniforms)) if (uniform.value?.isTexture) textures.add(uniform.value);
-    stag?.dispose();
+    stag?.dispose();hero?.dispose();partner?.dispose();merchant?.dispose();
     for (const geometry of geometries) geometry.dispose();
     for (const material of materials) material.dispose();
     for (const texture of textures) texture.dispose();
@@ -175,7 +186,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
       renderer.renderLists.dispose(); renderer.dispose(); renderer.forceContextLoss();
       lastDisposal = { ready: false, disposed: true, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, programs: renderer.info.programs?.length || 0, contextLost: renderer.getContext().isContextLost(), renderCount };
     }
-    valley?.dispose?.(); scene?.clear(); renderer = null; scene = null; model = null; shapes = null; valley = null; stag = null; sun = null; rig = null; input = null; camera = null;
+    valley?.dispose?.(); scene?.clear(); renderer = null; scene = null; model = null; shapes = null; valley = null; stag = null; hero = null; partner = null; merchant = null; sun = null; rig = null; input = null; camera = null;
     container.replaceChildren();
   }
   const observer = new ResizeObserver(resize);
@@ -193,7 +204,11 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
     sun.shadow.camera.top = 28; sun.shadow.camera.bottom = -28; sun.shadow.camera.near = 1; sun.shadow.camera.far = 160;
     sun.shadow.normalBias = .035; sun.shadow.bias = -.0001;
     scene.add(ambient, sun, sun.target);
-    model = createFeelBox(scene,{training:false,world}); shapes = createEncounterShapes(scene);
+    hero=await loadHero(scene,{appearance:avatar,world,adventure});
+    partner=await loadPartner(scene,{species:pet,world});
+    merchant=await loadHero(scene,{appearance:{skin:'warm',hair:'silver',style:'crop',top:'sage',bottom:'walnut',outfit:'cardigan',bottomStyle:'trousers',accessory:'glasses'},world,blade:false});
+    hero.update(encounter.state,sim.state,0,reducedMotion);partner.update(encounter.state,sim.state,0,reducedMotion);merchant.update(merchantEncounter,merchantSim.state,0,reducedMotion);
+    model = createFeelBox(scene,{training:false,world,bladeEndpoints:hero.bladeEndpoints}); shapes = createEncounterShapes(scene);
     stag=await loadMossheart(scene,{world});
     stag.update(encounter.state,sim.state,0,reducedMotion);
     valley=createValley(scene,{world});valley.skyUniforms.top.value.set('#4b91cc');valley.skyUniforms.horizon.value.set('#b6d4df');
@@ -207,6 +222,11 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
       if(!command)return;
       if(command==='resume'){resume();return;}
       if(command==='leave'){onLeave();return;}
+      if(command==='pet'){
+        const p=sim.state.player;
+        if(p.grounded && p.mode==='ground'){p.vx=0;p.vz=0;}
+        if(adventure.petCompanion(p,encounter.state.pet))resume();return;
+      }
       if(command.startsWith('tab-'))menuMode=command.slice(4);
       if(command.startsWith('buy:')){event.target.closest('button').disabled=true;await adventure.buy(command.slice(4),sim.state.player);}
       if(command==='potion' && await adventure.drink())encounter.heal(encounter.state.player.maxHealth*.5);
@@ -235,7 +255,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
       if (disposed) return lastDisposal;
       const samples = Array.from(frameTimes.slice(0, Math.min(frameSamples, frameTimes.length))).sort((a, b) => a - b);
       const work = Array.from(workTimes.slice(0, Math.min(frameSamples, workTimes.length))).sort((a, b) => a - b);
-      return { ready, paused, disposed, avatar, pet, landmarks:{cliff:world.solids.find(s=>s.id==='cliff'),camps:CAMPS}, exploration:{...structuredClone(adventure.state),save:adventure.save,stats:{...adventure.stats},checkpoint:adventure.checkpoint,coins:adventure.coins}, valley:valley.diagnostics?.(), actors:{stag:stag.diagnostics()}, encounter: structuredClone(encounter.state), position: { x: sim.state.player.x, y: sim.state.player.y, z: sim.state.player.z }, grounded: sim.state.player.grounded, stamina: sim.state.player.stamina, action: { ...sim.state.action }, state: structuredClone(sim.state), locked, muted, camera: rig.diagnostics(), counters: { ...sim.state.counts, jumps: sim.state.counts.jump, dodges: sim.state.counts.dodge, locks }, dummyPosition: { x: DUMMY.x, y: model.dummyPosition[1], z: DUMMY.z }, renderCount, frame: { samples: frameSamples, maxMs: maxFrame, p95Ms: samples[Math.floor(samples.length * .95)] || 0, over20, cpuP95Ms: work[Math.floor(work.length * .95)] || 0 }, resources: { ...renderer.info.memory, programs: renderer.info.programs.length, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, pixelRatio: renderer.getPixelRatio() } };
+      return { ready, paused, disposed, avatar, pet, landmarks:{cliff:world.solids.find(s=>s.id==='cliff'),camps:CAMPS}, exploration:{...structuredClone(adventure.state),save:adventure.save,stats:{...adventure.stats},checkpoint:adventure.checkpoint,coins:adventure.coins}, valley:valley.diagnostics?.(), actors:{stag:stag.diagnostics(),hero:hero.diagnostics(),partner:partner.diagnostics()}, encounter: structuredClone(encounter.state), position: { x: sim.state.player.x, y: sim.state.player.y, z: sim.state.player.z }, grounded: sim.state.player.grounded, stamina: sim.state.player.stamina, action: { ...sim.state.action }, state: structuredClone(sim.state), locked, muted, camera: rig.diagnostics(), counters: { ...sim.state.counts, jumps: sim.state.counts.jump, dodges: sim.state.counts.dodge, locks }, dummyPosition: { x: DUMMY.x, y: model.dummyPosition[1], z: DUMMY.z }, renderCount, frame: { samples: frameSamples, maxMs: maxFrame, p95Ms: samples[Math.floor(samples.length * .95)] || 0, over20, cpuP95Ms: work[Math.floor(work.length * .95)] || 0 }, resources: { ...renderer.info.memory, programs: renderer.info.programs.length, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, pixelRatio: renderer.getPixelRatio() } };
     },
   };
 }

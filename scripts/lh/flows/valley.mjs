@@ -83,6 +83,11 @@ export default {
       const caughtUp = await fightState(app); observe(caughtUp);
       const afterCatchUp = { gap: distance(caughtUp.encounter.pet, caughtUp.position), player: caughtUp.position, pet: caughtUp.encounter.pet };
       t.check('the companion follows beside the stopped swimmer within eight seconds', afterCatchUp.gap < 3 && caughtUp.encounter.pet.swimming && Math.abs(caughtUp.encounter.pet.ground + 44.22) < .05 && (beforeCatchUp.gap < 3 || afterCatchUp.gap < beforeCatchUp.gap), { before: beforeCatchUp, after: afterCatchUp });
+      await app.waitFor('(() => { const game = window.__littleHours.forest.diagnostics().game; return Math.hypot(game.encounter.pet.x - game.position.x, game.encounter.pet.z - game.position.z) < 1.6; })()', { what: 'the swimming partner beside the hero', timeout: 5000 });
+      const waterCareBefore = await fightState(app);
+      await app.key('e', 'KeyE'); await t.sleep(150);
+      const waterCareAfter = await fightState(app);
+      t.check('E in deep water keeps the companion paddling instead of pulling it to the bed', waterCareAfter.exploration.counts.pets === waterCareBefore.exploration.counts.pets && waterCareAfter.encounter.pet.swimming && Math.abs(waterCareAfter.encounter.pet.y + 44.22) < .05 && waterCareAfter.exploration.near?.kind !== 'pet', waterCareAfter.encounter.pet);
       await t.shot(app, 'valley-lake-swim');
       await seekShore(app, -160, -354, observe);
       await followTrail(app, [[-200,-350],[-230,-375],[-230,-400],[-220,-414]], observe);

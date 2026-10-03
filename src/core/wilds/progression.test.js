@@ -74,7 +74,7 @@ test('herbs pick once, pet sniffs secrets, whistle and petting respond without c
   const f=fixture(),before=structuredClone(f.saved.petBonds);
   assert.equal(f.adventure.step(.1,HERBS[0],null).herb,true);
   assert.equal(f.adventure.step(.1,HERBS[0],null).herb,false);
-  const cache=SECRETS.find(s=>s.id==='pip-cache'),player={...cache,x:cache.x+7},pet={...player,x:player.x+.7,health:100};
+  const cache=SECRETS.find(s=>s.id==='pip-cache'),player={...cache,x:cache.x+7,grounded:true,mode:'ground'},pet={...player,x:player.x+.7,ground:player.y,health:100};
   f.adventure.step(.1,player,pet,{whistle:true,interact:true});
   assert.equal(f.adventure.state.sniff.id,'pip-cache');
   assert.ok(f.adventure.state.petting>0 && f.adventure.state.whistle>0);
@@ -109,4 +109,38 @@ test('queued browser save transactions settle before live progression updates an
   assert.equal(await adventure.rest('meadow',21),true);assert.equal(adventure.save.hour,21);
   assert.equal(await adventure.claim(SECRETS[1].id,SECRETS[1]),true);assert.equal(adventure.save.xp,35);
   assert.equal(await adventure.victory(),true);assert.equal(adventure.save.xp,195);assert.equal(adventure.coins,85);
+});
+
+test('petting at a camp faces a nearby healthy companion and ends when movement resumes',()=>{
+  const f=fixture(),player={...CAMPS[0],vx:0,vz:0,heading:0,grounded:true,mode:'ground'},pet={...CAMPS[0],x:CAMPS[0].x+1,ground:CAMPS[0].y,health:100};
+  const before=structuredClone(f.saved);
+  assert.equal(f.adventure.petCompanion(player,pet),true);
+  assert.equal(player.heading,Math.PI/2);assert.equal(f.adventure.state.counts.pets,1);
+  assert.deepEqual(f.saved,before);
+  player.vx=4;f.adventure.step(.016,player,pet);
+  assert.equal(f.adventure.state.petting,0);
+  assert.equal(f.adventure.petCompanion(player,pet),false);
+  player.vx=0;pet.health=0;assert.equal(f.adventure.petCompanion(player,pet),false);
+  pet.health=100;pet.x+=5;assert.equal(f.adventure.petCompanion(player,pet),false);
+});
+
+test('care prompt waits for real coast-down and the first advertised E command succeeds',async()=>{
+  const {createFeelSimulation}=await import('./feel.js'),simulation=createFeelSimulation({posts:[],bounds:null,target:()=>null}),f=fixture();simulation.reset({x:-3,z:2});
+  for(let i=0;i<60;i++)simulation.step(1/60,{moveX:-1});
+  const player=simulation.state.player,pet={x:player.x+.8,z:player.z,y:player.y,ground:player.y,health:100,swimming:false,climbing:false};
+  f.adventure.step(1/60,player,pet);assert.equal(f.adventure.state.near,null);
+  let advertised=false;
+  for(let i=0;i<10;i++){simulation.step(1/60);f.adventure.step(1/60,player,pet);if(f.adventure.state.near?.kind==='pet'){advertised=true;assert.ok(Math.hypot(player.vx,player.vz)<=.5);break;}}
+  assert.equal(advertised,true);f.adventure.step(1/60,player,pet,{interact:true});assert.equal(f.adventure.state.counts.pets,1);
+});
+test('care is unavailable while swimming, climbing or airborne and resumes on shared dry support',()=>{
+  const f=fixture(),player={x:-7,z:2,y:0,vx:0,vz:0,grounded:true,mode:'ground'},pet={x:-6.2,z:2,y:0,ground:0,health:100};
+  for(const change of [{grounded:false,mode:'swim'},{grounded:false,mode:'climb'},{grounded:false,mode:'air'}]){
+    Object.assign(player,change);f.adventure.step(.016,player,pet);assert.equal(f.adventure.state.near,null);assert.equal(f.adventure.petCompanion(player,pet),false);
+  }
+  Object.assign(player,{grounded:true,mode:'ground'});
+  for(const change of [{swimming:true,climbing:false},{swimming:false,climbing:true},{swimming:false,climbing:false,y:.65}]){
+    Object.assign(pet,change);f.adventure.step(.016,player,pet);assert.equal(f.adventure.state.near,null);assert.equal(f.adventure.petCompanion(player,pet),false);
+  }
+  pet.y=pet.ground;f.adventure.step(.016,player,pet);assert.equal(f.adventure.state.near.kind,'pet');assert.equal(f.adventure.petCompanion(player,pet),true);
 });
