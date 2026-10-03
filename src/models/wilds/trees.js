@@ -7,6 +7,7 @@ const leafShade = (low, high) => y => 0.78 + Math.min(1, Math.max(0, (y - low) /
 const hash = (i, k) => ((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
 
 export const CARD = Object.freeze({ core: 0.82, lift: 0.95, blend: 0.55, leaves: 5 });
+export const NEEDLES = Object.freeze({ size: 0.62, farSize: 1.05, fringe: 2, top: 1, sprigs: 7, blend: 0.4, core: 0.85 });
 
 function build(positions, normals, colours, cards) {
   const geometry = new BufferGeometry();
@@ -48,7 +49,7 @@ export function canopy([dark, light], list, { detail, cards, size }) {
 }
 
 function tier(y, radius, height, points, droop, turn) {
-  const [dark, light] = LEAF.pine, positions = [], normals = [], colours = [], top = new Color(light).lerp(new Color(dark), 0.25), tip = new Color(light), valley = new Color(dark), under = new Color(dark).multiplyScalar(0.62);
+  const [dark, light] = LEAF.pine, positions = [], normals = [], colours = [], top = new Color(light).lerp(new Color(dark), 0.25).multiplyScalar(NEEDLES.core), tip = new Color(light).multiplyScalar(NEEDLES.core), valley = new Color(dark).multiplyScalar(NEEDLES.core), under = new Color(dark).multiplyScalar(0.62);
   const ring = Array.from({ length: points * 2 }, (_, k) => {
     const a = k / (points * 2) * Math.PI * 2 + turn, sharp = k % 2 === 0, r = sharp ? radius * (0.86 + hash(k + turn * 31, 7) * 0.28) : radius * 0.52;
     return { at: [Math.cos(a) * r, sharp ? y - droop * (0.8 + hash(k + turn * 31, 8) * 0.4) : y + height * 0.14, Math.sin(a) * r], colour: sharp ? tip : valley };
@@ -61,6 +62,28 @@ function tier(y, radius, height, points, droop, turn) {
     push(hub, outward(mid, -radius * 0.1), under); push(corner.at, outward(corner.at, -radius * 0.05), under); push(next.at, outward(next.at, -radius * 0.05), under);
   });
   return build(positions, normals, colours, new Array(positions.length / 3 * 4).fill(0));
+}
+
+function needles(list, { points, size }) {
+  const [dark, light] = LEAF.pine, positions = [], normals = [], colours = [], cards = [], tone = new Color(), spot = new Vector3(), normal = new Vector3(), whole = new Vector3();
+  const low = list[0][0] - list[0][1] * 0.32, high = list.at(-1)[0] + list.at(-1)[2], middle = new Vector3(0, (low + high) / 2, 0);
+  list.forEach(([y, r, h], t) => {
+    const turn = t * 1.7, count = points * NEEDLES.fringe + Math.round(points * NEEDLES.top * r / list[0][1]);
+    for (let c = 0; c < count; c++) {
+      const seed = t * 131 + c * 17 + 3, fringe = c < points * NEEDLES.fringe, k = c % points;
+      const a = fringe ? (k * 2 + (c >= points ? 1 : 0)) / (points * 2) * Math.PI * 2 + turn + (hash(seed, 1) - 0.5) * 0.25 : hash(seed, 1) * Math.PI * 2;
+      const out = fringe ? 0.88 + hash(seed, 2) * 0.16 : 0.45 + hash(seed, 2) * 0.35, drop = fringe ? r * 0.32 * (c < points ? 1 : 0.55) : 0;
+      spot.set(Math.cos(a) * r * out, fringe ? y - drop + size * 0.35 : y + h * Math.pow(1 - out, 1.3) - r * 0.32 * out * out + 0.05, Math.sin(a) * r * out);
+      normal.set(Math.cos(a), 0.5 + (1 - out) * 0.6, Math.sin(a)).normalize().lerp(whole.copy(spot).sub(middle).normalize(), NEEDLES.blend).normalize();
+      const height = (spot.y - low) / (high - low), half = size * (0.8 + hash(seed, 3) * 0.4) * (0.65 + r / list[0][1] * 0.35);
+      tone.set(dark).lerp(new Color(light), Math.min(1, Math.max(0, (fringe ? 0.55 : 0.25) + height * 0.35 + (hash(seed, 4) - 0.5) * 0.3))).multiplyScalar(0.85 + height * 0.25);
+      for (const [cx, cy] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) {
+        positions.push(spot.x, spot.y, spot.z); normals.push(normal.x, normal.y, normal.z); colours.push(tone.r, tone.g, tone.b);
+        cards.push(cx, cy, half, 1.05 + hash(seed, 5) * 0.9);
+      }
+    }
+  });
+  return build(positions, normals, colours, cards);
 }
 
 const plain = geometry => {
@@ -121,6 +144,7 @@ const SHAPES = Object.freeze({
   pine: detail => merge([
     trunk('pine', detail ? 9 : 8, 0.3, 0.12, detail ? 7 : 5),
     ...PINE[detail ? 'near' : 'far'].map(([y, r, h], i) => tier(y, r, h, detail ? 9 : 7, r * 0.32, i * 1.7)),
+    needles(PINE[detail ? 'near' : 'far'], { points: detail ? 9 : 7, size: detail ? NEEDLES.size : NEEDLES.farSize }),
   ]),
   birch: detail => detail ? merge([
     trunk('birch', 6.2, 0.2, 0.12, 7), branch('birch', [0, 4.2, 0], [0.8, 5.6, 0.2], 0.07),
@@ -158,13 +182,23 @@ function addLeaves(material) {
       .replace('#include <common>', '#include <common>\nattribute vec4 card;\nvarying vec4 vCard;')
       .replace('#include <project_vertex>', `#include <project_vertex>
 vCard = card;
-float spin = card.w * 6.2832 + sin(windTime * 1.7 + card.w * 40.0) * 0.12;
+float spin = (card.w > 1.0 ? 0.0 : card.w * 6.2832) + sin(windTime * 1.7 + card.w * 40.0) * 0.12;
 mvPosition.xy += mat2(cos(spin), sin(spin), -sin(spin), cos(spin)) * card.xy * card.z * length(instanceMatrix[0].xyz);
 gl_Position = projectionMatrix * mvPosition;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying vec4 vCard;')
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-if (vCard.w > 0.0) {
+if (vCard.w > 1.0) {
+  vec2 stem = vCard.xy * 1.05 - vec2(0.0, 0.95);
+  float sprig = 0.0;
+  for (int k = 0; k < ${NEEDLES.sprigs}; k++) {
+    float angle = (float(k) - ${((NEEDLES.sprigs - 1) / 2).toFixed(1)}) * 0.3 + (fract(vCard.w * (5.31 + float(k) * 2.7)) - 0.5) * 0.3;
+    vec2 along = vec2(sin(angle), -cos(angle));
+    float t = dot(stem, along) / (1.35 + fract(vCard.w * (2.9 + float(k) * 1.9)) * 0.55), side = abs(dot(stem, vec2(along.y, -along.x)));
+    sprig = max(sprig, step(0.0, t) * step(t, 1.0) * step(side, 0.15 * (1.0 - t) + 0.02));
+  }
+  if (sprig < 0.5) discard;
+} else if (vCard.w > 0.0) {
   vec2 stem = vCard.xy * 1.08 - vec2(0.0, -0.92);
   float leafy = 0.0;
   for (int k = 0; k < ${CARD.leaves}; k++) {
