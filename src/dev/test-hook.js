@@ -171,7 +171,6 @@ export function installTestHook(app) {
     get speech() { return app.speech; },
     get house() { return app.house; },
     get lake() { return app.lake; },
-    get forest() { return app.forest; },
     get wilds() { return app.wilds; },
     get connected() { return app.connected; },
     ready: (timeout = 30000) => until(() => app.wilds ? app.wilds.ready() : app.room && document.getElementById('loading-note')?.hidden, timeout, 'the view to be ready').then(() => true),

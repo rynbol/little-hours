@@ -1,8 +1,8 @@
 import { sleep } from './chrome.mjs';
 import { dispatchSequenceInput } from './sequence.mjs';
-import { wildsShotView } from './wilds-shots.mjs';
 
 export const steps = {
+  async openWilds(app) { await steps.openHouse(app); await app.clickSel('#house-open-forest'); await app.waitFor(`Boolean(window.__littleHours.wilds?.ready())`, { what: 'the Wilds valley to render', timeout: 90000 }); await app.settle(); },
   async houseRooms(app) { if (await app.js(`Boolean(document.getElementById('house-room-menu') && !document.getElementById('house-room-menu').matches(':popover-open'))`)) await app.clickSel('#house-rooms-toggle'); },
   async openMore(app) { if (await app.js(`Boolean(document.getElementById('room-more') && !document.getElementById('room-more').matches(':popover-open'))`)) await app.clickSel('#room-more-toggle'); },
   async openTimer(app) { if (await app.js(`Boolean(document.getElementById('timer-sheet-toggle') && !document.getElementById('focus-card').matches(':popover-open'))`)) await app.clickSel('#timer-sheet-toggle'); },
@@ -19,27 +19,6 @@ export const steps = {
 };
 
 export const cycles = {
-  'wilds-traversal': {
-    about: 'hold forward and sprint through the Wilds for twenty seconds',
-    settings: { path: '/checks/wilds.html', storageKey: 'little-hours-wilds-check-v1' },
-    async setup(app) {
-      await app.waitFor('window.__littleHours.wilds.ready()', { what: 'the Wilds to render', timeout: 30000 });
-      await app.waitFor('!window.__littleHours.wilds.diagnostics().world.pending && !window.__littleHours.wilds.diagnostics().world.lighting?.pending', { what: 'the Wilds terrain and lighting to settle', timeout: 30000 });
-      const placed = await app.js('window.__littleHours.wilds.place({position:{x:-106.5,z:-180},yaw:.6,stamina:100,camera:{yaw:.6}})');
-      if (!placed) throw new Error('The Forest start is outside loaded terrain');
-      await app.js("document.getElementById('wilds-canvas').focus()");
-    },
-    async run(app) {
-      try {
-        await dispatchSequenceInput(app, { type: 'keyDown', code: 'ShiftLeft' });
-        await dispatchSequenceInput(app, { type: 'keyDown', code: 'KeyW' });
-        await sleep(20000);
-      } finally {
-        try { await dispatchSequenceInput(app, { type: 'keyUp', code: 'KeyW' }); }
-        finally { await dispatchSequenceInput(app, { type: 'keyUp', code: 'ShiftLeft' }); }
-      }
-    },
-  },
   garden: { about: 'visit the living garden and return to the room', async run(app) { await steps.openHouse(app); if (await app.visible('#house-open-garden')) await app.clickSel('#house-open-garden'); await app.settle(); await steps.backToRoom(app); } },
   focus: { about: 'enter and leave whole-room Focus mode without pausing', async run(app) { await steps.openFocus(app); await steps.closeFocus(app); } },
   rooms: { about: 'visit the garden and studio through the house page', async run(app) { for (const id of ['garden', 'studio']) { await steps.openHouse(app); await steps.houseRooms(app); await app.clickSel(`#house-slot-${id}`); await app.waitFor(`document.querySelector('#enter-house-room') !== null`, { what: 'the Come on in button' }); await app.clickSel('#enter-house-room'); await app.waitFor(`window.__littleHours.state.house.activeId === '${id}' && !document.body.classList.contains('is-house')`, { what: `arrival in ${id}`, timeout: 30000 }); await app.settle(); } } },
@@ -53,9 +32,7 @@ export const cycles = {
 };
 
 export const views = {
-  'wilds-player': wildsShotView('player'),
-  'wilds-grass': wildsShotView('grass'),
-  wilds: { about: 'the Wilds forest and exploration view', settings: { path: '/checks/wilds.html', storageKey: 'little-hours-wilds-check-v1' }, async go(app) { await app.waitFor('window.__littleHours.wilds.ready()', { what: 'the Wilds to render' }); } },
+  wilds: { about: 'the Wilds valley, entered from the island Forest button', scene: 'wilds', async go(app) { await steps.openWilds(app); } },
   garden: { about: 'the personal garden, or the whole house on older refs', async go(app) { await steps.openHouse(app); if (await app.visible('#house-open-garden')) await app.clickSel('#house-open-garden'); await app.settle(); } },
   focus: { about: 'the seated Focus view, or the room on older refs', async go(app) {
     const enter = await app.waitFor(`Boolean(document.getElementById('focus-mode-enter'))`, { what: 'the Focus button', timeout: 8000 }).then(() => true, () => false);
@@ -72,5 +49,4 @@ export const views = {
   decorate: { about: 'Decorate mode', async go(app) { await steps.openDecorate(app); } },
   avatar: { about: 'the avatar editor', async go(app) { await steps.openAvatar(app); } },
   lake: { about: 'fishing at Willow Pond, idle', async go(app) { await steps.openLake(app); } },
-  forest: { about: 'the walk-in forest, at the start of the path', scene: 'forest', async go(app) { await steps.openHouse(app); await app.clickSel('[data-room="forest"]'); await app.waitFor(`Boolean(window.__littleHours.forest.isOpen && window.__littleHours.forest.diagnostics()?.ready)`, { what: 'the forest', timeout: 90000 }); await app.settle(); } },
 };

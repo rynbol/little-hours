@@ -11,7 +11,7 @@ import { archivePetFriendships } from './pet-legacy.js';
 import { petGifts } from './pet-gifts.js';
 import { emptyBuddy, normalizeBuddy, recordAdventure, waitingFind, BUDDY_COLORS } from './buddy.js';
 import { emptyGarden, normalizeGarden, focusGardenPlantId, plantGardenSeed, placeGardenPlant, growGarden, gardenGrowth } from './garden-plants.js';
-import { normalizeWilds } from './wilds/progression.js';
+import { normalizeWilds } from './wilds/progress.js';
 
 export const storageKey = 'little-hours-v1';
 // The save as it was just before a backup replaced it.
