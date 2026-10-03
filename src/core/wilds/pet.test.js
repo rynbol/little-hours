@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PET, PET_ATTACKS, PET_SKILL, castSkill, createPet, hurtPet, petDown, petStrength, revivePet, stepPet } from './pet.js';
+import { PET, PET_ATTACKS, PET_SKILL, castSkill, createPet, hurtPet, petDown, petStrength, revivePet, stepPet, whistlePet } from './pet.js';
 
 const DT = 1 / 120;
 const flat = () => 0;
@@ -15,7 +15,7 @@ function run(pet, seconds, context, each = () => {}) {
   const events = [];
   for (let t = 0; t < seconds - 1e-9; t += DT) {
     pet.events.length = 0;
-    stepPet(pet, { ground: flat, solids: [], rng: seeded(), foe: null, ...context }, DT);
+    stepPet(pet, { world: { ground: flat, solids: [] }, rng: seeded(), foe: null, ...context }, DT);
     events.push(...pet.events.map(event => ({ ...event, at: t })));
     each(t);
   }
@@ -36,9 +36,9 @@ test('the pet trots after you, settles at your heel and sits when you stand stil
 test('the pet wanders off to sniff a nearby spot and comes back', () => {
   const rng = seeded(), pet = createPet({ x: 0, z: 0, ground: flat, rng }), player = walker(0, 1.2);
   pet.sniffAt = 0.1; player.vz = 0.5;
-  const events = run(pet, 0.5, { player, rng, spots: [{ x: 2, z: 2 }] });
+  const events = run(pet, 0.5, { player, rng });
   assert.ok(events.some(event => event.type === 'pet-sniff'));
-  assert.deepEqual([pet.spotX, pet.spotZ], [2, 2]);
+  assert.ok(Math.hypot(pet.spotX, pet.spotZ) > 1);
   player.vz = 0;
   run(pet, PET.sniffFor + 2, { player, rng });
   assert.ok(['follow', 'sit'].includes(pet.state));
@@ -79,4 +79,54 @@ test('a beaten pet is knocked out, never killed: it limps after you and a campfi
   assert.equal(pet.state, 'limp');
   revivePet(pet);
   assert.deepEqual([pet.health, pet.state], [pet.max, 'follow']);
+});
+
+test('the pet scents a nearby secret, trots to it and points at it with a wag, then rests its nose', () => {
+  const rng = seeded(), pet = createPet({ x: 0, z: 0, ground: flat, rng }), player = walker(0, 1), scents = [{ id: 'seed', x: 9, z: 6 }, { id: 'far', x: 60, z: 0 }];
+  const events = run(pet, 5, { player, rng, scents });
+  assert.deepEqual(events.filter(event => event.type === 'pet-scent').map(event => event.id), ['seed']);
+  assert.equal(pet.state, 'point');
+  assert.ok(Math.hypot(pet.x - 9, pet.z - 6) < 1.2);
+  run(pet, PET.point + 0.1, { player, rng, scents });
+  assert.notEqual(pet.state, 'point');
+  assert.ok(!run(pet, PET.scentRest - 1, { player, rng, scents }).some(event => event.type === 'pet-scent'));
+});
+
+test('the pet digs up a buried secret it scents, and gives up and points at one it cannot reach', () => {
+  const rng = seeded(), pet = createPet({ x: 0, z: 0, ground: flat, rng }), player = walker(0, 1), buried = { id: 'key', x: 5, z: 5, buried: true, dug: false };
+  const dug = run(pet, 6, { player, rng, scents: [buried] }).filter(event => event.type === 'dug');
+  assert.deepEqual(dug.map(event => event.id), ['key']);
+  const cliff = (x, z) => x > 4 ? (x - 4) * 3 : 0, high = createPet({ x: 0, z: 0, ground: cliff, rng });
+  const ledge = { id: 'seed', x: 8, z: 0 };
+  run(high, 6, { player, rng, scents: [ledge], world: { ground: cliff, solids: [] } });
+  assert.ok(high.x < 4.2, `climbed to ${high.x.toFixed(2)}`);
+  assert.ok(high.state === 'point' || high.scentAt > 0);
+});
+
+test('R calls the pet straight back at a run, even from a scent', () => {
+  const rng = seeded(), pet = createPet({ x: 0, z: 0, ground: flat, rng }), player = walker(0, 0);
+  run(pet, 0.6, { player, rng, scents: [{ id: 'seed', x: 12, z: 0 }] });
+  assert.equal(pet.state, 'scent');
+  player.x = -14;
+  assert.equal(whistlePet(pet), true);
+  let fastest = 0;
+  run(pet, 3, { player, rng, scents: [] }, () => { fastest = Math.max(fastest, Math.hypot(pet.vx, pet.vz)); });
+  assert.ok(fastest > PET.trot * 1.5);
+  assert.ok(Math.hypot(pet.x - player.x, pet.z - player.z) < 2);
+});
+
+test('the pet paddles across deep water slowly and walks along a deck over a gap', () => {
+  const rng = seeded(), water = (x, z) => x > 2 && x < 10 ? 0 : -Infinity, dip = (x, z) => x > 2 && x < 10 ? -2 : 0;
+  const pet = createPet({ x: 0, z: 0, ground: dip, rng }), player = walker(14, 0);
+  let paddled = 0, deepest = 0;
+  run(pet, 8, { player, rng, world: { ground: dip, solids: [], water } }, () => { if (pet.swimming) { paddled += 1 / 120; deepest = Math.min(deepest, pet.y); } });
+  assert.ok(paddled > 1);
+  assert.ok(deepest > -0.5);
+  assert.ok(pet.x > 11);
+  const gap = (x, z) => x > 2 && x < 10 ? -6 : 0, decks = [{ ax: 1, az: 0, ay: 0, bx: 11, bz: 0, by: 0, width: 2 }];
+  const walker2 = createPet({ x: 0, z: 0, ground: gap, rng });
+  let lowest = 0;
+  run(walker2, 6, { player: walker(14, 0), rng, world: { ground: gap, solids: [], decks } }, () => { lowest = Math.min(lowest, walker2.y); });
+  assert.ok(lowest > -0.05);
+  assert.ok(walker2.x > 11);
 });

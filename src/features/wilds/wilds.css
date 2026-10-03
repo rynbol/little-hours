@@ -46,6 +46,14 @@ body.is-wilds { overflow: hidden; }
 .wilds-play:active { transform: translateY(1px); }
 .wilds-quiet { min-height: 40px; border: 1px solid var(--wilds-edge); border-radius: 14px; background: transparent; font-size: 13px !important; }
 .wilds-quiet:hover { background: #f3e8d6; }
+.wilds-shop { width: min(460px, calc(100% - 32px)); }
+.wilds-wares { display: grid; gap: 8px; margin: 0 0 18px; padding: 0; list-style: none; }
+.wilds-wares li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--wilds-edge); border-radius: 14px; background: #fffaf2; }
+.wilds-wares strong { display: block; font-size: 14px; }
+.wilds-wares span { display: block; color: var(--wilds-soft); font-size: 12px; line-height: 1.35; }
+.wilds-buy { flex: none; min-width: 96px; min-height: 36px; padding: 0 12px; border: 1px solid #a5793e; border-radius: 12px; background: #f6d79a; color: #4a3218 !important; font-size: 13px !important; font-weight: 600; }
+.wilds-buy:hover:not(:disabled) { background: #f2c977; }
+.wilds-buy:disabled { border-color: var(--wilds-edge); background: transparent; color: var(--wilds-soft) !important; font-weight: 500; }
 
 @keyframes wilds-spin { to { transform: rotate(360deg); } }
 @keyframes wilds-tired { to { opacity: .55; } }
@@ -54,13 +62,25 @@ body.is-wilds { overflow: hidden; }
 }
 
 .wilds-vitals { position: absolute; left: 18px; top: calc(env(safe-area-inset-top, 0px) + 16px); display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; width: min(260px, 52vw); }
-.wilds-level { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #fbf5eae6; box-shadow: 0 0 0 2px #f2c46b, 0 4px 12px #2a1f2433; color: var(--wilds-ink); font: 700 14px Georgia, serif; }
+.wilds-level { position: relative; display: grid; place-items: center; width: 40px; height: 40px; grid-row: span 2; }
+.wilds-level svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.wilds-level circle { fill: #fbf5eae6; stroke-width: 3.5; }
+.wilds-xp-back { stroke: #2b241f40; }
+.wilds-xp { fill: none !important; stroke: #f2c46b; stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+.wilds-level b { position: relative; color: var(--wilds-ink); font: 700 15px Georgia, serif; }
+.wilds-hud svg path, .wilds-hud svg circle:not([class]), .wilds-hud svg ellipse { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.wilds-hud svg .fill { fill: currentColor; stroke: none; }
 .wilds-life { position: relative; height: 12px; border-radius: 8px; background: #2b241f99; box-shadow: 0 0 0 1.5px #fff2d8b3, 0 2px 8px #0000004d; overflow: hidden; }
 .wilds-life i, .wilds-pet-life i, .wilds-boss-bar i { position: absolute; inset: 2px; border-radius: 6px; transform-origin: 0 50%; }
 .wilds-life-ghost { background: #ffe9b8; }
 .wilds-life-fill { background: linear-gradient(180deg, #a6dd6e, #6fae46); }
 .wilds-vitals.is-low .wilds-life-fill { background: linear-gradient(180deg, #f6a07a, #db6a4f); }
-.wilds-pet { grid-column: 2; display: flex; align-items: center; gap: 8px; color: #fff8ec; font-size: 12px; font-weight: 600; text-shadow: 0 1px 3px #0009; }
+.wilds-pet { grid-column: 2; display: flex; align-items: center; gap: 6px; color: #fff3d8; filter: drop-shadow(0 1px 2px #0009); }
+.wilds-pet > svg { width: 16px; height: 16px; }
+.wilds-potions { grid-column: 2; display: flex; gap: 3px; min-height: 18px; }
+.wilds-potions i { width: 16px; height: 16px; color: #fff3d866; filter: drop-shadow(0 1px 2px #0008); }
+.wilds-potions i.is-full { color: #ff9fb0; }
+.wilds-potions svg { width: 100%; height: 100%; }
 .wilds-pet-life { position: relative; flex: 0 0 90px; height: 7px; border-radius: 5px; background: #2b241f99; box-shadow: 0 0 0 1px #fff2d880; overflow: hidden; }
 .wilds-pet-life i { inset: 1.5px; background: #f2c46b; }
 .wilds-pet.is-out { opacity: .55; }
@@ -78,19 +98,30 @@ body.is-wilds { overflow: hidden; }
 
 .wilds-boss { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 34px); width: min(560px, calc(100% - 160px)); transform: translate(-50%, 12px); opacity: 0; transition: opacity .35s ease, transform .35s ease; text-align: center; }
 .wilds-boss.is-on { opacity: 1; transform: translate(-50%, 0); }
-.wilds-boss-name { display: block; margin-bottom: 6px; color: #fff8ec; font: italic 17px Georgia, serif; letter-spacing: .3px; text-shadow: 0 1px 4px #000a; }
+.wilds-boss > svg { display: block; width: 34px; height: 34px; margin: 0 auto 4px; color: #f2c46b; filter: drop-shadow(0 1px 4px #000a); }
 .wilds-boss-bar { position: relative; height: 12px; border-radius: 8px; background: #2b241fb3; box-shadow: 0 0 0 1.5px #fff2d8b3, 0 3px 10px #0006; overflow: hidden; }
 .wilds-boss-ghost { background: #ffe9b8; }
 .wilds-boss-fill { background: linear-gradient(180deg, #f2c46b, #c98a3c); }
 .wilds-boss-bar s { position: absolute; left: 50%; top: 1px; bottom: 1px; width: 2px; background: #fff8ecaa; }
 
-.wilds-prompt { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 120px); margin: 0; padding: 7px 14px; border-radius: 999px; background: #fbf5eae6; box-shadow: 0 4px 14px #2a1f2433; color: var(--wilds-ink); font-size: 13px; font-weight: 600; white-space: pre; transform: translate(-50%, 6px); opacity: 0; transition: opacity .18s ease, transform .18s ease; }
+.wilds-prompt { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 120px); display: flex; align-items: center; gap: 8px; margin: 0; padding: 6px 12px 6px 6px; border-radius: 999px; background: #fbf5eae6; box-shadow: 0 4px 14px #2a1f2433; color: var(--wilds-ink); transform: translate(-50%, 6px); opacity: 0; transition: opacity .18s ease, transform .18s ease; }
 .wilds-prompt.is-on { opacity: 1; transform: translate(-50%, 0); }
+.wilds-prompt kbd { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--wilds-ink); color: #fbf5ea; font: 700 13px 'DM Sans', sans-serif; }
+.wilds-prompt span, .wilds-prompt span svg { display: block; width: 22px; height: 22px; color: #9a6a2c; }
 
-.wilds-banner { position: absolute; left: 50%; top: 22%; transform: translate(-50%, 10px); opacity: 0; transition: opacity .4s ease, transform .4s ease; text-align: center; color: #fff8ec; text-shadow: 0 2px 10px #000a; pointer-events: none; }
-.wilds-banner.is-on { opacity: 1; transform: translate(-50%, 0); }
-.wilds-banner h3 { margin: 0 0 8px; font: 34px Georgia, serif; letter-spacing: -.3px; }
-.wilds-banner ul { margin: 0; padding: 0; list-style: none; font-size: 15px; font-weight: 600; line-height: 1.6; }
+.wilds-dial { position: absolute; right: 22px; top: calc(env(safe-area-inset-top, 0px) + 66px); width: 48px; height: 26px; color: #fff3d8; filter: drop-shadow(0 1px 2px #0008); }
+.wilds-dial svg { width: 100%; height: 100%; overflow: visible; }
+.wilds-dial-arc { stroke-dasharray: 2 3; opacity: .7; }
+.wilds-dial-sun { fill: #ffd27a !important; stroke: none !important; }
+.wilds-dial.is-night .wilds-dial-sun { fill: #dfe6ff !important; }
+
+.wilds-toast { position: absolute; left: 50%; top: 20%; display: grid; place-items: center; width: 84px; height: 84px; border-radius: 50%; background: radial-gradient(circle, #fff6e2f2 55%, #fff6e200 72%); color: #9a6a2c; transform: translate(-50%, 10px) scale(.9); opacity: 0; transition: opacity .35s ease, transform .35s ease; }
+.wilds-toast.is-on { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.wilds-toast[data-tone='cool'] { color: #4d6c9a; }
+.wilds-toast[data-tone='danger'] { color: #b9483a; }
+.wilds-toast[data-tone='glow'] { color: #5d8f3a; }
+.wilds-toast-icon, .wilds-toast-icon svg { display: block; width: 46px; height: 46px; }
+.wilds-toast-badge { position: absolute; right: 4px; bottom: 6px; display: grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 13px; background: var(--wilds-ink); color: #fbf5ea; font: 700 14px Georgia, serif; }
 
 .wilds-flash { position: absolute; inset: 0; opacity: 0; background: radial-gradient(120% 90% at 50% 50%, #fff6dc00 45%, #ffe6a866); }
 .wilds-flash.is-hurt { background: radial-gradient(120% 90% at 50% 50%, #ff6b4a00 50%, #d6463380); }

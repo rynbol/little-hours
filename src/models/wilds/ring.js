@@ -1,10 +1,11 @@
-import { AdditiveBlending, CircleGeometry, ConeGeometry, CylinderGeometry, DodecahedronGeometry, DoubleSide, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, Quaternion, RingGeometry, SphereGeometry, Vector3, CapsuleGeometry, Euler } from 'three';
+import { AdditiveBlending, CatmullRomCurve3, CircleGeometry, Color, TubeGeometry, ConeGeometry, CylinderGeometry, DodecahedronGeometry, DoubleSide, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, Quaternion, RingGeometry, SphereGeometry, Vector3, CapsuleGeometry, Euler } from 'three';
 import { STAG, STAG_ATTACKS } from '../../core/wilds/stag.js';
 import { part, merge } from './shapes.js';
 
 const HIDE = Object.freeze({ coat: '#8b5d3f', belly: '#cfa77d', dark: '#4f3527', hoof: '#3b2a22', bone: '#ece2c8', moss: '#7fa253', eye: '#1d1715', stone: '#a49b8c', lichen: '#9bb071', heart: '#ffd37a', warn: '#ff9a5c', roots: '#6e4b33', rootTip: '#9bc463' });
 const HIPS = Object.freeze([0, 1.35, -0.85]), SHOULDER = Object.freeze([0, 1.62, 0.95]);
 const ROOT_MAX = 128;
+const SPIRAL = Object.freeze({ dark: new Color('#5c554b'), lit: new Color('#c9ffa0'), rise: 1.4 });
 const ease = s => { const t = Math.min(1, Math.max(0, s)); return t * t * (3 - 2 * t); };
 const coatShade = (x, y, z) => 0.86 + (y < 1.25 ? 0.12 : 0) + Math.sin(z * 9 + x * 4) * 0.03;
 
@@ -72,6 +73,16 @@ function stoneGeometry(places, stone, ground) {
   }));
 }
 
+function spiralGeometry(places, centre, stone, ground) {
+  const coil = Array.from({ length: 40 }, (_, k) => { const t = k / 39, a = t * Math.PI * 5, r = 0.04 + t * 0.28; return new Vector3(Math.cos(a) * r, Math.sin(a) * r, 0); });
+  const shape = new TubeGeometry(new CatmullRomCurve3(coil), 80, 0.035, 5);
+  return merge(places.map(([x, z]) => {
+    const inward = Math.atan2(centre.x - x, centre.z - z), geometry = shape.clone();
+    geometry.translate(0, 0, 0.56).rotateY(inward).translate(x, ground(x, z) + stone.height * 0.52, z);
+    return part(geometry, '#ffffff');
+  }));
+}
+
 function rootGeometry() {
   return merge([
     part(new ConeGeometry(0.22, 1.5, 6), HIDE.roots, { position: [0, 0.75, 0], shade: (_, y) => 0.75 + y * 0.25 }),
@@ -94,6 +105,8 @@ export function buildRing(sim, painterly) {
   root.name = 'wilds-ring';
   const stones = new Mesh(stoneGeometry(layout.ring.places, layout.stone, ground), painterly.material('#ffffff', { vertexColors: true }));
   stones.castShadow = true; stones.receiveShadow = true; stones.name = 'wilds-stones';
+  const carving = new Mesh(spiralGeometry(layout.ring.places, layout.ring, layout.stone, ground), new MeshBasicMaterial({ color: SPIRAL.dark, toneMapped: false }));
+  carving.name = 'wilds-spirals';
 
   const flinch = { value: 0 }, glow = { value: 0 };
   const stag = new Group(), body = new Group(), neck = new Group();
@@ -115,9 +128,9 @@ export function buildRing(sim, painterly) {
   const spikes = new InstancedMesh(rootGeometry(), painterly.material('#ffffff', { vertexColors: true }), ROOT_MAX);
   const marks = new InstancedMesh(new CircleGeometry(1, 16), new MeshBasicMaterial({ color: HIDE.warn, transparent: true, opacity: 0.45, depthWrite: false, blending: AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2 }), ROOT_MAX);
   spikes.castShadow = true; spikes.count = 0; marks.count = 0; marks.renderOrder = 5; spikes.frustumCulled = false; marks.frustumCulled = false;
-  root.add(stones, stag, slam, wave, lane, arc, spikes, marks);
+  root.add(stones, carving, stag, slam, wave, lane, arc, spikes, marks);
 
-  let stride = 0, lastX = sim.stag.x, lastZ = sim.stag.z, fade = 1;
+  let stride = 0, lastX = sim.stag.x, lastZ = sim.stag.z, fade = 1, kindled = 0, clock = 0;
 
   function pose(state, dt, still) {
     const attack = state.attack && STAG_ATTACKS[state.attack], t = state.time;
@@ -207,8 +220,12 @@ export function buildRing(sim, painterly) {
 
   return {
     root,
+    get kindled() { return kindled; },
     update(dt, still) {
-      const state = sim.stag;
+      const state = sim.stag, wanted = sim.encounter === 'fight' ? 1 : sim.encounter === 'won' ? 0.3 : 0;
+      kindled += Math.sign(wanted - kindled) * Math.min(Math.abs(wanted - kindled), dt * SPIRAL.rise);
+      clock += still ? 0 : dt;
+      carving.material.color.copy(SPIRAL.dark).lerp(SPIRAL.lit, kindled * (still ? 1 : 0.85 + Math.sin(clock * 3) * 0.15));
       pose(state, dt, still);
       marksFor(state);
       rootsFor(state);

@@ -2,7 +2,7 @@ import { steps } from '../steps.mjs';
 import { WILDS, face, hold, sleep, until, walkTo } from '../wilds-moves.mjs';
 
 export default {
-  about: 'the Wilds: the island Forest pin opens a three.js feel box after freeing the island, Play starts it, and real keys and clicks run, jump, roll, swing a three-hit combo, charge a heavy, lock on, climb the cliff past its ledge, glide down and leave, each answered within 100 ms, at a capped pixel ratio, 60 fps with no long frames, then the island comes back at the trailhead, and a focus session closes it and keeps it shut',
+  about: 'the Wilds: the island Forest pin opens the three.js valley after freeing the island, Play starts it at the camp, and real keys and clicks run, jump, roll, swing a three-hit combo at the camp dummy, charge a heavy, lock on, climb the vista rock, glide down the valley and leave, each answered within 100 ms, at a capped pixel ratio, 60 fps with no long frames, then the island comes back at the trailhead, and a focus session closes it and keeps it shut',
   async run(t) {
     const { check } = t;
     const app = await t.open({ seed: 'three-rooms', scale: 2 });
@@ -22,7 +22,7 @@ export default {
 
     await hold(app, 'w', 'KeyW', 700);
     const ran = await app.js(WILDS);
-    check('W runs away from the camera, toward the dummy', ran.player.z < 4.2 - 1.5, ran.player);
+    check('W runs away from the camera, across the camp clearing', ran.player.z < start.player.z - 1.5, ran.player);
     check('the run starts within 100 ms of the key', ran.latency.move !== null && ran.latency.move < 100, ran.latency);
     await sleep(300);
 
@@ -39,6 +39,9 @@ export default {
     await until(app, `d.player.state === 'move'`, 'the roll to end', 2000);
     await sleep(600);
 
+    await walkTo(app, start.dummy.x + 2.5, start.dummy.z + 1.5, 0.8);
+    const near = await app.js(WILDS);
+    await face(app, Math.atan2(near.dummy.x - near.player.x, near.dummy.z - near.player.z));
     await app.key('f', 'KeyF');
     const locked = await until(app, `d.lock === 'dummy'`, 'lock-on', 1000);
     check('F locks on to the training dummy', locked.lock === 'dummy');
@@ -87,22 +90,22 @@ export default {
     const sprinted = await app.js(WILDS);
     check('Shift sprints and drains stamina', sprinted.player.stamina < 80, sprinted.player);
 
-    const foot = await walkTo(app, -11.6, -9);
-    await face(app, -Math.PI / 2);
+    const foot = await walkTo(app, 1, -29.5);
+    await face(app, Math.PI);
     await sleep(200);
     await app.down('w', 'KeyW');
     const grabbed = await until(app, `d.player.state === 'climb'`, 'grabbing the cliff', 4000);
-    check('walking into the cliff grabs it instead of walking up it', grabbed.reactions.grabs > foot.reactions.grabs && grabbed.player.y < foot.player.y + 0.8, { foot: foot.player, grabbed: grabbed.player });
+    check('walking into the vista rock grabs it instead of walking up it', grabbed.reactions.grabs > foot.reactions.grabs && grabbed.player.y < foot.player.y + 0.8, { foot: foot.player, grabbed: grabbed.player });
     await sleep(900);
     await t.shot(app, 'climb');
-    const topped = await until(app, `d.reactions.mantles >= ${foot.reactions.mantles + 2} && d.player.state === 'move'`, 'climbing past the ledge to the top', 16000);
+    const topped = await until(app, `d.reactions.mantles > ${foot.reactions.mantles} && d.player.state === 'move'`, 'climbing onto the top of the rock', 16000);
     await app.up('w', 'KeyW');
-    check('holding W climbs the cliff slowly, mantles onto the ledge, climbs again and mantles onto the top', topped.player.y > foot.player.y + 7 && topped.reactions.grabs - foot.reactions.grabs === 2, { from: foot.player.y, to: topped.player.y, grabs: topped.reactions.grabs - foot.reactions.grabs });
-    check('the climb costs stamina', topped.player.stamina < 70, topped.player);
+    check('holding W climbs the rock slowly and mantles onto its top', topped.player.y > foot.player.y + 3 && topped.reactions.grabs > foot.reactions.grabs, { from: foot.player.y, to: topped.player.y, grabs: topped.reactions.grabs - foot.reactions.grabs });
+    check('the climb costs stamina', topped.player.stamina < 90, topped.player);
     await sleep(500);
     await t.shot(app, 'cliff-top');
 
-    await face(app, Math.atan2(-5 - topped.player.x, -15 - topped.player.z));
+    await face(app, Math.atan2(10 - topped.player.x, -62 - topped.player.z));
     await app.down('w', 'KeyW');
     await until(app, `!d.player.grounded`, 'stepping off the cliff top', 4000);
     await sleep(250);
@@ -114,7 +117,7 @@ export default {
     const drifting = await app.js(WILDS);
     await t.shot(app, 'glide');
     check('the glider sinks slowly while you steer it forward', drifting.player.state === 'glide' && drifting.player.vy > -2.6 && Math.hypot(drifting.player.vx, drifting.player.vz) > 4, drifting.player);
-    const landed = await until(app, `d.player.grounded && d.player.state === 'move'`, 'the glide to land', 12000);
+    const landed = await until(app, `d.player.grounded && d.player.state === 'move'`, 'the glide to land', 40000);
     await app.up('w', 'KeyW');
     const flown = Math.hypot(landed.player.x - topped.player.x, landed.player.z - topped.player.z);
     check('the glide carries you well clear of the cliff before you land', flown > 12, { flown, at: landed.player });

@@ -1,9 +1,11 @@
-function axis(centre, half, step, far, rings) {
+function axis(centre, half, step, far, rings, refine) {
   const inner = Math.round(half / step), values = [];
   for (let i = -inner; i <= inner; i++) values.push(centre + i * step);
   const grow = (far / half) ** (1 / rings);
   for (let k = 1; k <= rings; k++) { values.push(centre + half * grow ** k); values.unshift(centre - half * grow ** k); }
-  return Float64Array.from(values);
+  for (const [lo, hi, fine] of refine) for (let v = lo; v <= hi + 1e-9; v += fine) values.push(v);
+  values.sort((a, b) => a - b);
+  return Float64Array.from(values.filter((v, i) => i === 0 || v - values[i - 1] > 1e-3));
 }
 
 function cell(values, v) {
@@ -14,8 +16,9 @@ function cell(values, v) {
   return lo;
 }
 
-export function createGround(heightAt, { centre = [0, 0], half = 52, step = 0.8, far = 900, rings = 28 } = {}) {
-  const xs = axis(centre[0], half, step, far, rings), zs = axis(centre[1], half, step, far, rings), columns = xs.length;
+export function createGround(heightAt, { centre = [0, 0], half = 52, step = 0.8, far = 900, rings = 28, refine = { x: [], z: [] } } = {}) {
+  const [halfX, halfZ] = Array.isArray(half) ? half : [half, half];
+  const xs = axis(centre[0], halfX, step, far, rings, refine.x), zs = axis(centre[1], halfZ, step, far, rings, refine.z), columns = xs.length;
   const heights = new Float32Array(columns * zs.length);
   for (let j = 0; j < zs.length; j++) for (let i = 0; i < columns; i++) heights[j * columns + i] = heightAt(xs[i], zs[j]);
   function at(x, z) {

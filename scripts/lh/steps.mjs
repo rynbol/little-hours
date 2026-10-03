@@ -1,3 +1,13 @@
+const VALLEY_VIEWS = Object.freeze({
+  'wilds-camp': ['the camp clearing, bedroll, pot and merchant', { x: 1, z: 38, facing: -0.67, yaw: -0.67, pitch: 0.28, zoom: 8 }],
+  'wilds-vista': ['the view down the valley from the vista rock', { x: 1, z: -39, facing: Math.PI, yaw: 3.12, pitch: 0.12, zoom: 7 }],
+  'wilds-lake': ['the lake and the cliffs from the gravel beach on the east shore', { x: 46, z: -196, facing: -1.0, yaw: -1.0, pitch: 0.12, zoom: 6 }],
+  'wilds-hero': ['the hero close up at the camp', { x: 2, z: 38, facing: 2.6, yaw: 2.6 + Math.PI, pitch: 0.08, zoom: 2.3 }],
+  'wilds-pet': ['the pet beside the hero at the camp', { x: 2, z: 38, facing: 0, yaw: Math.PI * 0.5, pitch: 0.2, zoom: 3.4 }],
+  'wilds-ring': ['the ring of stones under the lookout', { x: 8, z: -300, facing: Math.PI, yaw: Math.PI, pitch: 0.18, zoom: 7 }],
+  'wilds-oak': ['the great oak and its swing on the knoll', { x: 44, z: -132, facing: 2.4, yaw: 2.4, pitch: 0.2, zoom: 7 }],
+});
+
 export const steps = {
   async houseRooms(app) { if (await app.js(`Boolean(document.getElementById('house-room-menu') && !document.getElementById('house-room-menu').matches(':popover-open'))`)) await app.clickSel('#house-rooms-toggle'); },
   async openMore(app) { if (await app.js(`Boolean(document.getElementById('room-more') && !document.getElementById('room-more').matches(':popover-open'))`)) await app.clickSel('#room-more-toggle'); },
@@ -46,5 +56,9 @@ export const views = {
   decorate: { about: 'Decorate mode', async go(app) { await steps.openDecorate(app); } },
   avatar: { about: 'the avatar editor', async go(app) { await steps.openAvatar(app); } },
   lake: { about: 'fishing at Willow Pond, idle', async go(app) { await steps.openLake(app); } },
-  wilds: { about: 'the Wilds feel box, playing at the spawn', async go(app) { await steps.openWilds(app); await steps.playWilds(app); } },
+  wilds: { about: 'the Wilds valley, playing at the camp spawn', async go(app) { await steps.openWilds(app); await steps.playWilds(app); } },
+  ...Object.fromEntries(Object.entries(VALLEY_VIEWS).map(([name, [about, place]]) => [name, { about: `the Wilds: ${about} (--hour sets the time of day)`, async go(app, options = {}) {
+    await steps.openWilds(app); await steps.playWilds(app);
+    await app.js(`window.__littleHours.wilds.visit(${JSON.stringify({ ...place, ...(options.hour ? { hour: Number(options.hour) } : {}) })})`);
+  } }])),
 };

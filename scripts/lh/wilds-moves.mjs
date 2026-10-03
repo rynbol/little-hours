@@ -44,3 +44,81 @@ export function steering(app) {
     stop: () => hold(new Set()),
   };
 }
+
+export const FIGHT_LIMIT = 240000;
+const IN_FRONT_OF_STONE = 2.6, CHARGE_ROOM = 5.6;
+
+function lureSpot(d) {
+  let best = null;
+  for (const [x, z] of d.stones) {
+    const dx = x - d.stag.x, dz = z - d.stag.z, far = Math.hypot(dx, dz);
+    if (far - IN_FRONT_OF_STONE < CHARGE_ROOM) continue;
+    const spot = { x: x - dx / far * IN_FRONT_OF_STONE, z: z - dz / far * IN_FRONT_OF_STONE };
+    spot.walk = Math.hypot(spot.x - d.player.x, spot.z - d.player.z);
+    if (!best || spot.walk < best.walk) best = spot;
+  }
+  return best;
+}
+
+export async function fight(app, t, check) {
+  const seen = { perfect: null, stun: null, swing: null, roots: null, telegraph: null, lure: null };
+  let frames = 0, sampled = 0;
+  const gaps = [], steer = steering(app);
+  const walk = on => on ? steer.toward(0, 0) : steer.stop();
+  const end = Date.now() + FIGHT_LIMIT;
+  let d = await app.js(WILDS);
+  while (Date.now() < end && d.encounter !== 'won') {
+    d = await app.js(WILDS);
+    frames++;
+    if (Date.now() - sampled > 4000) { sampled = Date.now(); gaps.push(d.frames.gap.p50); }
+    if (d.player.state === 'down' || d.encounter === 'calm') {
+      await walk(false);
+      await until(app, `d.player.state === 'move'`, 'waking by the campfire', 8000);
+      await walkTo(app, d.arena.x, d.arena.z + d.arena.radius - 4);
+      continue;
+    }
+    if (d.stag.state === 'wake' || d.stag.state === 'dormant') { await sleep(60); continue; }
+    if (d.lock !== 'stag') {
+      await walk(false);
+      if (d.lock) await app.key('f', 'KeyF');
+      await face(app, Math.atan2(d.stag.x - d.player.x, d.stag.z - d.player.z));
+      await app.key('f', 'KeyF'); await sleep(80);
+      continue;
+    }
+    if (d.threat && d.player.state !== 'dodge' && d.player.state !== 'knocked') { await app.key('Control', 'ControlLeft'); await sleep(40); continue; }
+    const charging = d.stag.state === 'attack' && d.stag.attack === 'charge';
+    if (d.stag.state === 'retreat' || d.stag.prefer === 'charge' || (d.stag.state === 'telegraph' && d.stag.attack === 'charge') || charging) {
+      const spot = !charging && !(d.stag.state === 'telegraph' && d.stag.time > 0.55) && lureSpot(d);
+      if (spot && spot.walk > 0.45) await steer.toward(Math.atan2(spot.x - d.player.x, spot.z - d.player.z), d.camera.yaw);
+      else await walk(false);
+      if (!seen.lure && d.stag.state === 'telegraph') { seen.lure = true; await t.shot(app, 'fight-lure'); }
+      await sleep(20);
+      continue;
+    }
+    if (!seen.telegraph && d.stag.state === 'telegraph' && d.stag.time > 0.35) { seen.telegraph = d.stag.attack; await t.shot(app, `fight-telegraph`); }
+    if (!seen.roots && d.stag.roots > 6) { seen.roots = true; await t.shot(app, 'fight-roots'); }
+    if (d.flurry > 0 && !seen.perfect) { seen.perfect = true; await t.shot(app, 'fight-perfect'); }
+    const gap = Math.hypot(d.stag.x - d.player.x, d.stag.z - d.player.z) - 1.3;
+    if (d.stag.state === 'telegraph' && d.pet.cooldown === 0 && d.pet.state !== 'out' && d.pet.state !== 'limp') await app.key('q', 'KeyQ');
+    if (d.stag.heartOpen) {
+      await walk(gap > 1.4);
+      if (gap < 1.9 && d.player.state === 'move') {
+        if (!seen.stun) { seen.stun = true; await t.shot(app, 'fight-stun'); }
+        await app.press(720, 450); await sleep(700); await app.release(720, 450); await sleep(150);
+      }
+      continue;
+    }
+    if (gap > 1.9) { await walk(true); await sleep(30); continue; }
+    await walk(false);
+    await app.click(720, 450);
+    if (!seen.swing && d.player.state === 'attack') { seen.swing = true; await t.shot(app, 'fight-swing'); }
+  }
+  await walk(false);
+  return { seen, frames, d, gaps };
+}
+
+export async function followTrail(app, points, near = 2) {
+  let d = null;
+  for (const [x, z] of points) d = await walkTo(app, x, z, near);
+  return d;
+}

@@ -2,7 +2,7 @@
 
 ## Current step
 
-Stages 1 and 2 are done and pushed. Stage 2 is the fight in shapes: the stone ring, the Stag of the Old Ring, the pet fighting at your side, campfires, the rewards and the wolf. Stage 3, the valley and its secrets, is next.
+Stages 1 to 3 are done and pushed. Stage 3 is the valley: a long green valley with the camp clearing, the lake under a two-step fall, layered cliffs, the far ranges with a ruined observatory, the landmarks, eight secrets, the merchant, herbs, levels, swimming, the whistle, and three campfires that are rest points and respawns. The boss is now the Mossheart Stag. Stage 4, the stag in Blender, is next.
 
 ## Verified, and how
 
@@ -15,6 +15,12 @@ Stages 1 and 2 are done and pushed. Stage 2 is the fight in shapes: the stone ri
 - `lh run wilds-memory` enters and leaves five times with play inside each visit. After the first visit has loaded three.js, not one more three.js scene, renderer, object, geometry, attribute, material or texture stays alive. The GPU ledger is back at the island's 185.3 MB after every visit, and the WebGL contexts are back to the island's own. The JS heap plus array buffers come back within 5 MB of the warm baseline. A heap snapshot diff showed that the small creep across visits is V8 compiled code, not app objects.
 - Bundle: the room and island load 4,461,451 bytes (1,754,632 gzipped), against 4,491,818 (1,762,403) on `origin/codex/botw-look`. The retired forest route more than pays for the 1.4 KB of Wilds menu CSS. three.js and the Wilds arrive as one lazy 592 KB chunk only when the Forest pin is pressed.
 - `lh perf --against origin/codex/botw-look`. Room: same draw calls (158) and triangles, GPU 4.25 against 4.10 ms, idle within run-to-run noise. House: same draw calls (40) and triangles, GPU 3.35 against 3.20 ms, taps equal or faster.
+
+- Stage 3 gates: `npm test` (777 pass), guard 0, `verify:room`, `build`, and `lh run` of `wilds` (33 of 33), `wilds-fight` (22 of 22), `wilds-memory` (6 of 6) and the new `wilds-valley` (21 of 21).
+- `lh run wilds-valley` plays the whole valley with real keys and clicks from the island. It checks the play HUD has no words, buys a steel sword and a potion from the camp merchant for 75 study coins (the moonsteel sword stays locked below level 3), presses H at full health and keeps the potion, whistles with R, climbs the vista crag, glides off it through the updraft (it rises more than 1.5 m) and lands more than 18 m down the valley, follows the trail until the pet scents and digs up the buried find, claims a brass key for Pip with E, picks an herb, rests at the shrine fire into the evening, walks the east trail past the lake and the oak to the stone ring, sees the spirals kindle, beats the stag, checks the level rose and no study coins were paid, and leaves. The prompt lists the order island, climb, glide, secret, buy, fight. The flow shops first because the merchant stands at the camp where you arrive.
+- Unit tests for stage 3 cover both trails staying walkable from camp to ring, the oak glide landing on the chest pillar no swimmer can climb, the vista crag being a real climb whose glide rides the updraft, the shelf and recess behind the lower fall, the lake's deep centre, every secret resting on solid ground, the same forest every visit kept off the trails and clearings, trunks blocking movement, secrets claimed once for XP and reward, the merchant gating gear by level and never selling a piece twice, Pip's finds, the pet scenting, pointing at and digging up secrets, R calling it back, the pet paddling, herbs healing once and growing back after a rest, a rest healing fully and passing time to the next morning or night, potions, level-ups raising health and stamina, slow swimming that costs stamina, wading, the washed-back swimmer, decks, the elliptical valley edge, and night light staying readable.
+- Stage 3 frames: the base flow in the valley keeps a 16.7 ms median frame gap, a p95 frame CPU of 0.9 ms and no frame over 20 ms. Every 4 s sample of the night fight has a 16.7 ms median gap. Memory after five visits is back to the island's own level.
+- Stage 3 pictures are in `wilds-assets/progress-shots/wilds-three-claude/stage-3-valley/`: camp, vista, lake, hero, pet, ring and oak at morning (8.5), golden hour (19.5) and night (23), the shop, the updraft and the dig, and the night fight (telegraph, swing, stun), with `contact-sheet.jpg`. The shower is stage 6.
 
 ## Decisions made while the owner is away
 
@@ -30,16 +36,28 @@ Stages 1 and 2 are done and pushed. Stage 2 is the fight in shapes: the stone ri
 - A long fall never hurts. Landing faster than 22 m/s (about a 6 m drop) makes you stumble for half a second instead. The prompt asks for a cozy game and never asks for fall damage.
 - Climbing and gliding work on the ground heightfield. Anything that rises more steeply than 1.25 m per metre is a wall. A wall can be climbed while stamina lasts. Without stamina it simply stops you. Stage 3 ruin walls and rock faces will be shaped into the same heightfield, so they climb the same way.
 - The glider opens only when you are more than 1.2 m above the ground, so a second Space press during an ordinary jump never opens it.
+- The valley is a heightfield inside an ellipse 344 m wide and 472 m long that you slide along. The ellipse sits beyond the cliffs and forest at the valley rim, so there is no invisible wall inside the valley.
+- My three secrets: a lake pearl on the islet makes swimming cheaper, a kestrel feather on a cliff ledge slows the glider's sink, and a brass spyglass on the old watchtower above the lake becomes a room piece (Curios).
+- Rest moves the clock to the next dusk or dawn, so a rest by day brings the evening and a rest at night brings the morning. A day takes 12 minutes.
+- The play HUD shows a level number in a circle and keycaps for E, Q, R and H. These are digits and key letters, not words. Menus and the shop use words.
+- Toasts queue: a second toast waits up to 1.1 s behind the first instead of replacing it, so a whistle never hides a potion warning.
+- Moonlight is brighter than real night so a night fight reads. Rest at dusk is how the flow reaches the ring, so the fight is lit by the moon.
+- Trees and reeds dither away within 3.6 m of the camera, so the camera never sits inside a canopy.
+- Minimal wiring outside the Wilds folders for stage 3: `src/core/catalog.js` adds the Brass spyglass (`earned: 'spyglass'`) and renames the antler's source to the Mossheart Stag. `src/models/furniture.js` adds the spyglass builder, `src/features/decorate/furniture-art.js` its card picture, and `.github/workflows/ci.yml` runs `wilds-valley`. `scripts/lh.mjs` passes `--hour` to views.
 
 ## What remains
 
-Stages 3 to 6: the valley and its secrets with the merchant, herbs, levels, swimming and the whistle, then the stag in Blender, the hero and pet in Blender, then life, weather, sound and polish. Then the full island-to-victory flow, every lighting's screenshots and the judge rounds.
+Stages 4 to 6: the stag in Blender, the hero and pet in Blender, then life, weather, sound and polish. Then the shower screenshots and the judge rounds.
 
 ## What looks or plays wrong
 
-- The feel box is a grey capsule on an open green slope by design. Nothing in it is meant to look finished.
-- The far ground is a flat, hazy green with no landmarks yet, so the slope reads as endless.
-- The stag, pet and wolf are block-outs made of spheres and cylinders until stage 4.
+- The far ranges are streaky and washed out. Their banding reads as stretched texture, not rock.
+- The glide-chest pillar is a plain box of rock.
+- Flowers are small at the whole-valley scale and only read up close.
+- Grass tufts are fixed meadow scatter. Grass that follows the player is stage 6.
+- The waterfall recess is an open crevice rather than a cave behind the water.
+- Morning at 6.8 is a dull brown dawn. Morning shots use 8.5.
+- The hero is still a capsule, and the stag, pet and wolf are block-outs, until stages 4 and 5.
 - The camera pulls in hard when a standing stone is behind you, so a stone or the capsule can fill the frame.
 - From the ring the wolf is a small dark shape on the cliff top. It needs a rim of light or a howl to be noticed.
 - The antler trophy is thin for the room's scale, and its glow is faint at the room's zoom.

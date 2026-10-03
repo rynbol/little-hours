@@ -697,6 +697,17 @@ function antlerTrophy(parent) {
   for (const point of beam.slice(1, -1)) sphere(parent, [0.036, 0.036, 0.036], point, ANTLER.bone);
 }
 
+const SPYGLASS = { lens: { emissive: '#bfe6ff', emissiveIntensity: 0.6 } };
+function spyglass(parent) {
+  for (const angle of [0, 2.1, 4.2]) rod(parent, [0, 0.9, 0], [Math.cos(angle) * 0.34, 0.02, Math.sin(angle) * 0.34], 0.025, C.wood);
+  sphere(parent, [0.07, 0.06, 0.07], [0, 0.92, 0], C.darkWood);
+  rod(parent, [-0.42, 0.88, 0], [-0.3, 0.925, 0], 0.03, C.brass);
+  rod(parent, [-0.3, 0.925, 0], [0.12, 1.085, 0], 0.05, C.brass);
+  rod(parent, [0.12, 1.085, 0], [0.4, 1.19, 0], 0.064, C.darkWood);
+  rod(parent, [0.39, 1.186, 0], [0.43, 1.2, 0], 0.07, C.brass);
+  sphere(parent, [0.02, 0.056, 0.056], [0.435, 1.202, 0], '#d8f0ff').material = material(parent.getScene(), '#d8f0ff', SPYGLASS.lens);
+}
+
 export const SEED_BED_SOIL = 0.715;
 function seedBed(parent) {
   for (const x of [-0.84, 0.84]) for (const z of [-0.34, 0.34]) box(parent, [0.1, 0.26, 0.1], [x, 0.13, z], C.darkWood, 0.02);
@@ -2033,7 +2044,7 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
       'cloud-shelf': parent => cloudShelf(parent, 2.5), 'small-cloud-shelf': parent => cloudShelf(parent, 2.1),
       'wall-scroll': wallScroll, 'neon-orbit': neonOrbit, 'record-sleeve': recordSleeve, 'felt-rainbow': feltRainbow,
       'cottage-window': cottageWindow, 'arched-window': archedWindow, 'round-window': roundWindow,
-      'fish-tank': parent => fishTank(parent, TANK_WATER['fish-tank']), 'grand-tank': parent => fishTank(parent, TANK_WATER['grand-tank']), globe: globeStand, 'antler-trophy': antlerTrophy, easel, 'bean-bag': beanBag, monstera: parent => monstera(parent), 'tea-cart': teaCart,
+      'fish-tank': parent => fishTank(parent, TANK_WATER['fish-tank']), 'grand-tank': parent => fishTank(parent, TANK_WATER['grand-tank']), globe: globeStand, 'antler-trophy': antlerTrophy, spyglass, easel, 'bean-bag': beanBag, monstera: parent => monstera(parent), 'tea-cart': teaCart,
     };
     builders[type](source);
     const template = batch(source); template.setEnabled(false); templates.set(type, template);

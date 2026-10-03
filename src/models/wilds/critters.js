@@ -83,6 +83,11 @@ export function buildPet(painterly, kind) {
       else if (pet.state === 'out') { roll = 1.45; crouch = 0.12; }
       else if (pet.state === 'limp') { roll = 0.12; nod = 0.25; wagSize = 0.04; }
       else if (pet.state === 'pat') { nod = -0.35; wagRate = 14; wagSize = 0.6; }
+      else if (pet.state === 'scent') { nod = 0.5; wagRate = 18; wagSize = 0.6; }
+      else if (pet.state === 'point') { pitch = -0.12; nod = -0.15; wagRate = 20; wagSize = 0.7; }
+      else if (pet.state === 'dig') { pitch = 0.3; nod = 0.65; crouch = 0.05; wagRate = 12; wagSize = 0.5; lift = still ? 0 : Math.abs(Math.sin(t * 14)) * 0.04; }
+      else if (pet.state === 'come') { stretch = 1.15; nod = 0.1; wagRate = 10; wagSize = 0.4; }
+      if (pet.swimming) { pitch = -0.18; crouch = 0; lift = still ? 0 : Math.sin(t * 6) * 0.03; }
       if (pet.state !== 'attack' || pet.attack !== 'spin') spin = 0;
       if (still) { stride = 0; spin = 0; lift = Math.min(lift, 0.1); }
       const bob = still ? 0 : Math.abs(Math.sin(stride)) * Math.min(0.06, speed * 0.02);

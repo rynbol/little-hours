@@ -13,7 +13,7 @@ export function groundColour(x, z, slope, worn = 0, out = new Color()) {
   return out.lerp(tone.set(GREENS.worn), worn);
 }
 
-export function buildGround(grid, material, { worn = () => 0 } = {}) {
+export function buildGround(grid, material, { worn = () => 0, paint = (x, z, y, slope, out) => groundColour(x, z, slope, worn(x, z), out) } = {}) {
   const { xs, zs, heights, columns, rows } = grid, count = columns * rows;
   const positions = new Float32Array(count * 3), colours = new Float32Array(count * 3), colour = new Color();
   for (let j = 0; j < rows; j++) for (let i = 0; i < columns; i++) {
@@ -21,7 +21,7 @@ export function buildGround(grid, material, { worn = () => 0 } = {}) {
     positions.set([x, y, z], k * 3);
     const dx = (heights[j * columns + Math.min(columns - 1, i + 1)] - heights[j * columns + Math.max(0, i - 1)]) / Math.max(1e-3, xs[Math.min(columns - 1, i + 1)] - xs[Math.max(0, i - 1)]);
     const dz = (heights[Math.min(rows - 1, j + 1) * columns + i] - heights[Math.max(0, j - 1) * columns + i]) / Math.max(1e-3, zs[Math.min(rows - 1, j + 1)] - zs[Math.max(0, j - 1)]);
-    groundColour(x, z, Math.hypot(dx, dz), worn(x, z), colour);
+    paint(x, z, y, Math.hypot(dx, dz), colour);
     colours.set([colour.r, colour.g, colour.b], k * 3);
   }
   const indices = new (count > 65535 ? Uint32Array : Uint16Array)((columns - 1) * (rows - 1) * 6);

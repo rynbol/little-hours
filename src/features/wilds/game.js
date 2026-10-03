@@ -1,22 +1,28 @@
-import { ACESFilmicToneMapping, DirectionalLight, Fog, HemisphereLight, Mesh, PCFShadowMap, PerspectiveCamera, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three';
-import { heightAt, smooth } from '../../core/world-terrain.js';
+import { ACESFilmicToneMapping, DirectionalLight, FogExp2, HemisphereLight, Mesh, PCFShadowMap, PerspectiveCamera, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three';
 import { createGround } from '../../core/wilds/ground.js';
-import { createSim, foe, interact, lockTarget, petSkill, press, stepSim, toggleLock, CAMPFIRE, ENCOUNTER } from '../../core/wilds/sim.js';
+import { createSim, drink, equip, foe, interact, interactable, lockTarget, petSkill, press, stepSim, toggleLock, whistle } from '../../core/wilds/sim.js';
 import { stagAwake, threatens } from '../../core/wilds/stag.js';
-import { PET_SKILL, petDown } from '../../core/wilds/pet.js';
+import { PET_SKILL, petDown, placePet } from '../../core/wilds/pet.js';
 import { createWolf, stepWolf } from '../../core/wilds/wolf.js';
-import { emptyWilds, kindleFire, levelFor, recordVictory } from '../../core/wilds/progress.js';
-import { HILL, shapeHill } from '../../core/wilds/layout.js';
-import { VITALS, slopeAt } from '../../core/wilds/player.js';
+import { SECRETS, claimSecret, emptyWilds, keepPipFind, kindleFire, levelFor, recordVictory, wildsStats } from '../../core/wilds/progress.js';
+import { POTION, drinkPotion } from '../../core/wilds/gear.js';
+import { VALLEY, trailDistance, valleyHeight, waterAt } from '../../core/wilds/valley.js';
+import { VITALS, placePlayer, slopeAt } from '../../core/wilds/player.js';
 import { RIG, createRig, kickRig, moveFrom, orbit, stepRig, zoomRig } from '../../core/wilds/camera.js';
 import { ATTACKS, BLADE, bladeAngles, bladeSegment } from '../../core/wilds/moves.js';
 import { renderRatioCeiling } from '../../core/render-scale.js';
-import { clockRandom } from '../../core/test-pins.js';
+import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createPainterly } from '../../models/wilds/painterly.js';
 import { buildGround, buildTufts } from '../../models/wilds/terrain.js';
 import { buildDummy, buildPosts } from '../../models/wilds/props.js';
 import { buildStandin } from '../../models/wilds/standin.js';
 import { SKY, buildSky } from '../../models/wilds/sky.js';
+import { createDaylight, daylight } from '../../models/wilds/daylight.js';
+import { streamWater, valleyFlow, valleyPaint } from '../../models/wilds/valley-ground.js';
+import { buildTrees } from '../../models/wilds/trees.js';
+import { buildWater, buildWaterSurface } from '../../models/wilds/water.js';
+import { buildLandmarks, buildSecrets } from '../../models/wilds/landmarks.js';
+import { buildScatter } from '../../models/wilds/scatter.js';
 import { buildEffects } from '../../models/wilds/effects.js';
 import { buildRing } from '../../models/wilds/ring.js';
 import { buildPet, buildWolf } from '../../models/wilds/critters.js';
@@ -24,9 +30,9 @@ import { buildCamp } from '../../models/wilds/camp.js';
 import { createInput } from './input.js';
 import { createHud } from './hud.js';
 
-const STAG_NAME = 'Stag of the Old Ring';
-export const VIEW = Object.freeze({ ratio: 1.5, step: 1 / 120, longest: 0.1, shadow: 2048, shadowHalf: 14, fog: Object.freeze([70, 560]), frames: 240, zoomStep: 0.35 });
-const SUN = new Vector3(-0.62, 0.6, 0.36).normalize();
+export const VIEW = Object.freeze({ ratio: 1.5, step: 1 / 120, longest: 0.1, shadow: 2048, shadowHalf: 18, haze: 0.00085, far: 3200, frames: 240, zoomStep: 0.35, tree: 140 });
+const MEADOWS = Object.freeze([[0, 36, 30], [6, -100, 26], [VALLEY.oak.x, VALLEY.oak.z, 22], [VALLEY.ring.x, VALLEY.ring.z, 26], [2, -40, 22]]);
+const SHEETS = Object.freeze([Object.freeze({ lip: [-86.9, 46.2], land: [-84.8, 24.6], z: VALLEY.falls.z, width: 6, bulge: 0.3 }), Object.freeze({ lip: [-75.2, 25.1], land: [-72.6, 1.3], z: VALLEY.falls.z, width: 8, bulge: 0.5 })]);
 const RESPONSES = Object.freeze({
   move: player => Math.hypot(player.vx, player.vz) > 0,
   attack: player => player.state === 'attack' || player.state === 'charge',
@@ -44,7 +50,7 @@ function quantiles(values) {
   return { p50: at(0.5), p95: at(0.95), max: sorted[sorted.length - 1], count: sorted.length };
 }
 
-export function createGame(stage, hudLayer, { reducedMotion = () => false, onPause = () => {}, wilds = {}, onSave = () => {} } = {}) {
+export function createGame(stage, hudLayer, { reducedMotion = () => false, onPause = () => {}, onShop = () => {}, wilds = {}, onSave = () => {} } = {}) {
   const canvas = document.createElement('canvas');
   canvas.className = 'wilds-canvas'; canvas.tabIndex = -1;
   stage.append(canvas);
@@ -56,51 +62,77 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
 
   const scene = new Scene();
-  scene.fog = new Fog(SKY.horizon, ...VIEW.fog);
-  const camera = new PerspectiveCamera(RIG.fov, 1, 0.1, 2000);
+  scene.fog = new FogExp2(SKY.horizon, VIEW.haze);
+  const camera = new PerspectiveCamera(RIG.fov, 1, 0.1, VIEW.far);
   const painterly = createPainterly();
-  const wind = { value: 0 }, skyTime = { value: 0 };
+  const wind = { value: 0 }, skyTime = { value: 0 }, light = createDaylight();
 
-  const grid = createGround(shapeHill(heightAt), { centre: [HILL.bounds.x, HILL.bounds.z] });
+  const grid = createGround(valleyHeight, VALLEY.grid);
   const ground = (x, z) => grid.at(x, z);
-  const progress = structuredClone(wilds.progress ?? emptyWilds());
-  const sim = createSim(HILL, ground, { bond: wilds.bond ?? 0, kind: wilds.kind ?? 'cat', lit: progress.lit, beaten: progress.beaten.includes('stag') }), player = sim.player;
-  const petName = wilds.petName ?? 'Miso';
+  let progress = structuredClone(wilds.progress ?? emptyWilds());
+  const sim = createSim(VALLEY, ground, { bond: wilds.bond ?? 0, kind: wilds.kind ?? 'cat', progress, hour: wilds.hour ?? 9 }), player = sim.player;
   const tilt = [0, 0], near = (x, z, list, radius) => list.some(spot => Math.hypot(spot.x - x, spot.z - z) < radius);
-  const worn = (x, z) => Math.max(smooth(2.4, 0.9, Math.hypot(x - sim.dummy.x, z - sim.dummy.z)) * 0.75, smooth(2, 0.6, Math.hypot(x - HILL.spawn.x, z - HILL.spawn.z)) * 0.5);
-  scene.add(buildGround(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { worn }));
-  scene.add(buildTufts(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { centre: [HILL.bounds.x, HILL.bounds.z], radius: HILL.bounds.radius + 6, wind, keep: (x, z) => !near(x, z, [sim.dummy, ...sim.posts, ...sim.campfires], 0.75) && worn(x, z) < 0.3 && Math.hypot(...slopeAt(ground, x, z, tilt)) < 0.7 }));
+  const busy = [sim.dummy, ...sim.posts, ...sim.campfires, ...sim.stones, sim.merchant, ...sim.secrets];
+  scene.add(buildGround(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { paint: valleyPaint }));
+  for (const [x, z, radius] of MEADOWS) scene.add(buildTufts(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { centre: [x, z], radius, wind, keep: (tx, tz) => !near(tx, tz, busy, 1.1) && trailDistance(tx, tz) > 1.5 && waterAt(tx, tz) < ground(tx, tz) - 0.05 && Math.hypot(...slopeAt(ground, tx, tz, tilt)) < 0.6 }));
+  const { bounds } = VALLEY;
+  scene.add(buildTrees(sim.trees, painterly, { wind, near: tree => tree.hero || Math.hypot((tree.x - bounds.x) / bounds.rx, (tree.z - bounds.z) / bounds.rz) < 1 }));
+  const water = buildWater({
+    surfaces: [
+      buildWaterSurface(ground, waterAt, valleyFlow, { area: [-77, 72, -305, -100], step: 1.25 }),
+      buildWaterSurface(ground, waterAt, valleyFlow, { area: [-88, -76.6, -128, -116], step: 0.6 }),
+      buildWaterSurface(ground, streamWater(ground), valleyFlow, { area: [-166, -85.5, -134, -100], step: 1 }),
+    ],
+    sheets: SHEETS,
+  });
+  const landmarks = buildLandmarks(VALLEY, ground, painterly), secrets = buildSecrets(sim, painterly), scatter = buildScatter(sim, painterly, wind);
+  scene.add(water.root, landmarks.root, secrets.root, ...scatter.meshes);
   scene.add(buildPosts(sim.posts, painterly.material('#ffffff', { vertexColors: true })));
   const dummyView = buildDummy(sim.dummy, painterly);
   scene.add(dummyView.root);
   const hero = buildStandin(painterly);
   const ring = buildRing(sim, painterly), petView = buildPet(painterly, sim.pet.kind), wolfView = buildWolf(painterly), camp = buildCamp(sim.campfires, painterly);
   scene.add(ring.root, petView.root, wolfView.root, camp.root);
-  let wolf = progress.companions.includes('wolf') ? createWolf({ x: player.x + 1.3, z: player.z + 1.7, facing: player.facing, ground }) : null;
+  let wolf = progress.companions.includes('wolf') ? createWolf({ x: player.x + 1.3, z: player.z + 1.7, facing: player.facing, ground: sim.floor }) : null;
   scene.add(hero.root, hero.blade, hero.hand);
-  const sky = buildSky(SUN, { time: skyTime });
+  daylight(sim.hour, light);
+  const sky = buildSky(light.sun, { time: skyTime });
   scene.add(sky);
   const effects = buildEffects(clockRandom);
   scene.add(...effects.meshes);
 
-  scene.add(new HemisphereLight('#bcd4ea', '#6f8a4c', 1.35));
+  const hemi = new HemisphereLight('#bcd4ea', '#6f8a4c', 1.35);
+  scene.add(hemi);
   const sun = new DirectionalLight('#ffe3bd', 2.7);
   sun.castShadow = true;
   sun.shadow.mapSize.set(VIEW.shadow, VIEW.shadow);
-  Object.assign(sun.shadow.camera, { left: -VIEW.shadowHalf, right: VIEW.shadowHalf, top: VIEW.shadowHalf, bottom: -VIEW.shadowHalf, near: 1, far: 90 });
+  Object.assign(sun.shadow.camera, { left: -VIEW.shadowHalf, right: VIEW.shadowHalf, top: VIEW.shadowHalf, bottom: -VIEW.shadowHalf, near: 1, far: 120 });
   sun.shadow.camera.updateProjectionMatrix();
-  sun.shadow.radius = 3; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.025;
+  sun.shadow.radius = 3; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
   scene.add(sun, sun.target);
-  const lightRight = new Vector3().crossVectors(SUN, new Vector3(0, 1, 0)).normalize(), lightUp = new Vector3().crossVectors(lightRight, SUN), focus = new Vector3();
+  const lightRight = new Vector3(), lightUp = new Vector3(), worldUp = new Vector3(0, 1, 0), focus = new Vector3();
   const texel = VIEW.shadowHalf * 2 / VIEW.shadow, snap = value => Math.round(value / texel) * texel;
 
-  const rig = createRig({ yaw: HILL.spawn.facing, at: [player.x, player.y, player.z] });
+  function shine() {
+    daylight(sim.hour, light);
+    sun.color.copy(light.light); sun.intensity = light.strength;
+    hemi.color.copy(light.sky); hemi.groundColor.copy(light.earth); hemi.intensity = light.fill;
+    scene.fog.color.copy(light.fog);
+    renderer.toneMappingExposure = light.exposure;
+    const { uniforms } = sky.material;
+    uniforms.zenith.value.copy(light.zenith); uniforms.middle.value.copy(light.middle); uniforms.horizon.value.copy(light.horizon);
+    uniforms.sunColor.value.copy(light.glow); uniforms.sunDirection.value.copy(light.sun); uniforms.moonDirection.value.copy(light.moon); uniforms.night.value = light.night;
+    lightRight.crossVectors(light.toward, worldUp).normalize(); lightUp.crossVectors(lightRight, light.toward);
+  }
+  shine();
+
+  const rig = createRig({ yaw: VALLEY.spawn.facing, at: [player.x, player.y, player.z] });
   const steer = { moveX: 0, moveZ: 0, sprint: false, attackHeld: false, view: rig.yaw };
   const pose = [...BLADE.rest], shownPose = [...BLADE.rest], startPose = [...BLADE.rest], windPose = [0, 0];
   const segment = { root: [0, 0, 0], tip: [0, 0, 0], yaw: BLADE.rest[0], pitch: BLADE.rest[1] }, trailSegment = { root: [0, 0, 0], tip: [0, 0, 0] };
-  const projected = new Vector3(), hudState = { stamina: { x: 0, y: 0, visible: false, value: 100, max: 100, tired: false }, lock: { visible: false, x: 0, y: 0, barVisible: false, barX: 0, barY: 0, health: 100, max: 100 }, vitals: { health: 100, max: 100, level: 1 }, pet: { name: '', health: 1, max: 1, out: false }, skill: { left: 0, ready: true, useful: false }, boss: { name: STAG_NAME, health: 1, max: 1 } };
+  const projected = new Vector3(), hudState = { stamina: { x: 0, y: 0, visible: false, value: 100, max: 100, tired: false }, lock: { visible: false, x: 0, y: 0, barVisible: false, barX: 0, barY: 0, health: 100, max: 100 }, vitals: { health: 100, max: 100, level: 1, xp: 0, potions: 0, carry: POTION.carry }, pet: { health: 1, max: 1, out: false }, skill: { left: 0, ready: true, useful: false }, boss: { health: 1, max: 1 } };
   const cpu = [], gaps = [], latency = { move: null, attack: null, jump: null, dodge: null, worst: 0 }, pending = [];
-  const reactions = { swings: 0, hits: 0, breaks: 0, lands: 0, dodges: 0, jumps: 0, charges: 0, kicks: 0, trail: 0, warnings: 0, frozen: 0, grabs: 0, mantles: 0, glides: 0, lets: 0, hurts: 0, perfects: 0, evades: 0, telegraphs: 0, stuns: 0, heartHits: 0, petHits: 0, petSkills: 0, pats: 0, retreats: 0, rests: 0, respawns: 0, kindles: 0, victories: 0 };
+  const reactions = { swings: 0, hits: 0, breaks: 0, lands: 0, dodges: 0, jumps: 0, charges: 0, kicks: 0, trail: 0, warnings: 0, frozen: 0, grabs: 0, mantles: 0, glides: 0, lets: 0, hurts: 0, perfects: 0, evades: 0, telegraphs: 0, stuns: 0, heartHits: 0, petHits: 0, petSkills: 0, pats: 0, retreats: 0, rests: 0, respawns: 0, kindles: 0, victories: 0, secrets: 0, herbs: 0, shops: 0, levels: 0, digs: 0, scents: 0, whistles: 0, potions: 0 };
   let frame = 0, last = 0, paused = true, disposed = false, width = 0, height = 0, trailAttack = null, trailTime = 0, dustClock = 0, driftClock = 0, muted = false, seconds = 0;
 
   const hud = createHud(hudLayer);
@@ -112,6 +144,8 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
       if (action === 'lock') { toggleLock(sim, rig.yaw); return; }
       if (action === 'interact') { interact(sim); return; }
       if (action === 'pet') { if (petSkill(sim)) reactions.petSkills++; return; }
+      if (action === 'whistle') { whistle(sim); return; }
+      if (action === 'potion') { drink(sim); return; }
       if (action === 'dodge' && (player.tired || player.stamina <= 0)) { hud.warn(); reactions.warnings++; }
       if (['jump', 'dodge', 'attack'].includes(action)) press(sim, action);
       if (RESPONSES[action] && !RESPONSES[action](player)) pending.push({ action, stamp });
@@ -175,9 +209,20 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
   }
   const spot = [0, 0, 0], toward = [0, 0, 0];
 
+  function find(id) {
+    const award = claimSecret(progress, id);
+    onSave((saved, draft) => { claimSecret(saved, id); if (SECRETS[id].find) keepPipFind(draft.buddy, SECRETS[id].find, clockNow()); });
+    reactions.secrets++;
+    const spot = sim.secrets.find(entry => entry.id === id);
+    effects.hit(spot.x, spot.y + 0.6, spot.z, null, true);
+    hud.toast('secret', { icon: 'star', tone: 'glow', seconds: 2.6 });
+    if (award) equip(sim, wildsStats(progress));
+  }
+
   function react(event, still) {
-    if (event.type === 'swing') { reactions.swings++; trailAttack = event.attack; trailTime = 0; startPose[0] = shownPose[0]; startPose[1] = shownPose[1]; if (event.attack === 'heavy') effects.trail.cut(); }
-    else if (event.type === 'hit') {
+    const { type } = event;
+    if (type === 'swing') { reactions.swings++; trailAttack = event.attack; trailTime = 0; startPose[0] = shownPose[0]; startPose[1] = shownPose[1]; if (event.attack === 'heavy') effects.trail.cut(); }
+    else if (type === 'hit') {
       reactions.hits++;
       const attack = ATTACKS[event.attack], target = event.id === sim.stag.id ? sim.stag : sim.dummy;
       bladeAngles(attack, player.time, pose); bladeSegment(player, pose[0], pose[1], segment);
@@ -189,60 +234,71 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
       if (event.broke) { reactions.breaks++; effects.hit(target.x, target.top - 0.3, target.z, null, true); }
       if (!still) { const push = attack.nudge * 26; kickRig(rig, toward[0] * push, -push * (event.attack === 'heavy' ? 0.9 : 0.35), toward[2] * push); reactions.kicks++; }
     }
-    else if (event.type === 'jump') { reactions.jumps++; hero.jump(); effects.dust(player.x, player.y, player.z, 0.3); }
-    else if (event.type === 'land') { reactions.lands++; hero.land(event.speed); if (event.speed > 4) effects.dust(player.x, player.y, player.z, Math.min(1, event.speed / 14)); }
-    else if (event.type === 'dodge') { reactions.dodges++; effects.dust(player.x, player.y, player.z, 0.5); }
-    else if (event.type === 'charge') reactions.charges++;
-    else if (event.type === 'tired') hud.warn();
-    else if (event.type === 'grab') { reactions.grabs++; effects.dust(player.x, player.y + 0.6, player.z, 0.2); }
-    else if (event.type === 'mantle') { reactions.mantles++; hero.land(4); }
-    else if (event.type === 'leap') effects.dust(player.x, player.y, player.z, 0.3);
-    else if (event.type === 'glide') { reactions.glides++; hero.jump(); }
-    else if (event.type === 'let-go' || event.type === 'slip') reactions.lets++;
-    else if (event.type === 'hurt' || event.type === 'down') {
+    else if (type === 'jump') { reactions.jumps++; hero.jump(); effects.dust(player.x, player.y, player.z, 0.3); }
+    else if (type === 'land') { reactions.lands++; hero.land(event.speed); if (event.speed > 4) effects.dust(player.x, player.y, player.z, Math.min(1, event.speed / 14)); }
+    else if (type === 'dodge') { reactions.dodges++; effects.dust(player.x, player.y, player.z, 0.5); }
+    else if (type === 'charge') reactions.charges++;
+    else if (type === 'tired') hud.warn();
+    else if (type === 'grab') { reactions.grabs++; effects.dust(player.x, player.y + 0.6, player.z, 0.2); }
+    else if (type === 'mantle') { reactions.mantles++; hero.land(4); }
+    else if (type === 'leap') effects.dust(player.x, player.y, player.z, 0.3);
+    else if (type === 'glide') { reactions.glides++; hero.jump(); }
+    else if (type === 'let-go' || type === 'slip') reactions.lets++;
+    else if (type === 'hurt' || type === 'down') {
       reactions.hurts++; hud.hurt();
       if (!still) kickRig(rig, 0, -0.5 - event.damage * 0.03, 0);
-      if (event.type === 'down') hud.banner('You fall', ['You will wake by the campfire.'], 2.4);
+      if (type === 'down') hud.toast('down', { icon: 'dizzy', tone: 'danger', seconds: 2.4 });
     }
-    else if (event.type === 'perfect') { reactions.perfects++; hud.flash(); }
-    else if (event.type === 'evade') reactions.evades++;
-    else if (event.type === 'awaken') hud.banner(STAG_NAME, ['It wakes. Watch its antlers glow.'], 2.6);
-    else if (event.type === 'telegraph') reactions.telegraphs++;
-    else if (event.type === 'retreat') { reactions.retreats++; effects.dust(sim.stag.x, sim.stag.y, sim.stag.z, 0.8); }
-    else if (event.type === 'slam') { effects.dust(event.x, ground(event.x, event.z), event.z, 1); if (!still) kickRig(rig, 0, -0.9, 0); }
-    else if (event.type === 'stun') {
+    else if (type === 'perfect') { reactions.perfects++; hud.flash(); }
+    else if (type === 'evade') reactions.evades++;
+    else if (type === 'awaken') hud.toast('awaken', { icon: 'wake', tone: 'danger', seconds: 2.4 });
+    else if (type === 'telegraph') reactions.telegraphs++;
+    else if (type === 'retreat') { reactions.retreats++; effects.dust(sim.stag.x, sim.stag.y, sim.stag.z, 0.8); }
+    else if (type === 'slam') { effects.dust(event.x, ground(event.x, event.z), event.z, 1); if (!still) kickRig(rig, 0, -0.9, 0); }
+    else if (type === 'stun') {
       reactions.stuns++;
       const stone = sim.stones.find(entry => entry.id === event.stone);
       if (stone) effects.hit(stone.x, stone.y + 1.6, stone.z, null, true);
       if (!still) kickRig(rig, 0, -0.8, 0);
-      hud.banner('Stunned!', ['Its heart is open. Hold for a heavy.'], 2.2);
+      hud.toast('stun', { icon: 'stars', tone: 'glow', seconds: 2 });
     }
-    else if (event.type === 'phase') hud.banner('Roots stir', ['Lines of roots will burst across the ring.'], 2.6);
-    else if (event.type === 'pet-hit') { reactions.petHits++; effects.hit(sim.pet.x, sim.pet.y + 0.6, sim.pet.z, null, false); }
-    else if (event.type === 'pat') { reactions.pats++; effects.charge(sim.pet.x, sim.pet.y + 0.8, sim.pet.z); effects.charge(sim.pet.x, sim.pet.y + 0.9, sim.pet.z); }
-    else if (event.type === 'rest') { reactions.rests++; hud.banner('Rested', ['Health restored.'], 2); }
-    else if (event.type === 'respawn') { reactions.respawns++; hud.banner('You wake by the campfire', ['Nothing was lost.'], 2.6); }
-    else if (event.type === 'kindle') {
+    else if (type === 'phase') hud.toast('phase', { icon: 'roots', tone: 'danger', seconds: 2.4 });
+    else if (type === 'pet-hit') { reactions.petHits++; effects.hit(sim.pet.x, sim.pet.y + 0.6, sim.pet.z, null, false); }
+    else if (type === 'pat') { reactions.pats++; effects.charge(sim.pet.x, sim.pet.y + 0.8, sim.pet.z); effects.charge(sim.pet.x, sim.pet.y + 0.9, sim.pet.z); }
+    else if (type === 'rest') { reactions.rests++; shine(); hud.toast('rest', { icon: event.hour < 12 ? 'sun' : 'moon', tone: event.hour < 12 ? 'warm' : 'cool', seconds: 2.4 }); }
+    else if (type === 'respawn') { reactions.respawns++; hud.toast('respawn', { icon: 'fire', seconds: 2.4 }); }
+    else if (type === 'kindle') {
       reactions.kindles++;
       if (kindleFire(progress, event.id)) onSave(saved => kindleFire(saved, event.id));
-      hud.banner('Campfire lit', ['You will wake here if you fall.'], 2.4);
+      hud.toast('kindle', { icon: 'fire', tone: 'glow' });
     }
-    else if (event.type === 'victory') win();
+    else if (type === 'victory') win();
+    else if (type === 'secret') find(event.id);
+    else if (type === 'herb') { reactions.herbs++; effects.charge(player.x, player.y + 1, player.z); hud.toast('herb', { icon: 'leaf', tone: 'glow', seconds: 1.4 }); }
+    else if (type === 'shop') { reactions.shops++; onShop(); }
+    else if (type === 'level') { reactions.levels++; hud.flash(); hud.toast('level', { icon: 'up', badge: String(event.level), tone: 'glow', seconds: 3 }); }
+    else if (type === 'dug') { reactions.digs++; const found = sim.secrets.find(entry => entry.id === event.id); effects.dust(found.x, found.y, found.z, 0.8); hud.toast('dug', { icon: 'paw', tone: 'glow', seconds: 1.8 }); }
+    else if (type === 'pet-scent') { reactions.scents++; effects.charge(sim.pet.x, sim.pet.y + 0.9, sim.pet.z); }
+    else if (type === 'whistle' || type === 'whistle-unheard') { reactions.whistles++; hud.toast(type, { icon: type === 'whistle' ? 'note' : 'hush', tone: 'cool', seconds: 1.2 }); }
+    else if (type === 'potion') {
+      reactions.potions++;
+      if (drinkPotion(progress)) onSave(saved => drinkPotion(saved));
+      effects.charge(player.x, player.y + 1, player.z);
+      hud.toast('potion', { icon: 'flask', tone: 'glow', seconds: 1.4 });
+    }
+    else if (type === 'potion-wait') hud.toast('potion-wait', { icon: 'empty', tone: 'cool', seconds: 1.2 });
+    else if (type === 'rematch') hud.toast('rematch', { icon: 'antler', tone: 'danger', seconds: 1.8 });
   }
 
   function win() {
     reactions.victories++;
     const award = recordVictory(progress, 'stag');
     onSave(saved => recordVictory(saved, 'stag'));
-    const lines = [`+${award.xp} XP`];
-    if (award.heartwood) lines.push(`+${award.heartwood} heartwood`);
-    if (award.trophy) lines.push('A glowing antler for your room');
-    if (award.companion) lines.push('A wolf watches from the cliff');
-    if (award.levelsGained) lines.push(`Level ${award.level}!`);
-    hud.banner(award.first ? 'The stag is calmed' : 'Calmed again', lines, 6);
+    hud.toast('victory', { icon: 'antler', tone: 'glow', seconds: 4 });
+    equip(sim, wildsStats(progress));
     if (award.companion && !wolf) {
-      const { x, z } = HILL.lookout;
-      wolf = createWolf({ x, z, facing: Math.atan2(sim.arena.x - x, sim.arena.z - z), ground, waiting: true });
+      const { x, z } = VALLEY.lookout;
+      wolf = createWolf({ x, z, facing: Math.atan2(sim.arena.x - x, sim.arena.z - z), ground: sim.floor, waiting: true });
     }
   }
 
@@ -263,19 +319,16 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
       for (const event of events) react(event, still);
       if (player.state === 'attack' && player.attack === trailAttack) { sampleTrail(trailAttack, Math.max(before, trailTime), player.time); trailTime = player.time; }
     }
-    if (wolf) { stepWolf(wolf, { player, ground }, dt); wolf.events.length = 0; }
+    if (wolf) { stepWolf(wolf, { player, ground: sim.floor }, dt); wolf.events.length = 0; }
     if (player.sprinting && player.grounded && (dustClock += dt) > 0.28) { dustClock = 0; effects.dust(player.x - player.vx * 0.05, player.y, player.z - player.vz * 0.05, 0.1); }
-    if (!still && (driftClock += dt) > 0.09) { driftClock = 0; for (const draft of HILL.updrafts) { const angle = clockRandom() * Math.PI * 2, r = Math.sqrt(clockRandom()) * draft.radius, x = draft.x + Math.cos(angle) * r, z = draft.z + Math.sin(angle) * r; effects.drift(x, ground(x, z) + 0.3, z); } }
+    if (!still && (driftClock += dt) > 0.09) { driftClock = 0; for (const draft of VALLEY.updrafts) { const angle = clockRandom() * Math.PI * 2, r = Math.sqrt(clockRandom()) * draft.radius, x = draft.x + Math.cos(angle) * r, z = draft.z + Math.sin(angle) * r; effects.drift(x, ground(x, z) + 0.3, z); } }
     if (player.state === 'charge' && player.charge < 1 && !still && clockRandom() < dt * 30) effects.charge(segment.tip[0], segment.tip[1], segment.tip[2]);
     return frozen;
   }
 
   function promptFor() {
-    if (sim.encounter === 'fight' || player.state !== 'move') return '';
-    if (sim.campfires.some(fire => fire.lit && Math.hypot(fire.x - player.x, fire.z - player.z) < CAMPFIRE.light)) return 'E  Rest by the fire';
-    if (sim.encounter === 'won' && Math.hypot(sim.arena.x - player.x, sim.arena.z - player.z) < ENCOUNTER.rematch) return 'E  Call the stag back';
-    if (!petDown(sim.pet) && Math.hypot(sim.pet.x - player.x, sim.pet.z - player.z) < 1.8) return `E  Pet ${petName}`;
-    return '';
+    if (player.state !== 'move' || foe(sim)) return null;
+    return interactable(sim);
   }
 
   function project(x, y, z, into) {
@@ -295,6 +348,11 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
     petView.update(sim.pet, dt, still);
     wolfView.update(wolf, dt, still);
     camp.update(sim.campfires, player, dt, still);
+    secrets.update(seconds, still);
+    scatter.update();
+    shine();
+    landmarks.update(seconds, light.night, still);
+    water.update(seconds, light.toward, 0.45 + 0.55 * (1 - light.night), still);
     effects.shadow.place(player.x, ground(player.x, player.z), player.y, player.z);
     effects.step(dt, frozen ? 0 : dt);
     stepRig(rig, dt, { player, lock: lockTarget(sim), world: sim.world, still });
@@ -302,10 +360,10 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
     camera.updateMatrixWorld();
     sky.position.copy(camera.position);
     focus.set(player.x, player.y, player.z);
-    const a = snap(focus.dot(lightRight)), b = snap(focus.dot(lightUp)), c = focus.dot(SUN);
-    sun.target.position.set(0, 0, 0).addScaledVector(lightRight, a).addScaledVector(lightUp, b).addScaledVector(SUN, c);
-    sun.position.copy(sun.target.position).addScaledVector(SUN, 45);
-    painterly.setSun(SUN, camera);
+    const a = snap(focus.dot(lightRight)), b = snap(focus.dot(lightUp)), c = focus.dot(light.toward);
+    sun.target.position.set(0, 0, 0).addScaledVector(lightRight, a).addScaledVector(lightUp, b).addScaledVector(light.toward, c);
+    sun.position.copy(sun.target.position).addScaledVector(light.toward, 60);
+    painterly.setSun(light.toward, camera);
     if (!still) { wind.value = seconds; skyTime.value = seconds; }
     renderer.render(scene, camera);
     const stamina = hudState.stamina;
@@ -318,11 +376,12 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
       lock.barVisible = top.visible && target.id === 'dummy'; lock.barX = top.x; lock.barY = top.y; lock.health = target.health; lock.max = target.max;
     }
     const pet = sim.pet, fighting = foe(sim);
-    hudState.vitals.health = player.health; hudState.vitals.max = player.max; hudState.vitals.level = levelFor(progress.xp).level;
-    hudState.pet.name = petName; hudState.pet.health = pet.health; hudState.pet.max = pet.max; hudState.pet.out = petDown(pet);
+    const growth = levelFor(progress.xp), vitals = hudState.vitals;
+    vitals.health = player.health; vitals.max = player.max; vitals.level = growth.level; vitals.xp = growth.span ? growth.into / growth.span : 1; vitals.potions = sim.potions;
+    hudState.pet.health = pet.health; hudState.pet.max = pet.max; hudState.pet.out = petDown(pet);
     hudState.skill.left = pet.cooldown / PET_SKILL.cooldown; hudState.skill.ready = pet.cooldown <= 0 && !petDown(pet); hudState.skill.useful = Boolean(fighting);
     hudState.boss.health = sim.stag.health; hudState.boss.max = sim.stag.max;
-    hud.update({ stamina, lock: target ? lock : null, vitals: hudState.vitals, pet: hudState.pet, skill: hudState.skill, boss: sim.encounter === 'fight' ? hudState.boss : null, prompt: promptFor() }, dt);
+    hud.update({ stamina, lock: target ? lock : null, vitals: hudState.vitals, pet: hudState.pet, skill: hudState.skill, boss: sim.encounter === 'fight' ? hudState.boss : null, prompt: promptFor(), hour: sim.hour }, dt);
   }
 
   function tick(now) {
@@ -384,7 +443,13 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
         stones: sim.stones.map(stone => [stone.x, stone.z]),
         campfires: sim.campfires.map(fire => ({ id: fire.id, x: fire.x, z: fire.z, lit: fire.lit })), lastFire: sim.lastFire,
         progress: structuredClone(progress),
-        hud: { banner: hud.bannerText, prompt: promptFor() },
+        hud: { toast: hud.toastKind, waiting: hud.toastsWaiting, prompt: promptFor() },
+        hour: sim.hour, level: sim.level, potions: sim.potions, traits: { ...player.traits },
+        secrets: sim.secrets.map(entry => ({ id: entry.id, x: entry.x, y: entry.y, z: entry.z, found: entry.found, dug: entry.dug })),
+        herbs: { count: sim.herbs.length, picked: sim.herbs.filter(herb => herb.picked).length, nearest: sim.herbs.filter(herb => !herb.picked).map(herb => ({ x: herb.x, z: herb.z, distance: Math.hypot(herb.x - player.x, herb.z - player.z) })).sort((a, b) => a.distance - b.distance)[0] ?? null },
+        merchant: { x: sim.merchant.x, z: sim.merchant.z },
+        updrafts: sim.world.updrafts.map(draft => ({ x: draft.x, z: draft.z, radius: draft.radius })),
+        world: { trees: sim.trees.length, ring: ring.kindled, swimming: player.state === 'swim', water: waterAt(player.x, player.z) },
         dummy: { health: sim.dummy.health, max: sim.dummy.max, tilt: Math.hypot(sim.dummy.tiltX, sim.dummy.tiltZ), hurt: sim.dummy.hurt, x: sim.dummy.x, z: sim.dummy.z },
         lock: sim.lock,
         camera: { yaw: rig.yaw, pitch: rig.pitch, zoom: rig.zoom, distance: rig.distance, eye: [...rig.eye], clearance: rig.eye[1] - ground(rig.eye[0], rig.eye[2]), fov: camera.fov },
@@ -397,6 +462,19 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
       };
     },
     resetFrames() { cpu.length = 0; gaps.length = 0; latency.worst = 0; },
+    visit({ x = player.x, z = player.z, facing = player.facing, hour = sim.hour, yaw = facing, pitch = rig.pitch, zoom = rig.zoom } = {}) {
+      placePlayer(player, x, z, facing, sim.floor);
+      placePet(sim.pet, x - Math.sin(facing) * 1.6 + Math.cos(facing) * 0.9, z - Math.cos(facing) * 1.6 - Math.sin(facing) * 0.9, sim.floor);
+      sim.hour = hour;
+      Object.assign(rig, { yaw, pitch, zoom, distance: zoom });
+      rig.pivot[0] = player.x; rig.pivot[1] = player.y + RIG.height; rig.pivot[2] = player.z;
+      effects.clear();
+      draw(0, false, reducedMotion());
+    },
+    restock(saved) {
+      progress = structuredClone(saved);
+      equip(sim, wildsStats(progress), progress.potions);
+    },
     dispose() {
       if (disposed) return;
       disposed = true; stop();

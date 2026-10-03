@@ -1,19 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HILL } from './layout.js';
-import { CAMPFIRE, ENCOUNTER, FLURRY, LOCK, POST, createSim, interact, petSkill, press, stepSim, toggleLock } from './sim.js';
+import { createGround } from './ground.js';
+import { VALLEY, valleyHeight } from './valley.js';
+import { CAMPFIRE, DAY, ENCOUNTER, FLURRY, HERB, LOCK, POST, createSim, drink, equip, interact, interactable, nextRest, petSkill, press, stepSim, toggleLock, whistle } from './sim.js';
 import { STAG, hurtStag } from './stag.js';
 import { hurtPet } from './pet.js';
+import { emptyWilds, wildsStats } from './progress.js';
 
 const DT = 1 / 120;
 const still = { moveX: 0, moveZ: 0, sprint: false, attackHeld: false };
-const flat = () => 0;
+const grid = createGround(valleyHeight, VALLEY.grid), ground = (x, z) => grid.at(x, z);
 
 function seeded(seed = 3) {
   return () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
-const make = (options = {}) => createSim(HILL, flat, { rng: seeded(), ...options });
+const make = (options = {}) => createSim(VALLEY, ground, { rng: seeded(), ...options });
 
 function run(sim, seconds, input = still) {
   const events = [];
@@ -21,7 +23,7 @@ function run(sim, seconds, input = still) {
   return events;
 }
 
-function place(body, x, z, facing = body.facing) { body.x = x; body.z = z; body.facing = facing; }
+function place(body, x, z, facing = body.facing) { body.x = x; body.z = z; body.y = ground(x, z); body.facing = facing; }
 
 function facingDummy() {
   const sim = make(), { player, dummy } = sim;
@@ -94,11 +96,11 @@ test('locked on, the player keeps facing the dummy while strafing round it', () 
   run(sim, 1.5, { ...still, moveX: 1 });
   const toward = Math.atan2(dummy.x - player.x, dummy.z - player.z), off = Math.atan2(Math.sin(toward - player.facing), Math.cos(toward - player.facing));
   assert.ok(Math.abs(off) < 0.05, `off by ${off}`);
-  assert.ok(Math.abs(player.x - HILL.spawn.x) > 2, 'and moved sideways');
+  assert.ok(Math.abs(player.x - VALLEY.spawn.x) > 2, 'and moved sideways');
 });
 
 test('training posts stand solid in the player\'s way', () => {
-  const sim = make(), { player } = sim, [x, z] = HILL.posts[0];
+  const sim = make(), { player } = sim, [x, z] = VALLEY.posts[0];
   place(player, x, z + 2, Math.PI);
   run(sim, 1.5, { ...still, moveZ: -1 });
   assert.ok(Math.hypot(player.x - x, player.z - z) >= POST.radius + 0.3, `${player.x}, ${player.z}`);
@@ -259,7 +261,7 @@ test('beating the stag ends the fight in victory, and E at the ring centre calls
 });
 
 test('once the stag is calmed it no longer stands in your way, and calling it back makes it solid again', () => {
-  const sim = make({ beaten: true }), { player, stag } = sim, walkThrough = () => {
+  const sim = make({ progress: { ...emptyWilds(), beaten: ['stag'] } }), { player, stag } = sim, walkThrough = () => {
     place(player, stag.x, stag.z + 3, Math.PI);
     run(sim, 1.5, { ...still, moveZ: -1 });
     return player.z < stag.z - 1;
@@ -269,4 +271,95 @@ test('once the stag is calmed it no longer stands in your way, and calling it ba
   interact(sim);
   run(sim, DT);
   assert.equal(walkThrough(), false);
+});
+
+const types = events => events.map(event => event.type);
+
+test('E takes a secret within reach once, and a found secret stays found in a new visit', () => {
+  const sim = make(), sword = sim.secrets.find(entry => entry.id === 'root-sword');
+  place(sim.player, sword.x + 0.8, sword.z);
+  sim.player.y = sword.y;
+  assert.equal(interactable(sim), 'secret');
+  assert.equal(interact(sim), 'secret');
+  assert.deepEqual(run(sim, DT).filter(event => event.type === 'secret').map(event => event.id), ['root-sword']);
+  assert.notEqual(interact(sim), 'secret');
+  const again = make({ progress: { ...emptyWilds(), secrets: ['root-sword'] } });
+  assert.equal(again.secrets.find(entry => entry.id === 'root-sword').found, true);
+});
+
+test('the buried find stays hidden until the pet scents it and digs it up', () => {
+  const sim = make(), find = sim.secrets.find(entry => entry.buried);
+  place(sim.player, find.x + 1, find.z);
+  place(sim.pet, find.x + 2, find.z + 1);
+  assert.notEqual(interact(sim), 'secret');
+  const events = run(sim, 8);
+  assert.ok(types(events).includes('pet-scent'));
+  assert.deepEqual(events.filter(event => event.type === 'dug').map(event => event.id), [find.id]);
+  assert.equal(interact(sim), 'secret');
+});
+
+test('herbs heal a little once each and grow back when you rest at a campfire', () => {
+  const sim = make(), { player } = sim, herb = sim.herbs[0];
+  player.health = 50;
+  place(player, herb.x + 0.5, herb.z);
+  assert.equal(interact(sim), 'herb');
+  assert.equal(player.health, 50 + HERB.heal);
+  assert.notEqual(interact(sim), 'herb');
+  const fire = sim.campfires[0];
+  place(player, fire.x + 1.2, fire.z);
+  run(sim, DT);
+  assert.equal(interact(sim), 'rest');
+  assert.equal(herb.picked, false);
+});
+
+test('resting at a campfire heals fully and passes the time to the next morning or night', () => {
+  assert.equal(nextRest(10), DAY.dusk);
+  assert.equal(nextRest(22), DAY.dawn);
+  assert.equal(nextRest(3), DAY.dawn);
+  const sim = make({ hour: 14 }), { player } = sim, fire = sim.campfires[0];
+  place(player, fire.x + 1.2, fire.z);
+  run(sim, DT);
+  player.health = 20; player.stamina = 10;
+  interact(sim);
+  assert.deepEqual([player.health, player.stamina, sim.hour], [player.max, player.staminaMax, DAY.dusk]);
+  assert.deepEqual(run(sim, DT).filter(event => event.type === 'rest').map(event => event.hour), [DAY.dusk]);
+  interact(sim);
+  assert.equal(sim.hour, DAY.dawn);
+});
+
+test('the day turns once every twelve minutes', () => {
+  const sim = make({ hour: 9 });
+  run(sim, 60);
+  assert.ok(Math.abs(sim.hour - (9 + 24 * 60 / DAY.length)) < 1e-6);
+});
+
+test('E by the merchant opens the shop, and R whistles the pet back', () => {
+  const sim = make(), { player, merchant } = sim;
+  place(player, merchant.x + 1, merchant.z);
+  assert.equal(interact(sim), 'shop');
+  assert.ok(types(run(sim, DT)).includes('shop'));
+  assert.equal(whistle(sim), true);
+  assert.equal(sim.pet.state, 'come');
+  assert.ok(types(run(sim, DT)).includes('whistle'));
+});
+
+test('H drinks a potion for half your health only when hurt and carrying one', () => {
+  const sim = make({ progress: { ...emptyWilds(), potions: 2 } }), { player } = sim;
+  assert.equal(drink(sim), false);
+  player.health = 30;
+  assert.equal(drink(sim), true);
+  assert.deepEqual([player.health, sim.potions], [80, 1]);
+  assert.deepEqual(types(run(sim, DT)).filter(type => type.startsWith('potion')), ['potion-wait', 'potion']);
+});
+
+test('a level gained grows health and stamina, heals you whole, and a better sword hits harder', () => {
+  const sim = facingDummy(), progress = { ...emptyWilds(), xp: 120, owned: ['steel-sword'], wear: { sword: 'steel-sword', cape: null, armour: null } };
+  sim.player.health = 40;
+  equip(sim, wildsStats(progress));
+  assert.deepEqual([sim.player.max, sim.player.health, sim.player.staminaMax], [112, 112, 108]);
+  const events = run(sim, DT);
+  assert.deepEqual(events.filter(event => event.type === 'level').map(event => [event.from, event.level]), [[1, 2]]);
+  press(sim, 'attack');
+  const hit = run(sim, 0.3).find(event => event.type === 'hit');
+  assert.equal(hit.damage, Math.round(10 * 1.08 * 1.3));
 });

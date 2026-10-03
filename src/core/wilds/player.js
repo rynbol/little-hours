@@ -5,19 +5,43 @@ export const DODGE = Object.freeze({ time: 0.42, distance: 3.4, guard: Object.fr
 export const STAMINA = Object.freeze({ max: 100, sprint: 20, heavy: 22, regen: 38, tiredRegen: 26, delay: 0.55, recover: 35 });
 export const VITALS = Object.freeze({ health: 100, mercy: 0.9, hurt: 0.4, knocked: 0.8, rise: 0.5, heavy: 8, lift: 5.5, perfect: 0.2, stumble: 22 });
 export const CLIMB = Object.freeze({ steep: 1.25, speed: 1.3, side: 1.15, cost: 9, hold: 2.5, leap: 1.7, leapTime: 0.32, leapCost: 20, lip: 0.55, reach: 0.6 });
-export const GLIDE = Object.freeze({ speed: 6.4, idle: 0.55, accel: 5, turn: 3.4, sink: 1.9, rise: 1.4, settle: 7, cost: 6, height: 1.2 });
+export const GLIDE = Object.freeze({ speed: 6.4, idle: 0.55, accel: 5, turn: 3.4, sink: 1.9, rise: 1.4, settle: 7, cost: 6, height: 1.2, fade: 6 });
+export const SWIM = Object.freeze({ depth: 1.15, float: 1.05, speed: 2.1, fast: 3.3, accel: 7, cost: 5, fastCost: 13, tread: 1.5, wade: 0.65, shallow: 0.35 });
+export const PLAIN = Object.freeze({ power: 1, guard: 0, glide: 1, sink: 1, swim: 1 });
 
 const BUFFERED = Object.freeze(['attack', 'jump', 'dodge']);
 const easeOut = (s, power = 2) => 1 - (1 - Math.min(1, Math.max(0, s))) ** power;
 const angleTo = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
 
-export function createPlayer({ x = 0, z = 0, facing = 0, ground }) {
+export function createPlayer({ x = 0, z = 0, facing = 0, ground, health = VITALS.health, stamina = STAMINA.max, traits = PLAIN }) {
   return {
     x, y: ground(x, z), z, vx: 0, vy: 0, vz: 0, facing, state: 'move', time: 0, grounded: true, airTime: 0, peak: 0,
     attack: null, charge: 0, hit: new Set(), held: 0, armed: false, buffered: { attack: 0, jump: 0, dodge: 0 },
-    dodgeX: 0, dodgeZ: 1, leap: 0, stamina: STAMINA.max, rest: 0, tired: false, sprinting: false, health: VITALS.health, max: VITALS.health, mercy: 0, events: [],
+    dodgeX: 0, dodgeZ: 1, leap: 0, stamina, staminaMax: stamina, rest: 0, tired: false, sprinting: false, health, max: health, mercy: 0,
+    shore: [x, z], traits: { ...traits }, events: [],
   };
 }
+
+export function growPlayer(player, { health, stamina }) {
+  player.health += Math.max(0, health - player.max); player.max = health;
+  player.stamina += Math.max(0, stamina - player.staminaMax); player.staminaMax = stamina;
+}
+
+export const floorTop = (deck, x, z) => {
+  const dx = deck.bx - deck.ax, dz = deck.bz - deck.az, t = ((x - deck.ax) * dx + (z - deck.az) * dz) / (dx * dx + dz * dz);
+  return t >= 0 && t <= 1 && Math.hypot(x - deck.ax - dx * t, z - deck.az - dz * t) <= deck.width / 2 ? deck.ay + (deck.by - deck.ay) * t : -Infinity;
+};
+
+export function floorAt(world, x, z, y = Infinity) {
+  let floor = world.ground(x, z);
+  for (const deck of world.decks ?? []) {
+    const top = floorTop(deck, x, z);
+    if (top > floor && top <= y + MOVE.snap) floor = top;
+  }
+  return floor;
+}
+
+export const waterAt = (world, x, z) => world.water ? world.water(x, z) : -Infinity;
 
 export function pressPlayer(player, action) {
   const waiting = action === 'attack' && player.state === 'attack' ? ATTACKS[player.attack].chain - player.time : 0;
@@ -36,13 +60,13 @@ export function slopeAt(ground, x, z, out = [0, 0]) {
   return out;
 }
 
-export function updraftAt(world, x, z) {
-  for (const draft of world.updrafts ?? []) if (Math.hypot(x - draft.x, z - draft.z) < draft.radius) return draft.lift;
+export function updraftAt(world, x, z, y = -Infinity) {
+  for (const draft of world.updrafts ?? []) if (Math.hypot(x - draft.x, z - draft.z) < draft.radius) return draft.lift * Math.min(1, Math.max(0, ((draft.top ?? Infinity) - y) / GLIDE.fade));
   return 0;
 }
 
 export function hurtPlayer(player, { damage, knock = 0, fromX, fromZ }) {
-  const taken = Math.min(player.health, damage, player.max * MAX_HIT_SHARE);
+  const taken = Math.min(player.health, damage * (1 - player.traits.guard), player.max * MAX_HIT_SHARE);
   player.health -= taken;
   player.mercy = VITALS.mercy;
   const dx = player.x - fromX, dz = player.z - fromZ, length = Math.hypot(dx, dz) || 1;
@@ -57,7 +81,8 @@ export function hurtPlayer(player, { damage, knock = 0, fromX, fromZ }) {
 }
 
 export function placePlayer(player, x, z, facing, ground) {
-  Object.assign(player, { x, z, y: ground(x, z), vx: 0, vy: 0, vz: 0, facing, grounded: true, airTime: 0, attack: null, charge: 0, sprinting: false, mercy: 0, stamina: STAMINA.max, tired: false });
+  Object.assign(player, { x, z, y: ground(x, z), vx: 0, vy: 0, vz: 0, facing, grounded: true, airTime: 0, attack: null, charge: 0, sprinting: false, mercy: 0, stamina: player.staminaMax, tired: false });
+  player.shore[0] = x; player.shore[1] = z;
   enter(player, 'move');
 }
 
@@ -108,7 +133,7 @@ function startDodge(player, input, world) {
 }
 
 function canGlide(player, world) {
-  return !player.grounded && !player.tired && player.stamina > 0 && player.y - world.ground(player.x, player.z) > GLIDE.height;
+  return !player.grounded && !player.tired && player.stamina > 0 && player.y - Math.max(floorAt(world, player.x, player.z, player.y), waterAt(world, player.x, player.z)) > GLIDE.height;
 }
 
 function tryJump(player) {
@@ -120,7 +145,8 @@ function tryJump(player) {
 }
 
 function steer(player, input, dt, world, top) {
-  const magnitude = Math.min(1, Math.hypot(input.moveX, input.moveZ)), wantX = input.moveX * top, wantZ = input.moveZ * top;
+  const depth = waterAt(world, player.x, player.z) - player.y, pace = top * (player.grounded && depth > SWIM.shallow ? SWIM.wade : 1);
+  const magnitude = Math.min(1, Math.hypot(input.moveX, input.moveZ)), wantX = input.moveX * pace, wantZ = input.moveZ * pace;
   const rate = player.grounded ? (magnitude > 0.05 ? MOVE.accel : MOVE.brake) : MOVE.air;
   const dx = wantX - player.vx, dz = wantZ - player.vz, gap = Math.hypot(dx, dz), step = Math.min(gap, rate * dt);
   if (gap > 1e-6) { player.vx += dx / gap * step; player.vz += dz / gap * step; }
@@ -257,7 +283,7 @@ function climbing(player, input, dt, world) {
 function gliding(player, input, dt, world) {
   player.buffered.attack = 0; player.buffered.dodge = 0;
   if (player.buffered.jump) { player.buffered.jump = 0; enter(player, 'move'); player.events.push({ type: 'glide-end' }); return; }
-  spend(player, GLIDE.cost * dt);
+  spend(player, GLIDE.cost * player.traits.glide * dt);
   if (player.tired) { enter(player, 'move'); player.events.push({ type: 'glide-end', tired: true }); return; }
   const magnitude = Math.min(1, Math.hypot(input.moveX, input.moveZ));
   const wantX = magnitude > 0.2 ? input.moveX * GLIDE.speed : Math.sin(player.facing) * GLIDE.speed * GLIDE.idle;
@@ -265,7 +291,7 @@ function gliding(player, input, dt, world) {
   const dx = wantX - player.vx, dz = wantZ - player.vz, gap = Math.hypot(dx, dz), step = Math.min(gap, GLIDE.accel * dt);
   if (gap > 1e-6) { player.vx += dx / gap * step; player.vz += dz / gap * step; }
   if (Math.hypot(player.vx, player.vz) > 0.5) { const turn = angleTo(player.facing, Math.atan2(player.vx, player.vz)); player.facing += Math.sign(turn) * Math.min(Math.abs(turn), GLIDE.turn * dt); }
-  const lift = updraftAt(world, player.x, player.z), wantY = lift ? GLIDE.rise * lift : -GLIDE.sink;
+  const lift = updraftAt(world, player.x, player.z, player.y), wantY = lift ? GLIDE.rise * lift : -GLIDE.sink * player.traits.sink;
   player.vy += Math.max(-GLIDE.settle * dt, Math.min(GLIDE.settle * dt, wantY - player.vy));
 }
 
@@ -277,26 +303,61 @@ function dodging(player, input, dt, world) {
   if (s >= 1) { enter(player, 'move'); const carry = MOVE.jog * 0.6; player.vx = player.dodgeX * carry; player.vz = player.dodgeZ * carry; }
 }
 
-function collide(player, world) {
-  for (const solid of world.solids) {
+function shove(player, solids) {
+  for (const solid of solids) {
     const dx = player.x - solid.x, dz = player.z - solid.z, distance = Math.hypot(dx, dz), least = solid.radius + MOVE.radius;
-    if (distance < least && player.y < solid.top) {
+    if (distance < least && player.y < solid.top && player.y + MOVE.height > solid.bottom) {
       const nx = distance > 1e-6 ? dx / distance : 1, nz = distance > 1e-6 ? dz / distance : 0;
       player.x = solid.x + nx * least; player.z = solid.z + nz * least;
       const into = player.vx * nx + player.vz * nz;
       if (into < 0) { player.vx -= into * nx; player.vz -= into * nz; }
     }
   }
-  const { x, z, radius } = world.bounds, dx = player.x - x, dz = player.z - z, distance = Math.hypot(dx, dz);
-  if (distance > radius) { player.x = x + dx / distance * radius; player.z = z + dz / distance * radius; }
+}
+
+function collide(player, world) {
+  shove(player, world.solids);
+  if (world.statics) shove(player, world.statics.near(player.x, player.z, MOVE.radius));
+  const { x, z, rx, rz } = world.bounds, reach = Math.hypot((player.x - x) / rx, (player.z - z) / rz);
+  if (reach > 1) { player.x = x + (player.x - x) / reach; player.z = z + (player.z - z) / reach; }
+}
+
+function swimming(player, input, dt, world) {
+  for (const action of BUFFERED) player.buffered[action] = 0;
+  const fast = input.sprint && !player.tired, magnitude = Math.min(1, Math.hypot(input.moveX, input.moveZ)), top = fast ? SWIM.fast : SWIM.speed;
+  const dx = input.moveX * top - player.vx, dz = input.moveZ * top - player.vz, gap = Math.hypot(dx, dz), step = Math.min(gap, SWIM.accel * dt);
+  if (gap > 1e-6) { player.vx += dx / gap * step; player.vz += dz / gap * step; }
+  if (magnitude > 0.05) { const turn = angleTo(player.facing, Math.atan2(input.moveX, input.moveZ)); player.facing += Math.sign(turn) * Math.min(Math.abs(turn), MOVE.turn * 0.5 * dt); }
+  player.sprinting = fast && magnitude > 0.2;
+  spend(player, (magnitude > 0.05 ? (player.sprinting ? SWIM.fastCost : SWIM.cost) : SWIM.tread) * player.traits.swim * dt);
+  if (player.stamina <= 0) {
+    placePlayer(player, player.shore[0], player.shore[1], player.facing, (x, z) => floorAt(world, x, z));
+    player.events.push({ type: 'washed' });
+    return;
+  }
+  player.x += player.vx * dt; player.z += player.vz * dt;
+  collide(player, world);
+  const water = waterAt(world, player.x, player.z), floor = floorAt(world, player.x, player.z, water);
+  if (water - floor < SWIM.depth - 0.1) { settleOn(player, world, player.x, player.z, 'wade-out'); player.y = floor; return; }
+  player.y = water - SWIM.float;
+}
+
+function dive(player, world, floor) {
+  const water = waterAt(world, player.x, player.z);
+  if (water - floor <= SWIM.depth || player.y > water - (player.grounded ? SWIM.float - 1e-3 : 0.1)) return false;
+  const speed = -player.vy;
+  enter(player, 'swim');
+  player.y = water - SWIM.float; player.vy = 0; player.grounded = false; player.airTime = 0; player.attack = null; player.charge = 0;
+  player.events.push({ type: 'swim', speed });
+  return true;
 }
 
 function fall(player, input, dt, world) {
-  if (player.state === 'climb') return;
-  const ox = player.x, oz = player.z, base = player.grounded ? world.ground(ox, oz) : player.y;
+  if (player.state === 'climb' || player.state === 'swim') return;
+  const ox = player.x, oz = player.z, base = player.grounded ? floorAt(world, ox, oz, player.y) : player.y;
   player.x += player.vx * dt; player.z += player.vz * dt;
   collide(player, world);
-  let floor = world.ground(player.x, player.z);
+  let floor = floorAt(world, player.x, player.z, Math.max(player.y, base));
   const moved = Math.hypot(player.x - ox, player.z - oz);
   if (moved > 1e-6 && floor - base > (player.grounded ? moved * CLIMB.steep : 0.02)) {
     if (grab(player, input, world, player.x, player.z)) return;
@@ -304,16 +365,22 @@ function fall(player, input, dt, world) {
     slopeAt(world.ground, player.x + (player.x - ox), player.z + (player.z - oz), tilt);
     const steep = Math.hypot(tilt[0], tilt[1]) || 1, nx = tilt[0] / steep, nz = tilt[1] / steep, into = player.vx * nx + player.vz * nz;
     if (into > 0) { player.vx -= into * nx; player.vz -= into * nz; }
-    floor = world.ground(ox, oz);
+    floor = floorAt(world, ox, oz, player.y);
   }
   if (player.grounded) {
     if (player.y - floor > Math.min(MOVE.snap, moved * CLIMB.steep + 0.01)) { player.grounded = false; player.airTime = 0; player.vy = 0; player.peak = player.y; }
-    else { player.y = floor; return; }
+    else {
+      player.y = floor;
+      if (dive(player, world, floor)) return;
+      if (player.state === 'move' && waterAt(world, player.x, player.z) - floor < SWIM.shallow) { player.shore[0] = player.x; player.shore[1] = player.z; }
+      return;
+    }
   }
   player.airTime += dt;
   if (player.state !== 'glide') player.vy -= (player.vy > 0 ? MOVE.gravity : MOVE.fall) * dt;
   player.y += player.vy * dt;
   player.peak = Math.max(player.peak, player.y);
+  if (dive(player, world, floor)) return;
   if (player.y <= floor) {
     const speed = -player.vy, hard = speed > VITALS.stumble && player.state === 'move';
     player.events.push({ type: 'land', speed, height: player.peak - floor, hard });
@@ -330,8 +397,8 @@ export function stepPlayer(player, input, dt, world) {
   player.time += dt;
   player.mercy = Math.max(0, player.mercy - dt);
   player.rest = Math.max(0, player.rest - dt);
-  if (!player.rest && !player.sprinting && player.state !== 'charge') {
-    player.stamina = Math.min(STAMINA.max, player.stamina + (player.tired ? STAMINA.tiredRegen : STAMINA.regen) * dt);
+  if (!player.rest && !player.sprinting && player.state !== 'charge' && player.state !== 'swim') {
+    player.stamina = Math.min(player.staminaMax, player.stamina + (player.tired ? STAMINA.tiredRegen : STAMINA.regen) * dt);
     if (player.tired && player.stamina >= STAMINA.recover) player.tired = false;
   }
   if (STAGGERED.includes(player.state)) staggered(player, dt);
@@ -340,7 +407,8 @@ export function stepPlayer(player, input, dt, world) {
   else if (player.state === 'dodge') dodging(player, input, dt, world);
   else if (player.state === 'climb') climbing(player, input, dt, world);
   else if (player.state === 'glide') gliding(player, input, dt, world);
+  else if (player.state === 'swim') swimming(player, input, dt, world);
   else locomotion(player, input, dt, world);
-  if (player.state !== 'move') player.sprinting = false;
+  if (player.state !== 'move' && player.state !== 'swim') player.sprinting = false;
   fall(player, input, dt, world);
 }

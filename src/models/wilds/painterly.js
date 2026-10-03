@@ -1,6 +1,6 @@
 import { Color, DataTexture, LinearFilter, MeshToonMaterial, RedFormat, Vector3 } from 'three';
 
-export const BANDS = Object.freeze([[0, 0.1], [0.43, 0.1], [0.49, 0.58], [0.67, 0.58], [0.73, 1], [1, 1]]);
+export const BANDS = Object.freeze([[0, 0.3], [0.43, 0.3], [0.49, 0.66], [0.67, 0.66], [0.73, 1], [1, 1]]);
 
 export function bandAt(coord) {
   for (let i = 1; i < BANDS.length; i++) {

@@ -1,10 +1,10 @@
 export const KEYS = Object.freeze({
   KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
   ShiftLeft: 'sprint', ShiftRight: 'sprint', Space: 'jump', ControlLeft: 'dodge', ControlRight: 'dodge',
-  KeyF: 'lock', KeyE: 'interact', KeyQ: 'pet', KeyM: 'mute', Escape: 'pause',
+  KeyF: 'lock', KeyE: 'interact', KeyQ: 'pet', KeyR: 'whistle', KeyH: 'potion', KeyM: 'mute', Escape: 'pause',
 });
-export const PAD = Object.freeze({ 0: 'jump', 1: 'dodge', 2: 'attack', 3: 'pet', 6: 'lock', 7: 'sprint', 10: 'sprint', 9: 'pause', 12: 'zoomIn', 13: 'zoomOut' });
-export const PRESSES = Object.freeze(['jump', 'dodge', 'attack', 'lock', 'interact', 'pet', 'mute', 'pause']);
+export const PAD = Object.freeze({ 0: 'jump', 1: 'dodge', 2: 'attack', 3: 'pet', 4: 'whistle', 5: 'interact', 6: 'lock', 7: 'sprint', 10: 'sprint', 9: 'pause', 12: 'zoomIn', 13: 'zoomOut', 14: 'potion' });
+export const PRESSES = Object.freeze(['jump', 'dodge', 'attack', 'lock', 'interact', 'pet', 'whistle', 'potion', 'mute', 'pause']);
 const STEERS = Object.freeze(['forward', 'back', 'left', 'right']);
 
 const MOUSE_TURN = 0.0024, DRAG_TURN = 0.006, PAD_TURN = 3.2, DEAD = 0.18, DRAG_START = 7, LOCK_TRIES = 2;

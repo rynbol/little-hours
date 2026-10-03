@@ -1,79 +1,8 @@
 import { steps } from '../steps.mjs';
-import { WILDS, face, sleep, steering, until, walkTo } from '../wilds-moves.mjs';
-
-const FIGHT_LIMIT = 240000, IN_FRONT_OF_STONE = 2.6, CHARGE_ROOM = 5.6;
-
-function lureSpot(d) {
-  let best = null;
-  for (const [x, z] of d.stones) {
-    const dx = x - d.stag.x, dz = z - d.stag.z, far = Math.hypot(dx, dz);
-    if (far - IN_FRONT_OF_STONE < CHARGE_ROOM) continue;
-    const spot = { x: x - dx / far * IN_FRONT_OF_STONE, z: z - dz / far * IN_FRONT_OF_STONE };
-    spot.walk = Math.hypot(spot.x - d.player.x, spot.z - d.player.z);
-    if (!best || spot.walk < best.walk) best = spot;
-  }
-  return best;
-}
-
-async function fight(app, t, check) {
-  const seen = { perfect: null, stun: null, swing: null, roots: null, telegraph: null, lure: null };
-  let frames = 0, sampled = 0;
-  const gaps = [], steer = steering(app);
-  const walk = on => on ? steer.toward(0, 0) : steer.stop();
-  const end = Date.now() + FIGHT_LIMIT;
-  let d = await app.js(WILDS);
-  while (Date.now() < end && d.encounter !== 'won') {
-    d = await app.js(WILDS);
-    frames++;
-    if (Date.now() - sampled > 4000) { sampled = Date.now(); gaps.push(d.frames.gap.p50); }
-    if (d.player.state === 'down' || d.encounter === 'calm') {
-      await walk(false);
-      await until(app, `d.player.state === 'move'`, 'waking by the campfire', 8000);
-      await walkTo(app, d.arena.x, d.arena.z + d.arena.radius - 4);
-      continue;
-    }
-    if (d.stag.state === 'wake' || d.stag.state === 'dormant') { await sleep(60); continue; }
-    if (d.lock !== 'stag') {
-      await walk(false);
-      if (d.lock) await app.key('f', 'KeyF');
-      await face(app, Math.atan2(d.stag.x - d.player.x, d.stag.z - d.player.z));
-      await app.key('f', 'KeyF'); await sleep(80);
-      continue;
-    }
-    if (d.threat && d.player.state !== 'dodge' && d.player.state !== 'knocked') { await app.key('Control', 'ControlLeft'); await sleep(40); continue; }
-    const charging = d.stag.state === 'attack' && d.stag.attack === 'charge';
-    if (d.stag.state === 'retreat' || d.stag.prefer === 'charge' || (d.stag.state === 'telegraph' && d.stag.attack === 'charge') || charging) {
-      const spot = !charging && !(d.stag.state === 'telegraph' && d.stag.time > 0.55) && lureSpot(d);
-      if (spot && spot.walk > 0.45) await steer.toward(Math.atan2(spot.x - d.player.x, spot.z - d.player.z), d.camera.yaw);
-      else await walk(false);
-      if (!seen.lure && d.stag.state === 'telegraph') { seen.lure = true; await t.shot(app, 'fight-lure'); }
-      await sleep(20);
-      continue;
-    }
-    if (!seen.telegraph && d.stag.state === 'telegraph' && d.stag.time > 0.35) { seen.telegraph = d.stag.attack; await t.shot(app, `fight-telegraph`); }
-    if (!seen.roots && d.stag.roots > 6) { seen.roots = true; await t.shot(app, 'fight-roots'); }
-    if (d.flurry > 0 && !seen.perfect) { seen.perfect = true; await t.shot(app, 'fight-perfect'); }
-    const gap = Math.hypot(d.stag.x - d.player.x, d.stag.z - d.player.z) - 1.3;
-    if (d.stag.state === 'telegraph' && d.pet.cooldown === 0 && d.pet.state !== 'out' && d.pet.state !== 'limp') await app.key('q', 'KeyQ');
-    if (d.stag.heartOpen) {
-      await walk(gap > 1.4);
-      if (gap < 1.9 && d.player.state === 'move') {
-        if (!seen.stun) { seen.stun = true; await t.shot(app, 'fight-stun'); }
-        await app.press(720, 450); await sleep(700); await app.release(720, 450); await sleep(150);
-      }
-      continue;
-    }
-    if (gap > 1.9) { await walk(true); await sleep(30); continue; }
-    await walk(false);
-    await app.click(720, 450);
-    if (!seen.swing && d.player.state === 'attack') { seen.swing = true; await t.shot(app, 'fight-swing'); }
-  }
-  await walk(false);
-  return { seen, frames, d, gaps };
-}
+import { FIGHT_LIMIT, WILDS, face, fight, sleep, until, walkTo } from '../wilds-moves.mjs';
 
 export default {
-  about: 'the Wilds fight: real keys walk to the stone-ring campfire and light it, walk into the ring to wake the stag, lock on, and a bot that only presses keys and clicks dodges its telegraphed blows, lands combos and heavies on its open heart, and wins inside four minutes; the win saves XP, heartwood, the antler trophy and the wolf, the wolf bows from the cliff and follows, and the fight holds 60 fps',
+  about: 'the Wilds fight: starting a short walk from the stone-ring campfire at the head of the valley, real keys walk to it and light it, walk into the ring to wake the stag, lock on, and a bot that only presses keys and clicks dodges its telegraphed blows, lands combos and heavies on its open heart, and wins inside four minutes; the win saves XP, heartwood, the antler trophy and the wolf, the wolf bows from the cliff and follows, and the fight holds 60 fps',
   async run(t) {
     const { check } = t;
     const app = await t.open({ seed: 'three-rooms', scale: 2 });
@@ -88,6 +17,8 @@ export default {
     await t.shot(app, 'fight-start');
 
     const fire = start.campfires.find(entry => entry.id === 'stones');
+    await app.js(`window.__littleHours.wilds.visit({ x: ${fire.x + 7}, z: ${fire.z + 5}, facing: ${Math.atan2(-7, -5)} })`);
+    await sleep(300);
     await walkTo(app, fire.x + 1.4, fire.z + 0.6, 1.2);
     const lit = await until(app, `d.campfires.find(entry => entry.id === 'stones').lit`, 'the stone-ring campfire to light', 3000);
     check('walking up to the stone-ring campfire lights it and saves it', lit.progress.lit.includes('stones') && lit.lastFire === 'stones', lit.progress);
@@ -120,9 +51,9 @@ export default {
     check('the win is saved: 240 XP, 3 heartwood, the antler trophy and the wolf', award.xp === 240 && award.heartwood === 3 && award.trophies.includes('stag-antler') && award.companions.includes('wolf') && award.beaten.includes('stag'), award);
     check('the Wilds never pays study gold', await app.js(`window.__littleHours.state.house.coins`) === coins, coins);
     const watching = await until(app, `d.wolf && d.wolf.state !== 'follow'`, 'the wolf on the cliff', 3000);
-    check('a wolf appears on the cliff top after the win', watching.wolf.x < -15, watching.wolf);
+    check('a wolf appears on the lookout crag above the ring after the win', Math.hypot(watching.wolf.x - 40, watching.wolf.z + 330) < 4, watching.wolf);
     await sleep(2500);
-    check('the wolf keeps watching from the cliff until you come near', (await app.js(WILDS)).wolf.state === 'watch');
+    check('the wolf keeps watching from the lookout until you come near', (await app.js(WILDS)).wolf.state === 'watch');
     await face(app, Math.atan2(watching.wolf.x - watching.player.x, watching.wolf.z - watching.player.z));
     await app.down('w', 'KeyW');
     const bowing = await until(app, `d.wolf.state === 'bow'`, 'the wolf to bow as you walk toward it', 8000);

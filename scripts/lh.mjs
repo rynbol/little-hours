@@ -44,6 +44,7 @@ Options:
   --look <degrees>   focus shots: drag the view round by this many degrees first
   --pitch <degrees>  focus shots: drag the view up (positive) or down by this many degrees first
   --backdrop         focus shots: show the painted fallback valley the window falls back to when the outdoor world cannot build
+  --hour <h>         Wilds shots: the valley's time of day (6 morning, 19.5 golden hour, 23 night)
   --probe "<expr>"   shots: print an expression evaluated with the live Babylon scene bound to scene
   --before "<expr>"  shots, world and perf: evaluate an expression with scene bound before the picture is taken
   --pick "x,y;x,y"   shots: also name the room mesh and material under each CSS pixel
@@ -274,7 +275,7 @@ async function shots() {
     if (!views[name]) throw new Error(`Unknown view "${name}". Views: ${Object.keys(views).join(', ')}`);
     const app = await openApp(side.url, { ...viewport, scale: Number(options.scale || 1), seed: options.seed || 'three-rooms', theme: options.theme });
     try {
-      await sleep(800); await app.settle(); await views[name].go(app);
+      await sleep(800); await app.settle(); await views[name].go(app, options);
       for (let i = 0; i < Math.abs(Number(options.turn || 0)); i++) { await app.clickSel(Number(options.turn) < 0 ? '#house-turn-left' : '#house-turn-right'); await sleep(60); }
       if (options.closed) await app.clickSel('[data-house-open]');
       for (let left = Number(options.look || 0) * Math.PI / 180 / 0.0042; Math.abs(left) > 1; left -= Math.sign(left) * Math.min(Math.abs(left), 300)) {

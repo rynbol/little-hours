@@ -1,4 +1,7 @@
+import { floorAt, waterAt } from './player.js';
+
 export const PET = Object.freeze({
+  scent: 16, scentRest: 18, scentGiveUp: 1.6, scentLeash: 12, dig: 1.6, point: 3, swim: 0.45, float: 0.28, paddle: 0.6, step: 0.6, climb: 1.15,
   radius: 0.34, height: 0.6, heel: Object.freeze([0.9, -1.2]), arrive: 0.45, trot: 3.1, run: 6.6, accel: 26, turn: 10, leash: 26,
   sit: 1.1, pat: 1.6, sniffEvery: Object.freeze([5, 9]), sniffFor: 2.4, sniffReach: Object.freeze([1.6, 3.2]),
   health: 44, healthPerBond: 12, strengthPerBond: 0.25, hurt: 0.5, knock: 4.5, out: 1.8, limp: 0.62,
@@ -24,7 +27,7 @@ export function createPet({ x, z, ground, rng, bond = 0, kind = 'cat' }) {
   return {
     id: 'pet', kind, bond, x, z, y: ground(x, z), vx: 0, vz: 0, facing: 0, radius: PET.radius, bottom: 0, top: PET.height,
     state: 'follow', time: 0, health: max, max, attack: null, ticks: 0, closing: 0, think: 0, side: 1, cooldown: 0, sniffAt: between(rng, PET.sniffEvery), still: 0,
-    spotX: x, spotZ: z, hopX: 0, hopZ: 0, events: [],
+    spotX: x, spotZ: z, hopX: 0, hopZ: 0, scent: null, scentAt: 0, best: Infinity, stuck: 0, swimming: false, events: [],
   };
 }
 
@@ -175,13 +178,52 @@ export function patPet(pet, player) {
 }
 
 export function placePet(pet, x, z, ground) {
-  pet.x = x; pet.z = z; pet.y = ground(x, z); pet.vx = 0; pet.vz = 0; pet.attack = null;
+  pet.x = x; pet.z = z; pet.y = ground(x, z); pet.vx = 0; pet.vz = 0; pet.attack = null; pet.scent = null;
   if (!petDown(pet)) enter(pet, 'follow');
 }
 
-export function stepPet(pet, { player, foe, ground, solids, rng, spots = [] }, dt) {
+export function whistlePet(pet) {
+  if (petDown(pet) || pet.state === 'hurt') return false;
+  pet.attack = null; pet.scent = null;
+  enter(pet, 'come');
+  pet.events.push({ type: 'pet-come' });
+  return true;
+}
+
+function smell(pet, player, scents) {
+  let best = null, nearest = PET.scent;
+  for (const scent of scents) {
+    if (scent.found) continue;
+    const distance = Math.hypot(scent.x - pet.x, scent.z - pet.z);
+    if (distance < nearest && Math.hypot(scent.x - player.x, scent.z - player.z) < PET.scent + 4) { best = scent; nearest = distance; }
+  }
+  return best;
+}
+
+function giveUpScent(pet, state = 'follow') {
+  pet.scent = null; pet.scentAt = PET.scentRest;
+  enter(pet, state);
+}
+
+function scenting(pet, player, scents, dt) {
+  const scent = scents.find(entry => entry.id === pet.scent);
+  if (!scent || scent.found || Math.hypot(player.x - pet.x, player.z - pet.z) > PET.scentLeash) { giveUpScent(pet); return; }
+  const distance = Math.hypot(scent.x - pet.x, scent.z - pet.z);
+  if (distance < 1.1) {
+    brake(pet, dt);
+    enter(pet, scent.buried && !scent.dug ? 'dig' : 'point');
+    return;
+  }
+  if (distance < pet.best - 0.4) { pet.best = distance; pet.stuck = 0; }
+  else if ((pet.stuck += dt) > PET.scentGiveUp) { brake(pet, dt); enter(pet, 'point'); return; }
+  head(pet, scent.x, scent.z, PET.trot * 1.2, dt);
+}
+
+export function stepPet(pet, { player, foe, world, rng, scents = [] }, dt) {
+  const ground = (x, z) => floorAt(world, x, z);
   pet.time += dt;
   pet.cooldown = Math.max(0, pet.cooldown - dt);
+  pet.scentAt = Math.max(0, pet.scentAt - dt);
   const engaged = foe && Math.hypot(foe.x - player.x, foe.z - player.z) < PET.range;
   const playerStill = Math.hypot(player.vx, player.vz) < 0.2 && player.state === 'move';
   pet.still = playerStill ? pet.still + dt : 0;
@@ -207,6 +249,22 @@ export function stepPet(pet, { player, foe, ground, solids, rng, spots = [] }, d
       else if (!playerStill || Math.hypot(hx - pet.x, hz - pet.z) > 1.5) enter(pet, 'follow');
       break;
     }
+    case 'come': if (follow(pet, player, dt, PET.run)) enter(pet, engaged ? 'fight' : 'follow'); break;
+    case 'scent': if (engaged) giveUpScent(pet, 'fight'); else scenting(pet, player, scents, dt); break;
+    case 'point': {
+      brake(pet, dt);
+      const scent = scents.find(entry => entry.id === pet.scent);
+      if (scent) turn(pet, Math.atan2(scent.x - pet.x, scent.z - pet.z), dt);
+      if (engaged) giveUpScent(pet, 'fight');
+      else if (!scent || pet.time >= PET.point) giveUpScent(pet);
+      break;
+    }
+    case 'dig': {
+      brake(pet, dt);
+      if (engaged) giveUpScent(pet, 'fight');
+      else if (pet.time >= PET.dig) { pet.events.push({ type: 'dug', id: pet.scent }); giveUpScent(pet); }
+      break;
+    }
     case 'sniff': {
       if (engaged) { enter(pet, 'fight'); break; }
       const away = Math.hypot(pet.spotX - pet.x, pet.spotZ - pet.z);
@@ -217,22 +275,33 @@ export function stepPet(pet, { player, foe, ground, solids, rng, spots = [] }, d
     }
     default: {
       if (engaged) { enter(pet, 'fight'); pet.think = between(rng, PET.think); break; }
-      const arrived = follow(pet, player, dt, PET.run);
+      const arrived = follow(pet, player, dt, PET.run), scent = pet.scentAt > 0 ? null : smell(pet, player, scents);
       pet.sniffAt -= dt;
-      if (arrived && pet.still > PET.sit) { enter(pet, 'sit'); pet.events.push({ type: 'pet-sit' }); }
+      if (scent) { pet.scent = scent.id; pet.best = Infinity; pet.stuck = 0; enter(pet, 'scent'); pet.events.push({ type: 'pet-scent', id: scent.id }); }
+      else if (arrived && pet.still > PET.sit) { enter(pet, 'sit'); pet.events.push({ type: 'pet-sit' }); }
       else if (pet.sniffAt <= 0 && Math.hypot(player.vx, player.vz) < PET.trot) {
-        const near = spots.find(spot => Math.hypot(spot.x - pet.x, spot.z - pet.z) < PET.sniffReach[1] * 2);
         const angle = rng() * Math.PI * 2, reach = between(rng, PET.sniffReach);
-        pet.spotX = near ? near.x : pet.x + Math.sin(angle) * reach; pet.spotZ = near ? near.z : pet.z + Math.cos(angle) * reach;
+        pet.spotX = pet.x + Math.sin(angle) * reach; pet.spotZ = pet.z + Math.cos(angle) * reach;
         enter(pet, 'sniff'); pet.events.push({ type: 'pet-sniff' });
       }
     }
   }
-  pet.x += pet.vx * dt; pet.z += pet.vz * dt;
+  const pace = pet.swimming ? PET.paddle : 1, fromX = pet.x, fromZ = pet.z;
+  pet.x += pet.vx * pace * dt; pet.z += pet.vz * pace * dt;
+  push(pet, world.solids);
+  if (world.statics) push(pet, world.statics.near(pet.x, pet.z, PET.radius));
+  const moved = Math.hypot(pet.x - fromX, pet.z - fromZ), rise = world.ground(pet.x, pet.z) - world.ground(fromX, fromZ);
+  if (moved > 1e-6 && rise > moved * PET.climb && world.ground(pet.x, pet.z) > pet.y + (pet.swimming ? PET.float + PET.step : 0)) { pet.x = fromX; pet.z = fromZ; pet.vx = 0; pet.vz = 0; }
+  const below = floorAt(world, pet.x, pet.z, pet.y + PET.step), water = waterAt(world, pet.x, pet.z);
+  pet.swimming = water - below > PET.swim;
+  pet.y = pet.swimming ? water - PET.float : below; pet.bottom = pet.y; pet.top = pet.y + PET.height;
+  return pet.events;
+}
+
+function push(pet, solids) {
   for (const solid of solids) {
+    if (pet.y >= solid.top || pet.y + PET.height <= solid.bottom) continue;
     const dx = pet.x - solid.x, dz = pet.z - solid.z, distance = Math.hypot(dx, dz), least = solid.radius + PET.radius;
     if (distance < least) { const nx = distance > 1e-6 ? dx / distance : 1, nz = distance > 1e-6 ? dz / distance : 0; pet.x = solid.x + nx * least; pet.z = solid.z + nz * least; }
   }
-  pet.y = ground(pet.x, pet.z); pet.bottom = pet.y; pet.top = pet.y + PET.height;
-  return pet.events;
 }
