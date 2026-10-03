@@ -30,6 +30,8 @@ import { buildPet, loadPet } from '../../models/wilds/pet.js';
 import { buildCamp } from '../../models/wilds/camp.js';
 import { buildRain } from '../../models/wilds/rain.js';
 import { createPost } from '../../models/wilds/post.js';
+import { buildLife } from '../../models/wilds/life.js';
+import { buildMist } from '../../models/wilds/mist.js';
 import { createInput } from './input.js';
 import { createHud } from './hud.js';
 
@@ -113,6 +115,8 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   scene.add(stagView.root);
   const rain = buildRain(clockRandom, skyTime);
   scene.add(rain.mesh);
+  const life = buildLife(sim, painterly, effects, { time: skyTime, random: clockRandom, flowers: scatter.flowers }), mist = buildMist(skyTime);
+  scene.add(...life.meshes, ...mist.meshes);
 
   const hemi = new HemisphereLight('#bcd4ea', '#6f8a4c', 1.35);
   scene.add(hemi);
@@ -176,6 +180,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     camera.aspect = w / h; camera.updateProjectionMatrix();
     post.resize(Math.round(w * pixelRatio), Math.round(h * pixelRatio));
     effects.resize(h * pixelRatio, camera.fov);
+    life.resize(h * pixelRatio / (2 * Math.tan(camera.fov * Math.PI / 360)));
   }
   const observer = new ResizeObserver(resize);
   observer.observe(stage);
@@ -379,6 +384,8 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     camera.updateMatrixWorld();
     sky.position.copy(camera.position);
     rain.update(camera.position, light.rain, light.sky);
+    life.update({ player, hour: sim.hour, light, seconds, dt, still, ground, water: waterAt, flow: valleyFlow, eye: camera.position });
+    mist.update(life.amounts.mist, light);
     focus.set(player.x, player.y, player.z);
     const a = snap(focus.dot(lightRight)), b = snap(focus.dot(lightUp)), c = focus.dot(light.toward);
     sun.target.position.set(0, 0, 0).addScaledVector(lightRight, a).addScaledVector(lightUp, b).addScaledVector(light.toward, c);
@@ -472,6 +479,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
         herbs: { count: sim.herbs.length, picked: sim.herbs.filter(herb => herb.picked).length, nearest: sim.herbs.filter(herb => !herb.picked).map(herb => ({ x: herb.x, z: herb.z, distance: Math.hypot(herb.x - player.x, herb.z - player.z) })).sort((a, b) => a.distance - b.distance)[0] ?? null },
         merchant: { x: sim.merchant.x, z: sim.merchant.z },
         updrafts: sim.world.updrafts.map(draft => ({ x: draft.x, z: draft.z, radius: draft.radius })),
+        life: { amounts: { ...life.amounts }, deer: life.herd.map(deer => ({ state: deer.state, x: deer.x, z: deer.z })), fishJumping: life.fishJumping },
         world: { trees: sim.trees.length, ring: ring.kindled, swimming: player.state === 'swim', water: waterAt(player.x, player.z) },
         dummy: { health: sim.dummy.health, max: sim.dummy.max, tilt: Math.hypot(sim.dummy.tiltX, sim.dummy.tiltZ), hurt: sim.dummy.hurt, x: sim.dummy.x, z: sim.dummy.z },
         lock: sim.lock,

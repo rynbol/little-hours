@@ -9,7 +9,7 @@ async function talk(app, prompt, what) {
 }
 
 export default {
-  about: 'the Wilds valley journey with real input only: from the island to the camp, buy a steel sword and a potion from the merchant with study coins, whistle, climb the vista rock, glide off it through the updraft, follow the pet to the buried find and dig it up, pick an herb, rest at the shrine fire into the evening, walk the east trail past the lake and the oak to the stone ring, beat the Mossheart Stag and leave; the play HUD carries no words',
+  about: 'the Wilds valley journey with real input only: from the island to the camp, buy a steel sword and a potion from the merchant with study coins, whistle, climb the vista rock, glide off it through the updraft, follow the pet to the buried find and dig it up, pick an herb, rest at the shrine fire into the evening, walk the east trail past the lake and the oak, startling the deer on the far shore, to the stone ring, beat the Mossheart Stag and leave; the play HUD carries no words',
   async run(t) {
     const { check } = t;
     const app = await t.open({ seed: 'one-room-rich', scale: 2 });
@@ -109,7 +109,11 @@ export default {
     await sleep(800);
     await t.shot(app, 'valley-evening');
 
-    await followTrail(app, EAST_TRAIL);
+    const grazing = (await app.js(WILDS)).life.deer;
+    await followTrail(app, EAST_TRAIL.slice(0, -1));
+    const startled = await app.js(WILDS);
+    check('the deer grazing on the far shore bolt away as you walk up to them', grazing.every(deer => deer.state === 'graze' || deer.state === 'look') && startled.life.deer.some(deer => (deer.state === 'bolt' || deer.state === 'wary') && Math.hypot(deer.x - startled.player.x, deer.z - startled.player.z) > 12), { before: grazing, after: startled.life.deer, player: startled.player });
+    await followTrail(app, EAST_TRAIL.slice(-1));
     await walkTo(app, STONES_FIRE.x + 1.4, STONES_FIRE.z + 0.6, 1.2);
     await until(app, `d.campfires.find(entry => entry.id === 'stones').lit`, 'the stone-ring fire to light', 3000);
     const arena = (await app.js(WILDS)).arena;

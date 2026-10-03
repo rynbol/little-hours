@@ -9,6 +9,7 @@ export const KINDS = Object.freeze({
   seed: Object.freeze({ colour: '#fff3c9', size: 0.09, life: [3.2, 4.4], speed: [1.6, 2.4], gravity: -0.15, drag: 0.15, glow: 0 }),
   petal: Object.freeze({ colour: '#ffe1ea', size: 0.13, life: [2.2, 3.2], speed: [0.8, 2], gravity: 0.35, drag: 1.3, glow: 0 }),
   leaf: Object.freeze({ colour: '#a8c766', size: 0.15, life: [1.8, 2.8], speed: [1, 2.2], gravity: 0.7, drag: 1.5, glow: 0 }),
+  splash: Object.freeze({ colour: '#eef8fa', size: 0.13, life: [0.45, 0.75], speed: [1.8, 3.2], gravity: 9, drag: 0.8, glow: 0 }),
 });
 
 const POOL = 160, TRAIL = 48;
@@ -147,6 +148,7 @@ export function buildEffects(random) {
     dust(x, y, z, amount) { emit(soft, KINDS.dust, Math.round(4 + amount * 6), x, y + 0.05, z, null, 0.3, 0.15); },
     charge(x, y, z) { emit(bright, KINDS.charge, 1, x, y, z, null, 1.5, 0.3); },
     drift(x, y, z) { emit(soft, KINDS.seed, 1, x, y, z, null, 0.1, 0.95); },
+    splash(x, y, z) { emit(soft, KINDS.splash, 12, x, y, z, null, 0.35, 0.85); },
     blossom(x, y, z) { emit(soft, KINDS.petal, 1, x, y, z, null, 0.8, 0.55); emit(soft, KINDS.leaf, 1, x, y, z, null, 0.8, 0.4); },
     step(dt, trailDt = dt) { bright.step(dt); soft.step(dt); swish.step(trailDt); },
     resize(height, fov) { const scale = height / (2 * Math.tan(fov * Math.PI / 360)); bright.points.material.uniforms.scale.value = scale; soft.points.material.uniforms.scale.value = scale; },

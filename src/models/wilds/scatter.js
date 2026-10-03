@@ -116,6 +116,7 @@ export function buildScatter(sim, painterly, wind) {
   meadow.forEach(([, , bloom], i) => blooms.setColorAt(i, tint.set(BLOOMS[bloom])));
   return {
     meshes: [reeds, boulders, herbs, stems, blooms],
+    flowers: meadow,
     update() {
       const now = sim.herbs.reduce((sum, herb) => sum + (herb.picked ? 1 : 0), 0);
       if (now === picked) return;

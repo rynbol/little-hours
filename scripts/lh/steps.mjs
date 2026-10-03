@@ -7,6 +7,8 @@ const VALLEY_VIEWS = Object.freeze({
   'wilds-ring': ['the ring of stones under the lookout', { x: 8, z: -300, facing: Math.PI, yaw: Math.PI, pitch: 0.18, zoom: 7 }],
   'wilds-stag': ['the Mossheart Stag resting in the ring, from just outside it', { x: 15.45, z: -311.11, facing: -2.54, yaw: -2.04, pitch: 0.1, zoom: 4.2 }],
   'wilds-oak': ['the great oak and its swing on the knoll', { x: 44, z: -132, facing: 2.4, yaw: 2.4, pitch: 0.2, zoom: 7 }],
+  'wilds-golden': ['the valley rim facing the low western sun from the vista rock', { x: 1, z: -39, facing: -1.22, yaw: -1.22, pitch: 0, zoom: 6 }],
+  'wilds-shore': ['the deer grazing on the far shore of the lake', { x: 49, z: -261, facing: -2.16, yaw: -2.16, pitch: 0.08, zoom: 4.5 }],
 });
 
 export const steps = {
