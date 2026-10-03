@@ -1,7 +1,7 @@
 import { BufferAttribute, BufferGeometry, Color, DepthTexture, HalfFloatType, MathUtils, Matrix4, Mesh, OrthographicCamera, ShaderMaterial, Vector2, Vector3, WebGLRenderTarget } from 'three';
 
 export const POST = Object.freeze({ samples: 4, shrink: 4, threshold: 1.5, bloom: 0.2, shafts: 0.42, rays: 36, reach: 0.55, vignette: 0.26, moonlit: 0.45 });
-export const AERIAL = Object.freeze({ density: 0.0018, falloff: 0.008, floor: -10, start: 40, strength: 1, bright: 0.9, blue: 0.8, lowSun: 0.12, highSun: 0.4, sunward: 0.55, tint: '#9db8de' });
+export const AERIAL = Object.freeze({ density: 0.0018, falloff: 0.008, floor: -10, start: 40, strength: 1, bright: 0.85, blue: 0.85, lowSun: 0.12, highSun: 0.4, sunward: 0.55, tint: '#7c9ad6', shift: 1.5, veil: 0.55 });
 
 const SCREEN = `varying vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -47,9 +47,11 @@ vec3 aerial(vec3 colour, float alpha) {
   vec3 ray = (toWorld * vec4(view.xyz / view.w, 1.0)).xyz - eye;
   float dist = length(ray), rise = ray.y * ${AERIAL.falloff};
   float column = abs(rise) > 0.001 ? (1.0 - exp(-rise)) / rise : 1.0;
-  float amount = 1.0 - exp(-hazeDensity * exp(-(eye.y - ${AERIAL.floor.toFixed(1)}) * ${AERIAL.falloff}) * max(dist - ${AERIAL.start.toFixed(1)}, 0.0) * column);
+  float amount = 1.0 - exp(-hazeStrength * hazeDensity * exp(-(eye.y - ${AERIAL.floor.toFixed(1)}) * ${AERIAL.falloff}) * max(dist - ${AERIAL.start.toFixed(1)}, 0.0) * column);
   vec3 tint = mix(hazeColour, hazeSun, pow(max(dot(ray / max(dist, 0.001), sunDirection), 0.0), 6.0) * ${AERIAL.sunward});
-  return mix(colour, tint, amount * hazeStrength * step(0.5, alpha));
+  vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+  vec3 cooled = mix(colour, dot(colour, luma) * hazeColour / max(dot(hazeColour, luma), 0.001), min(amount * ${AERIAL.shift.toFixed(2)}, 1.0));
+  return mix(colour, mix(cooled, tint, amount * ${AERIAL.veil.toFixed(2)}), step(0.5, alpha));
 }
 vec3 fit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
 vec3 aces(vec3 colour) {
