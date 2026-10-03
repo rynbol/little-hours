@@ -119,9 +119,11 @@ The owner said the hero and the other characters look bad and asked for Palworld
 | Round | Change | Blind result | Mean score | Kept |
 | --- | --- | --- | --- | --- |
 | c1 | Character shading: a soft two-band ramp, warm skin shadow with a red edge, a sun rim and a back rim, and fuzz on the pets | 1 of 6 pairs, 5 slight losses | 4.00 to 4.17 | no, reverted |
-| c2 | Face: layered eyes (white with a lid shadow, graded amber iris, pupil, two glints, bold lash), a small nose, a narrower jaw and a smile. The mouth was missing in the game: Blender turned the one-sided disc inward and three.js culled it | 5 of 6 pairs (3 clear) | 3.42 to 4.17 | yes, see the commit after 50bc177 |
+| c2 | Face: layered eyes (white with a lid shadow, graded amber iris, pupil, two glints, bold lash), a small nose, a narrower jaw and a smile. The mouth was missing in the game: Blender turned the one-sided disc inward and three.js culled it | 5 of 6 pairs (3 clear) | 3.42 to 4.17 | yes, 8f44b5a |
+| c3 | Hair: 18 flat lock ribbons from the crown over the cap, darker lock edges and a broken sheen band | 1 of 6 pairs, 5 ties | 4.00 to 4.00 | no, too faint, replaced by c3b |
+| c3b | Hair: 22 thicker locks whose tips lift off the cap and taper to points past its edge, broad dark grooves, a darker cap under them and a brighter sheen | 6 of 6 pairs, all slight | 4.25 to 4.75 | yes, see the commit after 8f44b5a |
 
-The c1 judge read the warm skin as saturated flat orange, like painted plastic. After c2 the judge named the smooth helmet-shell hair cap on a featureless ball head as the cheapest thing. The biggest gap it named was no cheek or jaw planes, hair in soft clumps instead of locks with sheen, skin that goes cold grey in shade, tube arms and a jacket with no folds.
+The c1 judge read the warm skin as saturated flat orange, like painted plastic. After c2 the judge named the smooth helmet-shell hair cap on a featureless ball head as the cheapest thing. The biggest gap it named was no cheek or jaw planes, hair in soft clumps instead of locks with sheen, skin that goes cold grey in shade, tube arms and a jacket with no folds. After c3b the judge saw the side locks break the head outline. It named the grey, flat face skin as the cheapest thing. The biggest gap it named was skin and clothes with no warm tone, lifted shadows or rim light, so the hero goes dull grey in shade. It rated the orange cat closest to the bar. The mean is 4.8.
 
 ## What looks or plays wrong
 
