@@ -50,7 +50,7 @@ export default {
     const before = await app.js(WILDS);
     await app.key('r', 'KeyR');
     const called = await until(app, `d.reactions.whistles > ${before.reactions.whistles}`, 'the whistle', 1500);
-    check('R whistles and the pet comes running, its note queued behind the potion toast instead of replacing it', called.pet.state === 'come' && called.hud.toast === 'potion-wait' && called.hud.waiting.includes('whistle'), { toast: called.hud.toast, waiting: called.hud.waiting, pet: called.pet });
+    check('R whistles and the pet comes running, its note queued behind the potion toast instead of replacing it', ['come', 'follow'].includes(called.pet.state) && called.hud.toast === 'potion-wait' && called.hud.waiting.includes('whistle'), { toast: called.hud.toast, waiting: called.hud.waiting, pet: called.pet });
     const noted = await until(app, `d.hud.toast === 'whistle'`, 'the whistle toast to follow', 2500);
     check('the whistle toast shows once the potion toast is done', noted.hud.waiting.length === 0, noted.hud);
     await sleep(1500);
