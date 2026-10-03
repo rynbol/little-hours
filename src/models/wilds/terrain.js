@@ -31,11 +31,11 @@ export async function surveyValley() {
     const heights = new Float32Array(columns * rows);
     for (const part of await pool.all(bands.map(band => ({ message: { kind: 'heights', rows: band } })))) heights.set(part.heights, part.rows[0] * columns);
     const layout = { minX, minZ, step, columns, rows };
-    const colors = new Uint8Array(columns * rows * 4), mask = new Uint8Array(columns * rows * 4);
+    const colors = new Uint8Array(columns * rows * 4), mask = new Uint8Array(columns * rows * 4), tint = new Uint8Array(columns * rows * 4);
     for (const part of await pool.all(bands.map(band => ({ message: { kind: 'survey', rows: band, heights, layout } })))) {
-      colors.set(part.colors, part.rows[0] * columns * 4); mask.set(part.mask, part.rows[0] * columns * 4);
+      for (const [target, source] of [[colors, part.colors], [mask, part.mask], [tint, part.tint]]) target.set(source, part.rows[0] * columns * 4);
     }
-    return { grid: createHeightGrid(heights, layout), colors, mask };
+    return { grid: createHeightGrid(heights, layout), colors, mask, tint };
   } finally { pool.dispose(); }
 }
 

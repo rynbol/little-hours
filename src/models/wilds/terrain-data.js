@@ -1,5 +1,5 @@
 import { fbm, noise2, smooth } from '../../core/wilds/noise.js';
-import { VALLEY, lakeEdge, streamCourse, trailNearest, waterAt, cliffLine } from '../../core/wilds/valley.js';
+import { VALLEY, lakeEdge, streamCourse, trailNearest } from '../../core/wilds/valley.js';
 
 export const CHUNK = 64;
 export const LOD_STEPS = Object.freeze([1, 2, 4, 8]);
@@ -13,24 +13,25 @@ const PAINT = Object.freeze({
 });
 const blend = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-function paintAndMask(x, z, height, slope, out, mask, i) {
+function paintAndMask(x, z, height, slope, out, mask, tint, i) {
   const lake = lakeEdge(x, z), stream = streamCourse(x, z), path = trailNearest(x, z, 6);
-  const patch = fbm(x / 26, z / 26, 3, 601), fine = noise2(x / 3.1, z / 3.1, 602);
-  let color = blend(PAINT.meadow, PAINT.meadowLight, smooth(-.25, .45, patch));
-  color = blend(color, PAINT.meadowGold, smooth(.35, .7, fbm(x / 60, z / 60, 2, 603)) * .55);
-  color = blend(color, PAINT.hollow, smooth(.1, -.5, patch + fine * .3) * .6);
+  const patch = fbm(x / 26, z / 26, 3, 601), fine = noise2(x / 3.1, z / 3.1, 602), gold = smooth(.35, .7, fbm(x / 60, z / 60, 2, 603));
+  let meadow = blend(PAINT.meadow, PAINT.meadowLight, smooth(-.25, .45, patch));
+  meadow = blend(meadow, PAINT.meadowGold, gold * .55);
+  meadow = blend(meadow, PAINT.hollow, smooth(.1, -.5, patch + fine * .3) * .6);
   const woods = Math.min(1, smooth(-70, -110, z) + smooth(-110, -160, x) + smooth(.2, .5, fbm(x / 90, z / 90, 2, 604)) * smooth(150, 230, Math.abs(x)));
-  color = blend(color, blend(PAINT.forest, PAINT.litter, smooth(-.1, .5, fine)), woods * .75);
+  const grass = blend(meadow, PAINT.forest, woods * .7);
+  let color = blend(grass, blend(PAINT.forest, PAINT.litter, smooth(-.1, .5, fine)), woods * .75);
   const streamEdge = stream.distance - VALLEY.stream.width * .5, shore = Math.min(lake, streamEdge);
   const beach = x > 55 && z > 90 && z < 175 ? 1 : .35;
   color = blend(color, blend(PAINT.gravel, PAINT.pebble, smooth(-.3, .5, fine)), (1 - smooth(1.5, 4 + 5 * beach, shore)) * .95);
   color = blend(color, PAINT.wet, (1 - smooth(-.5, 1.2, shore)) * .6);
   if (lake < 0) color = blend(blend(PAINT.pebble, PAINT.bed, smooth(0, -6, lake)), PAINT.deep, smooth(-8, -30, lake));
   if (stream.distance < VALLEY.stream.width * .55) color = blend(PAINT.pebble, PAINT.bed, smooth(.2, -.4, fine));
+  const trailWidth = VALLEY.trailWidth, edge = path.distance + noise2(x / 1.7, z / 1.7, 612) * .3;
   if (path.distance < 5) {
-    const worn = 1 - smooth(VALLEY.trailWidth * .45, VALLEY.trailWidth * 1.25 + fine * .4, path.distance);
-    color = blend(color, PAINT.trailEdge, (1 - smooth(VALLEY.trailWidth, VALLEY.trailWidth * 2.2, path.distance)) * .7);
-    color = blend(color, PAINT.trail, worn * (.85 + .15 * fine));
+    color = blend(color, PAINT.trailEdge, (1 - smooth(trailWidth * .4, trailWidth * 1.1, edge)) * .55);
+    color = blend(color, PAINT.trail, (1 - smooth(trailWidth * .3, trailWidth * .56, edge)) * (.85 + .15 * fine));
   }
   const rock = smooth(.75, 1.15, slope);
   if (rock > 0) {
@@ -41,30 +42,38 @@ function paintAndMask(x, z, height, slope, out, mask, i) {
     stone = blend(stone, PAINT.moss, smooth(.5, .2, slope - .75) * .4);
     color = blend(color, stone, rock);
   }
-  out[i] = color[0] * 255; out[i + 1] = color[1] * 255; out[i + 2] = color[2] * 255; out[i + 3] = 255;
 
-  let density = lake < 0 || streamEdge < 0 ? 0 : smooth(.95, .55, slope);
-  density *= smooth(1.2, 4.5, shore + noise2(x / 4, z / 4, 611) * 1.5);
-  density *= smooth(VALLEY.trailWidth * .55, VALLEY.trailWidth * 1.35, path.distance + noise2(x / 1.7, z / 1.7, 612) * .3);
-  density *= .35 + .65 * smooth(3.5, 8, Math.hypot(x - VALLEY.camp.x, z - VALLEY.camp.z));
-  for (const fire of VALLEY.campfires) density *= smooth(1.8, 3.4, Math.hypot(x - fire.x, z - fire.z));
-  density *= smooth(1, 2.6, Math.hypot(x - VALLEY.shrine.x, z - VALLEY.shrine.z));
-  if (Math.hypot(x - VALLEY.waterfall.pool.x, z - VALLEY.waterfall.pool.z) < VALLEY.waterfall.pool.radius) density = 0;
-  mask[i] = Math.max(0, Math.min(1, density)) * 255;
-  mask[i + 1] = smooth(.25, .6, fbm(x / 18, z / 18, 2, 621)) * (1 - woods) * 255;
+  const camp = Math.hypot(x - VALLEY.camp.x, z - VALLEY.camp.z);
+  let cover = lake < 0 || streamEdge < 0 ? 0 : smooth(.95, .55, slope);
+  cover *= smooth(1.2, 3.6, shore + noise2(x / 4, z / 4, 611) * 1.5);
+  cover *= smooth(trailWidth * .3, trailWidth * .55, edge);
+  for (const fire of VALLEY.campfires) cover *= smooth(1.8, 3.2, Math.hypot(x - fire.x, z - fire.z));
+  cover *= smooth(1, 2.6, Math.hypot(x - VALLEY.shrine.x, z - VALLEY.shrine.z));
+  if (Math.hypot(x - VALLEY.waterfall.pool.x, z - VALLEY.waterfall.pool.z) < VALLEY.waterfall.pool.radius) cover = 0;
+  let tall = .3 + .45 * smooth(trailWidth * .5, trailWidth * 2.6, edge);
+  tall *= .45 + .55 * smooth(3, 10, camp);
+  tall *= .5 + .5 * smooth(1, 6, shore);
+  tall *= 1 - woods * .3 - rock * .3;
+  tall += .25 * smooth(40, 10, Math.hypot(x - VALLEY.meadow.x, z - VALLEY.meadow.z)) + .12 * smooth(.2, .6, patch);
+  color = blend(color, grass.map(value => value * .8), Math.max(0, Math.min(1, cover)) * .6);
+
+  out[i] = color[0] * 255; out[i + 1] = color[1] * 255; out[i + 2] = color[2] * 255; out[i + 3] = 255;
+  mask[i] = Math.max(0, Math.min(1, cover)) * 255;
+  mask[i + 1] = Math.max(0, Math.min(1, tall)) * 255;
   mask[i + 2] = (1 - smooth(1, 7, shore)) * 255;
   mask[i + 3] = woods * 255;
+  tint[i] = grass[0] * 255; tint[i + 1] = grass[1] * 255; tint[i + 2] = grass[2] * 255; tint[i + 3] = gold * 255;
 }
 
 export function surveyGround(grid, rows = [0, grid.rows]) {
   const { columns, minX, minZ, step, heights } = grid, span = (rows[1] - rows[0]) * columns * 4;
-  const colors = new Uint8Array(span), mask = new Uint8Array(span);
+  const colors = new Uint8Array(span), mask = new Uint8Array(span), tint = new Uint8Array(span);
   for (let r = rows[0]; r < rows[1]; r++) for (let c = 0; c < columns; c++) {
     const x = minX + c * step, z = minZ + r * step, h = heights[r * columns + c];
     const n = grid.normalAt(x, z), slope = Math.sqrt(Math.max(0, 1 - n.y * n.y)) / Math.max(.05, n.y);
-    paintAndMask(x, z, h, slope, colors, mask, ((r - rows[0]) * columns + c) * 4);
+    paintAndMask(x, z, h, slope, colors, mask, tint, ((r - rows[0]) * columns + c) * 4);
   }
-  return { colors, mask };
+  return { colors, mask, tint };
 }
 
 export function chunkGeometry(grid, colors, originX, originZ, step, size = CHUNK) {

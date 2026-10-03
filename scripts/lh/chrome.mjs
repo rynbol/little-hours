@@ -105,6 +105,8 @@ export async function launch({ width = 1440, height = 1000, scale = 2, headed = 
       for (let i = 1; i <= steps; i++) { await sleep(16); await mouse('mouseMoved', from.x + (to.x - from.x) * i / steps, from.y + (to.y - from.y) * i / steps, 1); }
       await sleep(40); await mouse('mouseReleased', to.x, to.y);
     },
+    hold: (key, code = key) => send('Input.dispatchKeyEvent', { type: 'keyDown', key, code }),
+    letGo: (key, code = key) => send('Input.dispatchKeyEvent', { type: 'keyUp', key, code }),
     async key(key, code = key) {
       const text = key === 'Enter' ? '\r' : key.length === 1 ? key : undefined;
       await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, text, windowsVirtualKeyCode: key === 'Escape' ? 27 : key === 'Enter' ? 13 : key === 'Tab' ? 9 : undefined });
