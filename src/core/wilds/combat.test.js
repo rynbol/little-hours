@@ -100,7 +100,7 @@ test('pet follows the lock, skill respects range and cooldown, recall persists u
   assert.equal(fought.events.filter(event => event.type === 'pet-skill').length, 1);
   assert.equal(fought.events.find(event => event.type === 'damage' && event.sourceId === 'cat').amount, 24);
   assert.equal(fought.state.pet.cooldownMs, 14000);
-  assert.equal(fought.state.pet.skillReadyAt, 14000);
+  assert.equal(fought.state.pet.skillReadyAt - fought.events.find(event => event.type === 'pet-skill').at, 14000);
   assert.equal(fought.state.pet.mode, 'fight');
   const recalled = run(fought.state, 30, (state, now, frame) => ({ actions: frame === 1 ? ['recall'] : [] }));
   assert.equal(recalled.state.pet.mode, 'recall');
@@ -118,8 +118,8 @@ test('pet follows the lock, skill respects range and cooldown, recall persists u
 test('exposed heartwood increases player and pet damage and the half-health phase introduces roots', () => {
   const state = start();
   Object.assign(state.boss, { engaged: true, mode: 'exposed', exposedUntil: 4500, nextActionAt: 4500 });
-  const result = run(state, 4, (state, now) => ({ actions: now === 50 ? ['lock', 'skill', 'attack'] : [] }));
-  assert.deepEqual(result.events.filter(event => event.type === 'damage').map(event => [event.sourceId, event.amount]), [['cat', 48], ['player', 18]]);
+  const result = run(state, 15, (state, now) => ({ actions: now === 50 ? ['lock', 'skill', 'attack'] : [] }));
+  assert.deepEqual(result.events.filter(event => event.type === 'damage').map(event => [event.sourceId, event.amount]), [['player', 18], ['cat', 48]]);
   const phase = start({ x: 6, y: 0, z: 0 });
   phase.boss.health = 210;
   const roots = run(phase, 300, (state, now, frame) => ({ actions: frame === 1 ? ['recall'] : [] }));

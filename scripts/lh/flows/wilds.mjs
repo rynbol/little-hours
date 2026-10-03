@@ -1,5 +1,6 @@
 import { dispatchSequenceInput } from '../sequence.mjs';
 import { views } from '../steps.mjs';
+import combatPlay from '../combat-play.mjs';
 
 const D = 'window.__littleHours.wilds.diagnostics()';
 
@@ -129,8 +130,9 @@ async function movementChecks(t, app) {
 
 
 export default {
-  about: 'Forest walk, sword and pet-assisted Warden victory, level-up, persistence and scene lifecycle on a fixed clock',
+  about: 'Recorded real-time entry-to-victory fight, followed by deterministic movement, rewards and lifecycle checks',
   async run(t) {
+    for (const style of (process.env.LH_COMBAT_STYLES || 'balanced').split(',')) await combatPlay.run(t, style);
     const app = await t.open({ ...views.wilds.settings, seed: 'one-room', theme: 'day', width: 960, height: 640 });
     await views.wilds.go(app);
     t.check('the Wilds mounts a ready populated scene', await app.js(`window.__littleHours.wilds.ready() && ${D}.phase === 'running' && ${D}.scene.meshes.length > 0 && document.querySelectorAll('#wilds-canvas').length === 1`));

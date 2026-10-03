@@ -1,13 +1,13 @@
 # Warden combat audit
 
-Goal 3 baseline: `6bc8a8f` plus the existing uncommitted player import. No owner bug list was present. Evidence starts at `shots/combat/baseline/`: a 22.3 second recording from Enter Wilds, walking to the arena with keyboard input, fighting and receiving victory. No placement or clock-control hook was used. Sampled HUD values agree with state, but this does not pass the visual checklist.
+Goal 3 baseline: `6bc8a8f` plus the existing uncommitted player import. No owner bug list was present. Evidence was moved outside Git to `wilds-assets/progress-shots/combat-before-separation/baseline/`: a 22.3 second recording from Enter Wilds, walking to the arena with keyboard input, fighting and receiving victory. No placement or clock-control hook was used. Sampled HUD values agree with state, but this does not pass the visual checklist.
 
 ## Combat rules
 
-- **C1 — Open: melee passes through standing stones.** Enter, follow the path, lock with Tab, dodge the first charge to the right, then attack from the near side of the stone the Warden hits. At 10–13 seconds the Warden loses health while the stone separates the player from its body. Sword range and facing are checked, but intervening obstacles are not.
-- **C2 — Open: pet skill damages at a distance before contact.** Lock and press Q while the pet approaches the first charge. At combat time 7857 ms, skill damage and skill start share a timestamp while the pet is several metres from the Warden. Ordinary pet attacks also resolve at their start, before any windup. The attack rule needs a pending contact time and a fresh range/obstruction check.
-- **C3 — Open: landed hits have no hit-stop.** In the repeated attacks at 18–21 seconds, neither movement nor action time pauses on damage. Add short contact pauses without freezing camera response or losing input.
-- **C4 — Open: attack timing and reach are scattered.** Sword timings, sword reach, pet skill reach, pet attack reach and Warden charge collision live in separate rules. Consolidate attack specifications so the look agent can retune contact to clips.
+- **C1 — Rule fixed and tested: melee passes through standing stones.** Enter, follow the path, lock with Tab, dodge the first charge to the right, then attack from the near side of the stone the Warden hits. At 10–13 seconds the Warden loses health while the stone separates the player from its body. The new contact rule rejects intervening obstacles; a failing regression now passes for stones and tree trunks.
+- **C2 — Contact rule fixed and tested; HUD follow-up open: pet skill damages at a distance before contact.** Lock and press Q while the pet approaches the first charge. At combat time 7857 ms, skill damage and skill start share a timestamp while the pet is several metres from the Warden. Ordinary pet attacks also resolve at their start, before any windup. Pet strikes now wait for a data-defined contact time and recheck range/obstruction. Distant skill commands queue an approach; recall cancels contact. The HUD still says ready briefly while the skill is queued; its failing test is preserved in the external separation checkpoint for the next fix.
+- **C3 — Fixed and tested: landed hits have no hit-stop.** In the repeated attacks at 18–21 seconds, neither movement nor action time pauses on damage. Every damage event now requests a short pause. The scene pauses simulation/action time while keeping camera input responsive and buffering commands; both event and scene regressions failed before the fix and now pass.
+- **C4 — Fixed: attack timing and reach are scattered.** Sword timings, sword reach, pet skill reach, pet attack reach and Warden charge collision live in separate rules. `src/core/wilds/attacks.js` now owns attack timing/reach in one row per attack. Current values still need alignment with the eventual authored clips.
 
 ## For the look agent
 
@@ -18,3 +18,11 @@ Goal 3 baseline: `6bc8a8f` plus the existing uncommitted player import. No owner
 ## Acceptance
 
 Consecutive fights with every visual checklist line true: **0 / 10**. The first entry-to-victory flow passed its six programmatic checks; the recording failed visual acceptance. No blind picture judge has been used because no visual piece has been built and static images cannot certify contact timing.
+
+## Separation checkpoint
+
+Player work is preserved locally on `codex/wilds-player-glb` at `79749db`: only the three model files, exported public assets, Blender player script and package script changed. No pycache is committed. The combat branch again uses the committed capsule and encounter; public/wilds and tools are absent. The combatAction handoff remains intact. Its old Ranger shader failure is confined to the preserved player branch.
+
+All combat videos, frame captures and large records are outside Git in `wilds-assets/progress-shots/`. New lh combat runs write there directly. Original raw recordings and a full separation backup are retained. The play-style batch was intentionally interrupted before changing the working tree. Balanced, rushing, backing off, circling, late dodge, mashing and initial inactivity reached victory, but none passed visual acceptance. The mashing run also caught a test-driver spawn assertion after an unnecessary W tap; that tap is removed. Pet-only, death/retry and leave/re-entry still need completed recordings.
+
+The required real-time fight now runs as part of `lh run wilds`, so the existing CI job cannot skip it. Unit-level contact and scene regressions pass after separation. After separation, all 904 unit tests, guard, build and all 36 Wilds flow checks pass. The room gate passed earlier in this change. Comparative fight performance and the remaining play styles are next.

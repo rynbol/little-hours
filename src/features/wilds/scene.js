@@ -50,6 +50,8 @@ export function createWildsView(engine, canvas, state, now = clockNow, dependenc
   let world, avatar, combatModels, cameraControl, player, combat, failure = null, loaded = false;
   let phase = 'suspended', renderCount = 0, readyFrames = 0, previousAt = null, elapsedMs = 0, deltaMs = 0, at = now();
   let cameraYaw = 0, cameraPitch = 0, events = [], eventHistory = [];
+  let hitStopRemainingMs = 0, cameraDeltaMs = 0, pendingJump = false;
+  const pendingActions = new Set();
 
   const worldPromise = Promise.resolve().then(() => dependencies.createWorld(scene, { theme: state.theme, still, signal: abort.signal }));
   const initialization = Promise.allSettled([
@@ -89,10 +91,10 @@ export function createWildsView(engine, canvas, state, now = clockNow, dependenc
 
   function updateActors(frameInput) {
     avatar.root.position.set(player.position.x, player.position.y, player.position.z);
-    avatar.update({ action: player.action, actionTimeMs: player.actionTimeMs, mantleAdvance: player.mantleAdvance, yaw: player.yaw, speed: player.speed, deltaMs, elapsedMs, grounded: player.grounded });
+    avatar.update({ action: player.action, actionTimeMs: player.actionTimeMs, mantleAdvance: player.mantleAdvance, yaw: player.yaw, speed: player.speed, deltaMs, elapsedMs, grounded: player.grounded, combatAction: combat.playerAction });
     combatModels.update(combat);
     const lockTarget = combat.targetId === combat.boss.id ? combat.boss : null;
-    ({ cameraYaw, cameraPitch } = cameraControl.update(player, frameInput, deltaMs, lockTarget));
+    ({ cameraYaw, cameraPitch } = cameraControl.update(player, frameInput, cameraDeltaMs, lockTarget));
     let targetScreen = null;
     if (lockTarget) {
       const projection = Vector3.Project(new Vector3(lockTarget.position.x, lockTarget.position.y + 2.7, lockTarget.position.z), Matrix.IdentityReadOnly, cameraControl.camera.getTransformationMatrix(), cameraControl.camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight()));
@@ -104,17 +106,25 @@ export function createWildsView(engine, canvas, state, now = clockNow, dependenc
   function render() {
     if (phase !== 'running' || owner.hidden) return;
     at = now();
-    deltaMs = previousAt === null ? 0 : Math.max(0, Math.min(100, at - previousAt));
+    cameraDeltaMs = previousAt === null ? 0 : Math.max(0, Math.min(100, at - previousAt));
+    const pausedMs = Math.min(cameraDeltaMs, hitStopRemainingMs);
+    hitStopRemainingMs -= pausedMs;
+    deltaMs = cameraDeltaMs - pausedMs;
     previousAt = at;
     elapsedMs += deltaMs;
     if (loaded) {
       world.refreshObstacles?.(player.position);
-      const frameInput = { ...(deltaMs > 0 ? input.read() : {}), cameraYaw };
+      const frameInput = { ...(cameraDeltaMs > 0 ? input.read() : {}), cameraYaw };
+      for (const action of frameInput.actions || []) pendingActions.add(action);
+      pendingJump ||= Boolean(frameInput.jump);
+      events = [];
       if (deltaMs > 0) {
-        const result = stepCombat(combat, frameInput, world, deltaMs, elapsedMs);
+        const result = stepCombat(combat, { ...frameInput, jump: pendingJump, actions: [...pendingActions] }, world, deltaMs, elapsedMs);
+        pendingActions.clear(); pendingJump = false;
         combat = result.state;
         player = combat.player;
         events = result.events.map(event => ({ ...event, at: event.at ?? elapsedMs }));
+        for (const event of events) if (event.type === 'hit-stop') hitStopRemainingMs = Math.max(hitStopRemainingMs, event.durationMs);
         if (events.length) eventHistory = [...eventHistory, ...events].slice(-40);
         for (const event of events) {
           if (event.type !== 'progress-changed') continue;
@@ -137,6 +147,7 @@ export function createWildsView(engine, canvas, state, now = clockNow, dependenc
     phase = next;
     previousAt = null;
     deltaMs = 0;
+    pendingActions.clear(); pendingJump = false;
     if (phase === 'running') engine.runRenderLoop(render);
     else engine.stopRenderLoop(render);
   }
