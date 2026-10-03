@@ -108,7 +108,8 @@ test('the mouth and eyes face out of the head, so back-face culling never hides 
   }
   for (const bone of ['mouth', 'eyeL', 'eyeR']) assert.ok(area[bone]?.out > area[bone].in, `${bone} shows ${area[bone]?.out} m² outward and ${area[bone]?.in} m² inward`);
   const parts = new Set(geometry.getAttribute('part').array);
-  assert.deepEqual([...parts].sort(), [0, 1, 2, 3]);
+  assert.deepEqual([...parts].sort(), [0, 1, 2, 3, 4]);
+  assert.deepEqual([...new Set(model.scene.getObjectByName('hair-bun').geometry.getAttribute('part').array)].sort(), [0, 4]);
 });
 
 test('the sword sits in the hand where the sim swings it at every hit frame', async () => {

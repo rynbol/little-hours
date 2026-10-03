@@ -15,7 +15,7 @@ export const HERO_SWORDS = Object.freeze({ plain: 'starter', 'rootwood-sword': '
 const STRIDE = Object.freeze(['idle', 'walk', 'jog', 'sprint', 'strafe-left', 'strafe-right', 'jog-back']);
 const SLOTS = Object.freeze([null, 'skin', 'hair', 'top', 'topShade', 'topTrim', 'bottom', 'bottomTrim', 'cape', 'capeTrim']);
 const CLOSED = Object.freeze(['down', 'knocked']);
-const FIGURE_PARTS = Object.freeze({ 1: 3, 10: 2, 11: 1 });
+const FIGURE_PARTS = Object.freeze({ 1: 3, 2: 4, 10: 2, 11: 1 });
 const ease = s => { const t = Math.min(1, Math.max(0, s)); return t * t * (3 - 2 * t); };
 const angleTo = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
 
