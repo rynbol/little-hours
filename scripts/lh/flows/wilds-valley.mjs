@@ -92,7 +92,7 @@ export default {
     await walkTo(app, BURIED.x, BURIED.z, 1);
     await talk(app, 'secret', 'buried find');
     const found = await until(app, `d.progress.secrets.includes('buried-find')`, 'claiming the buried find', 3000);
-    const buddy = await app.js(`window.__littleHours.state.buddy?.finds?.['brass-key']?.count ?? 0`);
+    const buddy = await app.waitFor(`window.__littleHours.state.buddy?.finds?.['brass-key']?.count ?? 0`, { what: 'Pip to keep the brass key in the saved state', timeout: 3000 }).catch(() => 0);
     check('E digs out a brass key: the secret and its XP are saved, and Pip keeps the key', found.progress.xp > 0 && buddy > 0, { xp: found.progress.xp, buddy });
 
     const herb = found.herbs.nearest;
