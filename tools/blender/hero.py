@@ -383,6 +383,7 @@ def surface_patch(table, a0, a1, z0, z1, lift, thick=0.008, sides=8, rings=6, po
 
 SLEEVE = {'at': (0.05, 0.13, 0.215, 0.27, 0.33, 0.38), 'end': (-0.03, 0.0), 'radii': (0.063, 0.061, 0.055, 0.049, 0.053, 0.058, 0.06, 0.055, 0.047), 'ridges': 5, 'cuff': (0.049, 0.046, 0.045), 'rib': 12}
 TROUSER = {'radii': (0.09, 0.085, 0.07, 0.069, 0.054, 0.044), 'ridges': 4}
+PIPING = {'top': 0.08, 'edge': 18, 'hem': 64, 'radius': 0.0062}
 SHIRT = [(1.0, 0.012), (1.06, 0.135), (1.11, 0.335), (1.165, 0.46)]
 TORSO_WEIGHTS = blend(['hips', 'spine', 'chest', 'neck'], 4.0, 2)
 
@@ -622,6 +623,19 @@ def cape_weight(p, a):
     return weights
 
 
+def piping(model, a0, a1):
+    side = [(a1, PIPING['top'] + (1 - PIPING['top']) * k / PIPING['edge']) for k in range(PIPING['edge'])]
+    hem = [(a1 + (a0 - a1) * k / PIPING['hem'], 1.0) for k in range(PIPING['hem'] + 1)]
+    path = side + hem + [(a0, s) for _, s in reversed(side)]
+    points = [cape_point(angle, s, 0.012 * math.sin(angle * 7 + 0.4) * smooth((s - 0.3) / 0.7) - 0.0045) for angle, s in path]
+
+    def weight(p, a):
+        nearest = min(range(len(points)), key=lambda k: (points[k] - p).length_squared)
+        angle, s = path[nearest]
+        return cape_weight(p, (None, s, angle))
+    model.add(refine(tube(points, [PIPING['radius']] * len(points), 8), 0), slot('capeTrim'), weight)
+
+
 def cape(model):
     rows, attrs = [], []
     steps, sides = 9, 26
@@ -643,12 +657,10 @@ def cape(model):
     piece = refine((verts, faces, flat), 1, 0.009, -1.0, True)
 
     def colour(p, a):
-        edge = max(smooth((a[1] - 0.93) / 0.05), smooth((abs(a[2]) - 2.17) / 0.06))
-        if edge > 0.5:
-            return (1.0, 1.0, 1.0, SLOT['capeTrim'] / 16)
         fold = 0.93 + 0.07 * math.cos(a[2] * 9)
         return (fold, fold, fold, SLOT['cape'] / 16)
     model.add(piece, colour, cape_weight)
+    piping(model, a0, a1)
     hood_rows, hood_attrs = [], []
     for i in range(7):
         s = i / 6
