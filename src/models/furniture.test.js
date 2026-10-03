@@ -172,3 +172,13 @@ test('the moon tree pads shrink from broad low pads to small crown pads, and not
     assert.ok(mean(sorted.slice(0, third)) > mean(sorted.slice(-third)) * 1.4, `low pads ${mean(sorted.slice(0, third)).toFixed(3)} against crown pads ${mean(sorted.slice(-third)).toFixed(3)}`);
   } finally { disposeFurnitureAssets(scene); scene.dispose(); engine.dispose(); }
 });
+
+test('the antler trophy stands its catalog height on an oak stand, with glowing tips', () => {
+  const engine = new NullEngine(), scene = new Scene(engine), trophy = createFurniture('antler-trophy', scene);
+  const meshes = trophy.getChildMeshes(false).filter(mesh => mesh.getTotalVertices() > 0);
+  for (const mesh of meshes) mesh.computeWorldMatrix(true);
+  const top = Math.max(...meshes.map(mesh => mesh.getBoundingInfo().boundingBox.maximumWorld.y)) - trophy.position.y;
+  assert.ok(Math.abs(top - FURNITURE.find(item => item.id === 'antler-trophy').height) < 0.05, `${top}`);
+  assert.ok(meshes.some(mesh => mesh.material?.emissiveColor.g > 0.5));
+  disposeFurnitureAssets(scene); scene.dispose(); engine.dispose();
+});

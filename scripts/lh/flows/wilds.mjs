@@ -1,30 +1,5 @@
 import { steps } from '../steps.mjs';
-
-const WILDS = `window.__littleHours.wilds.diagnostics()`;
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-async function hold(app, key, code, ms) { await app.down(key, code); await sleep(ms); await app.up(key, code); }
-async function until(app, expression, what, timeout = 4000) { return app.waitFor(`(() => { const d = ${WILDS}; return (${expression}) ? d : null; })()`, { what, timeout }); }
-const DRAG_TURN = 0.006;
-async function face(app, yaw) {
-  for (let i = 0; i < 8; i++) {
-    const { camera } = await app.js(WILDS), off = Math.atan2(Math.sin(yaw - camera.yaw), Math.cos(yaw - camera.yaw));
-    if (Math.abs(off) < 0.05) return;
-    const px = Math.max(-560, Math.min(560, -off / DRAG_TURN));
-    await app.drag({ x: 720, y: 450 }, { x: 720 + px + Math.sign(px) * 7, y: 450 }, 18);
-    await sleep(120);
-  }
-}
-async function walkTo(app, x, z, near = 0.9) {
-  for (let i = 0; i < 14; i++) {
-    const d = await app.js(WILDS), dx = x - d.player.x, dz = z - d.player.z, far = Math.hypot(dx, dz);
-    if (far < near) return d;
-    await face(app, Math.atan2(dx, dz));
-    await hold(app, 'w', 'KeyW', Math.max(120, Math.min(2000, far / 4.4 * 800)));
-    await sleep(200);
-  }
-  return app.js(WILDS);
-}
+import { WILDS, face, hold, sleep, until, walkTo } from '../wilds-moves.mjs';
 
 export default {
   about: 'the Wilds: the island Forest pin opens a three.js feel box after freeing the island, Play starts it, and real keys and clicks run, jump, roll, swing a three-hit combo, charge a heavy, lock on, climb the cliff past its ledge, glide down and leave, each answered within 100 ms, at a capped pixel ratio, 60 fps with no long frames, then the island comes back at the trailhead, and a focus session closes it and keeps it shut',

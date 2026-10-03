@@ -63,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flow: [atmosphere, avatar, buddy, clouds, companions, controls, decorate, doors, focus, house, landmarks, lightning, living-garden, motion, pet, pond, pond-grass, pond-zoom, rainbow, rooms, sun-air, timer, transitions, valley-air, wilds, wilds-memory, window-cut]
+        flow: [atmosphere, avatar, buddy, clouds, companions, controls, decorate, doors, focus, house, landmarks, lightning, living-garden, motion, pet, pond, pond-grass, pond-zoom, rainbow, rooms, sun-air, timer, transitions, valley-air, wilds, wilds-fight, wilds-memory, window-cut]
     name: flow (${{ matrix.flow }})
     steps:
       - uses: actions/checkout@v7

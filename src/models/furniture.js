@@ -681,6 +681,22 @@ function globeStand(parent) {
 }
 const GLOBE_TILT = 0.41;
 
+const ANTLER = { bone: '#efe5cf', glow: { emissive: '#8fe0a8', emissiveIntensity: 0.85 } };
+function antlerTrophy(parent) {
+  cylinder(parent, 0.24, 0.28, 0.06, [0, 0.03, 0], C.darkWood);
+  cylinder(parent, 0.05, 0.08, 0.1, [0, 0.11, 0], C.darkWood);
+  rod(parent, [0, 0.16, 0], [0, 0.62, 0], 0.035, C.wood);
+  box(parent, [0.3, 0.06, 0.14], [0, 0.65, 0], C.darkWood, 0.02);
+  const beam = [[-0.03, 0.66, 0], [0.03, 0.92, 0.02], [0.1, 1.15, 0], [0.07, 1.36, -0.03], [-0.01, 1.5, -0.05]];
+  beam.slice(1).forEach((point, i) => rod(parent, beam[i], point, 0.034 - i * 0.004, ANTLER.bone));
+  for (const [from, tip] of [[1, [-0.12, 1.06, 0.06]], [2, [0.25, 1.26, 0.05]], [3, [-0.1, 1.45, 0.02]]]) {
+    rod(parent, beam[from], tip, 0.02, ANTLER.bone);
+    sphere(parent, [0.03, 0.03, 0.03], tip, ANTLER.bone).material = material(parent.getScene(), '#c8f2d2', ANTLER.glow);
+  }
+  sphere(parent, [0.034, 0.034, 0.034], beam.at(-1), ANTLER.bone).material = material(parent.getScene(), '#c8f2d2', ANTLER.glow);
+  for (const point of beam.slice(1, -1)) sphere(parent, [0.036, 0.036, 0.036], point, ANTLER.bone);
+}
+
 export const SEED_BED_SOIL = 0.715;
 function seedBed(parent) {
   for (const x of [-0.84, 0.84]) for (const z of [-0.34, 0.34]) box(parent, [0.1, 0.26, 0.1], [x, 0.13, z], C.darkWood, 0.02);
@@ -2017,7 +2033,7 @@ export function createFurniture(type, scene, avatarAppearance = AVATAR_DEFAULT) 
       'cloud-shelf': parent => cloudShelf(parent, 2.5), 'small-cloud-shelf': parent => cloudShelf(parent, 2.1),
       'wall-scroll': wallScroll, 'neon-orbit': neonOrbit, 'record-sleeve': recordSleeve, 'felt-rainbow': feltRainbow,
       'cottage-window': cottageWindow, 'arched-window': archedWindow, 'round-window': roundWindow,
-      'fish-tank': parent => fishTank(parent, TANK_WATER['fish-tank']), 'grand-tank': parent => fishTank(parent, TANK_WATER['grand-tank']), globe: globeStand, easel, 'bean-bag': beanBag, monstera: parent => monstera(parent), 'tea-cart': teaCart,
+      'fish-tank': parent => fishTank(parent, TANK_WATER['fish-tank']), 'grand-tank': parent => fishTank(parent, TANK_WATER['grand-tank']), globe: globeStand, 'antler-trophy': antlerTrophy, easel, 'bean-bag': beanBag, monstera: parent => monstera(parent), 'tea-cart': teaCart,
     };
     builders[type](source);
     const template = batch(source); template.setEnabled(false); templates.set(type, template);

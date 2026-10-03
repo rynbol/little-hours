@@ -1,5 +1,5 @@
 import { CylinderGeometry, Group, LatheGeometry, Mesh, SphereGeometry, TorusGeometry, ConeGeometry, Vector2 } from 'three';
-import { DUMMY, POST } from '../../core/wilds/box.js';
+import { DUMMY, POST } from '../../core/wilds/sim.js';
 import { part, merge } from './shapes.js';
 
 const WOOD = Object.freeze({ post: '#8a6444', cap: '#6d4d34', rope: '#cdb486', stone: '#9c968a', straw: '#e2bf6a', strawDeep: '#bf9446', burlap: '#c9a77a', stake: '#6b4b31' });

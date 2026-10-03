@@ -1,5 +1,6 @@
 import { travelTo } from '../../ui/place-transition.js';
 import { isFocusing } from '../../core/session.js';
+import { bondLevel, petName } from '../../core/pet-bonds.js';
 import './wilds.css';
 
 const ICONS = Object.freeze({
@@ -8,7 +9,7 @@ const ICONS = Object.freeze({
 });
 const CONTROLS = Object.freeze([
   ['W A S D', 'Move'], ['Shift', 'Sprint'], ['Space', 'Jump'], ['Ctrl · Right click', 'Dodge roll'],
-  ['Click', 'Attack · click again to combo'], ['Hold click', 'Charged heavy'], ['F', 'Lock on'], ['Mouse · Scroll', 'Look · Zoom'], ['Esc', 'Pause'],
+  ['Click', 'Attack · click again to combo'], ['Hold click', 'Charged heavy'], ['F', 'Lock on'], ['E', 'Rest · pet'], ['Q', 'Pet skill'], ['M', 'Mute'], ['Mouse · Scroll', 'Look · Zoom'], ['Esc', 'Pause'],
 ]);
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -23,7 +24,7 @@ export function createWildsUI(app) {
     root.className = 'wilds'; root.hidden = true; root.setAttribute('aria-label', 'The Wilds');
     root.innerHTML = `<div class="wilds-stage"></div><div class="wilds-hud"></div>
 <div class="wilds-corner"><button class="wilds-icon" data-wilds="pause" aria-label="Pause">${ICONS.pause}</button><button class="wilds-icon" data-wilds="leave" aria-label="Leave the Wilds">${ICONS.leave}</button></div>
-<dialog class="wilds-menu" aria-labelledby="wilds-menu-title"><h2 id="wilds-menu-title">The Wilds</h2><p class="wilds-menu-note">A training hill above the island.</p>
+<dialog class="wilds-menu" aria-labelledby="wilds-menu-title"><h2 id="wilds-menu-title">The Wilds</h2><p class="wilds-menu-note">A hill above the island, and a ring of old stones.</p>
 <dl class="wilds-keys">${CONTROLS.map(([key, does]) => `<div><dt>${key}</dt><dd>${does}</dd></div>`).join('')}</dl>
 <div class="wilds-menu-actions"><button class="wilds-play" data-wilds="play">Play</button><button class="wilds-quiet" data-wilds="exit">Leave the Wilds</button></div></dialog>`;
     document.body.append(root);
@@ -63,7 +64,12 @@ export function createWildsUI(app) {
     app.houseUI?.release();
     module.then(({ createGame }) => {
       if (disposed || !isOpen() || game) return;
-      game = createGame($('.wilds-stage'), $('.wilds-hud'), { reducedMotion, onPause: pause });
+      const { state } = app;
+      game = createGame($('.wilds-stage'), $('.wilds-hud'), {
+        reducedMotion, onPause: pause,
+        wilds: { bond: bondLevel(state.petBonds[state.pet]).index, kind: state.pet, petName: petName(state), progress: state.wilds },
+        onSave: mutate => app.acceptUpdate(app.store.update(draft => { mutate(draft.wilds); })),
+      });
       menu(false);
     }).catch(error => {
       failed = true;

@@ -52,3 +52,48 @@ body.is-wilds { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .wilds-lock svg, .wilds-stamina.is-tired { animation: none; }
 }
+
+.wilds-vitals { position: absolute; left: 18px; top: calc(env(safe-area-inset-top, 0px) + 16px); display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; width: min(260px, 52vw); }
+.wilds-level { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #fbf5eae6; box-shadow: 0 0 0 2px #f2c46b, 0 4px 12px #2a1f2433; color: var(--wilds-ink); font: 700 14px Georgia, serif; }
+.wilds-life { position: relative; height: 12px; border-radius: 8px; background: #2b241f99; box-shadow: 0 0 0 1.5px #fff2d8b3, 0 2px 8px #0000004d; overflow: hidden; }
+.wilds-life i, .wilds-pet-life i, .wilds-boss-bar i { position: absolute; inset: 2px; border-radius: 6px; transform-origin: 0 50%; }
+.wilds-life-ghost { background: #ffe9b8; }
+.wilds-life-fill { background: linear-gradient(180deg, #a6dd6e, #6fae46); }
+.wilds-vitals.is-low .wilds-life-fill { background: linear-gradient(180deg, #f6a07a, #db6a4f); }
+.wilds-pet { grid-column: 2; display: flex; align-items: center; gap: 8px; color: #fff8ec; font-size: 12px; font-weight: 600; text-shadow: 0 1px 3px #0009; }
+.wilds-pet-life { position: relative; flex: 0 0 90px; height: 7px; border-radius: 5px; background: #2b241f99; box-shadow: 0 0 0 1px #fff2d880; overflow: hidden; }
+.wilds-pet-life i { inset: 1.5px; background: #f2c46b; }
+.wilds-pet.is-out { opacity: .55; }
+.wilds-pet.is-out .wilds-pet-life i { background: #b9aaa0; }
+
+.wilds-skill { position: absolute; left: 22px; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); width: 52px; height: 52px; opacity: .45; transition: opacity .2s ease; }
+.wilds-skill svg { width: 100%; height: 100%; }
+.wilds-skill circle { fill: #2b241f8c; stroke-width: 3.5; }
+.wilds-skill-back { stroke: #fff2d84d; }
+.wilds-skill-fill { fill: none !important; stroke: #f2c46b; stroke-linecap: round; }
+.wilds-skill kbd { position: absolute; inset: 0; display: grid; place-items: center; color: #fff8ec; font: 700 16px 'DM Sans', sans-serif; }
+.wilds-skill.is-ready { opacity: 1; }
+.wilds-skill.is-ready.is-idle { opacity: .6; }
+.wilds-skill.is-ready .wilds-skill-fill { filter: drop-shadow(0 0 4px #ffd27a); }
+
+.wilds-boss { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 34px); width: min(560px, calc(100% - 160px)); transform: translate(-50%, 12px); opacity: 0; transition: opacity .35s ease, transform .35s ease; text-align: center; }
+.wilds-boss.is-on { opacity: 1; transform: translate(-50%, 0); }
+.wilds-boss-name { display: block; margin-bottom: 6px; color: #fff8ec; font: italic 17px Georgia, serif; letter-spacing: .3px; text-shadow: 0 1px 4px #000a; }
+.wilds-boss-bar { position: relative; height: 12px; border-radius: 8px; background: #2b241fb3; box-shadow: 0 0 0 1.5px #fff2d8b3, 0 3px 10px #0006; overflow: hidden; }
+.wilds-boss-ghost { background: #ffe9b8; }
+.wilds-boss-fill { background: linear-gradient(180deg, #f2c46b, #c98a3c); }
+.wilds-boss-bar s { position: absolute; left: 50%; top: 1px; bottom: 1px; width: 2px; background: #fff8ecaa; }
+
+.wilds-prompt { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 120px); margin: 0; padding: 7px 14px; border-radius: 999px; background: #fbf5eae6; box-shadow: 0 4px 14px #2a1f2433; color: var(--wilds-ink); font-size: 13px; font-weight: 600; white-space: pre; transform: translate(-50%, 6px); opacity: 0; transition: opacity .18s ease, transform .18s ease; }
+.wilds-prompt.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+.wilds-banner { position: absolute; left: 50%; top: 22%; transform: translate(-50%, 10px); opacity: 0; transition: opacity .4s ease, transform .4s ease; text-align: center; color: #fff8ec; text-shadow: 0 2px 10px #000a; pointer-events: none; }
+.wilds-banner.is-on { opacity: 1; transform: translate(-50%, 0); }
+.wilds-banner h3 { margin: 0 0 8px; font: 34px Georgia, serif; letter-spacing: -.3px; }
+.wilds-banner ul { margin: 0; padding: 0; list-style: none; font-size: 15px; font-weight: 600; line-height: 1.6; }
+
+.wilds-flash { position: absolute; inset: 0; opacity: 0; background: radial-gradient(120% 90% at 50% 50%, #fff6dc00 45%, #ffe6a866); }
+.wilds-flash.is-hurt { background: radial-gradient(120% 90% at 50% 50%, #ff6b4a00 50%, #d6463380); }
+.wilds-flash.is-on { animation: wilds-flash .45s ease-out forwards; }
+@keyframes wilds-flash { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .wilds-flash.is-on { animation-duration: .9s; } }

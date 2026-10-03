@@ -11,6 +11,7 @@ import { archivePetFriendships } from './pet-legacy.js';
 import { petGifts } from './pet-gifts.js';
 import { emptyBuddy, normalizeBuddy, recordAdventure, waitingFind, BUDDY_COLORS } from './buddy.js';
 import { emptyGarden, normalizeGarden, focusGardenPlantId, plantGardenSeed, placeGardenPlant, growGarden, gardenGrowth } from './garden-plants.js';
+import { emptyWilds, normalizeWilds } from './wilds/progress.js';
 
 export const storageKey = 'little-hours-v1';
 // The save as it was just before a backup replaced it.
@@ -18,7 +19,7 @@ export const recoveryKey = 'little-hours-v1-before-restore';
 
 export function freshState() {
   const layout = createLayout();
-  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], petBonds: normalizePetBonds(null, FREE_PETS), petWish: null, petFamily: '', avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [], pond: emptyPond(), garden: emptyGarden(), buddy: emptyBuddy() };
+  return { theme: 'dusk', pet: 'cat', pets: [...FREE_PETS], petBonds: normalizePetBonds(null, FREE_PETS), petWish: null, petFamily: '', avatar: { ...AVATAR_DEFAULT }, seenAt: 0, task: '', decor: { plants: true, lights: true, rug: true }, layout, rooms: {}, house: createHouse(layout), session: createSession(), history: [], pond: emptyPond(), garden: emptyGarden(), buddy: emptyBuddy(), wilds: emptyWilds() };
 }
 
 export function localDate(timestamp = clockNow(), timeZone) {
@@ -76,6 +77,7 @@ export function restoreState(raw) {
       });
   }
   initial.buddy = normalizeBuddy(saved.buddy);
+  initial.wilds = normalizeWilds(saved.wilds);
   if (!saved.buddy) initial.buddy.minutes = initial.history.reduce((sum, entry) => sum + entry.minutes, 0);
   initial.house = normalizeHouse(saved.house, initial.layout, initial.history);
   if (saved.layout !== undefined) {

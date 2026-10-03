@@ -1,4 +1,4 @@
-import { FURNITURE, getFurniture } from '../../core/catalog.js';
+import { collectionFor, getFurniture } from '../../core/catalog.js';
 import { PRESETS, normalizeLayout, MAX_ITEMS, pieceCount, roomDesign } from '../../core/layout.js';
 import { ARTWORKS, SLEEVES, artName } from '../../core/art.js';
 import { tintsFor } from '../../core/tints.js';
@@ -126,7 +126,7 @@ export function createDecorateUI(app) {
       restoreControlFocus(content, rememberedFocus);
       return;
     }
-    const collection = FURNITURE.filter(item => !item.unique);
+    const collection = collectionFor(app.state);
     const categories = ['All', ...new Set(collection.map(item => item.category))];
     const items = collection.filter(item => category === 'All' || item.category === category);
     content.innerHTML = `<div class="category-list" aria-label="Furniture categories">${categories.map(name => `<button data-category="${name}" aria-pressed="${category === name}">${name}</button>`).join('')}</div><div class="furniture-grid">${items.map(item => `<button class="furniture-card" data-furniture="${item.id}" aria-pressed="${placement?.type === item.id}" aria-label="Place ${item.name}" title="${item.description}">${furnitureArt(item.id)}<span class="furniture-name">${item.name}</span><span class="furniture-detail">${item.category}<span class="furniture-add">${icon('plus')}</span></span></button>`).join('')}</div>`;
