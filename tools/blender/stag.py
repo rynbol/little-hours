@@ -1,45 +1,18 @@
 import json
 import math
 import os
-import subprocess
 import sys
 
-import bmesh
 import bpy
-from mathutils import Euler, Matrix, Vector, noise
+from mathutils import Matrix, Vector
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.dirname(__file__))
+from kit import (ROOT, FPS, RENDERS, Model, Poser, bake, blob, catmull, export, facing, frames_along, loft, make_armature, make_mesh, mix, reset,
+                 segment_distance, shade, smooth, srgb, studio, tables, track, tube, wobble)
+
 OUT = os.path.join(ROOT, 'public', 'wilds', 'stag.glb')
-FPS = 30
-ARGS = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-RENDERS = ARGS[ARGS.index('--renders') + 1] if '--renders' in ARGS else None
-
-
-def tables():
-    code = "import('./src/core/wilds/stag.js').then(m => console.log(JSON.stringify({ attacks: m.STAG_ATTACKS, stag: m.STAG, gaits: m.STAG_GAITS })))"
-    return json.loads(subprocess.run(['node', '-e', code], cwd=ROOT, capture_output=True, text=True, check=True).stdout)
-
-
-TABLES = tables()
+TABLES = tables('src/core/wilds/stag.js', {'attacks': 'STAG_ATTACKS', 'stag': 'STAG', 'gaits': 'STAG_GAITS'})
 ATTACKS, STAG, GAITS = TABLES['attacks'], TABLES['stag'], TABLES['gaits']
-
-
-def srgb(code):
-    code = code.lstrip('#')
-    return tuple(int(code[i:i + 2], 16) / 255 for i in (0, 2, 4))
-
-
-def to_linear(colour):
-    return tuple(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in colour)
-
-
-def mix(a, b, t):
-    t = max(0.0, min(1.0, t))
-    return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
-
-
-def shade(colour, amount):
-    return tuple(max(0.0, min(1.0, c * amount)) for c in colour)
 
 
 TONE = {name: srgb(code) for name, code in {
@@ -49,29 +22,6 @@ TONE = {name: srgb(code) for name, code in {
     'lichen': '#c3c97f', 'lichenGold': '#d9b85a', 'moss': '#5f8a35', 'mossLight': '#8db24c', 'mossDark': '#3f6627',
     'sage': '#b3bf98', 'petal': '#fbf8ef', 'pollen': '#f2c443', 'amber': '#ffb54a', 'eye': '#ffe2a0', 'hoof': '#4a4440', 'mouth': '#2a1b14',
 }.items()}
-
-noise.seed_set(11)
-
-
-def wobble(p, scale=1.0, offset=0.0):
-    return noise.noise(Vector((p.x * scale + offset, p.y * scale - offset * 0.7, p.z * scale + offset * 1.3)))
-
-
-def smooth(t):
-    t = max(0.0, min(1.0, t))
-    return t * t * (3 - 2 * t)
-
-
-def catmull(points, s):
-    count = len(points)
-    f = max(0.0, min(0.999999, s)) * (count - 1)
-    i = int(f)
-    t = f - i
-    p0, p1 = points[max(0, i - 1)], points[i]
-    p2, p3 = points[min(count - 1, i + 1)], points[min(count - 1, i + 2)]
-    t2, t3 = t * t, t * t * t
-    return tuple(0.5 * (2 * p1[k] + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3) for k in range(len(p1)))
-
 
 TORSO = [
     (1.40, 1.98, 0.07, 0.07), (1.34, 1.97, 0.24, 0.27), (1.22, 1.95, 0.35, 0.37), (1.00, 1.93, 0.41, 0.42),
@@ -108,96 +58,6 @@ def torso_s(y):
     return best
 
 
-class Model:
-    def __init__(self):
-        self.verts, self.colours, self.weights, self.faces, self.materials, self.smooth = [], [], [], [], [], []
-
-    def add(self, piece, colour, weight, material=0, smooth=True):
-        verts, faces, attrs = piece
-        base = len(self.verts)
-        for v, a in zip(verts, attrs):
-            self.verts.append(Vector(v))
-            self.colours.append(colour(Vector(v), a))
-            self.weights.append(weight(Vector(v), a))
-        for f in faces:
-            self.faces.append(tuple(base + i for i in f))
-            self.materials.append(material(f, verts, attrs) if callable(material) else material)
-            self.smooth.append(smooth)
-
-
-def loft(rings, attrs, cap_start=True, cap_end=True):
-    sides = len(rings[0])
-    verts = [v for ring in rings for v in ring]
-    flat_attrs = [a for ring in attrs for a in ring]
-    faces = []
-    for i in range(len(rings) - 1):
-        for j in range(sides):
-            a, b = i * sides + j, i * sides + (j + 1) % sides
-            faces.append((a, b, b + sides, a + sides))
-    if cap_start:
-        centre = sum(rings[0], Vector()) / sides
-        verts.append(centre)
-        flat_attrs.append(attrs[0][0])
-        faces += [(len(verts) - 1, (j + 1) % sides, j) for j in range(sides)]
-    if cap_end:
-        centre = sum(rings[-1], Vector()) / sides
-        verts.append(centre)
-        flat_attrs.append(attrs[-1][0])
-        last = (len(rings) - 1) * sides
-        faces += [(len(verts) - 1, last + j, last + (j + 1) % sides) for j in range(sides)]
-    return verts, faces, flat_attrs
-
-
-def tube(points, radii, sides=8, rough=0.0, seed=0.0, ridges=0):
-    points = [Vector(p) for p in points]
-    tangents = []
-    for i in range(len(points)):
-        a, b = points[max(0, i - 1)], points[min(len(points) - 1, i + 1)]
-        tangents.append((b - a).normalized())
-    normal = tangents[0].orthogonal().normalized()
-    rings, attrs = [], []
-    for i, (p, t) in enumerate(zip(points, tangents)):
-        normal = (normal - t * normal.dot(t)).normalized()
-        binormal = t.cross(normal)
-        u = i / (len(points) - 1)
-        ring, ring_attrs = [], []
-        for j in range(sides):
-            angle = j / sides * math.tau
-            out = normal * math.cos(angle) + binormal * math.sin(angle)
-            radius = radii[i] * (1.0 + rough * wobble(p + out * 0.3, 7.0, seed) + (0.07 * math.cos(angle * ridges + u * 3.0) if ridges else 0.0))
-            ring.append(p + out * radius)
-            ring_attrs.append((out, u, j / sides))
-        rings.append(ring)
-        attrs.append(ring_attrs)
-    return loft(rings, attrs)
-
-
-def blob(centre, radii, subdiv=1, rotation=None, rough=0.0, seed=0.0, flat_bottom=None):
-    bm = bmesh.new()
-    bmesh.ops.create_icosphere(bm, subdivisions=subdiv, radius=1.0)
-    unit = [v.co.copy() for v in bm.verts]
-    faces = [tuple(v.index for v in f.verts) for f in bm.faces]
-    bm.free()
-    rotation = rotation or Matrix.Identity(3)
-    verts, attrs = [], []
-    for n in unit:
-        bump = 1.0 + rough * wobble(n, 2.3, seed)
-        local = Vector((n.x * radii[0], n.y * radii[1], n.z * radii[2])) * bump
-        if flat_bottom is not None and local.z < -radii[2] * flat_bottom:
-            local.z = -radii[2] * flat_bottom
-        verts.append(Vector(centre) + rotation @ local)
-        attrs.append((rotation @ n, 0.5 + 0.5 * n.z, 0.5 + 0.5 * math.atan2(n.y, n.x) / math.pi))
-    return verts, faces, attrs
-
-
-def facing(normal, along=None):
-    z = Vector(normal).normalized()
-    x = (Vector(along) if along else Vector((0, 1, 0)))
-    x = (x - z * x.dot(z)).normalized()
-    y = z.cross(x)
-    return Matrix((x, y, z)).transposed()
-
-
 BONES = [
     ('root', (0, 0, 0), (0, -0.5, 0), None, False),
     ('hips', (0, 0.85, 1.95), (0, 0.2, 1.97), 'root', False),
@@ -229,12 +89,6 @@ BONE = {name: (Vector(head), Vector(tail), parent) for name, head, tail, parent,
 CHAIN = ['hips', 'spine', 'chest', 'neck1', 'neck2', 'head']
 
 
-def segment_distance(p, a, b):
-    ab = b - a
-    t = max(0.0, min(1.0, (p - a).dot(ab) / ab.length_squared))
-    return (a + ab * t - p).length
-
-
 def chain_weights(p, chain=CHAIN, sharp=4.0):
     scored = sorted(((segment_distance(p, BONE[n][0], BONE[n][1]), n) for n in chain))[:2]
     raw = [(1.0 / (d ** sharp + 1e-5), n) for d, n in scored]
@@ -249,20 +103,6 @@ def rigid(name):
 def rigid_chain(centre):
     weights = chain_weights(Vector(centre))
     return lambda p, a: weights
-
-
-def frames_along(points):
-    points = [Vector(p) for p in points]
-    out = []
-    normal = None
-    for i, p in enumerate(points):
-        a, b = points[max(0, i - 1)], points[min(len(points) - 1, i + 1)]
-        t = (b - a).normalized()
-        if normal is None:
-            normal = t.orthogonal().normalized()
-        normal = (normal - t * normal.dot(t)).normalized()
-        out.append((p, t, normal, t.cross(normal)))
-    return out
 
 
 def strip(controls, width, thick, mirror=1, lift=0.004, steps=22, sides=6, seed=0.0):
@@ -674,99 +514,7 @@ def build_model():
     return model
 
 
-def reset():
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    scene = bpy.context.scene
-    scene.render.fps = FPS
-    return scene
-
-
-def make_armature(scene):
-    data = bpy.data.armatures.new('MossheartRig')
-    rig = bpy.data.objects.new('MossheartRig', data)
-    scene.collection.objects.link(rig)
-    bpy.context.view_layer.objects.active = rig
-    bpy.ops.object.mode_set(mode='EDIT')
-    for name, head, tail, parent, connect in BONES:
-        bone = data.edit_bones.new(name)
-        bone.head, bone.tail, bone.roll = head, tail, 0.0
-        bone.use_deform = True
-    for name, head, tail, parent, connect in BONES:
-        if parent:
-            data.edit_bones[name].parent = data.edit_bones[parent]
-            data.edit_bones[name].use_connect = connect
-    bpy.ops.object.mode_set(mode='OBJECT')
-    return rig
-
-
-def make_mesh(scene, model, rig):
-    mesh = bpy.data.meshes.new('Mossheart')
-    mesh.from_pydata([tuple(v) for v in model.verts], [], model.faces)
-    for name in ('Body', 'Heart', 'Eyes'):
-        material = bpy.data.materials.new(name)
-        mesh.materials.append(material)
-    mesh.polygons.foreach_set('material_index', model.materials)
-    mesh.polygons.foreach_set('use_smooth', model.smooth)
-    bm = bmesh.new()
-    bm.from_mesh(mesh)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bm.to_mesh(mesh)
-    bm.free()
-    colours = mesh.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT')
-    flat = []
-    for c in model.colours:
-        flat += [*to_linear(c), 1.0]
-    colours.data.foreach_set('color', flat)
-    mesh.color_attributes.active_color = colours
-    mesh.color_attributes.render_color_index = 0
-    mesh.update()
-    obj = bpy.data.objects.new('Mossheart', mesh)
-    scene.collection.objects.link(obj)
-    groups = {name: obj.vertex_groups.new(name=name) for name, *_ in BONES}
-    for i, weights in enumerate(model.weights):
-        top = sorted(weights.items(), key=lambda item: -item[1])[:4]
-        total = sum(w for _, w in top)
-        for name, w in top:
-            if w / total > 0.002:
-                groups[name].add([i], w / total, 'REPLACE')
-    obj.parent = rig
-    modifier = obj.modifiers.new('Rig', 'ARMATURE')
-    modifier.object = rig
-    return obj
-
-
-class Poser:
-    def __init__(self, rig):
-        self.rig = rig
-        self.bones = rig.data.bones
-        self.rest = {b.name: b.matrix_local.copy() for b in self.bones}
-        self.relative = {}
-        for b in self.bones:
-            self.relative[b.name] = self.rest[b.parent.name].inverted() @ self.rest[b.name] if b.parent else self.rest[b.name].copy()
-        self.length = {b.name: b.length for b in self.bones}
-        self.pose, self.basis, self.miss, self.time = {}, {}, (0.0, '', 0.0), 0.0
-
-    def ident(self, name):
-        parent = self.bones[name].parent
-        return self.pose[parent.name] @ self.relative[name] if parent else self.relative[name].copy()
-
-    def turn(self, name, rotation=(0, 0, 0), offset=(0, 0, 0)):
-        start = self.ident(name)
-        head = start.translation.copy()
-        spin = Euler(rotation, 'XYZ').to_matrix().to_4x4()
-        final = Matrix.Translation(head + Vector(offset)) @ spin @ Matrix.Translation(-head) @ start
-        self.pose[name], self.basis[name] = final, start.inverted() @ final
-
-    def aim(self, name, direction):
-        start = self.ident(name)
-        y0 = start.to_3x3().col[1].normalized()
-        spin = y0.rotation_difference(Vector(direction).normalized()).to_matrix()
-        final = Matrix.Translation(start.translation) @ (spin @ start.to_3x3()).to_4x4()
-        self.pose[name], self.basis[name] = final, start.inverted() @ final
-
-    def head(self, name):
-        return self.ident(name).translation.copy()
-
+class StagPoser(Poser):
     def leg(self, upper, lower, cannon, hoof, target, fold, flex, bend):
         joint = self.head(upper)
         up = Vector((0, 0, 1))
@@ -836,34 +584,6 @@ def neutral():
         'neck1': (0, 0, 0), 'neck2': (0, 0, 0), 'head': (0, 0, 0), 'jaw': 0.0, 'ears': (0, 0.12, 0), 'scap': 0.0,
         **{key: (HOME[key].copy(), 0.0, 0.0, 0.0, Vector()) for key in HOME},
     }
-
-
-def track(t, keys):
-    keys = sorted(keys, key=lambda k: k[0])
-    if t <= keys[0][0]:
-        return keys[0][1]
-    if t >= keys[-1][0]:
-        return keys[-1][1]
-    for i in range(len(keys) - 1):
-        (ta, va), (tb, vb) = keys[i], keys[i + 1]
-        if ta <= t <= tb:
-            break
-    span = tb - ta
-    u = (t - ta) / span
-    scalar = not isinstance(va, (tuple, list))
-    va_, vb_ = ((va,), (vb,)) if scalar else (va, vb)
-
-    def slope(j):
-        if j <= 0 or j >= len(keys) - 1:
-            return tuple(0.0 for _ in va_)
-        (t0, v0), (t1, v1) = keys[j - 1], keys[j + 1]
-        v0, v1 = ((v0,), (v1,)) if scalar else (v0, v1)
-        return tuple((v1[k] - v0[k]) / (t1 - t0) for k in range(len(va_)))
-
-    ma, mb = slope(i), slope(i + 1)
-    h00, h10, h01, h11 = 2 * u ** 3 - 3 * u ** 2 + 1, u ** 3 - 2 * u ** 2 + u, -2 * u ** 3 + 3 * u ** 2, u ** 3 - u ** 2
-    out = tuple(h00 * va_[k] + h10 * span * ma[k] + h01 * vb_[k] + h11 * span * mb[k] for k in range(len(va_)))
-    return out[0] if scalar else out
 
 
 def feet(p, offsets):
@@ -1260,104 +980,33 @@ def clips():
     return out
 
 
-def bake(rig, poser):
-    rig.animation_data_create()
-    report = {}
-    for name, fn, length in clips():
-        action = bpy.data.actions.new(name)
-        action.use_fake_user = True
-        rig.animation_data.action = action
-        frames = max(2, round(length * FPS))
-        last = {}
-        poser.miss = (0.0, '', 0.0)
-        for frame in range(frames + 1):
-            poser.time = round(frame / FPS, 2)
-            basis = poser.evaluate(fn(frame / frames * length))
-            for bone, matrix in basis.items():
-                pb = rig.pose.bones[bone]
-                location, rotation, _ = matrix.decompose()
-                if bone in last and last[bone].dot(rotation) < 0:
-                    rotation.negate()
-                last[bone] = rotation
-                pb.rotation_quaternion = rotation
-                pb.keyframe_insert('rotation_quaternion', frame=frame, group=bone)
-                if bone == 'hips':
-                    pb.location = location
-                    pb.keyframe_insert('location', frame=frame, group=bone)
-        action.use_frame_range = True
-        action.frame_start, action.frame_end = 0, frames
-        track = rig.animation_data.nla_tracks.new()
-        track.name = name
-        track.strips.new(name, 0, action)
-        track.mute = True
-        rig.animation_data.action = None
-        report[name] = {'seconds': round(frames / FPS, 3), 'short': [round(poser.miss[0], 3), poser.miss[1], poser.miss[2]]}
-    return report
-
-
-def render(scene, rig, mesh, folder):
-    os.makedirs(folder, exist_ok=True)
-    scene.render.engine = 'BLENDER_WORKBENCH'
-    scene.display.shading.light = 'STUDIO'
-    scene.display.shading.color_type = 'VERTEX'
-    scene.display.shading.show_cavity = True
-    scene.display.shading.show_shadows = True
-    scene.render.resolution_x, scene.render.resolution_y = 900, 900
-    world = bpy.data.worlds.new('grey')
-    world.color = (0.62, 0.66, 0.62)
-    scene.world = world
-    camera = bpy.data.objects.new('camera', bpy.data.cameras.new('camera'))
-    camera.data.lens = 50
-    scene.collection.objects.link(camera)
-    scene.camera = camera
-    floor = bpy.data.objects.new('floor', bpy.data.meshes.new('floor'))
-    floor.data.from_pydata([(-6, -6, 0), (6, -6, 0), (6, 6, 0), (-6, 6, 0)], [], [(0, 1, 2, 3)])
-    scene.collection.objects.link(floor)
+def render(scene, rig, folder):
+    shoot = studio(scene)
     target = Vector((0, -0.4, 2.2))
-
-    def shoot(name, location, look=target):
-        camera.location = location
-        camera.rotation_euler = (look - Vector(location)).to_track_quat('-Z', 'Y').to_euler()
-        scene.render.filepath = os.path.join(folder, name + '.png')
-        bpy.ops.render.render(write_still=True)
-
     views = {'front': (0, -10.5, 2.6), 'side': (10.5, -0.4, 2.4), 'back': (0, 10, 2.8), 'three-quarter': (7.2, -7.6, 3.4)}
     for name, location in views.items():
-        shoot(name, location)
-    shoot('face', (1.5, -4.3, 3.3), Vector((0, -1.7, 3.1)))
-    shoot('eye', (1.6, -3.0, 3.1), Vector((0.1, -1.72, 2.92)))
-    shoot('chest', (2.2, -4.2, 1.6), Vector((0, -0.8, 1.8)))
+        shoot(folder, name, location, target)
+    shoot(folder, 'face', (1.5, -4.3, 3.3), (0, -1.7, 3.1))
+    shoot(folder, 'eye', (1.6, -3.0, 3.1), (0.1, -1.72, 2.92))
+    shoot(folder, 'chest', (2.2, -4.2, 1.6), (0, -0.8, 1.8))
     poses = [('sweep', 0.7), ('sweep', 1.0), ('stomp', 0.8), ('stomp', 1.0), ('charge-wind', 0.85), ('gallop', 0.1), ('gallop', 0.3), ('walk', 0.2), ('roots', 0.95), ('stun', 1.5), ('shift', 1.0), ('defeat', 4.0), ('rest', 0.0), ('stagger', 0.3)]
     for name, seconds in poses:
         rig.animation_data.action = bpy.data.actions[name]
         scene.frame_set(round(seconds * FPS))
-        shoot(f'pose-{name}-{seconds}', (9.0, -5.0, 3.0))
+        shoot(folder, f'pose-{name}-{seconds}', (9.0, -5.0, 3.0), target)
     rig.animation_data.action = None
 
 
 def main():
     scene = reset()
-    rig = make_armature(scene)
+    rig = make_armature(scene, 'MossheartRig', BONES)
     model = build_model()
-    mesh = make_mesh(scene, model, rig)
-    poser = Poser(rig)
-    report = bake(rig, poser)
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    bpy.ops.object.select_all(action='DESELECT')
-    rig.select_set(True)
-    mesh.select_set(True)
-    bpy.context.view_layer.objects.active = rig
-    bpy.ops.export_scene.gltf(
-        filepath=OUT, export_format='GLB', use_selection=True, export_yup=True, export_apply=False,
-        export_animations=True, export_animation_mode='ACTIONS', export_force_sampling=True, export_frame_step=1,
-        export_anim_slide_to_zero=True, export_optimize_animation_size=True, export_def_bones=True,
-        export_skins=True, export_influence_nb=4, export_vertex_color='ACTIVE', export_all_vertex_colors=False,
-        export_texcoords=False, export_normals=True, export_tangents=False, export_materials='EXPORT',
-        export_cameras=False, export_lights=False, export_extras=False, export_morph=False,
-    )
+    mesh = make_mesh(scene, 'Mossheart', model, rig, ('Body', 'Heart', 'Eyes'), [name for name, *_ in BONES])
+    report = bake(rig, StagPoser(rig), clips())
+    export(OUT, rig, [mesh])
     print('STAG', json.dumps({'triangles': sum(len(f) - 2 for f in model.faces), 'vertices': len(model.verts), 'clips': report, 'bytes': os.path.getsize(OUT)}))
     if RENDERS:
-        render(scene, rig, mesh, RENDERS)
+        render(scene, rig, RENDERS)
 
 
 main()
