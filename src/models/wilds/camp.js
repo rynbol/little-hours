@@ -2,7 +2,7 @@ import { AdditiveBlending, ConeGeometry, CylinderGeometry, DodecahedronGeometry,
 import { part, merge } from './shapes.js';
 
 const EMBER = Object.freeze({ stone: '#9d958a', log: '#6e4a31', bark: '#4f3524', ash: '#5d5550', flame: '#ffb347', core: '#fff0b8', light: '#ffb565' });
-const LIGHT = Object.freeze({ intensity: 14, distance: 11, reach: 26, night: 0.8 });
+const LIGHT = Object.freeze({ intensity: 14, distance: 11, reach: 26, night: 1.4 });
 
 function hearthGeometry(fires) {
   return merge(fires.flatMap(({ x, y, z }, f) => [

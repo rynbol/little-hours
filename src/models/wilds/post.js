@@ -1,6 +1,6 @@
 import { BufferAttribute, BufferGeometry, Color, HalfFloatType, Mesh, OrthographicCamera, ShaderMaterial, Vector2, Vector3, WebGLRenderTarget } from 'three';
 
-export const POST = Object.freeze({ samples: 4, shrink: 4, threshold: 1.5, bloom: 0.2, shafts: 0.42, rays: 36, reach: 0.55, vignette: 0.26 });
+export const POST = Object.freeze({ samples: 4, shrink: 4, threshold: 1.5, bloom: 0.2, shafts: 0.42, rays: 36, reach: 0.55, vignette: 0.26, moonlit: 0.45 });
 
 const SCREEN = `varying vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -39,7 +39,7 @@ void main() {
   gl_FragColor = vec4(vec3(total / ${POST.rays.toFixed(1)}), 1.0);
 }`;
 
-const FINAL = `uniform sampler2D scene; uniform sampler2D bloom; uniform sampler2D shafts; uniform float exposure; uniform float bloomStrength; uniform vec3 shaftColour; uniform vec3 lift; uniform vec3 gain; uniform float saturation; uniform float vignette; varying vec2 vUv;
+const FINAL = `uniform sampler2D scene; uniform sampler2D bloom; uniform sampler2D shafts; uniform float exposure; uniform float bloomStrength; uniform vec3 shaftColour; uniform vec3 lift; uniform vec3 gain; uniform float saturation; uniform float vignette; uniform float moonlit; varying vec2 vUv;
 vec3 fit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
 vec3 aces(vec3 colour) {
   const mat3 into = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
@@ -53,6 +53,7 @@ void main() {
   colour = lift + colour * (gain - lift);
   float grey = dot(colour, vec3(0.2126, 0.7152, 0.0722));
   colour = max(mix(vec3(grey), colour, saturation), 0.0);
+  colour = mix(colour, grey * vec3(0.8, 0.96, 1.3), moonlit * (1.0 - smoothstep(0.04, 0.45, grey)) * (1.0 - smoothstep(0.01, 0.1, colour.r - colour.b)));
   vec2 edge = vUv - 0.5;
   colour *= 1.0 - vignette * smoothstep(0.25, 0.85, dot(edge, edge) * 2.0);
   gl_FragColor = vec4(colour, 1.0);
@@ -74,7 +75,7 @@ export function createPost(renderer) {
   const shaftPass = pass(SHAFTS, { source: { value: bright.texture }, sun: { value: sun } });
   const finalPass = pass(FINAL, {
     scene: { value: target.texture }, bloom: { value: bright.texture }, shafts: { value: rays.texture }, exposure: { value: 1 }, bloomStrength: { value: POST.bloom },
-    shaftColour: { value: new Color() }, lift: { value: new Color(0, 0, 0) }, gain: { value: new Color(1, 1, 1) }, saturation: { value: 1 }, vignette: { value: POST.vignette },
+    shaftColour: { value: new Color() }, lift: { value: new Color(0, 0, 0) }, gain: { value: new Color(1, 1, 1) }, saturation: { value: 1 }, vignette: { value: POST.vignette }, moonlit: { value: 0 },
   });
   const passes = [brightPass, blurPass, shaftPass, finalPass];
   const projected = new Vector3(), white = new Color(1, 1, 1);
@@ -106,6 +107,7 @@ export function createPost(renderer) {
       finalPass.uniforms.gain.value.copy(white).lerp(light.glow, 0.12);
       finalPass.uniforms.lift.value.copy(light.fog).multiplyScalar(0.03);
       finalPass.uniforms.saturation.value = 1.08 - light.cloud * 0.22 - light.night * 0.1;
+      finalPass.uniforms.moonlit.value = light.night * POST.moonlit;
     },
     render(scene, camera3d) {
       renderer.setRenderTarget(target);
