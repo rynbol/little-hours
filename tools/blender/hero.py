@@ -32,9 +32,10 @@ console.log(JSON.stringify({ ATTACKS, BLADE, CHARGE_TIME, CLIMB, DODGE, GLIDE, G
 """)
 ATTACKS, BLADE, GAITS, MOVE, DODGE, VITALS, CLIMB, SWIM, GLIDE = (TABLES[k] for k in ('ATTACKS', 'BLADE', 'GAITS', 'MOVE', 'DODGE', 'VITALS', 'CLIMB', 'SWIM', 'GLIDE'))
 
-SLOT = {'fixed': 0, 'skin': 1, 'hair': 2, 'top': 3, 'topShade': 4, 'topTrim': 5, 'bottom': 6, 'bottomTrim': 7, 'cape': 8, 'capeTrim': 9}
+SLOT = {'fixed': 0, 'skin': 1, 'hair': 2, 'top': 3, 'topShade': 4, 'topTrim': 5, 'bottom': 6, 'bottomTrim': 7, 'cape': 8, 'capeTrim': 9, 'glint': 10, 'eye': 11}
+EYE = {'x': 0.047, 'z': 1.312, 'wide': 0.024, 'tall': 0.025, 'low': 0.78}
 TONE = {name: srgb(code) for name, code in {
-    'iris': '#2e211c', 'irisLow': '#7a5238', 'shine': '#fff6ea', 'lash': '#2a1c17', 'mouth': '#7a4842', 'mouthIn': '#5b2f2c',
+    'iris': '#2b1b16', 'irisLow': '#b07a45', 'irisRim': '#e3b277', 'pupil': '#160d0b', 'sclera': '#f3eee6', 'lid': '#c8c6d3', 'shine': '#fff6ea', 'lash': '#22171b', 'lashLow': '#6a4440', 'mouth': '#7a4842', 'mouthIn': '#5b2f2c',
     'leather': '#7a5236', 'leatherDark': '#563a27', 'strap': '#6a4630', 'brass': '#c9a35a', 'brassDark': '#8f7038',
     'wrap': '#cdbb94', 'wrapDark': '#a8946c', 'sole': '#3f322a', 'glove': '#6b4a35', 'gloveDark': '#4f3527',
     'steel': '#d9dee3', 'steelDark': '#9aa3ab', 'edge': '#f6f3ea', 'wood': '#8a5a3a', 'woodDark': '#5e3c26', 'vine': '#6f9a45', 'leafLight': '#a9c860',
@@ -143,7 +144,7 @@ def head_shape(n, grow=0.0):
     x, y, z = n
     jaw = smooth((-z - 0.42) / 0.58)
     cheek = math.exp(-((z + 0.42) / 0.24) ** 2) * smooth(-y * 2.0)
-    sx = 1.0 - 0.34 * jaw ** 1.2 + 0.07 * cheek
+    sx = 1.0 - 0.40 * jaw ** 1.2 + 0.07 * cheek
     sy = 1.0 - (0.1 * jaw + 0.05 * smooth(z * 2)) * smooth(-y * 3) + 0.06 * smooth(y * 2) * smooth(z * 2 + 0.6)
     sz = 1.0 - 0.05 * smooth(-z * 2) * smooth(y * 2)
     rx, ry, rz = HEAD_RADII
@@ -163,7 +164,7 @@ def face_hit(x, z):
     return location, normal
 
 
-def face_disc(cx, cz, w, h, lift, rings=5, sides=16, tilt=0.0, bend=0.0):
+def face_disc(cx, cz, w, h, lift, rings=5, sides=16, tilt=0.0, bend=0.0, low=1.0):
     verts, attrs, faces = [], [], []
     c, s = math.cos(tilt), math.sin(tilt)
     for i in range(rings + 1):
@@ -171,7 +172,7 @@ def face_disc(cx, cz, w, h, lift, rings=5, sides=16, tilt=0.0, bend=0.0):
         for j in range(sides if i else 1):
             angle = math.tau * j / sides
             u, v = math.cos(angle) * r, math.sin(angle) * r
-            v += bend * (u * u - 0.35)
+            v = v * (low if v < 0 else 1.0) + bend * (u * u - 0.35)
             x, z = cx + (u * c - v * s) * w, cz + (u * s + v * c) * h
             location, normal = face_hit(x, z)
             verts.append(location + normal * lift)
@@ -195,28 +196,47 @@ def face_band(points, width, lift, sides=6, flat=0.45):
     return tube([p for p, _ in path], [r for _, r in path], sides)
 
 
+def eye_colour(tone):
+    return lambda p, a=None: (*TONE[tone], SLOT['eye'] / 16)
+
+
+def glint(p, a=None):
+    return (*TONE['shine'], SLOT['glint'] / 16)
+
+
 def build_face(model):
     for side in ('L', 'R'):
         x = side_x(side)
         eye = rigid(f'eye.{side}')
-        cx, cz = 0.05 * x, 1.318
-        tilt = -0.08 * x
+        cx, cz, w, h = EYE['x'] * x, EYE['z'], EYE['wide'], EYE['tall']
+        tilt = -0.06 * x
 
-        def iris(p, a, cz=cz):
-            low = smooth((cz + 0.008 - p.z) / 0.03)
-            return (*mix(TONE['iris'], TONE['irisLow'], low * 0.85), 0.0)
-        model.add(face_disc(cx, cz, 0.024, 0.029, 0.0016, 6, 20, tilt), iris, eye)
-        model.add(face_disc(cx - 0.007 * x, cz + 0.009, 0.0085, 0.0095, 0.0034, 2, 12), fixed('shine'), eye)
-        model.add(face_disc(cx + 0.009 * x, cz - 0.012, 0.0042, 0.0042, 0.0034, 1, 10), fixed('shine'), eye)
-        lash = [(cx - 0.026 * x, cz + 0.004, 0.0028), (cx - 0.016 * x, cz + 0.024, 0.0036), (cx, cz + 0.031, 0.0042), (cx + 0.017 * x, cz + 0.026, 0.0042), (cx + 0.029 * x, cz + 0.012, 0.0036), (cx + 0.036 * x, cz + 0.016, 0.0015)]
-        model.add(face_band(lash, 0.004, 0.0022), fixed('lash'), eye)
-        brow = [(0.024 * x, 1.366, 0.0035), (0.04 * x, 1.374, 0.005), (0.058 * x, 1.376, 0.0048), (0.074 * x, 1.371, 0.0025)]
+        def sclera(p, a):
+            return (*mix(TONE['sclera'], TONE['lid'], smooth((a[2] - 0.2) / 0.6)), SLOT['eye'] / 16)
+
+        def iris(p, a):
+            r = math.hypot(a[1], a[2])
+            colour = mix(TONE['iris'], TONE['irisLow'], smooth((0.35 - a[2]) / 1.1))
+            colour = mix(colour, TONE['irisRim'], smooth((-0.35 - a[2]) / 0.3) * smooth((r - 0.4) / 0.2) * (1 - smooth((r - 0.8) / 0.1)))
+            return (*[c * (1 - 0.4 * smooth((r - 0.8) / 0.2)) for c in colour], SLOT['eye'] / 16)
+        model.add(face_disc(cx, cz, w, h, 0.0012, 6, 24, tilt, 0.0, EYE['low']), sclera, eye)
+        model.add(face_disc(cx + 0.001 * x, cz + 0.001, 0.0166, 0.0212, 0.0022, 6, 24, tilt), iris, eye)
+        model.add(face_disc(cx + 0.001 * x, cz + 0.003, 0.0071, 0.0097, 0.0028, 3, 16, tilt), eye_colour('pupil'), eye)
+        model.add(face_disc(cx - 0.0063, cz + 0.0097, 0.006, 0.0078, 0.0034, 2, 12), glint, eye)
+        model.add(face_disc(cx + 0.0068, cz - 0.0103, 0.003, 0.003, 0.0034, 1, 10), glint, eye)
+        upper = [(math.pi * k, r) for k, r in ((0.97, 0.0022), (0.8, 0.0036), (0.6, 0.0044), (0.4, 0.0048), (0.2, 0.0049), (0.03, 0.0045))]
+        lash = [(cx + x * w * math.cos(t), cz + h * math.sin(t), r) for t, r in upper]
+        lash += [(cx + x * w * 1.22, cz + h * 0.4, 0.003), (cx + x * w * 1.42, cz + h * 0.6, 0.001)]
+        model.add(face_band(lash, 0.004, 0.0026), eye_colour('lash'), eye)
+        lower = [(cx + x * w * math.cos(t), cz + h * EYE['low'] * math.sin(t), r) for t, r in ((-0.05 * math.pi, 0.0012), (-0.18 * math.pi, 0.0011), (-0.32 * math.pi, 0.0006))]
+        model.add(face_band(lower, 0.003, 0.0016), eye_colour('lashLow'), eye)
+        brow = [(0.022 * x, 1.364, 0.0032), (0.038 * x, 1.371, 0.0045), (0.056 * x, 1.373, 0.0042), (0.072 * x, 1.368, 0.0022)]
         model.add(face_band(brow, 0.004, 0.003), grey('hair', 0.78), rigid(f'brow.{side}'))
-    model.add(face_disc(0.0, 1.287, 0.0105, 0.008, 0.0025, 3, 12), slot('skin', (0.93, 0.83, 0.8)), rigid('head'))
-
-    def mouth_colour(p, a):
-        return (*mix(TONE['mouth'], TONE['mouthIn'], smooth(1.0 - abs(a[2]) * 3)), 0.0)
-    model.add(face_disc(0.0, 1.247, 0.013, 0.006, 0.0018, 3, 14, 0.0, 0.9), mouth_colour, rigid('mouth'))
+    tip, normal = face_hit(0.0, 1.279)
+    nose = transform(orb(lambda n: Vector((n.x * 0.0052, n.y * 0.0055, n.z * 0.0085)), 8, 12), Matrix.Translation(tip + normal * 0.0012) @ Matrix.Rotation(0.35, 4, 'X'))
+    model.add(refine(nose, 1), slot('skin'), rigid('head'))
+    smile = [(-0.0115, 1.2492, 0.0007), (-0.0068, 1.2468, 0.0016), (0.0, 1.2458, 0.0021), (0.0068, 1.2468, 0.0016), (0.0115, 1.2492, 0.0007)]
+    model.add(face_band(smile, 0.004, 0.0012), lambda p, a=None: (*mix(TONE['mouth'], TONE['mouthIn'], 0.6), 0.0), rigid('mouth'))
 
 
 def head_colour(p, a):
@@ -974,7 +994,7 @@ def preview_colours(mesh, model, colours):
     flat = []
     for c in model.colours:
         index = round(c[3] * 16)
-        rgb = c[:3] if index == 0 else tuple(colours[index][k] * c[k] for k in range(3))
+        rgb = tuple(colours[index][k] * c[k] for k in range(3)) if index in colours else c[:3]
         flat += [*to_linear(rgb), 1.0]
     attribute.data.foreach_set('color', flat)
     return attribute

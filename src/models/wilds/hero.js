@@ -15,6 +15,7 @@ export const HERO_SWORDS = Object.freeze({ plain: 'starter', 'rootwood-sword': '
 const STRIDE = Object.freeze(['idle', 'walk', 'jog', 'sprint', 'strafe-left', 'strafe-right', 'jog-back']);
 const SLOTS = Object.freeze([null, 'skin', 'hair', 'top', 'topShade', 'topTrim', 'bottom', 'bottomTrim', 'cape', 'capeTrim']);
 const CLOSED = Object.freeze(['down', 'knocked']);
+const EYE_PARTS = Object.freeze({ 10: 2, 11: 1 });
 const ease = s => { const t = Math.min(1, Math.max(0, s)); return t * t * (3 - 2 * t); };
 const angleTo = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
 
@@ -75,7 +76,7 @@ export function loadHero(base = import.meta.env?.BASE_URL ?? '/') {
 export function buildHero(model, painterly) {
   const root = model.scene, glow = { value: 0 };
   root.name = 'wilds-hero';
-  const looks = { Body: painterly.material('#ffffff', { vertexColors: true }), Blade: painterly.material('#ffffff', { vertexColors: true, glow }) };
+  const looks = { Body: painterly.material('#ffffff', { vertexColors: true, eyes: true }), Blade: painterly.material('#ffffff', { vertexColors: true, glow }) };
   const parts = new Map(), tones = {};
   root.traverse(object => {
     if (!object.isMesh) return;
@@ -86,6 +87,7 @@ export function buildHero(model, painterly) {
     object.castShadow = true; object.receiveShadow = true; object.frustumCulled = false;
     const source = object.geometry.getAttribute('color');
     object.geometry.setAttribute('color', new BufferAttribute(new Float32Array(source.count * 3), 3));
+    object.geometry.setAttribute('part', new BufferAttribute(Float32Array.from({ length: source.count }, (_, i) => EYE_PARTS[Math.round(source.getW(i) * 16)] ?? 0), 1));
     if (!parts.has(name)) parts.set(name, []);
     parts.get(name).push({ mesh: object, source });
   });

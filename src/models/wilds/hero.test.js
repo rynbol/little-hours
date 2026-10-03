@@ -94,6 +94,23 @@ async function viewOf() {
   return { model, body, view, settle };
 }
 
+test('the mouth and eyes face out of the head, so back-face culling never hides them, and the eyes are marked for their own shading', async () => {
+  const { model } = await viewOf(), body = model.scene.getObjectByName('body'), { geometry } = body;
+  const position = geometry.getAttribute('position'), joints = geometry.getAttribute('skinIndex'), index = geometry.index, area = {};
+  const corners = [new Vector3(), new Vector3(), new Vector3()], normal = new Vector3(), side = new Vector3();
+  for (let t = 0; t < index.count; t += 3) {
+    const bone = body.skeleton.bones[joints.getX(index.getX(t))].name;
+    if (!['mouth', 'eyeL', 'eyeR'].includes(bone)) continue;
+    corners.forEach((corner, k) => corner.fromBufferAttribute(position, index.getX(t + k)));
+    normal.subVectors(corners[1], corners[0]).cross(side.subVectors(corners[2], corners[0]));
+    area[bone] ??= { out: 0, in: 0 };
+    area[bone][normal.z > 0 ? 'out' : 'in'] += normal.length() / 2;
+  }
+  for (const bone of ['mouth', 'eyeL', 'eyeR']) assert.ok(area[bone]?.out > area[bone].in, `${bone} shows ${area[bone]?.out} m² outward and ${area[bone]?.in} m² inward`);
+  const parts = new Set(geometry.getAttribute('part').array);
+  assert.deepEqual([...parts].sort(), [0, 1, 2]);
+});
+
 test('the sword sits in the hand where the sim swings it at every hit frame', async () => {
   const { model, view, settle } = await viewOf(), sword = model.scene.getObjectByName('sword'), at = new Vector3(), pose = [0, 0], segment = { grip: [0, 0, 0], root: [0, 0, 0], tip: [0, 0, 0] };
   for (const [id, attack] of Object.entries(ATTACKS)) {

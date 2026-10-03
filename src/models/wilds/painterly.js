@@ -12,6 +12,7 @@ export function bandAt(coord) {
 
 export const SHADE = Object.freeze({ fill: 0.55, tint: '#6f9be8', cool: 0.75, low: 1.05, high: 0.55 });
 const COOL = new Color(SHADE.tint);
+export const EYES = Object.freeze({ glint: 1.25 });
 
 export function createPainterly({ rim = '#fff0d2', rimStrength = 0.55, rimPower = 2.8 } = {}) {
   const width = 128, data = new Uint8Array(width);
@@ -35,7 +36,17 @@ if (grain < dissolve) discard;`)
 #include <opaque_fragment>`);
   }
 
-  function patch(shader, { glow, rim, dissolve }) {
+  function eyeParts(shader) {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float part;\nvarying float vPart;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPart = part;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vPart;')
+      .replace('#include <opaque_fragment>', `outgoingLight = mix(outgoingLight, diffuseColor.rgb * max(lightLevel, shadowBand.y) * mix(1.0, ${EYES.glint.toFixed(2)}, step(1.5, vPart)), step(0.5, vPart));
+#include <opaque_fragment>`);
+  }
+
+  function patch(shader, { glow, rim, dissolve, eyes }) {
     Object.assign(shader.uniforms, shared, { glow: glow ?? { value: 0 }, rimOn: { value: rim ? 1 : 0 } });
     if (dissolve) crumble(shader, dissolve);
     shader.fragmentShader = shader.fragmentShader
@@ -49,15 +60,16 @@ outgoingLight += diffuseColor.rgb * glow;
 float upward = clamp(dot(normalize(normal), normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz)), 0.0, 1.0);
 outgoingLight = outgoingLight * (1.0 - wet * 0.26) + rimColor * wet * upward * pow(facing, 2.0) * 0.1;
 #include <opaque_fragment>`);
+    if (eyes) eyeParts(shader);
   }
 
   return {
     shared, gradient,
-    material(color, { vertexColors = false, glow, rim = true, side, transparent = false, opacity = 1, dissolve } = {}) {
+    material(color, { vertexColors = false, glow, rim = true, side, transparent = false, opacity = 1, dissolve, eyes = false } = {}) {
       const material = new MeshToonMaterial({ color, gradientMap: gradient, vertexColors, transparent, opacity });
       if (side !== undefined) material.side = side;
-      material.onBeforeCompile = shader => patch(shader, { glow, rim, dissolve });
-      material.customProgramCacheKey = () => dissolve ? 'wilds-painterly-dissolve' : 'wilds-painterly';
+      material.onBeforeCompile = shader => patch(shader, { glow, rim, dissolve, eyes });
+      material.customProgramCacheKey = () => `${dissolve ? 'wilds-painterly-dissolve' : 'wilds-painterly'}${eyes ? '-eyes' : ''}`;
       materials.add(material);
       return material;
     },
