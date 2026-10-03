@@ -33,7 +33,7 @@ console.log(JSON.stringify({ ATTACKS, BLADE, CHARGE_TIME, CLIMB, DODGE, GLIDE, G
 ATTACKS, BLADE, GAITS, MOVE, DODGE, VITALS, CLIMB, SWIM, GLIDE = (TABLES[k] for k in ('ATTACKS', 'BLADE', 'GAITS', 'MOVE', 'DODGE', 'VITALS', 'CLIMB', 'SWIM', 'GLIDE'))
 
 SLOT = {'fixed': 0, 'skin': 1, 'hair': 2, 'top': 3, 'topShade': 4, 'topTrim': 5, 'bottom': 6, 'bottomTrim': 7, 'cape': 8, 'capeTrim': 9, 'glint': 10, 'eye': 11}
-HAIR = {'locks': 22, 'width': 0.05, 'groove': 0.55, 'sheen': 0.45, 'ring': 0.7, 'cap': 0.72, 'lift': 0.036, 'thick': 0.65}
+HAIR = {'locks': 22, 'width': 0.05, 'groove': 0.55, 'sheen': 0.45, 'ring': 0.7, 'cap': 0.72, 'under': 0.48, 'flare': 0.07, 'lift': 0.036, 'thick': 0.65}
 CREASE = {'reach': 0.045, 'rays': 32, 'depth': 0.55, 'tint': (0.85, 1.0, 1.1), 'skip': (SLOT['glint'], SLOT['eye'])}
 EYE = {'x': 0.047, 'z': 1.312, 'wide': 0.024, 'tall': 0.025, 'low': 0.78}
 TONE = {name: srgb(code) for name, code in {
@@ -810,6 +810,11 @@ def hair_colour(p, a):
     return (v, v, v, SLOT['hair'] / 16)
 
 
+def under_colour(p, a):
+    v = HAIR['under'] + 0.04 * math.sin(p.x * 140 + p.z * 40) * math.sin(p.z * 90)
+    return (v, v, v, SLOT['hair'] / 16)
+
+
 def lock_colour(p, a):
     v = 0.9 * (1.0 - HAIR['groove'] * abs(a[2]) ** 2.5) + sheen(p) * (1.0 - a[2] ** 2)
     return (v, v, v, SLOT['hair'] / 16)
@@ -823,7 +828,7 @@ def crown_locks(model, style):
         rear = smooth((abs(phi - 180) - 90) / -60)
         reach = end * (1 - rear) + back * rear
         sway = 7 * math.sin(k * 2.3)
-        path = surface_path([(0, 10), (0.5, reach * 0.62), (1, reach)], [(0, phi * 0.6 + 72), (0.5, phi + sway * 0.5), (1, phi + sway)], [(0, 0.018), (0.55, HAIR['lift'] * (0.62 + 0.38 * (k % 2))), (1, HAIR['lift'] * 0.8)], 10)
+        path = surface_path([(0, 10), (0.5, reach * 0.62), (1, reach)], [(0, phi * 0.6 + 72), (0.5, phi + sway * 0.5), (1, phi + sway)], [(0, 0.018), (0.55, HAIR['lift'] * (0.62 + 0.38 * (k % 2))), (0.8, HAIR['lift'] * 1.1), (1, HAIR['flare'])], 10)
         widths = [HAIR['width'] * (0.55 + 0.45 * smooth(i / 3)) * (1 - 0.95 * smooth((i - 5) / 5)) + 0.001 for i in range(len(path))]
         model.add(ribbon(path, widths, HAIR['thick']), lock_colour, rigid('head'))
 
@@ -837,7 +842,7 @@ def direction(theta, phi):
 
 def hair(model, style):
     head_w = rigid('head')
-    model.add(hair_cap(style), hair_colour, head_w)
+    model.add(hair_cap(style), under_colour, head_w)
     crown_locks(model, style)
     fringe = [(-66, 0.032, -6), (-48, 0.04, -8), (-30, 0.046, -9), (-12, 0.048, -5), (6, 0.048, 3), (24, 0.046, 7), (42, 0.044, 9), (58, 0.038, 8), (72, 0.03, 5)]
     for phi, width, sway in fringe:
