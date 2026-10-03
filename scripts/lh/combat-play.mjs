@@ -6,7 +6,7 @@ import { views } from './steps.mjs';
 import { fightInput, movementInput, steeringKeys } from './flows/wilds.mjs';
 
 const D = 'window.__littleHours.wilds.diagnostics()';
-const snapshot = app => app.js(`(() => { const d = ${D}; return { player: d.player, combat: d.combat, events: d.eventHistory, cameraYaw: d.cameraYaw, elapsedMs: d.elapsedMs, avatar: d.avatar, frozen: window.__lhFrozenAt != null, hud: { health: document.querySelector('.wilds-health progress')?.value, boss: document.querySelector('.wilds-boss-health')?.value, pet: document.querySelector('.wilds-pet-health')?.value, notice: document.querySelector('.wilds-notice')?.textContent, locked: !document.querySelector('.wilds-target')?.hidden } }; })()`);
+const snapshot = app => app.js(`(() => { const d = ${D}; return { player: d.player, combat: d.combat, events: d.eventHistory, cameraYaw: d.cameraYaw, elapsedMs: d.elapsedMs, avatar: d.avatar, frozen: window.__lhFrozenAt != null, hud: { health: document.querySelector('.wilds-health progress')?.value, boss: document.querySelector('.wilds-boss-health')?.value, pet: document.querySelector('.wilds-pet-health')?.value, skill: document.querySelector('.wilds-pet-skill')?.textContent, notice: document.querySelector('.wilds-notice')?.textContent, locked: !document.querySelector('.wilds-target')?.hidden } }; })()`);
 async function tap(app, code) {
   try { await dispatchSequenceInput(app, { type: 'keyDown', code }); }
   finally { await dispatchSequenceInput(app, { type: 'keyUp', code }); }
@@ -20,7 +20,7 @@ export default {
     mkdirSync(folder, { recursive: true });
     await app.clickSel('#wilds-leave');
     const samples = [], events = new Map(), move = movementInput(app);
-    let entered, end, walked = false, firstWalked = false, fightBegan = null, retried = false, returned = false, resetClean = null;
+    let entered, end, retryState = null, walked = false, firstWalked = false, fightBegan = null, retried = false, returned = false, resetClean = null;
     const capture = await captureSequence(app, { durationMs: 120000, events: [] }, folder, { drive: async () => {
       await app.clickSel('#wilds-enter');
       await app.waitFor('window.__littleHours.wilds.ready()');
@@ -38,6 +38,7 @@ export default {
           if (died && !retried) {
             if (style !== 'death-retry') break;
             retried = true; walked = false; fightBegan = null;
+            retryState = sample;
             resetClean = !state.combat.targetId && state.combat.boss.health === 420 && state.player.health === state.player.maxHealth && !state.combat.playerAction;
           }
           if (!walked) {
@@ -66,7 +67,10 @@ export default {
             if (style === 'circle' && styleMs < 12000) input.keys = ['KeyD'];
             if (style === 'idle' && styleMs < 14000) { input.keys = []; input.actions = styleMs < 200 ? ['KeyR'] : []; }
             if (style === 'pet-alone') { input.actions = input.actions.filter(code => code !== 'KeyF'); if (gap > 9 && !['charge', 'telegraph'].includes(boss.mode)) input.keys = []; }
-            if (style === 'death-retry' && !retried) { input.keys = steeringKeys(player.position, boss.position, state.cameraYaw, 2); input.actions = ['KeyR']; }
+            if (style === 'death-retry' && !retried) {
+              input.keys = steeringKeys(player.position, boss.position, state.cameraYaw, 2);
+              input.actions = player.health <= 26 ? [...(state.combat.targetId ? [] : ['Tab']), ...(state.combat.pet.health && state.combat.pet.mode !== 'fight' ? ['KeyT'] : []), ...(state.combat.pet.health && state.combat.pet.skillReadyAt <= state.elapsedMs ? ['KeyQ'] : [])] : ['KeyR'];
+            }
             if (style === 'pointer' && input.actions.includes('KeyF')) {
               input.actions = input.actions.filter(code => code !== 'KeyF');
               await dispatchSequenceInput(app, { type: 'mousePressed', x: 480, y: 320, button: 'left', buttons: 1 });
@@ -83,13 +87,18 @@ export default {
       samples.push({ realMs: performance.now() - began, ...end });
       for (const event of end.events) events.set(JSON.stringify(event), event);
     } });
-    writeFileSync(join(folder, 'combat.json'), JSON.stringify({ style, theme, entered, end, walked: firstWalked, retried, returned, resetClean, events: [...events.values()], samples }, null, 2));
+    writeFileSync(join(folder, 'combat.json'), JSON.stringify({ style, theme, entered, end, retryState, walked: firstWalked, retried, returned, resetClean, events: [...events.values()], samples }, null, 2));
     const damage = source => [...events.values()].filter(event => event.type === 'damage' && event.targetId === end.combat.boss.id && event.sourceId === source).reduce((sum, event) => sum + event.amount, 0);
     t.check('Enter Wilds begins at camp and real keys reach the arena', Math.hypot(entered.player.position.x + 106.5, entered.player.position.z + 180) < .1 && firstWalked);
     t.check('the advancing-clock fight is captured from entry through the result', capture.frames.length > 100 && end.elapsedMs > entered.elapsedMs + 5000 && capture.recording?.events.some(event => event.code === 'KeyW'));
     t.check('player and companion both land attacks during actual play', (style === 'pet-alone' || damage('player') > 0) && damage(end.combat.pet.id) > 0, { player: damage('player'), pet: damage(end.combat.pet.id) });
     t.check('the whole fight reaches victory with only the intended retry', end.combat.boss.mode === 'defeated' && (style === 'death-retry' ? retried && resetClean : ![...events.values()].some(event => event.type === 'player-defeated')), { boss: end.combat.boss.health, health: end.player.health });
     t.check('HUD meters follow every sampled combat state', samples.every(sample => sample.hud.health === sample.player.health && sample.hud.boss === sample.combat.boss.health && sample.hud.pet === sample.combat.pet.health));
+    if (style === 'death-retry') {
+      const diedAt = [...events.values()].find(event => event.type === 'player-defeated')?.at;
+      const usedBeforeDeath = [...events.values()].some(event => event.type === 'pet-skill' && event.at < diedAt && event.at + entered.combat.pet.cooldownMs > diedAt);
+      t.check('death clears a pet skill cooldown from the failed attempt', usedBeforeDeath && retryState?.combat.pet.skillReadyAt <= retryState?.elapsedMs && /ready/.test(retryState?.hud.skill || ''), { usedBeforeDeath, skillReadyAt: retryState?.combat.pet.skillReadyAt, elapsedMs: retryState?.elapsedMs, skill: retryState?.hud.skill });
+    }
     if (style === 'leave-return') t.check('leaving mid-fight and entering resets the encounter', returned && resetClean);
     console.log(`Combat recording: ${folder}`);
     await t.close(app);

@@ -8,6 +8,7 @@ Goal 3 baseline: `6bc8a8f` plus the existing uncommitted player import. No owner
 - **C2 — Fixed and tested: pet skill damages at a distance before contact.** Lock and press Q while the pet approaches the first charge. At combat time 7857 ms, skill damage and skill start share a timestamp while the pet is several metres from the Warden. Ordinary pet attacks also resolve at their start, before any windup. Pet strikes now wait for a data-defined contact time and recheck range/obstruction. Distant skill commands queue an approach; recall cancels contact. The HUD acknowledges a queued skill immediately; its regression failed before the text/state fix and now passes.
 - **C3 — Fixed and tested: landed hits have no hit-stop.** In the repeated attacks at 18–21 seconds, neither movement nor action time pauses on damage. Every damage event now requests a short pause. The scene pauses simulation/action time while keeping camera input responsive and buffering commands; both event and scene regressions failed before the fix and now pass.
 - **C4 — Fixed: attack timing and reach are scattered.** Sword timings, sword reach, pet skill reach, pet attack reach and Warden charge collision live in separate rules. `src/core/wilds/attacks.js` now owns attack timing/reach in one row per attack. Current values still need alignment with the eventual authored clips.
+- **C5 — Fixed, tested and replayed: death retains the pet's skill cooldown.** Enter, walk to the Warden, recall the pet and allow the Warden to lower player health to 26. Lock, command the pet and use its skill, then take the next fatal attacks without dodging. In the real-input run `2026-10-03T00-48-55-run`, the skill started at 23872 ms and death reset the encounter at 33721 ms, but the pet's skill deadline stayed 37872 ms. The player and pet were healed at camp while the HUD still showed a cooldown from the failed attempt. The strengthened retry check failed, and the unit regression failed with “Pet skill · 14s” after respawn. Respawn now clears skill, attack and recovery timers; the unit regression passes. The stronger real-input replay also passes: at 33317 ms the pet follows at camp with skillReadyAt 0 and “Q · Pet skill ready” in the actual HUD. The old retry scenario never used a skill before death and missed this case.
 
 ## For the look agent
 
@@ -17,7 +18,7 @@ Goal 3 baseline: `6bc8a8f` plus the existing uncommitted player import. No owner
 
 ## Acceptance
 
-Consecutive fights with every checklist line true: **0 / 10**. Ten consecutive real-input scenarios on combat build `b6be476` reached victory and passed their mechanical assertions, but L1–L3 remain visible. This is not ten bug-free fights and Goal 3 is not complete. No blind picture judge has been used because no visual piece has been built and static images cannot certify contact timing.
+Consecutive fights with every checklist line true: **0 / 10**. After the C5 fix, ten fresh consecutive real-input scenarios reached victory and passed 92 checks, including use of a pet skill before death. L1–L3 remain visible. This is not ten bug-free fights and Goal 3 is not complete. No blind picture judge has been used because no visual piece has been built and static images cannot certify contact timing.
 
 ## Separation checkpoint
 
@@ -37,7 +38,7 @@ Performance preparation supports `LH_REAL_FIGHT=1`, which records Enter Wilds, w
 
 The first performance comparison included a 53 fps working-tree sample overlapping capture compression; the other working-tree sample held 60 fps. A fresh isolated comparison measured 60 fps on both sides, no frame gaps over 20 ms, 3.5 ms GPU time for the working tree versus 3.7 ms for the baseline. Both reports are retained under the external progress-shots/performance folder.
 
-## Ten-scenario checkpoint
+## Ten-scenario checkpoint before C5
 
 The completed batch is `wilds-assets/progress-shots/2026-10-03T00-25-47-run/`; each `wilds-combat-<style>` directory contains the original video, frames, input timestamps and combat state record. Review sheets and players are in the sibling `2026-10-03T00-25-47-review/` directory. Every sheet across every run was inspected at one-second intervals including the actual final frame. This sampled visual review does not establish 100 ms feedback or frame-accurate contact. Full recordings remain available.
 
@@ -66,9 +67,30 @@ All sampled HUD meters matched state. Every recorded damage timestamp has a corr
 | 6. Pet attacks visibly connect without blocking | No: L3; contact rules are tested, but visible paw contact is absent. |
 | 7. Nothing gets stuck, including camera | No: movement completed every route, but L2 still obstructs the camera. |
 | 8. HUD matches events | Yes in the observed runs and sampled state checks. |
-| 9. Death, retry and victory reset cleanly | Yes in the recorded retries and victories. |
+| 9. Death, retry and victory reset cleanly | The original check missed C5. After the fix, the strengthened skill-use-before-death replay passes, including the camp HUD. |
 | 10. Leaving and returning starts clean | Yes in both recorded re-entry runs. |
 
-Current gates: **907/907 unit tests, guard, verify:room, build and 91/91 Wilds checks passed**. The isolated comparative fight held 60 fps. Review tooling now includes the last frame and can reference the original external video without redundant encoding. No additional gameplay change was made during this batch.
+Pre-C5 gates: **907/907 unit tests, guard, verify:room, build and 91/91 Wilds checks passed**. The isolated comparative fight held 60 fps. Review tooling now includes the last frame and can reference the original external video without redundant encoding. No additional gameplay change was made during this batch.
 
 What still feels wrong: combat remains a sliding capsule beside rigid bodies, with much of close combat hidden by stones. The scoped rule fixes cannot make blade contact, roll protection or lock framing meet the requested bar. L1–L3 require the look agent's files; they remain open instead of being treated as test passes. Further checkpoints stay in this owned file under the owner's latest scope restriction.
+
+## Retry cooldown follow-up
+
+The C5 reproduction recording and its complete set of sampled review sheets are retained outside Git under `2026-10-03T00-48-55-run/` and `2026-10-03T00-48-55-review/`. The camp HUD visibly counts down after death at 35–38 seconds. The replay controller now issues a pet skill late in the fatal attempt and saves the first observed respawn state, including the actual HUD skill text.
+
+With the timer reset, **908/908 unit tests, guard, build, verify:room and 92/92 Wilds checks pass**. The fresh ten-scenario batch is retained under `2026-10-03T00-54-17-run/`, beginning with the strengthened death/retry case. Every one-second review sheet and final frame was inspected across all ten runs; the 41 sheets, original-video players, copied test report and acceptance record are in `2026-10-03T00-54-17-review/`. This remains sampled review, not a claim that every video frame was watched.
+
+| Order | Style | Light | Capture length | Mechanical result |
+| --- | --- | --- | --- | --- |
+| 1 | Death and retry | Rain | 61.33 s | Skill used before one intentional death; ready at camp; victory after retry |
+| 2 | Balanced | Day | 28.50 s | Victory |
+| 3 | Rush | Dusk | 31.07 s | Victory |
+| 4 | Back off | Rain | 54.90 s | Victory after disengaging and returning |
+| 5 | Circle | Day | 29.62 s | Victory |
+| 6 | Late dodge | Dusk | 28.40 s | Victory |
+| 7 | Mash attack | Rain | 29.07 s | Victory |
+| 8 | Initially idle | Day | 43.70 s | Victory after 14 seconds of inactivity |
+| 9 | Pet alone | Dusk | 76.36 s | Victory without a player strike; pet recovered from knockout |
+| 10 | Leave and return | Rain | 39.24 s | Clean re-entry, then victory |
+
+Every sampled health meter agreed with combat state and every recorded damage timestamp had a hit-stop event. The first retry sample showed full player/pet health, no lock, no active player action and no pet skill cooldown. No new combat-rule failure appeared in this batch. Full visual acceptance remains **0/10** because L1–L3 persist; the next complete acceptance run needs the look agent's animation and camera changes. No files outside Goal 3 ownership were changed for this follow-up.

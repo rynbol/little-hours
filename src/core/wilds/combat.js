@@ -330,6 +330,7 @@ function respawn(state, world, now, events) {
   state.pet.health = state.pet.maxHealth; state.pet.mode = 'follow'; state.pet.targetId = null;
   state.pet.position = { ...state.player.position, x: state.player.position.x + 1 }; state.pet.action = 'recover'; state.pet.actionStartedAt = now;
   state.pet.contact = null; state.pet.skillQueued = false;
+  state.pet.skillReadyAt = 0; state.pet.nextAttackAt = 0; state.pet.recoverAt = 0;
   events.push({ type: 'player-defeated', at: now });
 }
 
