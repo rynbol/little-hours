@@ -67,20 +67,25 @@ export function tuftGeometry() {
   return geometry;
 }
 
-export function swayTufts(material, wind, far) {
+export function swayTufts(material, wind, far, feet) {
   material.side = DoubleSide;
   const before = material.onBeforeCompile;
   material.onBeforeCompile = shader => {
     before?.(shader);
     shader.uniforms.windTime = wind;
     shader.uniforms.fadeFar = { value: far };
+    shader.uniforms.feet = feet;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float lift;\nuniform float windTime;\nuniform float fadeFar;')
+      .replace('#include <common>', '#include <common>\nattribute float lift;\nuniform float windTime;\nuniform float fadeFar;\nuniform vec4 feet;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vec3 rootAt = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 float gust = sin(windTime * 1.7 + rootAt.x * 0.31 + rootAt.z * 0.17) * 0.6 + sin(windTime * 3.1 + rootAt.x * 0.9) * 0.25;
 transformed += inverse(mat3(instanceMatrix)) * vec3(gust * 0.07, 0.0, gust * 0.035) * lift * lift;
-transformed *= 1.0 - smoothstep(fadeFar * 0.6, fadeFar, distance(rootAt.xz, cameraPosition.xz));`);
+vec2 fromPlayer = rootAt.xz - feet.xy, fromPet = rootAt.xz - feet.zw;
+vec2 parted = fromPlayer / max(length(fromPlayer), 0.05) * (1.0 - smoothstep(0.15, 0.8, length(fromPlayer))) + fromPet / max(length(fromPet), 0.05) * (1.0 - smoothstep(0.1, 0.55, length(fromPet)));
+transformed += inverse(mat3(instanceMatrix)) * vec3(parted.x * 0.2, -length(parted) * 0.1, parted.y * 0.2) * lift;
+vColor.rgb *= 1.0 + max(gust, 0.0) * 0.2 * lift;
+transformed *= (1.0 - smoothstep(fadeFar * 0.6, fadeFar, distance(rootAt.xz, cameraPosition.xz))) * smoothstep(0.7, 1.8, distance(rootAt, cameraPosition));`);
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(vNormal);');
   };
   material.customProgramCacheKey = () => 'wilds-tufts';

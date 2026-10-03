@@ -184,6 +184,31 @@ function observatory(layout, ground) {
   return parts;
 }
 
+function seaStack(layout, ground) {
+  const { pillar: p } = layout, parts = [], bottom = ground(p.x + p.radius + 1.4, p.z) - 0.4, lip = p.top - 0.03;
+  let y = bottom;
+  for (let i = 0; y < lip - 0.05; i++) {
+    const height = Math.min(0.45 + Math.abs(Math.sin(i * 2.3)) * 0.7, lip - y), bulge = Math.sin(i * 1.7) * 0.16 + (i % 2 ? 0.1 : -0.06) + 0.5 * (1 - (y - bottom) / (lip - bottom)) ** 2;
+    parts.push(part(new CylinderGeometry(p.radius + 0.18 + bulge, p.radius + 0.3 + bulge, height, 8 + i % 3), [C.stone, C.stoneWarm, C.stoneDark][i % 3], { position: [p.x + Math.sin(i * 2.9) * 0.1, y + height / 2, p.z + Math.cos(i * 2.9) * 0.1], rotation: [Math.sin(i * 3.7) * 0.04, i * 0.7, Math.cos(i * 2.1) * 0.04], shade: rough(i + 20) }));
+    y += height;
+  }
+  parts.push(part(new CylinderGeometry(p.radius + 0.42, p.radius + 0.3, 0.3, 13), C.moss, { position: [p.x, lip - 0.15, p.z], shade: rough(31) }));
+  for (let i = 0; i < 12; i++) {
+    const a = i * 2.4 + 0.3, at = bottom + 0.8 + ((i * 0.37) % 1) * (lip - bottom - 1.4), size = 0.6 + (i % 3) * 0.22;
+    parts.push(part(new DodecahedronGeometry(size, 0), [C.stoneWarm, C.stone, C.stoneDark][i % 3], { position: [p.x + Math.sin(a) * (p.radius + 0.25), at, p.z + Math.cos(a) * (p.radius + 0.25)], scale: [1.5, 0.55, 0.8], rotation: [0, a + Math.PI / 2, Math.sin(i) * 0.2], shade: rough(i + 50) }));
+  }
+  for (let i = 0; i < 16; i++) {
+    const a = i * 2.4, length = 0.9 + (i * 0.61) % 1.6, sx = p.x + Math.sin(a) * (p.radius + 0.36), sz = p.z + Math.cos(a) * (p.radius + 0.36);
+    if (i % 2) parts.push(part(new SphereGeometry(0.3, 6, 4), i % 4 === 1 ? C.mossDark : C.moss, { position: [sx, lip - 0.2 - length * 0.15, sz], scale: [1.3, 0.8 + length * 0.35, 0.3], rotation: [0, a, 0] }));
+    else parts.push(rod([sx, lip - 0.1, sz], [sx + Math.sin(a) * 0.12, lip - 0.1 - length * 1.6, sz + Math.cos(a) * 0.12], 0.035, C.bark, 4));
+  }
+  for (let i = 0; i < 7; i++) {
+    const a = i * 0.9 + 0.4, reach = p.radius + 0.7 + (i % 3) * 0.45, bx = p.x + Math.sin(a) * reach, bz = p.z + Math.cos(a) * reach, size = 0.45 + (i % 4) * 0.18;
+    parts.push(part(new DodecahedronGeometry(size, 0), i % 2 ? C.stoneDark : C.stone, { position: [bx, ground(bx, bz) + size * 0.25, bz], scale: [1.2, 0.7, 1], rotation: [i, i * 1.3, 0], shade: rough(i + 40) }));
+  }
+  return parts;
+}
+
 function lakeside(layout, ground) {
   const { islet, rocks } = layout, parts = [], iy = ground(islet.x, islet.z);
   parts.push(part(new DodecahedronGeometry(1.1, 0), C.stoneDark, { position: [islet.x - 1.6, iy + 0.2, islet.z + 1.2], scale: [1.3, 0.6, 1], rotation: [1, 2, 0] }));
@@ -197,7 +222,7 @@ export function buildLandmarks(layout, ground, painterly) {
   const root = new Group(), material = painterly.material('#ffffff', { vertexColors: true });
   root.name = 'wilds-landmarks';
   const campParts = camp(layout, ground), oak = greatOak(layout, ground);
-  const statics = new Mesh(merge([...campParts.parts, ...merchant(layout, ground), ...oak.parts, ...hollowLog(layout), ...stoneBridge(layout, ground), ...shrine(layout, ground), ...tower(layout, ground), ...lakeside(layout, ground)]), material);
+  const statics = new Mesh(merge([...campParts.parts, ...merchant(layout, ground), ...oak.parts, ...hollowLog(layout), ...stoneBridge(layout, ground), ...shrine(layout, ground), ...tower(layout, ground), ...seaStack(layout, ground), ...lakeside(layout, ground)]), material);
   statics.castShadow = true; statics.receiveShadow = true; statics.name = 'wilds-landmark-statics';
   const far = new Mesh(merge(observatory(layout, ground)), material);
   far.name = 'wilds-observatory';

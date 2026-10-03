@@ -1,4 +1,4 @@
-import { Color, Group, InstancedMesh, Matrix4, Quaternion, Sphere, Vector3 } from 'three';
+import { Color, Group, InstancedMesh, Matrix4, Quaternion, Sphere, Vector3, Vector4 } from 'three';
 import { fbm, noise2, smooth } from '../../core/world-terrain.js';
 import { groundColour, swayTufts, tuftGeometry } from './terrain.js';
 
@@ -17,7 +17,8 @@ export function grassSpots(cx, cz, keep) {
 
 export function buildGrass(ground, material, { keep, wind }) {
   const { chunk, reach } = GRASS, side = reach * 2 + 1, capacity = Math.ceil(chunk / GRASS.spacing) ** 2;
-  swayTufts(material, wind, (reach + 0.5) * chunk);
+  const feet = { value: new Vector4(1e5, 1e5, 1e5, 1e5) };
+  swayTufts(material, wind, (reach + 0.5) * chunk, feet);
   const geometry = tuftGeometry(), root = new Group(), cache = new Map(), queue = [];
   const matrix = new Matrix4(), turn = new Quaternion(), up = new Vector3(0, 1, 0), at = new Vector3(), size = new Vector3(), colour = new Color();
   root.name = 'wilds-grass';
@@ -50,6 +51,7 @@ export function buildGrass(ground, material, { keep, wind }) {
 
   return {
     root,
+    tread(x, z, petX, petZ) { feet.value.set(x, z, petX, petZ); },
     get chunks() { return slots.filter(slot => slot.key).length; },
     get tufts() { return slots.reduce((sum, slot) => sum + slot.mesh.count, 0); },
     update(x, z, budget = GRASS.fills) {

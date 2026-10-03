@@ -402,6 +402,8 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     life.update({ player, hour: sim.hour, light, seconds, dt, still, ground, water: waterAt, flow: valleyFlow, eye: camera.position });
     mist.update(life.amounts.mist, light);
     grass.update(player.x, player.z, dt > 0 ? GRASS.fills : Infinity);
+    const away = 1e5, petLow = sim.pet.y - ground(sim.pet.x, sim.pet.z) < 0.4;
+    grass.tread(player.grounded ? player.x : away, player.grounded ? player.z : away, petLow ? sim.pet.x : away, petLow ? sim.pet.z : away);
     focus.set(player.x, player.y, player.z);
     const a = snap(focus.dot(lightRight)), b = snap(focus.dot(lightUp)), c = focus.dot(light.toward);
     sun.target.position.set(0, 0, 0).addScaledVector(lightRight, a).addScaledVector(lightUp, b).addScaledVector(light.toward, c);
