@@ -1,6 +1,7 @@
-import { BufferAttribute, BufferGeometry, Color, HalfFloatType, Mesh, OrthographicCamera, ShaderMaterial, Vector2, Vector3, WebGLRenderTarget } from 'three';
+import { BufferAttribute, BufferGeometry, Color, DepthTexture, HalfFloatType, MathUtils, Matrix4, Mesh, OrthographicCamera, ShaderMaterial, Vector2, Vector3, WebGLRenderTarget } from 'three';
 
 export const POST = Object.freeze({ samples: 4, shrink: 4, threshold: 1.5, bloom: 0.2, shafts: 0.42, rays: 36, reach: 0.55, vignette: 0.26, moonlit: 0.45 });
+export const AERIAL = Object.freeze({ density: 0.0018, falloff: 0.008, floor: -10, start: 40, strength: 1, bright: 0.9, blue: 0.8, lowSun: 0.12, highSun: 0.4, sunward: 0.55, tint: '#9db8de' });
 
 const SCREEN = `varying vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -39,7 +40,17 @@ void main() {
   gl_FragColor = vec4(vec3(total / ${POST.rays.toFixed(1)}), 1.0);
 }`;
 
-const FINAL = `uniform sampler2D scene; uniform sampler2D bloom; uniform sampler2D shafts; uniform float exposure; uniform float bloomStrength; uniform vec3 shaftColour; uniform vec3 lift; uniform vec3 gain; uniform float saturation; uniform float vignette; uniform float moonlit; varying vec2 vUv;
+const FINAL = `uniform sampler2D scene; uniform sampler2D bloom; uniform sampler2D shafts; uniform float exposure; uniform float bloomStrength; uniform vec3 shaftColour; uniform vec3 lift; uniform vec3 gain; uniform float saturation; uniform float vignette; uniform float moonlit; uniform sampler2D depth; uniform mat4 unproject; uniform mat4 toWorld; uniform vec3 eye; uniform vec3 hazeColour; uniform vec3 hazeSun; uniform vec3 sunDirection; uniform float hazeStrength; uniform float hazeDensity; varying vec2 vUv;
+vec3 aerial(vec3 colour, float alpha) {
+  float d = texture2D(depth, vUv).r;
+  vec4 view = unproject * vec4(vUv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+  vec3 ray = (toWorld * vec4(view.xyz / view.w, 1.0)).xyz - eye;
+  float dist = length(ray), rise = ray.y * ${AERIAL.falloff};
+  float column = abs(rise) > 0.001 ? (1.0 - exp(-rise)) / rise : 1.0;
+  float amount = 1.0 - exp(-hazeDensity * exp(-(eye.y - ${AERIAL.floor.toFixed(1)}) * ${AERIAL.falloff}) * max(dist - ${AERIAL.start.toFixed(1)}, 0.0) * column);
+  vec3 tint = mix(hazeColour, hazeSun, pow(max(dot(ray / max(dist, 0.001), sunDirection), 0.0), 6.0) * ${AERIAL.sunward});
+  return mix(colour, tint, amount * hazeStrength * step(0.5, alpha));
+}
 vec3 fit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
 vec3 aces(vec3 colour) {
   const mat3 into = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
@@ -48,6 +59,7 @@ vec3 aces(vec3 colour) {
 }
 void main() {
   vec4 source = texture2D(scene, vUv);
+  source.rgb = aerial(source.rgb, source.a);
   vec3 colour = mix(source.rgb, aces(source.rgb), clamp(source.a, 0.0, 1.0));
   colour += texture2D(bloom, vUv).rgb * bloomStrength + texture2D(shafts, vUv).r * shaftColour;
   colour = lift + colour * (gain - lift);
@@ -61,7 +73,7 @@ void main() {
 }`;
 
 export function createPost(renderer) {
-  const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: POST.samples });
+  const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: POST.samples, depthTexture: new DepthTexture(1, 1) });
   const small = () => new WebGLRenderTarget(1, 1, { type: HalfFloatType, depthBuffer: false });
   const bright = small(), blurred = small(), rays = small();
   const geometry = new BufferGeometry();
@@ -76,9 +88,10 @@ export function createPost(renderer) {
   const finalPass = pass(FINAL, {
     scene: { value: target.texture }, bloom: { value: bright.texture }, shafts: { value: rays.texture }, exposure: { value: 1 }, bloomStrength: { value: POST.bloom },
     shaftColour: { value: new Color() }, lift: { value: new Color(0, 0, 0) }, gain: { value: new Color(1, 1, 1) }, saturation: { value: 1 }, vignette: { value: POST.vignette }, moonlit: { value: 0 },
+    depth: { value: target.depthTexture }, unproject: { value: new Matrix4() }, toWorld: { value: new Matrix4() }, eye: { value: new Vector3() }, hazeColour: { value: new Color() }, hazeSun: { value: new Color() }, sunDirection: { value: new Vector3() }, hazeStrength: { value: AERIAL.strength }, hazeDensity: { value: AERIAL.density },
   });
   const passes = [brightPass, blurPass, shaftPass, finalPass];
-  const projected = new Vector3(), white = new Color(1, 1, 1);
+  const projected = new Vector3(), white = new Color(1, 1, 1), blue = new Color(AERIAL.tint);
   let shaftsOn = false;
 
   function draw(material, output) {
@@ -108,6 +121,12 @@ export function createPost(renderer) {
       finalPass.uniforms.lift.value.copy(light.fog).multiplyScalar(0.03);
       finalPass.uniforms.saturation.value = 1.08 - light.cloud * 0.22 - light.night * 0.1;
       finalPass.uniforms.moonlit.value = light.night * POST.moonlit;
+      const { unproject, toWorld, eye, hazeColour, hazeSun, sunDirection, hazeStrength, hazeDensity } = finalPass.uniforms;
+      camera3d.updateMatrixWorld();
+      unproject.value.copy(camera3d.projectionMatrixInverse); toWorld.value.copy(camera3d.matrixWorld); eye.value.setFromMatrixPosition(camera3d.matrixWorld);
+      hazeColour.value.copy(light.fog).lerp(blue, AERIAL.blue * (1 - light.night) * MathUtils.smoothstep(light.sun.y, AERIAL.lowSun, AERIAL.highSun)).multiplyScalar(AERIAL.bright);
+      hazeSun.value.copy(light.glow).multiplyScalar(AERIAL.bright); sunDirection.value.copy(light.sun);
+      hazeStrength.value = AERIAL.strength * (1 - light.night * 0.6); hazeDensity.value = AERIAL.density * light.haze;
     },
     render(scene, camera3d) {
       renderer.setRenderTarget(target);

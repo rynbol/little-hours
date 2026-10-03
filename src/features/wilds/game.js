@@ -38,7 +38,7 @@ import { createInput } from './input.js';
 import { createSound } from './sound.js';
 import { createHud } from './hud.js';
 
-export const VIEW = Object.freeze({ ratio: 1.5, step: 1 / 120, longest: 0.1, shadow: 2048, shadowHalf: 18, haze: 0.00085, far: 3200, frames: 240, zoomStep: 0.35, tree: 140 });
+export const VIEW = Object.freeze({ ratio: 1.5, step: 1 / 120, longest: 0.1, shadow: 2048, shadowHalf: 18, haze: 0.00035, far: 3200, frames: 240, zoomStep: 0.35, tree: 140 });
 const SHEETS = Object.freeze([Object.freeze({ lip: [-86.9, 46.2], land: [-84.8, 24.6], z: VALLEY.falls.z, width: 6, bulge: 0.3 }), Object.freeze({ lip: [-75.2, 25.1], land: [-72.6, 1.3], z: VALLEY.falls.z, width: 8, bulge: 0.5 })]);
 const RESPONSES = Object.freeze({
   move: player => Math.hypot(player.vx, player.vz) > 0,
