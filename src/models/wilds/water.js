@@ -10,7 +10,7 @@ function lakeMaterial() {
     transparent: true, depthWrite: false, fog: true,
     uniforms: UniformsUtils.merge([UniformsLib.fog, {
       shallow: { value: new Color(WATER_LOOK.shallow) }, deep: { value: new Color(WATER_LOOK.deep) }, foam: { value: new Color(WATER_LOOK.foam) },
-      skyTint: { value: new Color(WATER_LOOK.sky) }, sparkle: { value: new Color(WATER_LOOK.sparkle) }, sunDirection: { value: new Vector3(0, 1, 0) }, time: { value: 0 }, light: { value: 1 },
+      skyTint: { value: new Color(WATER_LOOK.sky) }, sparkle: { value: new Color(WATER_LOOK.sparkle) }, sunDirection: { value: new Vector3(0, 1, 0) }, time: { value: 0 }, light: { value: 1 }, rain: { value: 0 },
     }]),
     vertexShader: `attribute float depth; attribute vec2 flow; varying float vDepth; varying vec2 vFlow; varying vec3 vWorld;
 #include <fog_pars_vertex>
@@ -21,7 +21,7 @@ void main() {
   gl_Position = projectionMatrix * mvPosition;
   #include <fog_vertex>
 }`,
-    fragmentShader: `uniform vec3 shallow; uniform vec3 deep; uniform vec3 foam; uniform vec3 skyTint; uniform vec3 sparkle; uniform vec3 sunDirection; uniform float time; uniform float light;
+    fragmentShader: `uniform vec3 shallow; uniform vec3 deep; uniform vec3 foam; uniform vec3 skyTint; uniform vec3 sparkle; uniform vec3 sunDirection; uniform float time; uniform float light; uniform float rain;
 varying float vDepth; varying vec2 vFlow; varying vec3 vWorld;
 #include <fog_pars_fragment>
 ${NOISE}
@@ -36,7 +36,17 @@ void main() {
   colour = mix(colour, skyTint, fresnel * 0.4);
   colour += vec3(0.04, 0.06, 0.05) * smoothstep(0.55, 0.8, ripple);
   float glint = pow(max(dot(reflect(-view, n), sunDirection), 0.0), 180.0);
-  colour += sparkle * step(0.35, glint) * 0.9;
+  colour += sparkle * step(0.35, glint) * 0.9 * (1.0 - rain);
+  if (rain > 0.0) {
+    float rings = 0.0;
+    for (int layer = 0; layer < 2; layer++) {
+      vec2 cell = vWorld.xz * (1.1 + float(layer) * 0.7) + float(layer) * 17.3, id = floor(cell);
+      vec2 offset = fract(cell) - 0.5 - (vec2(hash(id), hash(id + 5.2)) - 0.5) * 0.5;
+      float age = fract(time * 1.3 + hash(id + 1.7)), live = step(hash(id + 8.4), rain);
+      rings += smoothstep(0.05, 0.0, abs(length(offset) - age * 0.42)) * (1.0 - age) * live;
+    }
+    colour = mix(colour, colour * 0.82 + skyTint * 0.12, rain * 0.6) + vec3(0.42, 0.47, 0.52) * rings * 0.55;
+  }
   float edge = smoothstep(0.1, 0.0, d + (noise(p * 2.3 + time * 0.4) - 0.5) * 0.08) * (0.55 + 0.45 * sin(time * 1.3 + d * 40.0 + noise(p * 0.7) * 6.0));
   float flowFoam = smoothstep(0.62, 0.8, noise(p * 1.3)) * clamp(length(vFlow) * 0.6, 0.0, 1.0);
   colour = mix(colour, foam, max(edge * 0.7, flowFoam * 0.6));
@@ -140,8 +150,9 @@ export function buildWater({ surfaces, sheets }) {
   for (const sheet of sheets) { const mesh = new Mesh(sheetGeometry(sheet), fall); mesh.renderOrder = 3; root.add(mesh); }
   return {
     root,
-    update(seconds, sun, light, still) {
+    update(seconds, sun, light, still, rain = 0) {
       if (!still) { lake.uniforms.time.value = seconds; fall.uniforms.time.value = seconds; }
+      lake.uniforms.rain.value = rain;
       lake.uniforms.sunDirection.value.copy(sun);
       lake.uniforms.light.value = light; fall.uniforms.light.value = light;
     },

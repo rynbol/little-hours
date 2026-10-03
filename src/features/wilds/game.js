@@ -28,6 +28,8 @@ import { buildRing } from '../../models/wilds/ring.js';
 import { buildStag, loadStag } from '../../models/wilds/stag.js';
 import { buildPet, loadPet } from '../../models/wilds/pet.js';
 import { buildCamp } from '../../models/wilds/camp.js';
+import { buildRain } from '../../models/wilds/rain.js';
+import { createPost } from '../../models/wilds/post.js';
 import { createInput } from './input.js';
 import { createHud } from './hud.js';
 
@@ -57,12 +59,14 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   const canvas = document.createElement('canvas');
   canvas.className = 'wilds-canvas'; canvas.tabIndex = -1;
   stage.append(canvas);
-  const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false });
+  const renderer = new WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
   const pixelRatio = Math.min(VIEW.ratio, renderRatioCeiling(window.devicePixelRatio, rendererName(renderer.getContext())));
   renderer.setPixelRatio(pixelRatio);
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
+  renderer.info.autoReset = false;
+  const post = createPost(renderer);
 
   const scene = new Scene();
   scene.fog = new FogExp2(SKY.horizon, VIEW.haze);
@@ -107,6 +111,8 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   scene.add(...effects.meshes);
   const stagView = buildStag(models.stag, sim.stag, painterly, effects);
   scene.add(stagView.root);
+  const rain = buildRain(clockRandom, skyTime);
+  scene.add(rain.mesh);
 
   const hemi = new HemisphereLight('#bcd4ea', '#6f8a4c', 1.35);
   scene.add(hemi);
@@ -124,11 +130,13 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     daylight(sim.hour, light);
     sun.color.copy(light.light); sun.intensity = light.strength;
     hemi.color.copy(light.sky); hemi.groundColor.copy(light.earth); hemi.intensity = light.fill;
-    scene.fog.color.copy(light.fog);
+    scene.fog.color.copy(light.fog); scene.fog.density = VIEW.haze * light.haze;
     renderer.toneMappingExposure = light.exposure;
+    sun.shadow.intensity = 1 - light.cloud * 0.7;
+    painterly.shared.wet.value = light.wet;
     const { uniforms } = sky.material;
     uniforms.zenith.value.copy(light.zenith); uniforms.middle.value.copy(light.middle); uniforms.horizon.value.copy(light.horizon);
-    uniforms.sunColor.value.copy(light.glow); uniforms.sunDirection.value.copy(light.sun); uniforms.moonDirection.value.copy(light.moon); uniforms.night.value = light.night;
+    uniforms.sunColor.value.copy(light.glow); uniforms.sunDirection.value.copy(light.sun); uniforms.moonDirection.value.copy(light.moon); uniforms.night.value = light.night; uniforms.cloud.value = light.cloud; uniforms.rainbow.value = light.rainbow;
     lightRight.crossVectors(light.toward, worldUp).normalize(); lightUp.crossVectors(lightRight, light.toward);
   }
   shine();
@@ -166,6 +174,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     width = w; height = h;
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
+    post.resize(Math.round(w * pixelRatio), Math.round(h * pixelRatio));
     effects.resize(h * pixelRatio, camera.fov);
   }
   const observer = new ResizeObserver(resize);
@@ -353,29 +362,32 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     segment.yaw = pivot[0]; segment.pitch = pivot[1];
     hero.update(player, dt, still);
     dummyView.update(sim.dummy, still);
-    ring.update(dt, still);
+    ring.update(dt, still, light.night);
     stagView.update(dt, still);
     petView.update(sim.pet, dt, still);
     wolfView.update(wolf, dt, still);
-    camp.update(sim.campfires, player, dt, still);
+    camp.update(sim.campfires, player, dt, still, light.night);
     secrets.update(seconds, still);
     scatter.update();
     shine();
     landmarks.update(seconds, light.night, still);
-    water.update(seconds, light.toward, 0.45 + 0.55 * (1 - light.night), still);
+    water.update(seconds, light.toward, 0.45 + 0.55 * (1 - light.night), still, light.rain);
     effects.shadow.place(player.x, ground(player.x, player.z), player.y, player.z);
     effects.step(dt, frozen ? 0 : dt);
     stepRig(rig, dt, { player, lock: lockTarget(sim), world: sim.world, still });
     camera.position.set(...rig.eye); camera.lookAt(rig.look[0], rig.look[1], rig.look[2]);
     camera.updateMatrixWorld();
     sky.position.copy(camera.position);
+    rain.update(camera.position, light.rain, light.sky);
     focus.set(player.x, player.y, player.z);
     const a = snap(focus.dot(lightRight)), b = snap(focus.dot(lightUp)), c = focus.dot(light.toward);
     sun.target.position.set(0, 0, 0).addScaledVector(lightRight, a).addScaledVector(lightUp, b).addScaledVector(light.toward, c);
     sun.position.copy(sun.target.position).addScaledVector(light.toward, 60);
     painterly.setSun(light.toward, camera);
     if (!still) { wind.value = seconds; skyTime.value = seconds; }
-    renderer.render(scene, camera);
+    post.grade(light, camera);
+    renderer.info.reset();
+    post.render(scene, camera);
     const stamina = hudState.stamina;
     project(player.x, player.y + 1.05, player.z, stamina);
     stamina.x += 46; stamina.value = player.stamina; stamina.tired = player.tired;
@@ -438,7 +450,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
       if (disposed) return;
       paused = true; stop(); input.clear(); input.unlock(); pending.length = 0;
       steer.attackHeld = false;
-      renderer.render(scene, camera);
+      post.render(scene, camera);
     },
     diagnostics() {
       const info = renderer.info;
@@ -499,6 +511,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
         }
       });
       painterly.dispose();
+      post.dispose();
       sun.dispose();
       scene.clear();
       renderer.renderLists.dispose();

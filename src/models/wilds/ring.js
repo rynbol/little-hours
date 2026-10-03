@@ -4,7 +4,7 @@ import { part, merge } from './shapes.js';
 
 const HIDE = Object.freeze({ stone: '#a49b8c', lichen: '#9bb071', warn: '#ff9a5c', roots: '#6e4b33', rootTip: '#9bc463' });
 const ROOT_MAX = 128;
-const SPIRAL = Object.freeze({ dark: new Color('#5c554b'), lit: new Color('#c9ffa0'), rise: 1.4 });
+const SPIRAL = Object.freeze({ dark: new Color('#5c554b'), lit: new Color('#c9ffa0'), rise: 1.4, night: 0.32 });
 const ease = s => { const t = Math.min(1, Math.max(0, s)); return t * t * (3 - 2 * t); };
 
 function stoneGeometry(places, stone, ground) {
@@ -109,11 +109,11 @@ export function buildRing(sim, painterly) {
   return {
     root,
     get kindled() { return kindled; },
-    update(dt, still) {
+    update(dt, still, night = 0) {
       const state = sim.stag, wanted = sim.encounter === 'fight' ? 1 : sim.encounter === 'won' ? 0.3 : 0;
       kindled += Math.sign(wanted - kindled) * Math.min(Math.abs(wanted - kindled), dt * SPIRAL.rise);
       clock += still ? 0 : dt;
-      carving.material.color.copy(SPIRAL.dark).lerp(SPIRAL.lit, kindled * (still ? 1 : 0.85 + Math.sin(clock * 3) * 0.15));
+      carving.material.color.copy(SPIRAL.dark).lerp(SPIRAL.lit, Math.max(kindled, night * SPIRAL.night) * (still ? 1 : 0.85 + Math.sin(clock * 3) * 0.15));
       marksFor(state);
       rootsFor(state);
     },

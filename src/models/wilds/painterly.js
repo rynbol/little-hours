@@ -15,7 +15,7 @@ export function createPainterly({ rim = '#fff0d2', rimStrength = 0.55, rimPower 
   for (let i = 0; i < width; i++) data[i] = Math.round(bandAt(i / (width - 1)) * 255);
   const gradient = new DataTexture(data, width, 1, RedFormat);
   gradient.magFilter = LinearFilter; gradient.minFilter = LinearFilter; gradient.generateMipmaps = false; gradient.needsUpdate = true;
-  const shared = { rimColor: { value: new Color(rim) }, rimStrength: { value: rimStrength }, rimPower: { value: rimPower }, sunView: { value: new Vector3(0, 1, 0) } };
+  const shared = { rimColor: { value: new Color(rim) }, rimStrength: { value: rimStrength }, rimPower: { value: rimPower }, sunView: { value: new Vector3(0, 1, 0) }, wet: { value: 0 } };
   const materials = new Set();
 
   function crumble(shader, dissolve) {
@@ -36,11 +36,13 @@ if (grain < dissolve) discard;`)
     Object.assign(shader.uniforms, shared, { glow: glow ?? { value: 0 }, rimOn: { value: rim ? 1 : 0 } });
     if (dissolve) crumble(shader, dissolve);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 rimColor;\nuniform float rimStrength;\nuniform float rimPower;\nuniform vec3 sunView;\nuniform float glow;\nuniform float rimOn;')
+      .replace('#include <common>', '#include <common>\nuniform vec3 rimColor;\nuniform float rimStrength;\nuniform float rimPower;\nuniform vec3 sunView;\nuniform float glow;\nuniform float rimOn;\nuniform float wet;')
       .replace('#include <opaque_fragment>', `float facing = 1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
 float toward = clamp(dot(normalize(normal), sunView) * 0.5 + 0.6, 0.0, 1.0);
 outgoingLight += rimColor * pow(facing, rimPower) * rimStrength * toward * rimOn;
 outgoingLight += diffuseColor.rgb * glow;
+float upward = clamp(dot(normalize(normal), normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz)), 0.0, 1.0);
+outgoingLight = outgoingLight * (1.0 - wet * 0.26) + rimColor * wet * upward * pow(facing, 2.0) * 0.1;
 #include <opaque_fragment>`);
   }
 

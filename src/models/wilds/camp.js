@@ -2,7 +2,7 @@ import { AdditiveBlending, ConeGeometry, CylinderGeometry, DodecahedronGeometry,
 import { part, merge } from './shapes.js';
 
 const EMBER = Object.freeze({ stone: '#9d958a', log: '#6e4a31', bark: '#4f3524', ash: '#5d5550', flame: '#ffb347', core: '#fff0b8', light: '#ffb565' });
-const LIGHT = Object.freeze({ intensity: 14, distance: 11, reach: 26 });
+const LIGHT = Object.freeze({ intensity: 14, distance: 11, reach: 26, night: 0.8 });
 
 function hearthGeometry(fires) {
   return merge(fires.flatMap(({ x, y, z }, f) => [
@@ -30,7 +30,7 @@ export function buildCamp(campfires, painterly) {
   let clock = 0;
   return {
     root,
-    update(fires, player, dt, still) {
+    update(fires, player, dt, still, night = 0) {
       clock += still ? 0 : dt;
       let near = null, best = LIGHT.reach;
       fires.forEach((fire, i) => {
@@ -43,7 +43,8 @@ export function buildCamp(campfires, painterly) {
         const distance = Math.hypot(fire.x - player.x, fire.z - player.z);
         if (distance < best) { best = distance; near = fire; }
       });
-      light.intensity = near ? LIGHT.intensity * (still ? 1 : 0.9 + Math.sin(clock * 17) * 0.1) : 0;
+      light.intensity = near ? LIGHT.intensity * (1 + night * LIGHT.night) * (still ? 1 : 0.9 + Math.sin(clock * 17) * 0.1) : 0;
+      light.distance = LIGHT.distance * (1 + night * LIGHT.night);
       if (near) light.position.set(near.x, near.y + 0.9, near.z);
     },
   };
