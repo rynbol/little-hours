@@ -21,7 +21,7 @@ const roomTints = {
 };
 
 export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onFocus, onPond, onForest, art, icon, notice }) {
-  let view, firstBuild = 0, shown = false, selectedId = store.state.house.activeId, signature = '', modelSignature = '';
+  let view, firstBuild = 0, shown = false, strollPlace = 'island', selectedId = store.state.house.activeId, signature = '', modelSignature = '';
   let detailOpen = false, detailReturn = '#house-rooms-toggle', renaming = false;
   let preview = true, celebration = null, celebrationTimer, exporting = false, postcardUrl = null;
   const plans = new Map();
@@ -181,13 +181,13 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     $('#house-preview-toggle').hidden = !canPreview;
     $('#house-preview-toggle').textContent = preview ? 'Before' : 'Preview';
     $('#house-preview-toggle').setAttribute('aria-pressed', String(preview));
-    const nextModel = JSON.stringify([modelHouse.rooms, modelHouse.garden, modelHouse.plants, house.activeId, selectedId, store.state.theme, store.state.avatar, store.state.pet]);
+    const nextModel = JSON.stringify([modelHouse.rooms, modelHouse.garden, modelHouse.plants, house.activeId, selectedId, store.state.theme, store.state.avatar, store.state.pet, strollPlace]);
     if (modelSignature !== nextModel) {
       modelSignature = nextModel;
-      const options = { house: modelHouse, selectedId, theme: store.state.theme, avatar: store.state.avatar, focused: isFocusing(store.state.session), onSelect: id => id === 'garden-exit' ? select(store.state.house.activeId, false) : id === 'pond' ? onPond?.() : id === 'forest' ? onForest?.() : select(id) };
+      const options = { house: modelHouse, selectedId, strollPlace, theme: store.state.theme, avatar: store.state.avatar, focused: isFocusing(store.state.session), onSelect: id => id === 'garden-exit' ? select(store.state.house.activeId, false) : id === 'pond' ? onPond?.() : id === 'forest' ? onForest?.() : select(id) };
       const build = () => {
         try {
-          if (view) view.update(options.house, options.selectedId, options.theme, options.avatar);
+          if (view) view.update(options.house, options.selectedId, options.theme, options.avatar, options.strollPlace);
           else view = createHouseView($('#house-canvas'), options);
           if (selectedId === 'orchard') view.selectGardenPlot(gardenUI.selectedSlot);
         } catch (error) {
@@ -205,9 +205,11 @@ export function createHouseUI(root, { store, acceptUpdate, onEnter, onClose, onF
     else if (focusDesign) root.querySelector(`[data-house-design="${focusDesign}"]`)?.focus({ preventScroll: true });
   }
   return {
-    show(id) { detailOpen = Boolean(id); id ||= store.state.house.activeId; renaming = false; shown = true; root.hidden = false; selectedId = /^plot-[0-5]$/.test(id) ? 'orchard' : id; preview = true; signature = ''; view?.setSuspended(false); render(); if (selectedId !== id) gardenUI.selectSlot(Number(id.slice(5))); },
+    show(id, place = 'island') { strollPlace = place; detailOpen = Boolean(id); id ||= store.state.house.activeId; renaming = false; shown = true; root.hidden = false; selectedId = /^plot-[0-5]$/.test(id) ? 'orchard' : id; preview = true; signature = ''; view?.setSuspended(false); render(); if (selectedId !== id) gardenUI.selectSlot(Number(id.slice(5))); },
     // The house stays built while away, so coming back is instant.
     hide() { $('#house-room-menu').hidePopover(); gardenUI.close(); document.body.classList.remove('is-garden'); shown = false; postcardDialog.close(); root.hidden = true; view?.setSuspended(true); if (!view) modelSignature = ''; signature = ''; celebration = null; clearTimeout(celebrationTimer); $('#house-celebration').hidden = true; root.classList.remove('house-just-built'); $('#house-name-form').hidden = true; },
+    releaseView() { this.hide(); cancelAnimationFrame(firstBuild); clearTimeout(firstBuild); firstBuild = 0; view?.dispose(); view = null; modelSignature = ''; signature = ''; },
+    restoreAtTrailhead() { this.show(store.state.house.activeId, 'forest-return'); },
     render,
     selectGardenPlant(id) { if (shown && selectedId === 'orchard') { gardenUI.selectPlant(id); $('#garden-card-title')?.focus({ preventScroll: true }); } },
     diagnostics: () => view?.diagnostics(),

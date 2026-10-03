@@ -1,87 +1,100 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { steps } from '../steps.mjs';
-import { drawnRatio, ratioCeiling } from '../chrome.mjs';
+import { enterWilds, leaveWilds, holdKeys, resourceSample, wildsState, wildsFrameSample } from '../wilds.mjs';
 
-const FOREST = `(() => { const forest = window.__littleHours.forest, d = forest.diagnostics(); return { open: forest.isOpen, ready: Boolean(d?.ready), walker: d?.walker ?? null, trees: d?.trees ?? 0, raining: d?.raining ?? null, drawn: d?.drawn ?? 0, start: d?.start ?? null, eye: d ? [d.camera.position.x, d.camera.position.y, d.camera.position.z] : null }; })()`;
-const ENGINES = `window.__littleHours.counts().engines`;
-const hold = (app, key, code, down) => app.send('Input.dispatchKeyEvent', { type: down ? 'keyDown' : 'keyUp', key, code });
-const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-const arrive = app => app.waitFor(`(() => { const f = window.__littleHours.forest; return f.isOpen && Boolean(f.diagnostics()?.ready) && document.querySelector('#forest-status').hidden; })()`, { what: 'the forest to be built', timeout: 90000 });
-const leave = app => app.waitFor(`!window.__littleHours.forest.isOpen && !document.body.classList.contains('is-forest')`, { what: 'the island after the forest', timeout: 20000 });
-
-const frames = async (app, count) => { const from = (await app.js(FOREST)).drawn; await app.waitFor(`window.__littleHours.forest.diagnostics().drawn >= ${from + count}`, { what: `${count} more forest frames`, timeout: 30000 }); };
-const STOPPED = `window.__littleHours.forest.diagnostics().walker.speed === 0`;
-
-async function walk(app, key, code, ms, least) {
-  const from = (await app.js(FOREST)).walker;
-  await hold(app, key, code, true); await pause(ms);
-  await app.waitFor(`(() => { const w = window.__littleHours.forest.diagnostics().walker; return Math.hypot(w.x - ${from.x}, w.z - ${from.z}) > ${least}; })()`, { what: `the walker to cover ${least} m`, timeout: 60000 });
-  await hold(app, key, code, false);
-  await app.waitFor(STOPPED, { what: 'the walker to coast to a stop', timeout: 30000 });
-  const to = (await app.js(FOREST)).walker;
-  return { from, to, east: to.x - from.x, south: to.z - from.z, far: Math.hypot(to.x - from.x, to.z - from.z) };
-}
+const distance = (a,b) => Math.hypot(a.x-b.x, a.z-b.z);
+const game = async app => (await wildsState(app)).game;
+const visibleWords = `(() => { const root = document.querySelector('#wilds-page'), walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), words = []; for (let n; n = walker.nextNode();) { const el = n.parentElement, style = getComputedStyle(el); if (/[a-zA-Z]/.test(n.textContent) && el.checkVisibility() && style.opacity !== '0' && el.getBoundingClientRect().width > 0) words.push(n.textContent.trim()); } return words; })()`;
 
 export default {
-  about: 'the forest: the island trailhead pin and the dock both open a walk-in forest with its own scene, W walks the way you face, a drag turns the view, the eye rides the ground, it draws at the capped pixel ratio, Escape and the Island chip return to the island and free the engine, and reduced motion draws only when the view changes',
+  about: 'three.js feel box: lazy entry, real movement/combat/camera input, pause and five disposal cycles',
   async run(t) {
-    const { check } = t;
-    const app = await t.open({ seed: 'three-rooms' });
+    const app = await t.open({ seed: 'three-rooms', scale: 2 });
     await app.settle();
+    const initialSave = await app.saved();
     await steps.openHouse(app);
-    const engines = await app.js(ENGINES);
-    await app.clickSel('[data-room="forest"]');
-    await arrive(app);
-    const start = await app.js(FOREST);
-    check('the trailhead pin opens the forest with its own scene and the island set aside', start.open && await app.js(`document.body.classList.contains('is-forest') && document.getElementById('app').inert`) && await app.js(ENGINES) === engines + 1, { engines, now: await app.js(ENGINES) });
-    check('the walk starts on the valley path among more than a thousand trees', start.walker.x === start.start.x && start.walker.z === start.start.z && Math.hypot(start.start.x, start.start.z) > 150 && start.trees > 1000, start);
-    check('the camera sits at the walker’s eye', Math.hypot(start.eye[0] - start.walker.x, start.eye[1] - start.walker.y, start.eye[2] - start.walker.z) < 1e-3, start);
-    const ratio = await app.js(drawnRatio('forest'));
-    check('the forest draws at the screen pixel ratio, capped at 2, or at 0.6 on a software renderer', Math.abs(ratio.drawn - ratioCeiling(ratio)) < 0.01, ratio);
-    check('the hint names the keys, and the thumb stick stays away from mouse users', await app.visible('#forest-hint') && !await app.visible('#forest-stick'));
-    await frames(app, 2);
-    const idle = await app.js(FOREST);
-    check('the forest keeps moving while the walker stands still', idle.drawn > start.drawn && idle.walker.x === start.walker.x, { before: start.drawn, after: idle.drawn });
-
-    const ahead = await walk(app, 'w', 'KeyW', 1500, 2), facing = [Math.sin(ahead.from.yaw), -Math.cos(ahead.from.yaw)];
-    const along = (ahead.east * facing[0] + ahead.south * facing[1]) / ahead.far;
-    check('holding W walks the way the walker faces, at a walking pace, and letting go stops', ahead.far > 1.5 && ahead.far < 17 && along > 0.9, { far: ahead.far, along });
-    check('the first step tucks the hint away', await app.js(`document.querySelector('#forest-hint').classList.contains('is-read')`));
-    const back = await walk(app, 's', 'KeyS', 800, 0.8);
-    check('S backs away', (back.east * facing[0] + back.south * facing[1]) < -0.5, back);
-
-    const before = (await app.js(FOREST)).walker, middle = { x: app.width / 2, y: app.height / 2 };
-    await app.drag(middle, { x: middle.x + 200, y: middle.y });
-    await frames(app, 2);
-    const turned = (await app.js(FOREST)).walker;
-    check('dragging across the view turns the walker without moving them', Math.abs(Math.abs(turned.yaw - before.yaw) - 0.84) < 0.15 && turned.x === before.x && turned.z === before.z, { before: before.yaw, after: turned.yaw });
-
+    const requests = [];
+    await app.send('Network.enable');
+    const unwatch = app.on(message => { if (message.method === 'Network.requestWillBeSent') requests.push(message.params.request.url); });
+    const prior = await app.js('performance.getEntriesByType("resource").map(e => e.name)');
+    t.check('room and island load no three.js or Wilds modules', !prior.some(url => /\/three[/.]|\/features\/wilds\/|\/models\/wilds\//.test(url)), prior.filter(url => /three|wilds/.test(url)));
+    const baseline = await resourceSample(app, { retained: false });
+    await enterWilds(app, { entry: 'button' });
+    t.check('Forest loads the new three.js slice lazily', requests.some(url => /three|\/features\/wilds\//.test(url)), requests);
+    unwatch();
+    t.check('the island scene is freed during play', await app.js('window.__littleHours.house.diagnostics() == null'));
+    t.check('play shows no visible words', (await app.js(visibleWords)).length === 0, await app.js(visibleWords));
+    const start = await game(app);
+    await holdKeys(app, [['w','KeyW']], 500);
+    const walked = await game(app);
+    t.check('W moves the player', distance(start.position,walked.position) > .3, {start,walked});
+    await holdKeys(app, [['Shift','ShiftLeft'],['w','KeyW']], 500);
+    const sprinted = await game(app);
+    t.check('Shift sprint covers more ground and spends stamina', distance(walked.position,sprinted.position) > distance(start.position,walked.position) * 1.15 && sprinted.stamina < walked.stamina, {walked,sprinted});
+    await app.key(' ', 'Space');
+    await app.waitFor('window.__littleHours.forest.diagnostics().game.counters.jumps > 0', {what:'jump input'});
+    t.check('Space jumps', (await game(app)).counters.jumps > start.counters.jumps);
+    await t.sleep(700);
+    await app.key('Control','ControlLeft');
+    await t.sleep(100);
+    t.check('Control dodges', (await game(app)).counters.dodges > start.counters.dodges);
+    await t.sleep(850);
+    const canvas = await app.box('#wilds-canvas');
+    const beforeRightDodge = await game(app);
+    await app.send('Input.dispatchMouseEvent', {type:'mousePressed',x:canvas.x,y:canvas.y,button:'right',buttons:2,clickCount:1});
+    await app.send('Input.dispatchMouseEvent', {type:'mouseReleased',x:canvas.x,y:canvas.y,button:'right',buttons:0,clickCount:1});
+    await t.sleep(100);
+    t.check('right click also dodges', (await game(app)).counters.dodges > beforeRightDodge.counters.dodges);
+    await t.sleep(850);
+    for (let i = 0; i < 3; i++) { await app.click(canvas.x,canvas.y); await t.sleep(250); }
+    await t.sleep(650);
+    const combo = await game(app);
+    t.check('three clicks produce the three-hit combo', combo.counters.lightAttacks >= start.counters.lightAttacks + 3 && combo.counters.hits >= 3 && combo.state.lastHit?.kind === 'light3', combo);
+    await app.press(canvas.x,canvas.y); await t.sleep(850); await app.release(canvas.x,canvas.y); await t.sleep(700);
+    const heavy = await game(app);
+    t.check('holding left click releases a charged heavy that connects', heavy.counters.heavyAttacks > start.counters.heavyAttacks && heavy.counters.hits > combo.counters.hits && heavy.state.lastHit?.kind === 'heavy', heavy);
+    await app.key('f','KeyF'); await t.sleep(100);
+    const locked = await game(app);
+    t.check('F locks onto the training dummy', locked.locked, locked);
+    await app.key('f','KeyF'); await t.sleep(100);
+    t.check('F releases lock cleanly', !(await game(app)).locked);
+    const beforeCamera = (await game(app)).camera;
+    await app.drag({x:canvas.x,y:canvas.y},{x:canvas.x+180,y:canvas.y+40});
+    await app.send('Input.dispatchMouseEvent', {type:'mouseWheel',x:canvas.x,y:canvas.y,deltaX:0,deltaY:180});
+    await t.sleep(300);
+    const afterCamera = (await game(app)).camera;
+    t.check('drag orbits and wheel zooms', Math.abs(afterCamera.yaw-beforeCamera.yaw) > .1 && Math.abs(afterCamera.distance-beforeCamera.distance) > .1, {beforeCamera,afterCamera});
+    await t.shot(app,'feel-box');
+    const beforeFrameRun = await game(app);
+    const frames = await wildsFrameSample(app,5);
+    t.check('orbit drag cancels its press and movement remains responsive', frames.game.action.kind === 'run' && distance(beforeFrameRun.position, frames.game.position) > 2, {before:beforeFrameRun.action,after:frames.game.action,distance:distance(beforeFrameRun.position,frames.game.position)});
+    t.check('gameplay holds 60fps with no frame over 20ms', frames.fps >= 59 && frames.over20 === 0, frames);
     await app.key('Escape');
-    await leave(app);
-    await app.settle();
-    check('Escape returns to the island, frees the forest engine and puts focus back on the trailhead', await app.js(`document.body.classList.contains('is-house') && !document.getElementById('app').inert`) && await app.js(ENGINES) === engines && await app.js(`document.activeElement?.dataset?.room === 'forest'`), { engines: await app.js(ENGINES), focus: await app.js(`document.activeElement?.outerHTML.slice(0, 80)`) });
-
-    await app.clickSel('#house-open-forest');
-    await arrive(app);
-    check('the dock’s Forest button opens it too, back at the start of the path', await app.js(`(() => { const d = window.__littleHours.forest.diagnostics(); return d.walker.x === d.start.x && d.walker.z === d.start.z; })()`));
-    await app.clickSel('#forest-back');
-    await leave(app);
-    check('the Island chip leaves the forest', await app.js(ENGINES) === engines);
-    check('no errors were logged', app.errors.length === 0, app.errors);
-    await app.close();
-
-    const still = await t.open({ seed: 'three-rooms', reducedMotion: true, theme: 'rain' });
-    await still.settle();
-    await steps.openHouse(still);
-    await still.clickSel('[data-room="forest"]');
-    await arrive(still);
-    await pause(500);
-    const rest = await still.js(FOREST);
-    await pause(600);
-    const later = await still.js(FOREST);
-    check('reduced motion: a still forest draws no further frames', later.drawn === rest.drawn, { rest: rest.drawn, later: later.drawn });
-    const stepped = await walk(still, 'w', 'KeyW', 800, 0.8);
-    check('reduced motion: walking still moves the view and draws it', stepped.far > 0.5 && (await still.js(FOREST)).drawn > later.drawn, stepped);
-    check('rain falls in the forest in the rain theme and in no other', rest.raining === true && start.raining === false, { rain: rest.raining, fair: start.raining });
-    await still.close();
+    const paused = await game(app);
+    await holdKeys(app,[['w','KeyW']],400);
+    t.check('Escape pauses and movement stops', paused.paused && distance(paused.position,(await game(app)).position) < .01, paused);
+    await app.clickSel('#wilds-resume');
+    t.check('Resume returns to play', !(await game(app)).paused);
+    await leaveWilds(app);
+    const coldReturn = await resourceSample(app);
+    const warmup = [];
+    for (let i = 0; i < 10; i++) { await enterWilds(app); await t.sleep(250); await leaveWilds(app); warmup.push(await resourceSample(app)); }
+    const samples = [warmup.at(-1)];
+    const entered = [];
+    const returned = await app.js(`import('/src/features/house/island-forest.js').then(({ FOREST_TRAILHEAD }) => { const d = window.__littleHours.house.diagnostics(); return { place: d.strollPlace, actual: d.strollWorld, expected: FOREST_TRAILHEAD.position }; })`);
+    t.check('leaving restores the trailhead', returned.place === 'forest-return' && Math.hypot(returned.actual.x - returned.expected[0], returned.actual.y - returned.expected[1], returned.actual.z - returned.expected[2]) < .001, returned);
+    for (let i = 0; i < 5; i++) { const entry = i % 2 ? 'pin' : 'button'; await enterWilds(app, { entry }); await t.sleep(250); entered.push({ entry, ...await wildsState(app) }); await leaveWilds(app); samples.push(await resourceSample(app)); }
+    t.check('each entry starts with consistent position and stamina', entered.every(s => distance(s.game.position, start.position) < .001 && s.game.stamina === start.stamina && s.game.counters.attack === 0), entered.map(s => ({entry:s.entry,position:s.game.position,stamina:s.game.stamina,counters:s.game.counters})));
+    t.check('five exits restore the island with stable Babylon object counts', samples.every(s => JSON.stringify(s.counts) === JSON.stringify(samples[0].counts)), samples.map(s=>s.counts));
+    t.check('five exits dispose all three.js GPU allocations and context', samples.every(s => s.forest.disposed?.geometries === 0 && s.forest.disposed?.textures === 0 && s.forest.disposed?.programs === 0 && s.forest.disposed?.contextLost === true), samples.map(s=>s.forest.disposed));
+    const retentionSamples = [coldReturn, ...warmup, ...samples];
+    t.check('every exit releases detached Wilds canvases and WebGL contexts', retentionSamples.every(s => s.retained.canvases.detachedWilds === 0 && s.retained.contexts.detachedWilds === 0), retentionSamples.map(s => s.retained));
+    const heapGrowth = samples.at(-1).heap - samples[0].heap;
+    t.check('warmed JS heap returns within 1MiB after five exits', heapGrowth <= 1048576, {baseline:baseline.heap,heaps:samples.map(s=>s.heap),growth:heapGrowth});
+    const finalSave = await app.saved();
+    t.check('Wilds does not award study gold or change the save', JSON.stringify(finalSave) === JSON.stringify(initialSave));
+    writeFileSync(join(t.out,'wilds-evidence.json'),JSON.stringify({baseline,coldReturn,warmup,frames,entered,samples},null,2));
+    await t.close(app);
   },
 };

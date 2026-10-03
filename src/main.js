@@ -26,7 +26,7 @@ import './ui/calm-ui.css';
 import { createDecorateUI, roomDesignArt } from './features/decorate/index.js';
 import { createTimerUI } from './features/timer/index.js';
 import { createFishingUI } from './features/fishing/index.js';
-import { createForestUI } from './features/forest/index.js';
+import { createWildsNavigation } from './core/wilds/navigation.js';
 import { createBuddyUI } from './features/buddy/index.js';
 import './ui/room-screen.css';
 import { installTestHook } from './dev/test-hook.js';
@@ -62,7 +62,13 @@ app.nav = createHouseNavigation(app);
 app.roomUI = createRoomUI(app);
 app.panels = createPanels(app);
 app.lake = createFishingUI(app);
-app.forest = createForestUI(app);
+const wildsPage = document.createElement('section');
+wildsPage.id = 'wilds-page';
+wildsPage.setAttribute('aria-label', 'The Wilds');
+wildsPage.style.cssText = 'position:fixed;inset:0;z-index:70;background:#233b31;color:#f1efda';
+wildsPage.hidden = true;
+$('#app').appendChild(wildsPage);
+app.forest = createWildsNavigation(app, wildsPage, () => import('./features/wilds/index.js'));
 app.buddy = createBuddyUI(app);
 wireSoundControls(app);
 
@@ -171,6 +177,7 @@ app.houseUI = createHouseUI($('#house-page'), {
 $('#house-coin-wallet').addEventListener('click', () => app.nav.setHouseOpen(false), { signal: listeners.signal });
 $('#house-focus').addEventListener('click', async () => { await app.nav.setHouseOpen(false); app.timer.expand(); if (!app.nav.houseOpen) $('#focus-card').showPopover(); }, { signal: listeners.signal });
 document.addEventListener('keydown', event => {
+  if (app.forest.active) return;
   if (event.key === 'Escape' && !event.isComposing && app.timer.leaveFocusMode({ animate: true })) { event.preventDefault(); return; }
   if (event.key === 'Escape' && app.nav.houseOpen && !event.target.closest('input')) { app.nav.setHouseOpen(false); return; }
   if (event.key === 'Escape' && app.room?.cancelDrag?.()) { event.preventDefault(); return; }

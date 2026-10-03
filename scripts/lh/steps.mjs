@@ -15,6 +15,7 @@ export const steps = {
 };
 
 export const cycles = {
+  wilds: { wilds: true, about: 'enter the Wilds and restore the island', async setup(app) { await steps.openHouse(app); }, async run(app) { const { enterWilds, leaveWilds } = await import('./wilds.mjs'); await enterWilds(app); await leaveWilds(app); } },
   garden: { about: 'visit the living garden and return to the room', async run(app) { await steps.openHouse(app); if (await app.visible('#house-open-garden')) await app.clickSel('#house-open-garden'); await app.settle(); await steps.backToRoom(app); } },
   focus: { about: 'enter and leave whole-room Focus mode without pausing', async run(app) { await steps.openFocus(app); await steps.closeFocus(app); } },
   rooms: { about: 'visit the garden and studio through the house page', async run(app) { for (const id of ['garden', 'studio']) { await steps.openHouse(app); await steps.houseRooms(app); await app.clickSel(`#house-slot-${id}`); await app.waitFor(`document.querySelector('#enter-house-room') !== null`, { what: 'the Come on in button' }); await app.clickSel('#enter-house-room'); await app.waitFor(`window.__littleHours.state.house.activeId === '${id}' && !document.body.classList.contains('is-house')`, { what: `arrival in ${id}`, timeout: 30000 }); await app.settle(); } } },
@@ -44,5 +45,6 @@ export const views = {
   decorate: { about: 'Decorate mode', async go(app) { await steps.openDecorate(app); } },
   avatar: { about: 'the avatar editor', async go(app) { await steps.openAvatar(app); } },
   lake: { about: 'fishing at Willow Pond, idle', async go(app) { await steps.openLake(app); } },
-  forest: { about: 'the walk-in forest, at the start of the path', async go(app) { await steps.openHouse(app); await app.clickSel('[data-room="forest"]'); await app.waitFor(`Boolean(window.__littleHours.forest.isOpen && window.__littleHours.forest.diagnostics()?.ready)`, { what: 'the forest', timeout: 90000 }); await app.settle(); } },
+  'wilds-roll': { about: 'a real dodge, frozen near its first fifth', async go(app) { const { enterWilds } = await import('./wilds.mjs'); await steps.openHouse(app); await enterWilds(app); await app.key('Control', 'ControlLeft'); let state; for (let i = 0; i < 100; i++) { state = await app.js('window.__littleHours.forest.diagnostics().game.action'); if (state.kind === 'dodge' && state.progress >= .18) break; await new Promise(resolve => setTimeout(resolve, 8)); } if (state?.kind !== 'dodge' || state.progress >= .5) throw new Error('The early real dodge was not captured'); await app.js('window.__lhFrozenAt = window.__littleHoursTest.now()'); } },
+  wilds: { about: 'the three.js Wilds feel box', async go(app) { await steps.openHouse(app); await app.clickSel('[data-room="forest"]'); await app.waitFor(`Boolean(window.__littleHours.forest.isOpen && window.__littleHours.forest.diagnostics()?.ready)`, { what: 'the Wilds', timeout: 90000 }); await app.settle(); } },
 };

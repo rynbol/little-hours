@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { FOREST_TRAILHEAD } from './island-forest.js';
 import { strollAt } from './house-stroll.js';
 import { onIsland } from './house-island.js';
 import { inPond, DOCK } from './house-pond.js';
@@ -47,4 +48,12 @@ test('focused garden visits seat the avatar on the arbour cushion', () => {
   assert.deepEqual([pose.x, pose.z, pose.yaw, pose.sit, pose.moving], [-.55, -3.55, Math.PI, 1, false]);
   assert.ok(Math.abs(pose.y + pose.seatHeight * .76 - .715) < 1e-9);
   assert.deepEqual(strollAt(0, 'garden-rest'), pose);
+});
+
+test('leaving the Wilds restores the island stroll at its trailhead', () => {
+  const pose = strollAt(0, 'forest-return');
+  assert.deepEqual([pose.x, pose.y, pose.z], FOREST_TRAILHEAD.position);
+  assert.equal(pose.yaw, Math.atan2(-FOREST_TRAILHEAD.facing[0], -FOREST_TRAILHEAD.facing[2]));
+  assert.equal(pose.moving, false);
+  assert.deepEqual(strollAt(120, 'forest-return'), pose);
 });

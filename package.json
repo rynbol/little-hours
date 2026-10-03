@@ -16,7 +16,8 @@
     "detail": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup --python scripts/detail/run.py --"
   },
   "dependencies": {
-    "@babylonjs/core": "9.27.1"
+    "@babylonjs/core": "9.27.1",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

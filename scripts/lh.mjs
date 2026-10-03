@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromePath, closeAll, gpuFlag, killAllNow, launch, sleep, slow } from './lh/chrome.mjs';
+import { retainedWildsObjects, wildsFrameSample } from './lh/wilds.mjs';
 import { openApp } from './lh/app.mjs';
 import { serve } from './lh/server.mjs';
 import { SEEDS } from './lh/seeds.mjs';
@@ -20,7 +21,7 @@ const HELP = `lh: drive the real Little Hours app in Chrome and collect evidence
   lh flows                          list the flows
   lh run <flow...|all>              run flows with real input; exits 1 on any failure
   lh shot <view...>                 screenshots; views: ${Object.keys(views).join(', ')}
-  lh perf [--view house|garden|lake|room|decorate|pet|focus|focus-trip|trips]
+  lh perf [--view house|garden|lake|room|decorate|pet|focus|focus-trip|trips|wilds]
                                     idle cost, frame gaps, click-to-paint, GPU time, draw calls
   lh trace <cycle>                  Chrome performance trace of one cycle (--cold: the first run, without a warm-up run)
   lh alloc <cycle>                  sampled allocations during one cycle, by allocating function (--cold as for trace)
@@ -216,6 +217,7 @@ async function perfOnce(url, view) {
     const result = { readyMs: app.readyMs };
     await watchEvents(app);
     if (view === 'house') { await app.clickSel('#rooms-button'); result.openMs = await takeEvents(app, 4000); }
+    if (view === 'wilds') { await views.wilds.go(app); Object.assign(result, await wildsFrameSample(app, Number(options.seconds || 5))); result.pageErrors = app.errors.length; return result; }
     if (view === 'garden') { await views.garden.go(app); result.openMs = await takeEvents(app, 2000); }
     if (view === 'lake') { await views.lake.go(app); result.openMs = await takeEvents(app, 2000); }
     if (view === 'pet') { await views.pet.go(app); result.openMs = await takeEvents(app, 1500); }
@@ -226,7 +228,7 @@ async function perfOnce(url, view) {
     if (options.before) await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; ${options.before}; })()`);
     Object.assign(result, await idle(app, Number(options.seconds || 5)));
     if (view === 'house') {
-      const tags = await app.js(`[...document.querySelectorAll('button.house-room-tag:not(.is-site):not(.is-garden):not(.is-pond)')].map(tag => tag.dataset.room)`);
+      const tags = await app.js(`[...document.querySelectorAll('button.house-room-tag:not(.is-site):not(.is-garden):not(.is-pond):not([data-room="forest"])')].map(tag => tag.dataset.room)`);
       for (const id of tags) { await app.clickSel(`.house-room-tag[data-room="${id}"]`); result[`tapMs ${id}`] = await takeEvents(app, 1500); }
     }
     if (view === 'lake') {
@@ -340,8 +342,9 @@ async function heapOnce(side, cycle, repeat, out, tag) {
     await sleep(1000); await app.settle(); await cycle.setup?.(app);
     for (let i = 0; i < 3; i++) await cycle.run(app);
     const counts = () => app.hook ? app.js('window.__littleHours.counts?.() ?? null') : null;
-    const sample = async () => { await collectGarbage(app); return { heap: await heapUsed(app), counts: await counts() }; };
+    const sample = async () => { await collectGarbage(app); return { heap: await heapUsed(app), counts: await counts(), ...(cycle.wilds ? { retained: await retainedWildsObjects(app) } : {}) }; };
     const snapshots = [];
+    if (cycle.wilds) await retainedWildsObjects(app);
     const before = await sample();
     if (options.snapshots) snapshots.push(await heapSnapshot(app, join(out, `${tag}-before.heapsnapshot`)));
     const half = Math.ceil(repeat / 2);

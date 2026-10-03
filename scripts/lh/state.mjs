@@ -12,8 +12,8 @@ export function ensureDir(path) {
 }
 
 export function outDir(command, keep = 12) {
-  const root = ensureDir(join(lhDir, 'out'));
-  for (const old of readdirSync(root).sort().slice(0, -keep + 1)) rmSync(join(root, old), { recursive: true, force: true });
+  const root = ensureDir(process.env.LH_OUT_DIR || join(lhDir, 'out'));
+  for (const old of (process.env.LH_OUT_DIR ? [] : readdirSync(root).sort().slice(0, -keep + 1))) rmSync(join(root, old), { recursive: true, force: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   return ensureDir(join(root, `${stamp}-${command}`));
 }

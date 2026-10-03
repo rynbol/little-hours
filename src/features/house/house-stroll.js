@@ -1,6 +1,7 @@
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { createMobileCompanion } from '../../models/furniture.js';
 import { createPetModel } from '../pet/index.js';
+import { FOREST_TRAILHEAD } from './island-forest.js';
 import { DOCK } from './house-pond.js';
 
 const SCALE = .43, GROUND = -.175, DOCK_TOP = -.04, SPEED = .36, PET_LAG = 1.2;
@@ -32,6 +33,7 @@ const GARDEN_ROUTE = [
   { at: [-.3, -.6] }, { at: [0, .1] }, { at: [.2, 1] }, { at: [.18, 2] },
 ];
 const PLACES = {
+  'forest-return': { ...timeline([{ at: [FOREST_TRAILHEAD.position[0], FOREST_TRAILHEAD.position[2]], rest: 1, yaw: Math.atan2(-FOREST_TRAILHEAD.facing[0], -FOREST_TRAILHEAD.facing[2]) }], SPEED), scale: SCALE, ground: FOREST_TRAILHEAD.position[1], sit: 0, seatHeight: .5 },
   island: { ...timeline(ROUTE, SPEED), scale: SCALE, ground: GROUND, sit: 0, seatHeight: .5 },
   garden: { ...timeline(GARDEN_ROUTE, .4), scale: .76, ground: .035, sit: 0, seatHeight: .5 },
   'garden-rest': { ...timeline([{ at: [-.55, -3.55], rest: 1, yaw: Math.PI }], .4), scale: .76, ground: .035, sit: 1, seatHeight: .68 / .76 },
@@ -53,16 +55,18 @@ export function createStroll(scene, avatar, pet) {
   for (const mesh of node.getChildMeshes()) { mesh.isPickable = false; mesh.material?.freeze(); }
   const pose = { x: 0, z: 0, yaw: 0, step: 0, moving: false, sit: 0, seatHeight: .5, doze: 0, activity: null, activityTime: 0, atDesk: false, preview: null, reach: null };
   const petPose = { action: 'sit', moving: false, petAge: Infinity, walked: 0, x: 0, z: 0, yaw: 0, hearts: [] };
-  let last = null, drawn = -1, location = 'island', arrived = 0, still = false;
+  let last = null, drawn = -1, location = 'island', arrived = 0, still = false, ground = GROUND;
   return {
     node,
     get pose() { return { ...pose }; },
+    get world() { return { x: pose.x * node.scaling.x, y: ground, z: pose.z * node.scaling.z }; },
     get pet() { return petModel && { ...petPose }; },
     setVisible(visible) { node.setEnabled(visible); if (!visible) last = null; },
     animate(seconds, reducedMotion, place = 'island') {
       if (place !== location || reducedMotion !== still) { location = place; still = reducedMotion; arrived = seconds; last = null; }
       const scale = PLACES[place].scale; node.scaling.setAll(scale);
       const elapsed = seconds - arrived, me = strollAt(elapsed, place), pal = strollAt(elapsed - PET_LAG, place);
+      ground = me.y;
       if (reducedMotion && place === 'garden') Object.assign(pal, { x: me.x - .35, z: me.z - .15, yaw: me.yaw });
       if (place === 'garden-rest') Object.assign(pal, { x: .55, z: -3.1, yaw: Math.PI - .3 });
       if (!me.moving && !pal.moving && last !== null && seconds - drawn < .1) return;
