@@ -2,8 +2,10 @@ decision	evidence	action
 Start with feel	Owner requires six gated stages	Implement controls and lifecycle before final assets
 Limit engine boundary	Only one engine may draw; room download must stay flat	Dynamic feature import and dispose/rebuild island scene
 Delegate with explicit authorization	Owner's latest message permits GPT-6.1 Sol helpers	Assign separate simulation, entry and harness ownership; integrate centrally
-Keep full scope	Stage stop gates do not narrow the final objective	Track all six stages and wait for verdict after each
+Keep full scope	The updated brief requires one continuous run while the owner is away	Track all six stages; play, verify, commit and push each, then continue without owner approval stops
 Release actual shader resources	Heap snapshots traced discarded contexts through the shared DFG lighting texture's dispose listeners	Collect actual bound texture uniforms and dispose them with owned geometry, materials and shadow targets
 Ground the dodge pose	Rendered roll had a gap at ground contact; blind judge preferred corrected pose A	Rotate around the capsule centre and preserve sword length; test transformed vertices across a full roll
 Cancel coalesced camera input	A press and drag in one frame left the player charging	Give cancellation priority and regress movement plus the next click
 Measure retained heap consistently	The old final wait allocated up to 1.53 MB; three warmups had not reached a plateau	Sample immediately after collection, preserve all readings, use ten fixed warmups before five measured visits, and keep the 1 MiB limit
+Frame the whole guardian	Recorded melee frames cropped the block-out antlers	Use live target elevation and height to frame both actor bounds; regress projected apex and feet over slopes and movement
+Keep sound tied to input	Gameplay capture stops document bubbling before the old sound unlock listener	Invoke an explicit interaction callback within the input adapter; ignore idle controllers and release active audio voices on pause or disposal

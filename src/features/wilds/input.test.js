@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createWildsInput } from './input.js';
 import { createFeelSimulation } from '../../core/wilds/feel.js';
 
-function fixture(t) {
+function fixture(t, options = {}) {
   const originals = new Map(['document', 'window', 'navigator'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
   const document = new EventTarget(), window = new EventTarget(), canvas = new EventTarget(), captures = new Set(), calls = [];
   document.closest = () => null;
@@ -13,7 +13,7 @@ function fixture(t) {
   canvas.releasePointerCapture = id => captures.delete(id);
   let pads = [];
   for (const [key, value] of Object.entries({ document, window, navigator: { getGamepads: () => pads } })) Object.defineProperty(globalThis, key, { configurable: true, value });
-  const input = createWildsInput(canvas, { pause: () => calls.push('pause'), lock: () => calls.push('lock'), mute: () => calls.push('mute'), orbit: (...args) => calls.push(['orbit', ...args]), zoom: value => calls.push(['zoom', value]) });
+  const input = createWildsInput(canvas, { pause: () => calls.push('pause'), lock: () => calls.push('lock'), mute: () => calls.push('mute'), orbit: (...args) => calls.push(['orbit', ...args]), zoom: value => calls.push(['zoom', value]), ...options });
   t.after(() => {
     input.dispose();
     for (const [key, descriptor] of originals) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; }
@@ -132,4 +132,64 @@ test('disposing input removes document and canvas behavior', t => {
   f.send(f.canvas, 'wheel', { deltaY: 100 });
   assert.deepEqual(f.calls, []);
   assert.equal(f.input.read(0, 1 / 60).jump, undefined);
+});
+
+test('partner and camp inputs are edge-triggered on keyboard and gamepad', t => {
+  const f = fixture(t);
+  f.key('KeyQ'); f.key('KeyE');
+  let controls = f.input.read(0, 1 / 60);
+  assert.equal(controls.petSkill, true);
+  assert.equal(controls.interact, true);
+  controls = f.input.read(0, 1 / 60);
+  assert.equal(controls.petSkill, undefined);
+  assert.equal(controls.interact, undefined);
+  f.pads([pad(3, 6)]);
+  controls = f.input.read(0, 1 / 60);
+  assert.equal(controls.petSkill, true);
+  assert.equal(controls.interact, true);
+  assert.equal(f.input.read(0, 1 / 60).petSkill, undefined);
+});
+
+test('accepted keyboard input unlocks synchronously before capture blocks later listeners', t => {
+  const order = [], f = fixture(t, { onInteraction: () => order.push('unlock') });
+  f.document.addEventListener('keydown', () => order.push('bubble'));
+  f.key('KeyW');
+  assert.deepEqual(order, ['unlock']);
+  f.send(f.document, 'keydown', { code: 'KeyW', repeat: true });
+  assert.deepEqual(order, ['unlock']);
+  f.document.closest = selector => selector.includes('input') ? f.document : null;
+  f.key('KeyW');
+  assert.deepEqual(order, ['unlock', 'bubble']);
+});
+
+test('only deliberate pointer controls trigger interaction and disposal removes the callback', t => {
+  let count = 0;
+  const f = fixture(t, { onInteraction: () => count++ });
+  f.send(f.canvas, 'pointermove', { pointerId: 1, clientX: 1, clientY: 1 });
+  f.send(f.canvas, 'pointerdown', { button: 4, pointerId: 1 });
+  f.send(f.canvas, 'wheel', { deltaY: 0 });
+  assert.equal(count, 0);
+  f.send(f.canvas, 'pointerdown', { button: 2, pointerId: 1 });
+  f.send(f.canvas, 'wheel', { deltaY: 12 });
+  assert.equal(count, 2);
+  f.input.dispose();
+  f.key('KeyW'); f.send(f.canvas, 'pointerdown', { button: 0, pointerId: 2 });
+  assert.equal(count, 2);
+});
+
+test('gamepad connection and stick drift remain silent until an active button or axis interaction', t => {
+  let count = 0;
+  const f = fixture(t, { onInteraction: () => count++ });
+  f.pads([pad()]); f.input.read(0, 1 / 60);
+  const drifting = pad(); drifting.axes = [.16, -.05, .1, 0];
+  f.pads([drifting]); f.input.read(0, 1 / 60);
+  assert.equal(count, 0);
+  const moving = pad(); moving.axes = [.4, 0, 0, 0];
+  f.pads([moving]); f.input.read(0, 1 / 60); f.input.read(0, 1 / 60);
+  assert.equal(count, 1);
+  f.pads([pad()]); f.input.read(0, 1 / 60);
+  f.pads([pad(7)]); f.input.read(0, 1 / 60); f.input.read(0, 1 / 60);
+  assert.equal(count, 2);
+  f.input.dispose(); f.input.read(0, 1 / 60);
+  assert.equal(count, 2);
 });

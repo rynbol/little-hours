@@ -1,12 +1,12 @@
-export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom }) {
+export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom, onInteraction = () => {} }) {
   const events = new AbortController(), keys = new Set(), pulses = {};
-  let pointer = null, mouseHeld = false, previousButtons = [];
+  let pointer = null, mouseHeld = false, previousButtons = [], padActive = false, disposed = false;
   const pulse = name => { pulses[name] = true; };
-  const buttons = { Space: 'jump', ControlLeft: 'dodge', ControlRight: 'dodge' };
+  const buttons = { Space: 'jump', ControlLeft: 'dodge', ControlRight: 'dodge', KeyQ: 'petSkill', KeyE: 'interact' };
   const release = () => {
     keys.clear();
     if (pointer && canvas.hasPointerCapture(pointer.id)) canvas.releasePointerCapture(pointer.id);
-    pointer = null; mouseHeld = false;
+    pointer = null; mouseHeld = false; padActive = false;
     for (const name of Object.keys(pulses)) delete pulses[name];
     pulse('attackCancelled');
   };
@@ -14,6 +14,7 @@ export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom }) {
     if (event.isComposing || event.target.closest('input, textarea, select')) return;
     if (event.target.closest('#wilds-menu, button') && event.code !== 'Escape') return;
     if (!['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'Space', 'ControlLeft', 'ControlRight', 'KeyF', 'KeyM', 'Escape', 'KeyE', 'KeyQ'].includes(event.code)) return;
+    if (!event.repeat) onInteraction();
     event.preventDefault(); event.stopImmediatePropagation();
     keys.add(event.code);
     if (event.repeat) return;
@@ -29,6 +30,8 @@ export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom }) {
   }, { signal: events.signal });
   canvas.addEventListener('contextmenu', event => event.preventDefault(), { signal: events.signal });
   canvas.addEventListener('pointerdown', event => {
+    if (![0, 1, 2].includes(event.button)) return;
+    onInteraction();
     event.preventDefault(); canvas.focus({ preventScroll: true });
     if (event.button === 2) { pulse('dodge'); return; }
     if (event.button !== 0 && event.button !== 1) return;
@@ -52,7 +55,7 @@ export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom }) {
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   }, { signal: events.signal });
   canvas.addEventListener('pointercancel', release, { signal: events.signal });
-  canvas.addEventListener('wheel', event => { event.preventDefault(); zoom(event.deltaY * .008); }, { passive: false, signal: events.signal });
+  canvas.addEventListener('wheel', event => { if (event.deltaY) onInteraction(); event.preventDefault(); zoom(event.deltaY * .008); }, { passive: false, signal: events.signal });
   window.addEventListener('blur', release, { signal: events.signal });
   const deadzone = value => Math.abs(value || 0) < .17 ? 0 : value;
   return {
@@ -61,15 +64,20 @@ export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom }) {
       let horizontal = Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
       let forward = Number(keys.has('KeyW')) - Number(keys.has('KeyS'));
       let sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
-      const pad = navigator.getGamepads?.().find(pad => pad?.connected);
+      const pad = disposed ? null : navigator.getGamepads?.().find(pad => pad?.connected);
       let padHeld = false;
       if (pad) {
         horizontal += deadzone(pad.axes[0]); forward -= deadzone(pad.axes[1]);
         orbit(deadzone(pad.axes[2]) * dt * 240, deadzone(pad.axes[3]) * dt * 180);
         const down = pad.buttons.map(button => button.pressed);
+        const active = down.some(Boolean) || pad.axes.some(value => deadzone(value) !== 0);
+        if (active && !padActive) onInteraction();
+        padActive = active;
         const pressed = index => down[index] && !previousButtons[index];
         if (pressed(0)) pulse('jump');
         if (pressed(1)) pulse('dodge');
+        if (pressed(3)) pulse('interact');
+        if (pressed(6)) pulse('petSkill');
         if (pressed(4) || pressed(11)) lock();
         if (pressed(9)) { release(); pause(); }
         if (pressed(2) || pressed(7)) pulse('attackPressed');
@@ -79,7 +87,7 @@ export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom }) {
         previousButtons = down;
       } else {
         if ((previousButtons[2] || previousButtons[7]) && !mouseHeld) pulse('attackCancelled');
-        previousButtons = [];
+        previousButtons = []; padActive = false;
       }
       const length = Math.max(1, Math.hypot(horizontal, forward));
       horizontal /= length; forward /= length;
@@ -87,6 +95,6 @@ export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom }) {
       for (const name of Object.keys(pulses)) delete pulses[name];
       return result;
     },
-    dispose() { events.abort(); release(); },
+    dispose() { disposed = true; events.abort(); release(); },
   };
 }

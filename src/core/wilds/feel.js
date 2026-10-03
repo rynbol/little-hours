@@ -13,7 +13,7 @@ export const POSTS = Object.freeze([
   { x: -6, z: 2, radius: 0.6, height: 2.6 },
   { x: 6, z: 2, radius: 0.6, height: 2.6 },
 ].map(Object.freeze));
-export const DUMMY = Object.freeze({ x: 0, z: -5, radius: 0.55 });
+export const DUMMY = Object.freeze({ id: 'dummy', x: 0, z: -5, radius: 0.55, height: 1.8 });
 export const FEEL_BOUNDS = Object.freeze({ x: 0, z: -4, radius: 44 });
 
 const CHARGE_TIME = 0.38;
@@ -22,7 +22,7 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const angleDifference = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const movingActions = new Set(['idle', 'run', 'sprint', 'jump', 'land']);
 
-export function createFeelSimulation() {
+export function createFeelSimulation({ target = () => DUMMY, obstacles = [] } = {}) {
   const state = {};
   let serial = 0;
   let hitSerial = 0;
@@ -79,7 +79,8 @@ export function createFeelSimulation() {
       if (state.action.kind === 'charge') action('idle');
       return;
     }
-    if (locked) state.player.heading = Math.atan2(DUMMY.x - state.player.x, state.player.z - DUMMY.z);
+    const aim = target();
+    if (locked && aim) state.player.heading = Math.atan2(aim.x - state.player.x, state.player.z - aim.z);
     combo = kind === 'heavy' ? 0 : Number(kind.at(-1));
     comboTime = row.duration + 0.3;
     state.counts.attack++;
@@ -104,20 +105,22 @@ export function createFeelSimulation() {
   function strike(row, from, to) {
     if (attackHit || to < row.hitStart || from > row.hitEnd) return;
     const player = state.player;
-    const dx = DUMMY.x - player.x, dz = DUMMY.z - player.z, distance = Math.hypot(dx, dz);
-    if (distance > row.range + DUMMY.radius || Math.abs(player.y - heightAt(DUMMY.x, DUMMY.z)) > 1) return;
+    const aim = target();
+    if (!aim) return;
+    const dx = aim.x - player.x, dz = aim.z - player.z, distance = Math.hypot(dx, dz);
+    if (distance > row.range + aim.radius || Math.abs(player.y - heightAt(aim.x, aim.z)) > 1) return;
     const bearing = angleDifference(Math.atan2(dx, -dz), player.heading);
     const start = (clamp((from - row.hitStart) / (row.hitEnd - row.hitStart), 0, 1) - 0.5) * row.arc;
     const end = (clamp((to - row.hitStart) / (row.hitEnd - row.hitStart), 0, 1) - 0.5) * row.arc;
-    const tolerance = Math.asin(Math.min(1, DUMMY.radius / Math.max(distance, DUMMY.radius))) + 0.12;
+    const tolerance = Math.asin(Math.min(1, aim.radius / Math.max(distance, aim.radius))) + 0.12;
     if (bearing < start - tolerance || bearing > end + tolerance) return;
     attackHit = true;
-    state.dummy.hits++;
+    if ((aim.id ?? 'dummy') === 'dummy') state.dummy.hits++;
     state.counts.hits++;
-    state.dummy.health = Math.max(0, state.dummy.health - row.damage);
+    if ((aim.id ?? 'dummy') === 'dummy') state.dummy.health = Math.max(0, state.dummy.health - row.damage);
     state.dummy.flash = 0.22;
     state.hitStop = state.action.kind === 'heavy' ? 0.075 : 0.045;
-    state.lastHit = { serial: ++hitSerial, kind: state.action.kind, x: DUMMY.x, y: heightAt(DUMMY.x, DUMMY.z) + 0.9, z: DUMMY.z };
+    state.lastHit = { serial: ++hitSerial, kind: state.action.kind, targetId: aim.id ?? 'dummy', damage: row.damage, x: aim.x, y: heightAt(aim.x, aim.z) + 0.9, z: aim.z };
   }
 
   function advance(dt, input, moveX, moveZ, moving) {
@@ -134,8 +137,9 @@ export function createFeelSimulation() {
     if (current.kind === 'charge') current.charge = clamp(heldTime / CHARGE_TIME, 0, 1);
     const row = ATTACKS[current.kind];
     const canMove = movingActions.has(current.kind);
-    if (canMove && moving) player.heading = input.locked ? Math.atan2(DUMMY.x - player.x, player.z - DUMMY.z) : Math.atan2(moveX, -moveZ);
-    else if (canMove && input.locked) player.heading = Math.atan2(DUMMY.x - player.x, player.z - DUMMY.z);
+    const aim = target();
+    if (canMove && moving) player.heading = input.locked && aim ? Math.atan2(aim.x - player.x, player.z - aim.z) : Math.atan2(moveX, -moveZ);
+    else if (canMove && input.locked && aim) player.heading = Math.atan2(aim.x - player.x, player.z - aim.z);
     if (!input.sprint || player.stamina >= 18) sprintExhausted = false;
     if (player.stamina <= 0) sprintExhausted = true;
     const sprint = canMove && moving && input.sprint && !sprintExhausted;
@@ -164,7 +168,8 @@ export function createFeelSimulation() {
     player.x += player.vx * dt;
     player.z += player.vz * dt;
     for (const post of POSTS) collide(post);
-    collide(DUMMY);
+    for (const obstacle of obstacles) collide(obstacle);
+    if (aim) collide(aim);
     const boundaryX = player.x - FEEL_BOUNDS.x, boundaryZ = player.z - FEEL_BOUNDS.z;
     const boundaryDistance = Math.hypot(boundaryX, boundaryZ);
     const boundaryRadius = FEEL_BOUNDS.radius - PLAYER_RADIUS;

@@ -1,19 +1,17 @@
 # Current step
 
-Stage 1: the three.js feel box is ready for the owner's playtest. Stop here before Stage 2. The owner explicitly authorized GPT-6.1 Sol helpers after the original work-alone brief.
+Stage 2 is green and ready for its recovery commit. Continue directly into Stage 3, then the Blender actors and final polish. The October 3 prompt has been reread in full: build all six stages in one run without approval stops. The owner explicitly authorized limited GPT-6.1 Sol helpers; current ownership is movement, valley geometry and primary integration/progression.
 
 # What is verified and how
 
-The branch and separate worktree exist. The required retired-valley archive tag already exists. The four specified mood stills have been viewed and saved outside Git. No archived game code or models are reused.
+Stages 1–2 have real-input recordings, inspected frames, lifecycle measurements and regression tests. Stage 2 passes 768 unit tests, guard, room verification and build. Every existing app flow passes across the broad and clean reruns. Its final `wilds` replay passes 17/17: all attacks and phase two, two stone stuns, perfect dodges, pet assistance, victory, intentional defeat and full camp recovery. The last camera fixes preserve the view at victory and reset it at camp. Measured responses are 3.8–15.3 ms. The unrecorded Retina fight averages 60.002 fps, maximum 16.8 ms, with no frame over 20 ms.
 
-Real browser input verifies run, sprint, jump, both dodge controls, three-hit combo, heavy hits, lock/unlock, camera orbit/zoom, pause/resume and both Forest entrances. The Forest flow passes 26/26 checks; all 25 other flows also pass. Five measured exits after ten warmups add 696 bytes of heap, restore the trailhead and release every measured three.js geometry, texture, shader program and context. No discarded Wilds canvases or contexts remain. A separate 20-visit check ends below its starting heap.
-
-Final gameplay measures 60 fps with a worst frame of 16.8 ms and none over 20 ms. The room/island performance remains within baseline variation; initial JavaScript and CSS bundles shrink. Unit tests, guard, room verification and production build pass. A fresh blind picture judge preferred the corrected roll pose, with all five Stage 1 legibility/grounding checks passing. The in-app browser also verified Forest entry and keyboard pause/resume. Detailed numbers, earlier failures and sampling corrections are in `stage1-validation.md`.
+Five measured entry/exit cycles add 16,708 bytes after fixed warmups and retain zero Wilds canvases or contexts. All measured three.js resources are released. The room/island initial bundles remain smaller than the fork; surrounding renderer code is unchanged. Detailed evidence, failures found by frame review and corrections are in `stage1-validation.md` and `stage2-validation.md`. A picture-only judge preferred the corrected combat framing.
 
 # What remains
 
-Wait for the owner's verdict on Stage 1 before starting the fight in shapes. Stages 2–6 remain in the plan; this checkpoint does not complete the full valley goal.
+Stage 3 completes climb/glide/swim with physical world surfaces before dressing the continuous valley, then eight secrets, checkpoints, merchant and persistent progression. Stage 4 builds the stag in Blender; Stage 5 builds the avatar and pet; Stage 6 supplies weather, life, sound and final visual polish. Play, inspect, gate, commit and push each stage, then continue. All images remain outside Git.
 
 # What looks or plays wrong in your own judgement
 
-Stage 1 intentionally uses the requested capsule and training shapes. The valley, final character art, pet, boss, weather and sound remain later stages. No known failing Stage 1 check remains; the owner's judgement of control feel is still pending.
+The current capsule, stag and pet are temporary block-outs. Climbing, gliding and swimming were not completed in the first feel checkpoint and must be implemented now; no final movement or art completion is claimed. The distant valley, final actors and atmospheric lighting remain unbuilt. The scene is intentionally plain and falls far below the final visual bar. The first recorded fight had a 116.7 ms frame; subsequent independent fight samples have none over 20 ms. Source must stay fixed during browser measurements to avoid HMR failures.

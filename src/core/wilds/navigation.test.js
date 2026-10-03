@@ -127,3 +127,42 @@ test('disposing during import never constructs a renderer or restores a torn-dow
   assert.equal(f.calls.some(item => item[0] === 'create'), false);
   assert.equal(f.calls.includes('trailhead'), false);
 });
+
+test('game receives the active room pet and its bond level without changing saved bonds', async () => {
+  const f = fixture();
+  f.app.state.pet = 'dog';
+  f.app.state.petBonds = Object.freeze({
+    cat: Object.freeze({ name: 'Miso', affection: 60, minutes: 75, sessions: 4 }),
+    dog: Object.freeze({ name: 'Bramble', affection: 24, minutes: 35, sessions: 2 }),
+    fox: Object.freeze({ name: 'Ember', affection: 8, minutes: 10, sessions: 1 }),
+  });
+  const saved = structuredClone(f.app.state.petBonds);
+  assert.equal(await f.forest.open(), true);
+  const first = f.calls.find(item => item[0] === 'create')[1];
+  assert.equal(first.pet, 'dog');
+  assert.equal(first.bond, 2);
+  first.bond = 99;
+  assert.deepEqual(f.app.state.petBonds, saved);
+  await f.forest.close();
+  f.app.state.pet = 'fox';
+  assert.equal(await f.forest.open(), true);
+  const second = f.calls.filter(item => item[0] === 'create').at(-1)[1];
+  assert.equal(second.pet, 'fox');
+  assert.equal(second.bond, 1);
+  await second.onLeave();
+  assert.deepEqual(f.app.state.petBonds, saved);
+});
+
+test('new and absent room pet bonds enter with zero strength bonus without creating save data', async () => {
+  for (const pet of ['bunny', undefined]) {
+    const f = fixture();
+    if (pet) f.app.state.pet = pet;
+    const saved = structuredClone(f.app.state);
+    assert.equal(await f.forest.open(), true);
+    const options = f.calls.find(item => item[0] === 'create')[1];
+    assert.equal(options.pet, pet || 'cat');
+    assert.equal(options.bond, 0);
+    await options.onLeave();
+    assert.deepEqual(f.app.state, saved);
+  }
+});

@@ -244,3 +244,32 @@ test('airborne dodge is ignored without stamina loss or a second action', () => 
   assert.equal(simulation.state.counts.dodge, 0);
   assert.equal(simulation.state.player.stamina, stamina);
 });
+
+test('dynamic target redirects lock, collision and attack events without damaging the training dummy', () => {
+  const boss = { id: 'mossheart', x: 5, z: -8, radius: 1.3, height: 4.5 };
+  const simulation = createFeelSimulation({ target: () => boss });
+  Object.assign(simulation.state.player, { x: 5, z: -5.5, y: heightAt(5, -5.5), heading: Math.PI });
+  simulation.step(1 / 120, { attackPressed: true, locked: true });
+  simulation.step(1 / 120, { attackReleased: true, locked: true });
+  assert.equal(simulation.state.player.heading, 0);
+  advance(simulation, 0.4);
+  assert.equal(simulation.state.lastHit.targetId, 'mossheart');
+  assert.equal(simulation.state.lastHit.damage, ATTACKS.light1.damage);
+  assert.equal(simulation.state.lastHit.x, 5);
+  assert.equal(simulation.state.dummy.health, 100);
+  assert.equal(simulation.state.dummy.hits, 0);
+  assert.ok(Math.hypot(simulation.state.player.x - boss.x, simulation.state.player.z - boss.z) >= boss.radius + 0.32 - 1e-8);
+  boss.x = 8;
+  advance(simulation, 0.5, { locked: true });
+  assert.ok(simulation.state.player.heading > 0.5);
+});
+
+test('additional world obstacles block player travel while a null target releases cleanly', () => {
+  const obstacle = { x: 0, z: 5, radius: 1, height: 3 };
+  const simulation = createFeelSimulation({ target: () => null, obstacles: [obstacle] });
+  advance(simulation, 1.2, { moveZ: 1, sprint: true, locked: true });
+  assert.ok(simulation.state.player.z <= obstacle.z - obstacle.radius - 0.32 + 1e-8);
+  click(simulation);
+  advance(simulation, 0.6);
+  assert.equal(simulation.state.lastHit, null);
+});

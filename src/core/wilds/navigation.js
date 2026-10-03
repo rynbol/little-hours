@@ -1,4 +1,5 @@
 import { isFocusing } from '../session.js';
+import { bondLevel } from '../pet-bonds.js';
 
 export function createWildsNavigation(app, container, loadWilds) {
   let active = false, game = null, pending = null, generation = 0, disposed = null, destroyed = false;
@@ -39,7 +40,7 @@ export function createWildsNavigation(app, container, loadWilds) {
       container.innerHTML = '<p role="status">Opening the Wilds…</p>';
       const module = await loadWilds();
       if (!current()) return false;
-      const created = await module.createWildsGame({ container, appearance: structuredClone(app.state.avatar), onLeave: close });
+      const created = await module.createWildsGame({ container, appearance: structuredClone(app.state.avatar), pet: app.state.pet || 'cat', bond: bondLevel(app.state.petBonds?.[app.state.pet]).index, onLeave: close });
       if (!current()) { release(created); return false; }
       game = created;
       return true;
