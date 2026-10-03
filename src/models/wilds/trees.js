@@ -1,4 +1,4 @@
-import { Color, ConeGeometry, CylinderGeometry, Euler, Group, IcosahedronGeometry, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
+import { Color, ConeGeometry, CylinderGeometry, Euler, Group, IcosahedronGeometry, InstancedMesh, Matrix4, PlaneGeometry, Quaternion, ShaderMaterial, Vector3 } from 'three';
 import { part, merge } from './shapes.js';
 
 const BARK = Object.freeze({ oak: '#5f4532', beech: '#8a8576', pine: '#6a4936', birch: '#e7e1d3' });
@@ -10,9 +10,33 @@ function blobs(kind, list, detail) {
   return list.map(([x, y, z, r, squash = 0.85], i) => part(new IcosahedronGeometry(r, detail), i % 3 === 2 ? light : dark, { position: [x, y, z], scale: [1, squash, 1], rotation: [i, i * 2, 0], shade: leafShade(low, high) }));
 }
 
+export const ROOTS = Object.freeze({ dark: 0.58, rise: 0.9, spread: 1.7, opacity: 0.42, tint: '#1c2614' });
+const rootShade = y => ROOTS.dark + (1 - ROOTS.dark) * Math.min(1, Math.max(0, (y + 0.3) / ROOTS.rise));
+
 function trunk(kind, height, base, top, sides) {
-  const shade = kind === 'birch' ? (_, y) => (Math.sin(y * 9.3) > 0.82 ? 0.35 : 1) : (_, y) => 0.85 + (y / height) * 0.2;
-  return part(new CylinderGeometry(top, base, height, sides, 3), BARK[kind], { position: [0, height / 2 - 0.3, 0], shade });
+  const bark = kind === 'birch' ? y => (Math.sin(y * 9.3) > 0.82 ? 0.35 : 1) : y => 0.85 + (y / height) * 0.2;
+  return part(new CylinderGeometry(top, base, height, sides, 6), BARK[kind], { position: [0, height / 2 - 0.3, 0], shade: (_, y) => bark(y) * rootShade(y) });
+}
+
+function roots(trees, ground) {
+  const material = new ShaderMaterial({
+    transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+    uniforms: { tint: { value: new Color(ROOTS.tint) } },
+    vertexShader: `varying vec2 vSpot;
+void main() { vSpot = position.xz; gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform vec3 tint; varying vec2 vSpot;
+void main() { float r = dot(vSpot, vSpot); if (r > 1.0) discard; float fall = 1.0 - r; gl_FragColor = vec4(tint, fall * fall * ${ROOTS.opacity.toFixed(2)}); }`,
+  });
+  const mesh = new InstancedMesh(new PlaneGeometry(2, 2).rotateX(-Math.PI / 2), material, trees.length), matrix = new Matrix4(), tilt = new Quaternion(), at = new Vector3(), size = new Vector3(), up = new Vector3(0, 1, 0), normal = new Vector3();
+  trees.forEach((tree, i) => {
+    normal.set(ground(tree.x - 1, tree.z) - ground(tree.x + 1, tree.z), 2, ground(tree.x, tree.z - 1) - ground(tree.x, tree.z + 1)).normalize();
+    const spread = ROOTS.spread * tree.scale * (tree.kind === 'pine' ? 0.85 : 1);
+    mesh.setMatrixAt(i, matrix.compose(at.set(tree.x, ground(tree.x, tree.z) + 0.04, tree.z), tilt.setFromUnitVectors(up, normal), size.set(spread, 1, spread)));
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingSphere();
+  mesh.renderOrder = 1; mesh.name = 'wilds-tree-roots';
+  return mesh;
 }
 
 function branch(kind, from, to, radius) {
@@ -62,7 +86,7 @@ if (smoothstep(${CLOSE.gone.toFixed(2)}, ${CLOSE.whole.toFixed(2)}, length(vView
   return material;
 }
 
-export function buildTrees(trees, painterly, { wind, near = () => true }) {
+export function buildTrees(trees, painterly, { wind, ground, near = () => true }) {
   const root = new Group(), material = addSway(painterly.material('#ffffff', { vertexColors: true }), wind);
   root.name = 'wilds-trees';
   const matrix = new Matrix4(), turn = new Quaternion(), lean = new Quaternion(), at = new Vector3(), size = new Vector3(), tint = new Color(), axis = new Vector3();
@@ -87,5 +111,6 @@ export function buildTrees(trees, painterly, { wind, near = () => true }) {
     mesh.name = `wilds-trees-${kind}-${detail ? 'near' : 'far'}`;
     root.add(mesh);
   }
+  root.add(roots(trees.filter(near), ground));
   return root;
 }

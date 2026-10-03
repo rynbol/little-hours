@@ -1,4 +1,4 @@
-import { AdditiveBlending, BufferAttribute, BufferGeometry, CircleGeometry, Color, DoubleSide, DynamicDrawUsage, Mesh, MeshBasicMaterial, NormalBlending, Points, ShaderMaterial } from 'three';
+import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DoubleSide, DynamicDrawUsage, InstancedBufferAttribute, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, NormalBlending, PlaneGeometry, Points, ShaderMaterial } from 'three';
 
 export const KINDS = Object.freeze({
   spark: Object.freeze({ colour: '#ffe7a8', size: 0.11, life: [0.18, 0.34], speed: [4, 9], gravity: 9, drag: 3, glow: 1 }),
@@ -106,23 +106,35 @@ function trail() {
   };
 }
 
-function blob() {
-  const material = new MeshBasicMaterial({ color: '#25331c', transparent: true, opacity: 0.32, depthWrite: false, fog: false });
-  const mesh = new Mesh(new CircleGeometry(0.36, 20).rotateX(-Math.PI / 2), material);
-  mesh.renderOrder = 2; mesh.name = 'wilds-blob';
-  material.polygonOffset = true; material.polygonOffsetFactor = -2; material.polygonOffsetUnits = -2;
+export const CONTACT = Object.freeze({ bodies: 4, opacity: 0.5, tint: '#1f2b18' });
+
+function contacts() {
+  const geometry = new PlaneGeometry(2, 2).rotateX(-Math.PI / 2), strength = new Float32Array(CONTACT.bodies);
+  geometry.setAttribute('strength', new InstancedBufferAttribute(strength, 1).setUsage(DynamicDrawUsage));
+  const material = new ShaderMaterial({
+    transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    uniforms: { tint: { value: new Color(CONTACT.tint) } },
+    vertexShader: `attribute float strength; varying vec2 vSpot; varying float vStrength;
+void main() { vSpot = position.xz; vStrength = strength; gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform vec3 tint; varying vec2 vSpot; varying float vStrength;
+void main() { float r = dot(vSpot, vSpot); if (r > 1.0 || vStrength <= 0.0) discard; float fall = 1.0 - r; gl_FragColor = vec4(tint, fall * fall * vStrength); }`,
+  });
+  const mesh = new InstancedMesh(geometry, material, CONTACT.bodies), matrix = new Matrix4();
+  mesh.renderOrder = 2; mesh.name = 'wilds-contact-shadows'; mesh.frustumCulled = false;
   return {
     mesh,
-    place(x, ground, height, z) {
-      const lift = Math.max(0, height - ground), size = Math.max(0.45, 1 - lift * 0.18);
-      mesh.position.set(x, ground + 0.03, z); mesh.scale.setScalar(size);
-      material.opacity = 0.32 * Math.max(0.35, 1 - lift * 0.22);
+    place(body, x, floor, height, z, radius) {
+      const lift = Math.max(0, height - floor), size = radius * Math.max(0.45, 1 - lift * 0.18);
+      strength[body] = CONTACT.opacity * Math.max(0.3, 1 - lift * 0.22);
+      mesh.setMatrixAt(body, matrix.makeScale(size, 1, size).setPosition(x, floor + 0.03, z));
+      mesh.instanceMatrix.needsUpdate = true; geometry.attributes.strength.needsUpdate = true;
     },
+    hide(body) { strength[body] = 0; geometry.attributes.strength.needsUpdate = true; },
   };
 }
 
 export function buildEffects(random) {
-  const bright = pool(AdditiveBlending, 'wilds-sparks'), soft = pool(NormalBlending, 'wilds-motes'), swish = trail(), shadow = blob();
+  const bright = pool(AdditiveBlending, 'wilds-sparks'), soft = pool(NormalBlending, 'wilds-motes'), swish = trail(), shadow = contacts();
   const direction = [0, 0, 0];
   const scatter = (spread, lift) => {
     const angle = random() * Math.PI * 2, rise = lift + (random() - 0.5) * spread;

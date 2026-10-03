@@ -2,7 +2,7 @@ import { steps } from '../steps.mjs';
 import { WILDS, face, hold, sleep, until, walkTo } from '../wilds-moves.mjs';
 
 export default {
-  about: 'the Wilds: the island Forest pin opens the three.js valley after freeing the island, Play starts it at the camp, and real keys and clicks run, jump, roll, swing a three-hit combo at the camp dummy, charge a heavy, lock on, climb the vista rock, glide down the valley and leave, each answered within 100 ms, at a capped pixel ratio, 60 fps with no long frames, then the island comes back at the trailhead, and a focus session closes it and keeps it shut',
+  about: 'the Wilds: the island Forest pin opens the three.js valley after freeing the island, Play starts it at the camp, and real keys and clicks run, jump, roll, swing a three-hit combo at the camp dummy, charge a heavy, lock on, climb the vista rock, glide down the valley and leave, each answered within 100 ms, with sound that waits for the first input, footsteps, swishes, thuds and an M mute, at a capped pixel ratio, 60 fps with no long frames, then the island comes back at the trailhead, and a focus session closes it and keeps it shut',
   async run(t) {
     const { check } = t;
     const app = await t.open({ seed: 'three-rooms', scale: 2 });
@@ -15,6 +15,7 @@ export default {
     check('entering frees the island: its engine and canvas are gone while the Wilds draws', before.house && !inside.house && inside.engines === before.engines - 1, { before, inside });
     const start = await app.js(WILDS);
     check('the Wilds caps the pixel ratio at 1.5 on a 2x screen', start.renderer.pixelRatio === 1.5, start.renderer);
+    check('the Wilds makes no sound before the first input inside it', start.sound.state === 'asleep', start.sound);
     await t.shot(app, 'start-card');
     await steps.playWilds(app);
     await app.move(720, 450);
@@ -24,6 +25,7 @@ export default {
     const ran = await app.js(WILDS);
     check('W runs away from the camera, across the camp clearing', ran.player.z < start.player.z - 1.5, ran.player);
     check('the run starts within 100 ms of the key', ran.latency.move !== null && ran.latency.move < 100, ran.latency);
+    check('input wakes the sound and the run patters footsteps on the camp ground', ran.sound.awake && ran.sound.counts.steps.grass + ran.sound.counts.steps.dirt >= 3, ran.sound);
     await sleep(300);
 
     await app.key(' ', 'Space');
@@ -58,6 +60,7 @@ export default {
     check('the first click answers within 100 ms', comboed.latency.attack < 100, comboed.latency);
     check('every hit kicks the camera and throws sparks', comboed.reactions.kicks - fresh.reactions.kicks === 3 && comboed.reactions.trail > fresh.reactions.trail, comboed.reactions);
     check('the combo takes 39 health off the dummy in three chunks', fresh.dummy.health - comboed.dummy.health === 39, { from: fresh.dummy.health, to: comboed.dummy.health });
+    check('every swing swishes and every hit thuds', comboed.sound.counts.swishes - fresh.sound.counts.swishes === 3 && comboed.sound.counts.thuds - fresh.sound.counts.thuds === 3, { before: fresh.sound.counts, after: comboed.sound.counts });
     await sleep(2800);
 
     const rested = await app.js(WILDS);
@@ -123,6 +126,10 @@ export default {
     check('the glide carries you well clear of the cliff before you land', flown > 12, { flown, at: landed.player });
     await sleep(400);
 
+    await app.key('m', 'KeyM');
+    const hushed = await app.js(WILDS);
+    await app.key('m', 'KeyM');
+    check('M mutes the Wilds and M again brings the sound back', hushed.sound.muted && !(await app.js(WILDS)).sound.muted && hushed.muted, hushed.sound);
     const frames = (await app.js(WILDS)).frames;
     check('the Wilds holds 60 fps: median frame gap under 17.5 ms', frames.gap.p50 < 17.5, frames);
     check('no frame over 20 ms while playing', frames.over20 === 0, frames);

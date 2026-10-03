@@ -32,7 +32,9 @@ import { buildRain } from '../../models/wilds/rain.js';
 import { createPost } from '../../models/wilds/post.js';
 import { buildLife } from '../../models/wilds/life.js';
 import { buildMist } from '../../models/wilds/mist.js';
+import { ambience, createStride, stride, surfaceUnder } from '../../core/wilds/sound.js';
 import { createInput } from './input.js';
+import { createSound } from './sound.js';
 import { createHud } from './hud.js';
 
 export const VIEW = Object.freeze({ ratio: 1.5, step: 1 / 120, longest: 0.1, shadow: 2048, shadowHalf: 18, haze: 0.00085, far: 3200, frames: 240, zoomStep: 0.35, tree: 140 });
@@ -85,7 +87,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   scene.add(buildGround(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { paint: valleyPaint }));
   for (const [x, z, radius] of MEADOWS) scene.add(buildTufts(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { centre: [x, z], radius, wind, keep: (tx, tz) => !near(tx, tz, busy, 1.1) && trailDistance(tx, tz) > 1.5 && waterAt(tx, tz) < ground(tx, tz) - 0.05 && Math.hypot(...slopeAt(ground, tx, tz, tilt)) < 0.6 }));
   const { bounds } = VALLEY;
-  scene.add(buildTrees(sim.trees, painterly, { wind, near: tree => tree.hero || Math.hypot((tree.x - bounds.x) / bounds.rx, (tree.z - bounds.z) / bounds.rz) < 1 }));
+  scene.add(buildTrees(sim.trees, painterly, { wind, ground, near: tree => tree.hero || Math.hypot((tree.x - bounds.x) / bounds.rx, (tree.z - bounds.z) / bounds.rz) < 1 }));
   const water = buildWater({
     surfaces: [
       buildWaterSurface(ground, waterAt, valleyFlow, { area: [-77, 72, -305, -100], step: 1.25 }),
@@ -155,11 +157,13 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   let frame = 0, last = 0, paused = true, disposed = false, width = 0, height = 0, trailAttack = null, trailTime = 0, dustClock = 0, driftClock = 0, muted = false, seconds = 0;
 
   const hud = createHud(hudLayer);
+  const sound = createSound(), walk = createStride(), hearing = ambience(sim.hour, player.x, player.z), underfoot = { ground, water: waterAt }, lastStep = { x: player.x, z: player.z };
+  sound.attach(window);
   const input = createInput(canvas, {
     onPress(action, stamp) {
       if (paused || disposed) return;
       if (action === 'pause') { onPause('key'); return; }
-      if (action === 'mute') { muted = !muted; return; }
+      if (action === 'mute') { muted = !muted; sound.setMuted(muted); return; }
       if (action === 'lock') { toggleLock(sim, rig.yaw); return; }
       if (action === 'interact') { interact(sim); return; }
       if (action === 'pet') { if (petSkill(sim)) reactions.petSkills++; return; }
@@ -242,9 +246,10 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
 
   function react(event, still) {
     const { type } = event;
-    if (type === 'swing') { reactions.swings++; trailAttack = event.attack; trailTime = 0; startPose[0] = shownPose[0]; startPose[1] = shownPose[1]; if (event.attack === 'heavy') effects.trail.cut(); }
+    if (type === 'swing') { reactions.swings++; sound.swish(event.attack === 'heavy'); trailAttack = event.attack; trailTime = 0; startPose[0] = shownPose[0]; startPose[1] = shownPose[1]; if (event.attack === 'heavy') effects.trail.cut(); }
     else if (type === 'hit') {
       reactions.hits++;
+      sound.thud(event.attack === 'heavy' || event.heart);
       const attack = ATTACKS[event.attack], target = event.id === sim.stag.id ? sim.stag : sim.dummy;
       bladeAngles(attack, player.time, pose); bladeSegment(player, pose[0], pose[1], segment);
       contact(target, spot);
@@ -255,8 +260,8 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
       if (event.broke) { reactions.breaks++; effects.hit(target.x, target.top - 0.3, target.z, null, true); }
       if (!still) { const push = attack.nudge * 26; kickRig(rig, toward[0] * push, -push * (event.attack === 'heavy' ? 0.9 : 0.35), toward[2] * push); reactions.kicks++; }
     }
-    else if (type === 'jump') { reactions.jumps++; hero.jump(); effects.dust(player.x, player.y, player.z, 0.3); }
-    else if (type === 'land') { reactions.lands++; hero.land(event); if (event.speed > 4) effects.dust(player.x, player.y, player.z, Math.min(1, event.speed / 14)); }
+    else if (type === 'jump') { reactions.jumps++; sound.step(surfaceUnder(player, underfoot), 0.7); hero.jump(); effects.dust(player.x, player.y, player.z, 0.3); }
+    else if (type === 'land') { reactions.lands++; sound.step(surfaceUnder(player, underfoot), Math.min(1.8, 0.8 + event.speed / 10)); hero.land(event); if (event.speed > 4) effects.dust(player.x, player.y, player.z, Math.min(1, event.speed / 14)); }
     else if (type === 'dodge') { reactions.dodges++; effects.dust(player.x, player.y, player.z, 0.5); }
     else if (type === 'charge') reactions.charges++;
     else if (type === 'tired') hud.warn();
@@ -272,12 +277,13 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     }
     else if (type === 'perfect') { reactions.perfects++; hud.flash(); hero.perfect(); }
     else if (type === 'evade') reactions.evades++;
-    else if (type === 'awaken') hud.toast('awaken', { icon: 'wake', tone: 'danger', seconds: 2.4 });
-    else if (type === 'telegraph') reactions.telegraphs++;
-    else if (type === 'retreat') { reactions.retreats++; effects.dust(sim.stag.x, sim.stag.y, sim.stag.z, 0.8); }
-    else if (type === 'slam') { effects.dust(event.x, ground(event.x, event.z), event.z, 1); if (!still) kickRig(rig, 0, -0.9, 0); }
+    else if (type === 'awaken') { sound.rumble(); sound.creak(); hud.toast('awaken', { icon: 'wake', tone: 'danger', seconds: 2.4 }); }
+    else if (type === 'telegraph') { reactions.telegraphs++; sound.creak(); }
+    else if (type === 'retreat') { reactions.retreats++; sound.creak(); effects.dust(sim.stag.x, sim.stag.y, sim.stag.z, 0.8); }
+    else if (type === 'slam') { sound.rumble(); effects.dust(event.x, ground(event.x, event.z), event.z, 1); if (!still) kickRig(rig, 0, -0.9, 0); }
     else if (type === 'stun') {
       reactions.stuns++;
+      sound.rumble();
       const stone = sim.stones.find(entry => entry.id === event.stone);
       if (stone) effects.hit(stone.x, stone.y + 1.6, stone.z, null, true);
       if (!still) kickRig(rig, 0, -0.8, 0);
@@ -343,6 +349,10 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
       if (player.state === 'attack' && player.attack === trailAttack) { sampleTrail(trailAttack, Math.max(before, trailTime), player.time); trailTime = player.time; }
     }
     if (wolf) { stepWolf(wolf, { player, ground: sim.floor }, dt); wolf.events.length = 0; }
+    const moved = Math.hypot(player.x - lastStep.x, player.z - lastStep.z);
+    lastStep.x = player.x; lastStep.z = player.z;
+    if (stride(walk, moved, Math.hypot(player.vx, player.vz), player.grounded && player.state !== 'swim')) sound.step(surfaceUnder(player, underfoot));
+    sound.update(ambience(sim.hour, player.x, player.z, hearing), dt, seconds);
     if (player.sprinting && player.grounded && (dustClock += dt) > 0.28) { dustClock = 0; effects.dust(player.x - player.vx * 0.05, player.y, player.z - player.vz * 0.05, 0.1); }
     if (!still && (driftClock += dt) > 0.09) { driftClock = 0; for (const draft of VALLEY.updrafts) { const angle = clockRandom() * Math.PI * 2, r = Math.sqrt(clockRandom()) * draft.radius, x = draft.x + Math.cos(angle) * r, z = draft.z + Math.sin(angle) * r; effects.drift(x, ground(x, z) + 0.3, z); } }
     if (player.state === 'charge' && player.charge < 1 && !still && clockRandom() < dt * 30) effects.charge(segment.tip[0], segment.tip[1], segment.tip[2]);
@@ -377,7 +387,11 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     shine();
     landmarks.update(seconds, light.night, still);
     water.update(seconds, light.toward, 0.45 + 0.55 * (1 - light.night), still, light.rain);
-    effects.shadow.place(player.x, ground(player.x, player.z), player.y, player.z);
+    const floor = (x, z) => Math.max(ground(x, z), waterAt(x, z));
+    effects.shadow.place(0, player.x, floor(player.x, player.z), player.y, player.z, 0.42);
+    effects.shadow.place(1, sim.pet.x, floor(sim.pet.x, sim.pet.z), sim.pet.y, sim.pet.z, 0.36);
+    if (wolf) effects.shadow.place(2, wolf.x, floor(wolf.x, wolf.z), wolf.y, wolf.z, 0.5); else effects.shadow.hide(2);
+    if (sim.stag.state === 'gone') effects.shadow.hide(3); else effects.shadow.place(3, sim.stag.x, floor(sim.stag.x, sim.stag.z), sim.stag.y, sim.stag.z, 1.8);
     effects.step(dt, frozen ? 0 : dt);
     stepRig(rig, dt, { player, lock: lockTarget(sim), world: sim.world, still });
     camera.position.set(...rig.eye); camera.lookAt(rig.look[0], rig.look[1], rig.look[2]);
@@ -438,10 +452,20 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     frame = requestAnimationFrame(tick);
   }
   function stop() { cancelAnimationFrame(frame); frame = 0; }
-  const onVisibility = () => { if (document.hidden) stop(); else if (!paused) start(); };
+  const onVisibility = () => { if (document.hidden) { stop(); sound.hush(); } else if (!paused) { start(); sound.wake(); } };
   document.addEventListener('visibilitychange', onVisibility);
 
+  function compileAll() {
+    const hidden = [];
+    scene.traverse(object => { if (!object.visible) { hidden.push(object); object.visible = true; } });
+    renderer.setRenderTarget(post.target);
+    renderer.compile(scene, camera);
+    renderer.setRenderTarget(null);
+    for (const object of hidden) object.visible = false;
+  }
+
   resize();
+  compileAll();
   draw(0, false, reducedMotion());
 
   return {
@@ -449,13 +473,13 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     get paused() { return paused; },
     resume({ capture = true } = {}) {
       if (disposed) return;
-      paused = false; input.clear();
+      paused = false; input.clear(); sound.wake();
       if (capture) input.lock();
       start();
     },
     pause() {
       if (disposed) return;
-      paused = true; stop(); input.clear(); input.unlock(); pending.length = 0;
+      paused = true; stop(); input.clear(); input.unlock(); pending.length = 0; sound.hush();
       steer.attackHeld = false;
       post.render(scene, camera);
     },
@@ -489,6 +513,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
         reactions: { ...reactions, particles: effects.live },
         renderer: { pixelRatio: renderer.getPixelRatio(), width: renderer.domElement.width, height: renderer.domElement.height, calls: info.render.calls, triangles: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures, programs: info.programs?.length ?? 0 },
         pointer: { locked: input.locked, lockable: input.lockable },
+        sound: sound.diagnostics(),
         paused, muted, running: Boolean(frame),
       };
     },
@@ -511,7 +536,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
       if (disposed) return;
       disposed = true; stop();
       document.removeEventListener('visibilitychange', onVisibility);
-      observer.disconnect(); input.dispose(); hud.dispose(); stagView.dispose(); hero.dispose(); petView.dispose(); wolfView.dispose();
+      observer.disconnect(); input.dispose(); hud.dispose(); sound.dispose(); stagView.dispose(); hero.dispose(); petView.dispose(); wolfView.dispose();
       scene.traverse(object => {
         if (object instanceof Mesh || object.isPoints) {
           object.geometry?.dispose();

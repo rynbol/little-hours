@@ -125,6 +125,7 @@ export default {
     const won = await app.js(WILDS);
     check('the stag falls to the steel sword', won.encounter === 'won', { stag: d.stag, player: d.player });
     check('the stag and the find raised your level', won.level > 1 && won.reactions.levels > 0, { level: won.level, xp: won.progress.xp });
+    check('every shader was compiled before the first frame: the evening, its lights and life, and the whole stag fight add no program', won.renderer.programs === start.renderer.programs, { start: start.renderer.programs, end: won.renderer.programs });
     check('the Wilds spent study coins at the merchant but never paid any', await app.js(`window.__littleHours.state.house.coins`) === spent);
     await sleep(1200);
     await t.shot(app, 'valley-victory');
