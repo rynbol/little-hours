@@ -12,7 +12,7 @@ export function bandAt(coord) {
 
 export const SHADE = Object.freeze({ fill: 0.55, tint: '#6f9be8', cool: 0.75, low: 1.05, high: 0.55 });
 const COOL = new Color(SHADE.tint);
-export const FIGURE = Object.freeze({ glint: 1.25, warm: [1.2, 0.98, 0.86], glow: [0.16, 0.05, 0.0], cloth: 0.5, lift: 1.15, rim: [0.62, 0.74, 0.32], back: 0.18, sheen: [0.42, 0.08, 1.3, 0.05, 23.0, 0.35], shine: [1.0, 0.86, 0.7] });
+export const FIGURE = Object.freeze({ glint: 1.25, warm: [1.2, 0.98, 0.86], glow: [0.16, 0.05, 0.0], cloth: 0.5, lift: 1.15, rim: [0.62, 0.74, 0.32], back: 0.18, sheen: { ring: 0.42, wave: 0.025, waves: 6.0, width: 0.1, dashes: 11.0, strength: 1.2, tint: 0.2 }, shine: [1.0, 0.86, 0.7] });
 const vec = list => `vec3(${list.map(v => v.toFixed(3)).join(', ')})`;
 
 export function createPainterly({ rim = '#fff0d2', rimStrength = 0.55, rimPower = 2.8 } = {}) {
@@ -48,8 +48,10 @@ outgoingLight += diffuseColor.rgb * (mix(mix(shadowFill, vec3(fillLevel), ${FIGU
 float daylight = clamp(fillLevel * 4.0, 0.0, 1.0), sunSide = dot(normalize(normal), sunView);
 outgoingLight += rimColor * smoothstep(${FIGURE.rim[0].toFixed(2)}, ${FIGURE.rim[1].toFixed(2)}, facing) * (clamp(sunSide + 0.3, 0.0, 1.0) * ${FIGURE.rim[2].toFixed(2)} + ${FIGURE.back.toFixed(2)}) * daylight * rimOn;
 vec3 hairNormal = normalize(normal);
-float ringAt = ${FIGURE.sheen[0].toFixed(2)} + ${FIGURE.sheen[3].toFixed(2)} * sin(hairNormal.x * ${FIGURE.sheen[4].toFixed(1)});
-outgoingLight += mix(diffuseColor.rgb * 2.0, ${vec(FIGURE.shine)}, ${FIGURE.sheen[5].toFixed(2)}) * smoothstep(${FIGURE.sheen[1].toFixed(2)}, 0.0, abs(hairNormal.y - ringAt)) * smoothstep(0.2, 0.5, hairNormal.z) * ${FIGURE.sheen[2].toFixed(2)} * max(daylight, 0.25) * hairPart;
+float ringAt = ${FIGURE.sheen.ring.toFixed(3)} + ${FIGURE.sheen.wave.toFixed(3)} * sin(hairNormal.x * ${FIGURE.sheen.waves.toFixed(1)});
+float dashWidth = max(${FIGURE.sheen.width.toFixed(3)} * sqrt(max(sin(hairNormal.x * ${FIGURE.sheen.dashes.toFixed(1)} + 0.6), 0.0)), 0.001);
+float dash = clamp(1.0 - abs(hairNormal.y - ringAt) / dashWidth, 0.0, 1.0);
+outgoingLight += mix(diffuseColor.rgb * 2.0, ${vec(FIGURE.shine)}, ${FIGURE.sheen.tint.toFixed(2)}) * dash * dash * (3.0 - 2.0 * dash) * smoothstep(0.2, 0.5, hairNormal.z) * ${FIGURE.sheen.strength.toFixed(2)} * max(daylight, 0.25) * hairPart;
 outgoingLight = mix(outgoingLight, diffuseColor.rgb * max(lightLevel, shadowBand.y) * mix(1.0, ${FIGURE.glint.toFixed(2)}, step(1.5, vPart)), eyePart);
 #include <opaque_fragment>`);
   }
