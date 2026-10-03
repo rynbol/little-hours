@@ -9,7 +9,7 @@ from mathutils import Euler, Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, os.path.dirname(__file__))
-from kit import (ROOT, FPS, RENDERS, Model, Poser, bake, catmull, export, keep_faces, loft, make_armature, make_mesh, mix, node, orb, refine, reset, smooth, srgb, studio, to_linear, track, transform, tube)
+from kit import (ROOT, FPS, RENDERS, Model, Poser, bake, catmull, export, keep_faces, loft, make_armature, make_mesh, mix, node, occlusion, orb, refine, reset, smooth, srgb, studio, to_linear, track, transform, tube)
 
 OUT = os.path.join(ROOT, 'public', 'wilds', 'hero.glb')
 TABLES = node("""
@@ -34,6 +34,7 @@ ATTACKS, BLADE, GAITS, MOVE, DODGE, VITALS, CLIMB, SWIM, GLIDE = (TABLES[k] for 
 
 SLOT = {'fixed': 0, 'skin': 1, 'hair': 2, 'top': 3, 'topShade': 4, 'topTrim': 5, 'bottom': 6, 'bottomTrim': 7, 'cape': 8, 'capeTrim': 9, 'glint': 10, 'eye': 11}
 HAIR = {'locks': 22, 'width': 0.05, 'groove': 0.55, 'sheen': 0.45, 'ring': 0.7, 'cap': 0.72, 'lift': 0.036, 'thick': 0.65}
+CREASE = {'reach': 0.045, 'rays': 32, 'depth': 0.55, 'tint': (0.85, 1.0, 1.1), 'skip': (SLOT['glint'], SLOT['eye'])}
 EYE = {'x': 0.047, 'z': 1.312, 'wide': 0.024, 'tall': 0.025, 'low': 0.78}
 TONE = {name: srgb(code) for name, code in {
     'iris': '#2b1b16', 'irisLow': '#b07a45', 'irisRim': '#e3b277', 'pupil': '#160d0b', 'sclera': '#f3eee6', 'lid': '#c8c6d3', 'shine': '#fff6ea', 'lash': '#22171b', 'lashLow': '#6a4440', 'mouth': '#7a4842', 'mouthIn': '#5b2f2c',
@@ -1004,6 +1005,20 @@ def build_parts():
     part('pearl', pearl)
     part('glider', glider)
     return parts
+
+
+def decal(colour):
+    return len(colour) > 3 and round(colour[3] * 16) in CREASE['skip']
+
+
+def shade_creases(parts):
+    look = TABLES['AVATAR_DEFAULT']
+    worn = ['body', f"hair-{look['style']}", f"outfit-{look['outfit']}", f"bottom-{look['bottomStyle']}"]
+    for name, model in parts.items():
+        if name.startswith('sword-') or name == 'glider':
+            continue
+        shade = occlusion(model, [parts[n] for n in dict.fromkeys(worn + [name])], CREASE['reach'], CREASE['rays'], decal)
+        model.colours = [c if decal(c) else (*(c[k] * (1.0 - CREASE['depth'] * s * CREASE['tint'][k]) for k in range(3)), *c[3:]) for c, s in zip(model.colours, shade)]
 
 
 def palette(appearance, cape_tone=('#3e5d6e', '#d9b46a')):
@@ -2325,6 +2340,7 @@ def main():
     scene = reset()
     rig = make_armature(scene, 'HeroRig', BONES)
     parts = build_parts()
+    shade_creases(parts)
     meshes = {}
     for name, model in parts.items():
         meshes[name] = make_mesh(scene, name, model, rig, ('Body', 'Blade'), NAMES)

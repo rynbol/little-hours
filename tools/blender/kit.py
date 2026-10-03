@@ -7,6 +7,7 @@ import sys
 import bmesh
 import bpy
 from mathutils import Euler, Matrix, Vector, kdtree, noise
+from mathutils.bvhtree import BVHTree
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 FPS = 30
@@ -167,6 +168,53 @@ def orb(shape, rings=18, segments=28):
         last = (rings - 2) * segments
         faces.append((bottom, last + (j + 1) % segments, last + j))
     return verts, faces, attrs
+
+
+def hemisphere(count):
+    rays = []
+    for i in range(count):
+        z = 1.0 - (i + 0.5) / count
+        r = math.sqrt(max(0.0, 1.0 - z * z))
+        rays.append(Vector((r * math.cos(i * 2.399963), r * math.sin(i * 2.399963), z)))
+    return rays
+
+
+def vertex_normals(model):
+    mesh = bpy.data.meshes.new('normals')
+    mesh.from_pydata([tuple(v) for v in model.verts], [], model.faces)
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.normal_update()
+    normals = [v.normal.copy() for v in bm.verts]
+    bm.free()
+    bpy.data.meshes.remove(mesh)
+    return normals
+
+
+def occlusion(model, occluders, reach, count=20, ignore=lambda colour: False):
+    verts, faces = [], []
+    for other in occluders:
+        faces += [tuple(len(verts) + i for i in f) for f in other.faces if not ignore(other.colours[f[0]])]
+        verts += [tuple(v) for v in other.verts]
+    tree = BVHTree.FromPolygons(verts, faces)
+    rays = hemisphere(count)
+    total = sum(d.z for d in rays)
+    shade = []
+    for p, n in zip(model.verts, vertex_normals(model)):
+        if n.length < 0.5:
+            shade.append(0.0)
+            continue
+        t = n.orthogonal().normalized()
+        b = n.cross(t)
+        start = Vector(p) + n * 0.0015
+        hit = 0.0
+        for d in rays:
+            location, _, _, distance = tree.ray_cast(start, t * d.x + b * d.y + n * d.z, reach)
+            if location is not None:
+                hit += d.z * (1.0 - distance / reach)
+        shade.append(hit / total)
+    return shade
 
 
 def keep_faces(piece, test):
