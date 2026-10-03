@@ -381,9 +381,9 @@ test('the avatar sun follows the world direction while a cool side fill preserve
     const { scene } = f.view.diagnostics();
     const sun = scene.getLightByName('wilds-sun'), sky = scene.getLightByName('wilds-sky-light'), bounce = scene.getLightByName('wilds-sky-bounce');
     assert.deepEqual(sun.direction.asArray(), [.5457491135496484, -.7173560908995228, .43307983549125045]);
-    assert.equal(sun.diffuse.toHexString(), '#FFF4DC');
-    assert.equal(sky.diffuse.toHexString(), '#A9C4D6');
-    assert.equal(sky.groundColor.toHexString(), '#8A9A5C');
+    assert.equal(sun.diffuse.toHexString(), '#FFF0C8');
+    assert.equal(sky.diffuse.toHexString(), '#A2C4EA');
+    assert.equal(sky.groundColor.toHexString(), '#8AA056');
     assert.deepEqual(bounce.direction.asArray(), [-.65, -.45, -.75]);
     assert.equal(bounce.diffuse.toHexString(), '#BED6E3');
     assert.ok(sun.intensity > bounce.intensity && bounce.intensity > 0);

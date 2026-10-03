@@ -67,8 +67,8 @@ function terrainMark(mark, surfaceAt) {
 export function createEncounter(scene, { petId = 'cat', ribbon = 0, arena, surfaceAt, createPet, signal } = {}) {
   if (signal?.aborted || scene.isDisposed) throw new DOMException('Combat model creation cancelled', 'AbortError');
   const previousMaterials = new Set(scene.materials), previousTextures = new Set(scene.textures);
-  const root = new TransformNode('wilds-combat', scene), bossRoot = new TransformNode('wilds-warden', scene), swordRoot = new TransformNode('wilds-sword', scene);
-  bossRoot.parent = root; swordRoot.parent = root;
+  const root = new TransformNode('wilds-combat', scene), bossRoot = new TransformNode('wilds-warden', scene);
+  bossRoot.parent = root;
   const paint = new StandardMaterial('wilds-combat-stone', scene);
   paint.diffuseColor = Color3.White(); paint.specularColor.set(.035, .04, .025); paint.ambientColor.set(.26, .3, .23);
   const glow = new StandardMaterial('wilds-heartwood-glow', scene);
@@ -87,12 +87,6 @@ export function createEncounter(scene, { petId = 'cat', ribbon = 0, arena, surfa
     stonesBatch.box([stone.x, y + stone.height * .72, stone.z - stone.radius * .69], [.14, .8, .05], '#d4cba4');
   }
   const stones = stonesBatch.mesh('wilds-standing-stones', scene, root, paint); stones.freezeWorldMatrix();
-  const swordBatch = geometryBatch();
-  swordBatch.branch([0, 0, 0], [0, .3, 0], .055, .055, '#665846');
-  swordBatch.box([0, .32, 0], [.34, .07, .12], '#c7ad6e');
-  swordBatch.box([0, .77, 0], [.12, .85, .045], '#d5ddd0');
-  swordBatch.branch([0, 1.18, 0], [0, 1.34, 0], .055, 0, '#edf1de');
-  const sword = swordBatch.mesh('wilds-sword-body', scene, swordRoot, paint); sword.rotation.x = -.58;
   const pet = createPet(scene, petId, ribbon); pet.root.parent = root;
   pet.animate({ action: 'stand', moving: false, walked: 0, petAge: Infinity, hearts: [], ritual: null, ritualAge: Infinity }, 0, 0, true);
   pet.contact.setEnabled(false);
@@ -111,8 +105,6 @@ export function createEncounter(scene, { petId = 'cat', ribbon = 0, arena, surfa
     heart.setEnabled(boss.mode !== 'defeated');
     glow.emissiveColor.copyFromFloats(...(boss.mode === 'exposed' ? [1, .82, .28] : boss.phase === 2 ? [.82, .5, .16] : [.49, .47, .2]));
     pet.body.visibility = companion.mode === 'knockout' ? .45 : 1;
-    const rightX = Math.cos(player.yaw) * .48, rightZ = -Math.sin(player.yaw) * .48;
-    positionRoot(swordRoot, { x: player.position.x + rightX, y: player.position.y + .65, z: player.position.z + rightZ }, player.yaw);
     const mark = boss.mode === 'telegraph' || boss.mode === 'charge' ? boss.telegraph : null;
     telegraphKind = mark?.kind ?? null; telegraph.setEnabled(Boolean(mark));
     const telegraphKey = mark ? JSON.stringify(mark) : '';
@@ -140,7 +132,7 @@ export function createEncounter(scene, { petId = 'cat', ribbon = 0, arena, surfa
   }
   return {
     update,
-    diagnostics: () => ({ source: 'frozen-placeholder', petId, ribbon, bossAction, petAction, bossPosition: bossRoot.position.asArray(), petPosition: pet.root.position.asArray(), telegraph: { kind: telegraphKind, visible: telegraph.isEnabled() }, meshes: [body, heart, stones, sword, pet.body, telegraph, skill, slash].filter(mesh => mesh.isEnabled()).length, disposed }),
+    diagnostics: () => ({ source: 'frozen-placeholder', petId, ribbon, bossAction, petAction, bossPosition: bossRoot.position.asArray(), petPosition: pet.root.position.asArray(), telegraph: { kind: telegraphKind, visible: telegraph.isEnabled() }, meshes: [body, heart, stones, pet.body, telegraph, skill, slash].filter(mesh => mesh.isEnabled()).length, disposed }),
     dispose,
   };
 }

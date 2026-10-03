@@ -89,7 +89,7 @@ export function createWildsView(engine, canvas, state, now = clockNow, dependenc
 
   function updateActors(frameInput) {
     avatar.root.position.set(player.position.x, player.position.y, player.position.z);
-    avatar.update({ action: player.action, actionTimeMs: player.actionTimeMs, mantleAdvance: player.mantleAdvance, yaw: player.yaw, speed: player.speed, deltaMs, elapsedMs, grounded: player.grounded });
+    avatar.update({ action: player.action, actionTimeMs: player.actionTimeMs, mantleAdvance: player.mantleAdvance, yaw: player.yaw, speed: player.speed, deltaMs, elapsedMs, grounded: player.grounded, combatAction: combat.playerAction });
     combatModels.update(combat);
     const lockTarget = combat.targetId === combat.boss.id ? combat.boss : null;
     ({ cameraYaw, cameraPitch } = cameraControl.update(player, frameInput, deltaMs, lockTarget));

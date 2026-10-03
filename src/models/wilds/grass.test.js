@@ -47,7 +47,8 @@ test('the ground field reaches past the farthest ring and carries slope, canopy 
 test('the Wilds palette keeps every Forest key and changes only ground, sun and rain air', () => {
   const ground = ['dirt', 'forestFloor', 'grass', 'grassFar', 'grassLight', 'grassTip', 'grassWarm', 'sand'];
   const rainAir = ['cloudLit', 'cloudRim', 'cloudShade', 'fogFar', 'fogNear', 'fogSun', 'glow', 'groundAmbient', 'high', 'horizon', 'horizonAway', 'mist', 'skyAmbient', 'zenith'];
-  const allowed = { day: [...ground, 'sun'], dusk: [...ground, 'sun'], rain: [...ground, ...rainAir] };
+  const storybookDay = ['bark', 'cloudLit', 'cloudRim', 'cloudShade', 'flowerWhite', 'flowerYellow', 'fogFar', 'fogNear', 'fogSun', 'glow', 'groundAmbient', 'high', 'horizon', 'horizonAway', 'leafBack', 'leafCrown', 'leafMid', 'leafTop', 'leafUnder', 'mist', 'needleTop', 'needleUnder', 'ridgeLight', 'rock', 'rockDark', 'shadowLift', 'shadowTint', 'skyAmbient', 'sunColor', 'zenith'];
+  const allowed = { day: [...ground, 'sun', ...storybookDay], dusk: [...ground, 'sun', 'bark'], rain: [...ground, ...rainAir] };
   const light = { day: [1, .2], dusk: [.8, .3], rain: [.4, .1] };
   for (const theme of ['day', 'dusk', 'rain']) {
     const wilds = wildsAtmosphere(theme), forest = worldAtmosphere(theme);
@@ -60,4 +61,6 @@ test('the Wilds palette keeps every Forest key and changes only ground, sun and 
   assert.ok(wildsAtmosphere('day').sun[1] > worldAtmosphere('day').sun[1]);
   assert.ok(wildsAtmosphere('dusk').sun[1] > worldAtmosphere('dusk').sun[1]);
   assert.equal(wildsAtmosphere('unknown'), wildsAtmosphere('day'));
+  assert.deepEqual([wildsAtmosphere('day').zenith, wildsAtmosphere('day').cloudLit, wildsAtmosphere('day').bark], ['#3f86d6', '#ffffff', '#6a5640']);
+  assert.equal(wildsAtmosphere('dusk').bark, '#6c5544');
 });

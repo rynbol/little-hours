@@ -6,6 +6,7 @@ import { createWildsTerrainPaint } from './ground.js';
 import { createWildsGrass } from './grass.js';
 import { createWildsShadows } from './light.js';
 import { createWildsPost } from './post.js';
+import { createWildsBoulders, placeWildsBoulders } from './boulders.js';
 import { LANDMARKS } from '../world/landmarks.js';
 import { WARDEN_ARENA } from '../../core/wilds/combat.js';
 
@@ -45,11 +46,13 @@ export async function createWildsWorld(scene, { theme = 'day', still = false, wo
   const shadows = createWildsShadows(scene, { atmosphere: outdoor.atmosphere, paints: [ground.paint, grass.mesh.material] });
   const post = createWildsPost(scene, { atmosphere: outdoor.atmosphere });
   const forest = outdoor.layers.find(layer => layer.planted), trees = outdoor.trees;
+  const boulders = createWildsBoulders(scene, { root: outdoor.root, boulders: placeWildsBoulders({ surfaceAt: outdoor.surfaceAt, trees, spawn: FOREST_START, arena: WARDEN_ARENA }) });
   const allObstacles = Array.from({ length: trees.count }, (_, index) => ({
     id: `forest-tree-${index}`, x: trees.x[index], z: trees.z[index],
     radius: trees.width[index] * .5, height: trees.height[index] * 5,
     baseY: outdoor.surfaceAt(trees.x[index], trees.z[index]).height, climbable: false,
   }));
+  boulders.placed.filter(boulder => boulder.radius > .7).forEach((boulder, index) => allObstacles.push({ id: `wilds-boulder-${index}`, x: boulder.x, z: boulder.z, radius: boulder.radius * .85, height: boulder.height * .8, baseY: boulder.y + boulder.height * .2, climbable: false }));
   for (const stone of WARDEN_ARENA.stones) allObstacles.push({ ...stone, baseY: outdoor.surfaceAt(stone.x, stone.z).height, climbable: false });
   const obstacles = [], nearby = { x: Infinity, z: Infinity };
   function refreshObstacles(position) {
@@ -86,13 +89,13 @@ export async function createWildsWorld(scene, { theme = 'day', still = false, wo
       return {
         location: 'Forest trail', scenery: 'forest', lighting: null, center: { x: 0, z: 0 }, pending: false, builds: 1, failures: 0,
         terrainTriangles: outdoor.terrain.reduce((sum, mesh) => sum + mesh.getTotalIndices() / 3, 0),
-        trees: trees.count, grassBlades: grass.blades, shadowCasters: shadows.casters(), postCameras: post.cameras(),
+        trees: trees.count, boulders: boulders.count, grassBlades: grass.blades, shadowCasters: shadows.casters(), postCameras: post.cameras(),
         landmarks: landmarks.length, obstacles: obstacles.length, totalObstacles: allObstacles.length, disposed,
       };
     },
     dispose() {
       if (disposed) return;
-      disposed = true; controller.abort(); scene.onDisposeObservable.remove(loading); signal?.removeEventListener('abort', cancel); post.dispose(); shadows.dispose(); outdoor.dispose();
+      disposed = true; controller.abort(); scene.onDisposeObservable.remove(loading); signal?.removeEventListener('abort', cancel); post.dispose(); shadows.dispose(); boulders.dispose(); outdoor.dispose();
     },
   };
 }

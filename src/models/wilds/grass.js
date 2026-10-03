@@ -21,6 +21,7 @@ export const WILDS_GRASS = Object.freeze({
   blade: Object.freeze({ width: 0.03, height: 0.36, widenEvery: 9 }),
   field: Object.freeze({ texels: 105, step: 2, recentre: 8 }),
   parting: 0.8,
+  flower: Object.freeze({ head: 0.036, share: 0.045 }),
 });
 
 const BLADE_ROWS = Object.freeze([[-1, 0], [1, 0], [-0.8, 0.38], [0.8, 0.38], [-0.48, 0.72], [0.48, 0.72], [0, 1]]);
@@ -71,7 +72,7 @@ const perRing = key => `(ring < .5 ? ${glsl(WILDS_GRASS.rings[0][key])} : ring <
 const GRASS_VERTEX = `precision highp float;
 attribute vec3 position; attribute vec4 blade;
 uniform mat4 world, viewProjection; uniform sampler2D ground; uniform vec4 groundGrid, walker, stones[${MEADOW_ROCKS.length}]; uniform float goldenHour;
-varying vec3 vColor; varying float vFold;
+varying vec3 vColor; varying float vFold; varying vec3 vPetal;
 ${WILDS_GROUND_GLSL}
 void groundAt(vec2 p, out vec3 n, out float height, out float canopy) {
   vec2 g = (p - groundGrid.xy) / groundGrid.w, i = floor(g), f = g - i; float size = groundGrid.z;
@@ -86,7 +87,7 @@ void main() {
   vec2 base = blade.xy + period * floor((eye.xz - blade.xy) / period + .5);
   float dist = length(base - eye.xz), keep = 1. - smoothstep(reach * .45, reach, dist);
   vec4 aim = viewProjection * world * vec4(base.x, eye.y - 1.5, base.y, 1.);
-  vColor = vec3(0.); vFold = 0.; gl_Position = vec4(2., 2., 2., 1.);
+  vColor = vec3(0.); vFold = 0.; vPetal = vec3(0.); gl_Position = vec4(2., 2., 2., 1.);
   if (keep <= rank || aim.w < -1. || abs(aim.x) > aim.w * 1.1 + 1.5) return;
   vec3 n; float level, canopy; groundAt(base, n, level, canopy);
   float grow = clamp((keep - rank) * 5., 0., 1.) * sward(base, level, n);
@@ -94,7 +95,7 @@ void main() {
   for (int i = 0; i < ${MEADOW_ROCKS.length}; i++) grow *= smoothstep(stones[i].z * .8, stones[i].z, distance(base, stones[i].xy));
   if (grow < .02) return;
   float swath = worldNoise(base / 17. + 3.7), clump = worldNoise(base / 2.3 + 11.);
-  float bloom = ring < 1.5 ? step(fract(seed * 91.7), smoothstep(.74, .88, worldNoise(base / 8. + 17.3)) * .035) * (1. - smoothstep(30., 45., dist)) : 0.;
+  float bloom = ring < 1.5 ? step(fract(seed * 91.7), smoothstep(.74, .88, worldNoise(base / 8. + 17.3)) * ${glsl(WILDS_GRASS.flower.share)}) * (1. - smoothstep(30., 45., dist)) : 0.;
   float tall = ${glsl(WILDS_GRASS.blade.height)} * (.72 + .56 * fract(seed * 7.31)) * (.78 + .3 * swath + .28 * clump) * (1. + dist / 250.) * grow;
   float wide = ${glsl(WILDS_GRASS.blade.width)} * (1. + dist / ${glsl(WILDS_GRASS.blade.widenEvery)}) * (.8 + .4 * fract(seed * 3.17)) * min(grow * 2., 1.);
   vec2 view = normalize(base - eye.xz + vec2(1e-3)), across = vec2(-view.y, view.x);
@@ -105,7 +106,7 @@ void main() {
   float press = walker.w * (1. - smoothstep(.15, ${glsl(WILDS_GRASS.parting)}, beside)) * step(abs(level - walker.y), 1.2);
   lean += away / max(beside, .05) * press * 1.2;
   tall *= 1. - .3 * press;
-  float head = (.02 + .003 * dist) * grow, stem = tall * 1.08, row = position.z;
+  float head = (${glsl(WILDS_GRASS.flower.head)} + .003 * dist) * grow, stem = tall * 1.08, row = position.z;
   float lift = mix(t * tall, row < .5 ? 0. : stem + head * (row - 2.) * .9, bloom);
   float span = mix(position.x * wide, sign(position.x) * head * (row > 1.5 && row < 2.5 ? 1. : .22), bloom);
   float reachUp = lift / max(tall, .01), bend = reachUp * reachUp * tall;
@@ -128,12 +129,16 @@ void main() {
   color *= contactShade(base);
   vColor = worldAir(color, worldPos.xyz, eye, sun, fogNear, fogFar, fogSun, fogDensity, fogHeight);
   vFold = position.x * (1. - bloom) * (1. - smoothstep(6., 18., dist));
+  vPetal = vec3(sign(position.x) * (row > 1.5 && row < 2.5 ? 1. : .22), row - 2., step(1.5, row)) * bloom;
   gl_Position = viewProjection * worldPos;
 }`;
 
 const GRASS_FRAGMENT = `precision highp float;
-varying vec3 vColor; varying float vFold;
-void main() { gl_FragColor = vec4(vColor * (1. + .07 * clamp(vFold * 6., -1., 1.)), 1.); }`;
+varying vec3 vColor; varying float vFold; varying vec3 vPetal;
+void main() {
+  float heart = vPetal.z * (1. - smoothstep(.24, .36, length(vPetal.xy)));
+  gl_FragColor = vec4(vColor * (1. + .07 * clamp(vFold * 6., -1., 1.)) * mix(vec3(1.), vec3(1., .72, .18), heart), 1.);
+}`;
 
 export function createWildsGrass(scene, { root, atmosphere, still = false, surface, blades = wildsBlades() }) {
   const paint = new ShaderMaterial('wilds-grass-paint', scene, { vertexSource: GRASS_VERTEX, fragmentSource: GRASS_FRAGMENT }, { attributes: ['position', 'blade'], uniforms: ['world', 'viewProjection', 'groundGrid', 'walker', 'stones', 'goldenHour', ...GROUND_UNIFORMS, ...SHADOW_UNIFORMS], samplers: ['ground', ...SHADOW_SAMPLERS] });

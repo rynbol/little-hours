@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 
 export const WILDS_SHOTS = {
   player: { position: [-106.5, -180], camera: [2.8, 1.6, -4.2], target: [0, .95, 0], crop: [.34, .22, .32, .64] },
+  ranger: { position: [-106.5, -180], camera: [1.25, 1.2, -2.3], target: [0, .92, 0], crop: [.3, .08, .4, .84] },
   grass: { position: [-111, -185], camera: [3, 1.25, 6], target: [0, .35, -6], crop: [.2, .4, .6, .48], empty: true },
   meadow: { position: [-118, -190], camera: [1.1, 2.3, 5.4], target: [-.6, .9, -9], crop: [.25, .45, .5, .5] },
   vista: { position: [-118, -190], camera: [2, 7, 16], target: [-8, -1, -60], crop: [.2, .3, .6, .4], empty: true },
