@@ -18,8 +18,23 @@ export function createPainterly({ rim = '#fff0d2', rimStrength = 0.55, rimPower 
   const shared = { rimColor: { value: new Color(rim) }, rimStrength: { value: rimStrength }, rimPower: { value: rimPower }, sunView: { value: new Vector3(0, 1, 0) } };
   const materials = new Set();
 
-  function patch(shader, { glow, rim }) {
+  function crumble(shader, dissolve) {
+    shader.uniforms.dissolve = dissolve;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vRest;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = position;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float dissolve;\nvarying vec3 vRest;')
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+float grain = fract(sin(dot(floor(vRest * 7.0), vec3(12.9898, 78.233, 45.164))) * 43758.5453) * 0.75 + clamp(vRest.y / 4.6, 0.0, 1.0) * 0.25;
+if (grain < dissolve) discard;`)
+      .replace('#include <opaque_fragment>', `outgoingLight += vec3(1.0, 0.8, 0.55) * smoothstep(0.07, 0.0, grain - dissolve) * step(0.0001, dissolve) * 1.6;
+#include <opaque_fragment>`);
+  }
+
+  function patch(shader, { glow, rim, dissolve }) {
     Object.assign(shader.uniforms, shared, { glow: glow ?? { value: 0 }, rimOn: { value: rim ? 1 : 0 } });
+    if (dissolve) crumble(shader, dissolve);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform vec3 rimColor;\nuniform float rimStrength;\nuniform float rimPower;\nuniform vec3 sunView;\nuniform float glow;\nuniform float rimOn;')
       .replace('#include <opaque_fragment>', `float facing = 1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
@@ -31,11 +46,11 @@ outgoingLight += diffuseColor.rgb * glow;
 
   return {
     shared, gradient,
-    material(color, { vertexColors = false, glow, rim = true, side, transparent = false, opacity = 1 } = {}) {
+    material(color, { vertexColors = false, glow, rim = true, side, transparent = false, opacity = 1, dissolve } = {}) {
       const material = new MeshToonMaterial({ color, gradientMap: gradient, vertexColors, transparent, opacity });
       if (side !== undefined) material.side = side;
-      material.onBeforeCompile = shader => patch(shader, { glow, rim });
-      material.customProgramCacheKey = () => 'wilds-painterly';
+      material.onBeforeCompile = shader => patch(shader, { glow, rim, dissolve });
+      material.customProgramCacheKey = () => dissolve ? 'wilds-painterly-dissolve' : 'wilds-painterly';
       materials.add(material);
       return material;
     },

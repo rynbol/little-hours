@@ -97,16 +97,16 @@ export function createWildsUI(app) {
     root.hidden = false; root.dataset.phase = 'loading'; delete root.dataset.started;
     document.body.classList.add('is-wilds'); document.getElementById('app').inert = true;
     app.houseUI?.release();
-    module.then(({ createGame }) => {
+    module.then(({ createGame, loadModels }) => loadModels().then(models => {
       if (disposed || !isOpen() || game) return;
       const { state } = app;
       game = createGame($('.wilds-stage'), $('.wilds-hud'), {
-        reducedMotion, onPause: pause, onShop: shop,
+        models, reducedMotion, onPause: pause, onShop: shop,
         wilds: { bond: bondLevel(state.petBonds[state.pet]).index, kind: state.pet, progress: state.wilds },
         onSave: mutate => app.acceptUpdate(app.store.update(draft => { mutate(draft.wilds, draft); })),
       });
       menu(false);
-    }).catch(error => {
+    })).catch(error => {
       failed = true;
       console.error('Could not open the Wilds:', error);
       app.toast('The Wilds couldn’t load. Your island is safe.', true);

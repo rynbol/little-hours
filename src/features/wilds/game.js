@@ -25,6 +25,7 @@ import { buildLandmarks, buildSecrets } from '../../models/wilds/landmarks.js';
 import { buildScatter } from '../../models/wilds/scatter.js';
 import { buildEffects } from '../../models/wilds/effects.js';
 import { buildRing } from '../../models/wilds/ring.js';
+import { buildStag, loadStag } from '../../models/wilds/stag.js';
 import { buildPet, buildWolf } from '../../models/wilds/critters.js';
 import { buildCamp } from '../../models/wilds/camp.js';
 import { createInput } from './input.js';
@@ -50,7 +51,9 @@ function quantiles(values) {
   return { p50: at(0.5), p95: at(0.95), max: sorted[sorted.length - 1], count: sorted.length };
 }
 
-export function createGame(stage, hudLayer, { reducedMotion = () => false, onPause = () => {}, onShop = () => {}, wilds = {}, onSave = () => {} } = {}) {
+export const loadModels = () => loadStag().then(stag => ({ stag }));
+
+export function createGame(stage, hudLayer, { models, reducedMotion = () => false, onPause = () => {}, onShop = () => {}, wilds = {}, onSave = () => {} } = {}) {
   const canvas = document.createElement('canvas');
   canvas.className = 'wilds-canvas'; canvas.tabIndex = -1;
   stage.append(canvas);
@@ -100,6 +103,8 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
   scene.add(sky);
   const effects = buildEffects(clockRandom);
   scene.add(...effects.meshes);
+  const stagView = buildStag(models.stag, sim.stag, painterly, effects);
+  scene.add(stagView.root);
 
   const hemi = new HemisphereLight('#bcd4ea', '#6f8a4c', 1.35);
   scene.add(hemi);
@@ -345,6 +350,7 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
     hero.update(player, segment, dt, still);
     dummyView.update(sim.dummy, still);
     ring.update(dt, still);
+    stagView.update(dt, still);
     petView.update(sim.pet, dt, still);
     wolfView.update(wolf, dt, still);
     camp.update(sim.campfires, player, dt, still);
@@ -434,7 +440,7 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
       const info = renderer.info;
       return {
         player: { x: player.x, y: player.y, z: player.z, vx: player.vx, vy: player.vy, vz: player.vz, facing: player.facing, state: player.state, attack: player.attack, charge: player.charge, stamina: player.stamina, tired: player.tired, grounded: player.grounded, sprinting: player.sprinting, health: player.health, max: player.max },
-        stag: { state: sim.stag.state, attack: sim.stag.attack, time: sim.stag.time, health: sim.stag.health, max: sim.stag.max, phase: sim.stag.phase, prefer: sim.stag.prefer, heartOpen: sim.stag.heartOpen, x: sim.stag.x, z: sim.stag.z, facing: sim.stag.facing, roots: sim.stag.roots.length },
+        stag: { clip: stagView.clip, dissolve: stagView.dissolve, state: sim.stag.state, attack: sim.stag.attack, time: sim.stag.time, health: sim.stag.health, max: sim.stag.max, phase: sim.stag.phase, prefer: sim.stag.prefer, heartOpen: sim.stag.heartOpen, x: sim.stag.x, z: sim.stag.z, facing: sim.stag.facing, roots: sim.stag.roots.length },
         pet: { kind: sim.pet.kind, state: sim.pet.state, health: sim.pet.health, max: sim.pet.max, cooldown: sim.pet.cooldown, x: sim.pet.x, z: sim.pet.z },
         wolf: wolf && { state: wolf.state, x: wolf.x, z: wolf.z },
         encounter: sim.encounter, flurry: sim.flurry, taunt: sim.taunt,
@@ -479,7 +485,7 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
       if (disposed) return;
       disposed = true; stop();
       document.removeEventListener('visibilitychange', onVisibility);
-      observer.disconnect(); input.dispose(); hud.dispose();
+      observer.disconnect(); input.dispose(); hud.dispose(); stagView.dispose();
       scene.traverse(object => {
         if (object instanceof Mesh || object.isPoints) {
           object.geometry?.dispose();

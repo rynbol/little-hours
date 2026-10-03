@@ -61,7 +61,7 @@ function lureSpot(d) {
 }
 
 export async function fight(app, t, check) {
-  const seen = { perfect: null, stun: null, swing: null, roots: null, telegraph: null, lure: null };
+  const seen = { perfect: null, stun: null, swing: null, roots: null, telegraph: null, lure: null, clips: {}, dissolve: 0, defeat: null };
   let frames = 0, sampled = 0;
   const gaps = [], steer = steering(app);
   const walk = on => on ? steer.toward(0, 0) : steer.stop();
@@ -70,6 +70,9 @@ export async function fight(app, t, check) {
   while (Date.now() < end && d.encounter !== 'won') {
     d = await app.js(WILDS);
     frames++;
+    seen.clips[d.stag.clip] = (seen.clips[d.stag.clip] ?? 0) + 1;
+    seen.dissolve = Math.max(seen.dissolve, d.stag.dissolve);
+    if (!seen.defeat && d.stag.state === 'defeat' && d.stag.time > 2.9) { seen.defeat = true; await t.shot(app, 'fight-defeat'); }
     if (Date.now() - sampled > 4000) { sampled = Date.now(); gaps.push(d.frames.gap.p50); }
     if (d.player.state === 'down' || d.encounter === 'calm') {
       await walk(false);

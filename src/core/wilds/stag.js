@@ -12,6 +12,12 @@ export const STAG_ATTACKS = Object.freeze({
   roots: Object.freeze({ telegraph: 0.8, active: 0, recover: 0.8, damage: 12, knock: 5, spacing: 1.4, length: 20, warn: 0.6, wave: 0.07, rise: 0.4, width: 0.9, near: Object.freeze([4, Infinity]), weight: 3, phase: 2 }),
 });
 
+export const STAG_GAITS = Object.freeze({
+  walk: Object.freeze({ speed: 2.4, cycle: 0.78, stance: 0.58 }),
+  trot: Object.freeze({ speed: 5.5, cycle: 0.44, stance: 0.42 }),
+  gallop: Object.freeze({ speed: 15, cycle: 0.42, stance: 0.18 }),
+});
+
 export const AMBIENT_ROOTS = Object.freeze({ damage: 10, knock: 5, spacing: 1.4, warn: 0.9, wave: 0.05, rise: 0.4, width: 0.9 });
 
 const SLEEPING = Object.freeze(['dormant', 'wake', 'shift', 'defeat', 'gone']);
