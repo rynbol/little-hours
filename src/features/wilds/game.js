@@ -118,7 +118,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   scene.add(stagView.root);
   const rain = buildRain(clockRandom, skyTime);
   scene.add(rain.mesh);
-  const life = buildLife(sim, painterly, effects, { time: skyTime, random: clockRandom, flowers: scatter.flowers }), mist = buildMist(skyTime);
+  const life = buildLife(sim, painterly, effects, { time: skyTime, random: clockRandom, flowers: scatter.flowers }), mist = buildMist(skyTime, ground);
   scene.add(...life.meshes, ...mist.meshes);
 
   const hemi = new HemisphereLight('#bcd4ea', '#6f8a4c', 1.35);

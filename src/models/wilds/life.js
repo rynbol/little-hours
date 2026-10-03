@@ -83,7 +83,7 @@ function glowPoints(count, name) {
   const material = new ShaderMaterial({
     ...GLOW, uniforms: { scale: { value: 600 } },
     vertexShader: `attribute float size; attribute vec4 tint; uniform float scale; varying vec4 vTint;
-void main() { vTint = tint; vec4 at = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale / max(0.1, -at.z); gl_Position = projectionMatrix * at; }`,
+void main() { vTint = tint; vec4 at = modelViewMatrix * vec4(position, 1.0); vTint.a *= smoothstep(1.2, 3.0, -at.z); gl_PointSize = min(12.0, size * scale / max(0.1, -at.z)); gl_Position = projectionMatrix * at; }`,
     fragmentShader: `varying vec4 vTint;
 void main() { vec2 p = gl_PointCoord * 2.0 - 1.0; float r = dot(p, p); if (r > 1.0) discard; float core = exp(-r * 6.0); gl_FragColor = vec4(vTint.rgb * (core * 1.6 + (1.0 - r) * 0.35) * vTint.a, 1.0); }`,
   });

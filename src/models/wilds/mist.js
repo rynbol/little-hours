@@ -1,25 +1,26 @@
-import { Color, CustomBlending, Mesh, OneMinusSrcAlphaFactor, PlaneGeometry, ShaderMaterial, SrcAlphaFactor, UniformsLib, UniformsUtils, Vector3, ZeroFactor, OneFactor } from 'three';
+import { BufferAttribute, Color, CustomBlending, Mesh, OneMinusSrcAlphaFactor, PlaneGeometry, ShaderMaterial, SrcAlphaFactor, UniformsLib, UniformsUtils, Vector3, ZeroFactor, OneFactor } from 'three';
 import { VALLEY, WATER } from '../../core/wilds/valley.js';
 
-export const MIST = Object.freeze({ layers: Object.freeze([0.35, 1.3, 2.6]), margin: 26, opacity: 0.5, drift: Object.freeze([0.9, -0.35]) });
+export const MIST = Object.freeze({ layers: Object.freeze([0.35, 1.3, 2.6]), margin: 26, cell: 2, shore: 1.2, opacity: 0.5, drift: Object.freeze([0.9, -0.35]) });
 
-export function buildMist(time) {
+export function buildMist(time, ground) {
   const { ax, az, bx, bz, radius } = VALLEY.lake;
   const x0 = Math.min(ax, bx) - radius - MIST.margin, x1 = Math.max(ax, bx) + radius + MIST.margin, z0 = Math.min(az, bz) - radius - MIST.margin, z1 = Math.max(az, bz) + radius + MIST.margin;
   const material = new ShaderMaterial({
     transparent: true, depthWrite: false, fog: true,
     blending: CustomBlending, blendSrc: SrcAlphaFactor, blendDst: OneMinusSrcAlphaFactor, blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,
     uniforms: UniformsUtils.merge([UniformsLib.fog, { time, amount: { value: 0 }, tint: { value: new Color() }, lit: { value: new Color() }, sun: { value: new Vector3(0, 1, 0) }, layer: { value: 0 } }]),
-    vertexShader: `varying vec3 vWorld;
+    vertexShader: `attribute float clearance; varying vec3 vWorld; varying float vClearance;
 #include <fog_pars_vertex>
 void main() {
+  vClearance = clearance;
   vec4 world = modelMatrix * vec4(position, 1.0);
   vWorld = world.xyz;
   vec4 mvPosition = viewMatrix * world;
   gl_Position = projectionMatrix * mvPosition;
   #include <fog_vertex>
 }`,
-    fragmentShader: `uniform float time; uniform float amount; uniform vec3 tint; uniform vec3 lit; uniform vec3 sun; varying vec3 vWorld;
+    fragmentShader: `uniform float time; uniform float amount; uniform vec3 tint; uniform vec3 lit; uniform vec3 sun; varying vec3 vWorld; varying float vClearance;
 #include <fog_pars_fragment>
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -32,7 +33,7 @@ void main() {
   float wisps = smoothstep(0.38, 0.8, fbm(p * 0.035 + flow * 0.02) * 0.65 + fbm(p * 0.09 - flow * 0.045) * 0.45);
   vec3 view = normalize(vWorld - cameraPosition);
   float glow = pow(max(dot(view, sun), 0.0), 4.0);
-  gl_FragColor = vec4(mix(tint, lit, glow * 0.7), wisps * inside * amount * ${MIST.opacity.toFixed(2)});
+  gl_FragColor = vec4(mix(tint, lit, glow * 0.7), wisps * inside * smoothstep(0.0, ${MIST.shore.toFixed(1)}, vClearance) * amount * ${MIST.opacity.toFixed(2)});
   #include <fog_fragment>
 }`,
   });
@@ -40,8 +41,10 @@ void main() {
     const layer = material.clone();
     layer.uniforms.time = time;
     layer.uniforms.amount.value = 0;
-    const mesh = new Mesh(new PlaneGeometry(x1 - x0, z1 - z0).rotateX(-Math.PI / 2), layer);
-    mesh.position.set((x0 + x1) / 2, WATER + height, (z0 + z1) / 2);
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, geometry = new PlaneGeometry(x1 - x0, z1 - z0, Math.ceil((x1 - x0) / MIST.cell), Math.ceil((z1 - z0) / MIST.cell)).rotateX(-Math.PI / 2), flat = geometry.attributes.position;
+    geometry.setAttribute('clearance', new BufferAttribute(Float32Array.from({ length: flat.count }, (_, v) => WATER + height - ground(cx + flat.getX(v), cz + flat.getZ(v))), 1));
+    const mesh = new Mesh(geometry, layer);
+    mesh.position.set(cx, WATER + height, cz);
     mesh.name = `wilds-mist-${i}`; mesh.renderOrder = 6 + i; mesh.frustumCulled = false; mesh.visible = false;
     return mesh;
   });
