@@ -85,7 +85,7 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
   const segment = { root: [0, 0, 0], tip: [0, 0, 0], yaw: BLADE.rest[0], pitch: BLADE.rest[1] }, trailSegment = { root: [0, 0, 0], tip: [0, 0, 0] };
   const projected = new Vector3(), hudState = { stamina: { x: 0, y: 0, visible: false, value: 100, max: 100, tired: false }, lock: { visible: false, x: 0, y: 0, barVisible: false, barX: 0, barY: 0, health: 100, max: 100 } };
   const cpu = [], gaps = [], latency = { move: null, attack: null, jump: null, dodge: null, worst: 0 }, pending = [];
-  const reactions = { swings: 0, hits: 0, breaks: 0, lands: 0, dodges: 0, jumps: 0, charges: 0, kicks: 0, trail: 0, warnings: 0 };
+  const reactions = { swings: 0, hits: 0, breaks: 0, lands: 0, dodges: 0, jumps: 0, charges: 0, kicks: 0, trail: 0, warnings: 0, frozen: 0 };
   let frame = 0, last = 0, paused = true, disposed = false, width = 0, height = 0, trailAttack = null, trailTime = 0, dustClock = 0, muted = false, seconds = 0;
 
   const hud = createHud(hudLayer);
@@ -188,7 +188,9 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
     let frozen = false;
     for (let i = 0; i < steps; i++) {
       const before = player.time;
+      const stopped = box.stop;
       const events = stepBox(box, sim, h);
+      reactions.frozen += Math.min(stopped, h);
       frozen = box.stop > 0;
       for (const event of events) react(event, still);
       if (player.state === 'attack' && player.attack === trailAttack) { sampleTrail(trailAttack, Math.max(before, trailTime), player.time); trailTime = player.time; }

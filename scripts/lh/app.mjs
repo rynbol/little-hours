@@ -19,10 +19,11 @@ function pinScript({ state, seed, startAt }) {
   })();`;
 }
 
-export async function openApp(url, { seed = 'three-rooms', theme, reducedMotion = false, width = 1440, height = 1000, scale = 2, headed = false, randomSeed = 7, startAt = START, pins = true } = {}) {
+export async function openApp(url, { seed = 'three-rooms', theme, reducedMotion = false, width = 1440, height = 1000, scale = 2, headed = false, randomSeed = 7, startAt = START, pins = true, before = [] } = {}) {
   const browser = await launch({ width, height, scale, headed, reducedMotion });
   try {
     if (pins) await browser.send('Page.addScriptToEvaluateOnNewDocument', { source: pinScript({ state: seedState(seed, { theme }), seed: randomSeed, startAt }) });
+    for (const source of before) await browser.send('Page.addScriptToEvaluateOnNewDocument', { source });
     const began = performance.now();
     await browser.navigate(url + '/');
     let hook = false;

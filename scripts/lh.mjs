@@ -226,7 +226,7 @@ async function perfOnce(url, view) {
     if (options.before) await app.js(`(() => { const scene = window.__littleHours.room.diagnostics().scene; ${options.before}; })()`);
     Object.assign(result, await idle(app, Number(options.seconds || 5)));
     if (view === 'house') {
-      const tags = await app.js(`[...document.querySelectorAll('button.house-room-tag:not(.is-site):not(.is-garden):not(.is-pond)')].map(tag => tag.dataset.room)`);
+      const tags = await app.js(`[...document.querySelectorAll('button.house-room-tag:not(.is-site):not(.is-garden):not(.is-pond):not(.is-forest)')].map(tag => tag.dataset.room)`);
       for (const id of tags) { await app.clickSel(`.house-room-tag[data-room="${id}"]`); result[`tapMs ${id}`] = await takeEvents(app, 1500); }
     }
     if (view === 'lake') {

@@ -7,7 +7,7 @@ async function hold(app, key, code, ms) { await app.down(key, code); await sleep
 async function until(app, expression, what, timeout = 4000) { return app.waitFor(`(() => { const d = ${WILDS}; return (${expression}) ? d : null; })()`, { what, timeout }); }
 
 export default {
-  about: 'the Wilds: the island Forest pin opens a three.js feel box after freeing the island, Play starts it, and real keys and clicks run, jump, roll, swing a three-hit combo, charge a heavy, lock on and leave, each answered within 100 ms, at a capped pixel ratio, 60 fps with no long frames, then the island comes back at the trailhead',
+  about: 'the Wilds: the island Forest pin opens a three.js feel box after freeing the island, Play starts it, and real keys and clicks run, jump, roll, swing a three-hit combo, charge a heavy, lock on and leave, each answered within 100 ms, at a capped pixel ratio, 60 fps with no long frames, then the island comes back at the trailhead, and a focus session closes it and keeps it shut',
   async run(t) {
     const { check } = t;
     const app = await t.open({ seed: 'three-rooms', scale: 2 });
@@ -71,7 +71,8 @@ export default {
     const slammed = await until(app, `d.player.attack === 'heavy' && d.reactions.hits >= ${rested.reactions.hits + 2}`, 'the heavy to land', 2000);
     await sleep(60);
     await t.shot(app, 'heavy');
-    check('releasing the charge swings the heavy, which lands with hit-stop', slammed.player.attack === 'heavy', slammed.reactions);
+    const held = (await app.js(WILDS)).reactions.frozen - charging.reactions.frozen;
+    check('releasing the charge swings the heavy, and its hit freezes the frame for about a tenth of a second', slammed.player.attack === 'heavy' && held > 0.1 && held < 0.2, { attack: slammed.player.attack, frozen: held });
     await sleep(1200);
 
     await app.wheel(720, 450, 240);
@@ -106,6 +107,21 @@ export default {
     check('leaving rebuilds the island and leaves no Wilds canvas behind', back.house && back.engines === before.engines && !await app.js(`Boolean(document.querySelector('.wilds-canvas'))`), back);
     check('the island comes back at the trailhead', await app.js(`document.activeElement?.dataset.room === 'forest'`));
     await t.shot(app, 'island-after');
+
+    await steps.openWilds(app);
+    await steps.playWilds(app);
+    await app.js(`(() => {
+      const key = 'little-hours-v1', saved = JSON.parse(localStorage.getItem(key)), now = window.__littleHoursTest.now(), length = 25 * 60000;
+      saved.session = { ...saved.session, kind: 'focus', phase: 'running', id: 'lh-other-tab', startedAt: now, duration: length, remaining: length, endsAt: now + length, running: true };
+      localStorage.setItem(key, JSON.stringify(saved));
+      window.dispatchEvent(new StorageEvent('storage', { key }));
+    })()`);
+    await app.waitFor(`document.querySelector('.wilds').hidden && Boolean(window.__littleHours.house.diagnostics()?.scene.isReady()) && !document.documentElement.dataset.placeTransition`, { what: 'focus to close the Wilds', timeout: 20000 });
+    const closed = await app.js(`window.__littleHours.counts()`);
+    check('a focus session started in another tab closes the Wilds and brings the island back', closed.house && closed.engines === before.engines, closed);
+    await app.clickSel('[data-room="forest"]');
+    await sleep(800);
+    check('while focusing, the Forest pin keeps you on the island and says why', await app.js(`document.querySelector('.wilds').hidden && !document.querySelector('#toast').hidden && document.querySelector('#toast').textContent.includes('focus')`));
     await t.close(app);
   },
 };
