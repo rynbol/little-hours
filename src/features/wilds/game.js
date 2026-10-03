@@ -13,7 +13,8 @@ import { ATTACKS, BLADE, bladeAngles, bladeSegment } from '../../core/wilds/move
 import { renderRatioCeiling } from '../../core/render-scale.js';
 import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createPainterly } from '../../models/wilds/painterly.js';
-import { buildGround, buildTufts } from '../../models/wilds/terrain.js';
+import { buildGround } from '../../models/wilds/terrain.js';
+import { GRASS, buildGrass } from '../../models/wilds/grass.js';
 import { buildDummy, buildPosts } from '../../models/wilds/props.js';
 import { buildHero, loadHero } from '../../models/wilds/hero.js';
 import { SKY, buildSky } from '../../models/wilds/sky.js';
@@ -38,7 +39,6 @@ import { createSound } from './sound.js';
 import { createHud } from './hud.js';
 
 export const VIEW = Object.freeze({ ratio: 1.5, step: 1 / 120, longest: 0.1, shadow: 2048, shadowHalf: 18, haze: 0.00085, far: 3200, frames: 240, zoomStep: 0.35, tree: 140 });
-const MEADOWS = Object.freeze([[0, 36, 30], [6, -100, 26], [VALLEY.oak.x, VALLEY.oak.z, 22], [VALLEY.ring.x, VALLEY.ring.z, 26], [2, -40, 22]]);
 const SHEETS = Object.freeze([Object.freeze({ lip: [-86.9, 46.2], land: [-84.8, 24.6], z: VALLEY.falls.z, width: 6, bulge: 0.3 }), Object.freeze({ lip: [-75.2, 25.1], land: [-72.6, 1.3], z: VALLEY.falls.z, width: 8, bulge: 0.5 })]);
 const RESPONSES = Object.freeze({
   move: player => Math.hypot(player.vx, player.vz) > 0,
@@ -85,7 +85,8 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   const tilt = [0, 0], near = (x, z, list, radius) => list.some(spot => Math.hypot(spot.x - x, spot.z - z) < radius);
   const busy = [sim.dummy, ...sim.posts, ...sim.campfires, ...sim.stones, sim.merchant, ...sim.secrets];
   scene.add(buildGround(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { paint: valleyPaint }));
-  for (const [x, z, radius] of MEADOWS) scene.add(buildTufts(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { centre: [x, z], radius, wind, keep: (tx, tz) => !near(tx, tz, busy, 1.1) && trailDistance(tx, tz) > 1.5 && waterAt(tx, tz) < ground(tx, tz) - 0.05 && Math.hypot(...slopeAt(ground, tx, tz, tilt)) < 0.6 }));
+  const grass = buildGrass(ground, painterly.material('#ffffff', { vertexColors: true, rim: false }), { wind, keep: (tx, tz) => !near(tx, tz, busy, 1.1) && trailDistance(tx, tz) > 1.5 && waterAt(tx, tz) < ground(tx, tz) - 0.05 && Math.hypot(...slopeAt(ground, tx, tz, tilt)) < 0.6 });
+  scene.add(grass.root);
   const { bounds } = VALLEY;
   scene.add(buildTrees(sim.trees, painterly, { wind, ground, near: tree => tree.hero || Math.hypot((tree.x - bounds.x) / bounds.rx, (tree.z - bounds.z) / bounds.rz) < 1 }));
   const water = buildWater({
@@ -400,6 +401,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     rain.update(camera.position, light.rain, light.sky);
     life.update({ player, hour: sim.hour, light, seconds, dt, still, ground, water: waterAt, flow: valleyFlow, eye: camera.position });
     mist.update(life.amounts.mist, light);
+    grass.update(player.x, player.z, dt > 0 ? GRASS.fills : Infinity);
     focus.set(player.x, player.y, player.z);
     const a = snap(focus.dot(lightRight)), b = snap(focus.dot(lightUp)), c = focus.dot(light.toward);
     sun.target.position.set(0, 0, 0).addScaledVector(lightRight, a).addScaledVector(lightUp, b).addScaledVector(light.toward, c);
@@ -504,6 +506,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
         herbs: { count: sim.herbs.length, picked: sim.herbs.filter(herb => herb.picked).length, nearest: sim.herbs.filter(herb => !herb.picked).map(herb => ({ x: herb.x, z: herb.z, distance: Math.hypot(herb.x - player.x, herb.z - player.z) })).sort((a, b) => a.distance - b.distance)[0] ?? null },
         merchant: { x: sim.merchant.x, z: sim.merchant.z },
         updrafts: sim.world.updrafts.map(draft => ({ x: draft.x, z: draft.z, radius: draft.radius })),
+        grass: { chunks: grass.chunks, tufts: grass.tufts },
         life: { amounts: { ...life.amounts }, deer: life.herd.map(deer => ({ state: deer.state, x: deer.x, z: deer.z })), fishJumping: life.fishJumping },
         world: { trees: sim.trees.length, ring: ring.kindled, swimming: player.state === 'swim', water: waterAt(player.x, player.z) },
         dummy: { health: sim.dummy.health, max: sim.dummy.max, tilt: Math.hypot(sim.dummy.tiltX, sim.dummy.tiltZ), hurt: sim.dummy.hurt, x: sim.dummy.x, z: sim.dummy.z },

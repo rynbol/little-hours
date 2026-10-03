@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry, Color, DoubleSide, InstancedMesh, Matrix4, Mesh, Quaternion, Vector3 } from 'three';
+import { BufferAttribute, BufferGeometry, Color, DoubleSide, Mesh } from 'three';
 import { fbm, noise2, smooth } from '../../core/world-terrain.js';
 
 const GREENS = Object.freeze({ deep: '#4f7f36', fresh: '#7aa847', sun: '#a3bd5c', dry: '#b2b26a', worn: '#b09a6b', moss: '#3f6a34', rock: '#9a8f7e', shade: '#6f6758' });
@@ -42,7 +42,7 @@ export function buildGround(grid, material, { worn = () => 0, paint = (x, z, y, 
   return mesh;
 }
 
-function tuftGeometry() {
+export function tuftGeometry() {
   const positions = [], colours = [], normals = [], lift = [], base = new Color(0.72, 0.78, 0.7), tip = new Color(1.22, 1.24, 1.02), mixed = new Color();
   const blades = [[0, 0, 0.3, 0.0], [0.05, 0.03, 0.25, 0.9], [-0.05, 0.02, 0.28, 1.8], [0.02, -0.05, 0.22, 2.7], [-0.03, -0.04, 0.24, 3.6], [0.06, -0.02, 0.2, 4.5], [-0.06, 0.05, 0.21, 5.4]];
   for (const [ox, oz, height, turn] of blades) {
@@ -67,38 +67,21 @@ function tuftGeometry() {
   return geometry;
 }
 
-export function buildTufts(grid, material, { centre, radius, spacing = 0.5, keep = () => true, wind }) {
-  const spots = [];
-  for (let x = centre[0] - radius; x <= centre[0] + radius; x += spacing) for (let z = centre[1] - radius; z <= centre[1] + radius; z += spacing) {
-    const jx = x + (noise2(x * 3.1, z * 3.1, 81) - 0.5) * spacing * 1.6, jz = z + (noise2(x * 2.7, z * 2.9, 82) - 0.5) * spacing * 1.6;
-    const fade = 1 - smooth(radius * 0.6, radius, Math.hypot(jx - centre[0], jz - centre[1]));
-    if (noise2(jx * 1.7, jz * 1.7, 83) < fade * (0.55 + 0.45 * smooth(-0.2, 0.3, fbm(jx / 9, jz / 9, 2, 84))) && keep(jx, jz)) spots.push([jx, jz]);
-  }
-  const mesh = new InstancedMesh(tuftGeometry(), material, spots.length), matrix = new Matrix4(), turn = new Quaternion(), up = new Vector3(0, 1, 0), at = new Vector3(), size = new Vector3(), colour = new Color();
-  spots.forEach(([x, z], i) => {
-    mesh.setColorAt(i, groundColour(x, z, 0, 0, colour));
-    const s = 0.75 + noise2(x * 5.3, z * 5.3, 85) * 0.7;
-    turn.setFromAxisAngle(up, noise2(x * 4.1, z * 4.7, 86) * Math.PI * 2);
-    matrix.compose(at.set(x, grid.at(x, z) - 0.02, z), turn, size.set(s, s * (0.8 + noise2(x * 6.1, z * 6.3, 87) * 0.6), s));
-    mesh.setMatrixAt(i, matrix);
-  });
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.receiveShadow = true;
-  mesh.frustumCulled = false;
-  mesh.name = 'wilds-tufts';
+export function swayTufts(material, wind, far) {
   material.side = DoubleSide;
   const before = material.onBeforeCompile;
   material.onBeforeCompile = shader => {
     before?.(shader);
     shader.uniforms.windTime = wind;
+    shader.uniforms.fadeFar = { value: far };
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float lift;\nuniform float windTime;')
+      .replace('#include <common>', '#include <common>\nattribute float lift;\nuniform float windTime;\nuniform float fadeFar;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vec3 rootAt = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 float gust = sin(windTime * 1.7 + rootAt.x * 0.31 + rootAt.z * 0.17) * 0.6 + sin(windTime * 3.1 + rootAt.x * 0.9) * 0.25;
-transformed += inverse(mat3(instanceMatrix)) * vec3(gust * 0.07, 0.0, gust * 0.035) * lift * lift;`);
+transformed += inverse(mat3(instanceMatrix)) * vec3(gust * 0.07, 0.0, gust * 0.035) * lift * lift;
+transformed *= 1.0 - smoothstep(fadeFar * 0.6, fadeFar, distance(rootAt.xz, cameraPosition.xz));`);
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(vNormal);');
   };
   material.customProgramCacheKey = () => 'wilds-tufts';
-  return mesh;
 }
