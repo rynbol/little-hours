@@ -381,6 +381,8 @@ def surface_patch(table, a0, a1, z0, z1, lift, thick=0.008, sides=8, rings=6, po
     return verts, faces, attrs
 
 
+SLEEVE = {'at': (0.05, 0.13, 0.215, 0.27, 0.33, 0.38), 'end': (-0.03, 0.0), 'radii': (0.063, 0.061, 0.055, 0.049, 0.053, 0.058, 0.06, 0.055, 0.047), 'ridges': 5, 'cuff': (0.049, 0.046, 0.045), 'rib': 12}
+TROUSER = {'radii': (0.09, 0.085, 0.07, 0.069, 0.054, 0.044), 'ridges': 4}
 SHIRT = [(1.0, 0.012), (1.06, 0.135), (1.11, 0.335), (1.165, 0.46)]
 TORSO_WEIGHTS = blend(['hips', 'spine', 'chest', 'neck'], 4.0, 2)
 
@@ -403,12 +405,12 @@ def sleeve(model, side, colour, cuff, cuff_colour):
     shoulder, elbow, wrist, knuckle, tip, down = arm_points(side)
     x = side_x(side)
     start = shoulder - down * 0.035 + Vector((-0.014 * x, 0, -0.006))
-    points = [start, shoulder + down * 0.05, shoulder + down * 0.13, elbow - down * 0.01, elbow + down * 0.07, wrist - down * 0.035, wrist + down * 0.004]
-    radii = [0.06, 0.057, 0.052, 0.046, 0.045, 0.042, 0.04]
-    model.add(refine(tube(points, radii, 14), 1), colour, arm_weights(side))
+    points = [start] + [shoulder + down * t for t in SLEEVE['at']] + [wrist + down * t for t in SLEEVE['end']]
+    radii = SLEEVE['radii']
+    model.add(refine(tube(points, radii, 16, ridges=SLEEVE['ridges']), 1), colour, arm_weights(side))
     if cuff:
         end = points[-1]
-        band = tube([end - down * 0.024, end + down * 0.01], [radii[-1] + 0.004, radii[-1] + 0.004], 14)
+        band = tube([end - down * 0.03, end - down * 0.012, end + down * 0.012], SLEEVE['cuff'], 16, ridges=SLEEVE['rib'])
         model.add(refine(band, 1), cuff_colour, arm_weights(side))
 
 
@@ -447,7 +449,8 @@ def legs(model, style):
         radii = [0.082, 0.076, 0.061, 0.058, 0.051, 0.046]
         weights = leg_weights(side)
         if style == 'trousers':
-            model.add(refine(tube(pts, radii, 16), 1), slot('bottom'), weights)
+            baggy = pts[:4] + [ankle + Vector((0, 0.006, 0.177)), ankle + Vector((0, 0.004, 0.11))]
+            model.add(refine(tube(baggy, TROUSER['radii'], 18, ridges=TROUSER['ridges']), 1), slot('bottom'), weights)
             continue
         model.add(refine(tube(pts, [r * 0.86 for r in radii], 16), 1), slot('skin'), weights)
         if style == 'shorts':
@@ -566,17 +569,17 @@ def boots(model):
         x = side_x(side)
         ankle = BONE[f'foot.{side}'][0]
         shaft_w = blend([f'shin.{side}', f'foot.{side}'], 6.0, 2)
-        shaft = tube([ankle + Vector((0, 0.002, -0.03)), ankle + Vector((0, 0.004, 0.06)), ankle + Vector((0, 0.006, 0.13)), ankle + Vector((0, 0.006, 0.175))], [0.046, 0.044, 0.047, 0.05], 14)
+        shaft = tube([ankle + Vector((0, 0.002, -0.03)), ankle + Vector((0, 0.004, 0.06)), ankle + Vector((0, 0.006, 0.13)), ankle + Vector((0, 0.006, 0.175))], [0.05, 0.05, 0.054, 0.057], 16)
 
         def wrap(p, a):
             band = math.sin((p.z * 95 + a[2] * math.tau) * 1.0)
             return (*(TONE['wrap'] if band > -0.2 else TONE['wrapDark']), 0.0)
         model.add(refine(shaft, 1), wrap, shaft_w)
-        model.add(refine(tube([ankle + Vector((0, 0.006, 0.165)), ankle + Vector((0, 0.006, 0.19))], [0.053, 0.052], 14), 1), fixed('leather'), shaft_w)
+        model.add(refine(tube([ankle + Vector((0, 0.006, 0.165)), ankle + Vector((0, 0.006, 0.195))], [0.062, 0.061], 16), 1), fixed('leather'), shaft_w)
 
         def foot_shape(n):
-            fx = n.x * 0.044
-            fy = n.y * (0.105 if n.y < 0 else 0.05)
+            fx = n.x * 0.05
+            fy = n.y * (0.115 if n.y < 0 else 0.055)
             fz = n.z * 0.042
             if fz < -0.028:
                 fz = -0.028
