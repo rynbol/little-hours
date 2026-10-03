@@ -42,20 +42,23 @@ export function buildGround(grid, material, { worn = () => 0, paint = (x, z, y, 
   return mesh;
 }
 
+export const TUFT = Object.freeze({ blades: 12, radius: 0.32, rows: Object.freeze([[0, 1], [0.4, 0.85], [0.75, 0.5], [1, 0]]) });
+
 export function tuftGeometry() {
-  const positions = [], colours = [], normals = [], lift = [], base = new Color(0.72, 0.78, 0.7), tip = new Color(1.22, 1.24, 1.02), mixed = new Color();
-  const blades = [[0, 0, 0.3, 0.0], [0.05, 0.03, 0.25, 0.9], [-0.05, 0.02, 0.28, 1.8], [0.02, -0.05, 0.22, 2.7], [-0.03, -0.04, 0.24, 3.6], [0.06, -0.02, 0.2, 4.5], [-0.06, 0.05, 0.21, 5.4]];
-  for (const [ox, oz, height, turn] of blades) {
-    const lean = 0.07 + height * 0.25, dx = Math.cos(turn), dz = Math.sin(turn), wide = 0.028;
-    const rows = [[0, 1], [0.55, 0.62], [1, 0]];
-    const points = rows.map(([t, w]) => [ox + dx * lean * t * t, height * t, oz + dz * lean * t * t, w * wide, t]);
-    for (let r = 0; r < rows.length - 1; r++) {
+  const positions = [], colours = [], normals = [], lift = [], base = new Color(0.5, 0.6, 0.5), middle = new Color(0.96, 1, 0.88), tip = new Color(1.38, 1.34, 0.9), mixed = new Color();
+  const hash = (i, k) => ((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
+  for (let i = 0; i < TUFT.blades; i++) {
+    const angle = hash(i, 1) * Math.PI * 2, out = Math.sqrt(hash(i, 2)) * TUFT.radius, ox = Math.cos(angle) * out, oz = Math.sin(angle) * out;
+    const height = 0.36 + hash(i, 3) * 0.34, turn = (hash(i, 4) - 0.5) * 1.3, lean = 0.08 + hash(i, 5) * 0.1 + height * 0.35, dx = Math.cos(turn), dz = Math.sin(turn), wide = 0.022 + hash(i, 6) * 0.012;
+    const points = TUFT.rows.map(([t, w]) => [ox + dx * lean * t * t, height * t, oz + dz * lean * t * t, w * wide, t]);
+    for (let r = 0; r < points.length - 1; r++) {
       const [ax, ay, az, aw, at] = points[r], [bx, by, bz, bw, bt] = points[r + 1];
       const quad = [[ax - dz * aw, ay, az + dx * aw, at], [ax + dz * aw, ay, az - dx * aw, at], [bx - dz * bw, by, bz + dx * bw, bt], [bx + dz * bw, by, bz - dx * bw, bt]];
-      for (const index of [0, 1, 2, 1, 3, 2]) {
+      for (const index of bw > 0 ? [0, 1, 2, 1, 3, 2] : [0, 1, 2]) {
         const [x, y, z, t] = quad[index];
         positions.push(x, y, z); normals.push(0, 1, 0); lift.push(t);
-        mixed.copy(base).lerp(tip, t); colours.push(mixed.r, mixed.g, mixed.b);
+        if (t < 0.5) mixed.copy(base).lerp(middle, t * 2); else mixed.copy(middle).lerp(tip, t * 2 - 1);
+        colours.push(mixed.r, mixed.g, mixed.b);
       }
     }
   }
@@ -79,7 +82,7 @@ export function swayTufts(material, wind, far, feet) {
       .replace('#include <common>', '#include <common>\nattribute float lift;\nuniform float windTime;\nuniform float fadeFar;\nuniform vec4 feet;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vec3 rootAt = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-float gust = sin(windTime * 1.7 + rootAt.x * 0.31 + rootAt.z * 0.17) * 0.6 + sin(windTime * 3.1 + rootAt.x * 0.9) * 0.25;
+float gust = sin(windTime * 1.7 + rootAt.x * 0.31 + rootAt.z * 0.17) * 0.6 + sin(windTime * 3.1 + rootAt.x * 0.9) * 0.25 + sin(windTime * 4.3 + position.x * 11.0 + position.z * 7.0) * 0.12;
 transformed += inverse(mat3(instanceMatrix)) * vec3(gust * 0.07, 0.0, gust * 0.035) * lift * lift;
 vec2 fromPlayer = rootAt.xz - feet.xy, fromPet = rootAt.xz - feet.zw;
 vec2 parted = fromPlayer / max(length(fromPlayer), 0.05) * (1.0 - smoothstep(0.15, 0.8, length(fromPlayer))) + fromPet / max(length(fromPet), 0.05) * (1.0 - smoothstep(0.1, 0.55, length(fromPet)));

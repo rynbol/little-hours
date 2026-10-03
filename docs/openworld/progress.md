@@ -2,7 +2,7 @@
 
 ## Current step
 
-Stages 1 to 4 are done and pushed. Stage 3 is the valley: a long green valley with the camp clearing, the lake under a two-step fall, layered cliffs, the far ranges with a ruined observatory, the landmarks, eight secrets, the merchant, herbs, levels, swimming, the whistle, and three campfires that are rest points and respawns. Stage 4 is the Mossheart Stag built and animated in Blender: driftwood strips over a stone frame, flowering mossy antlers and an amber heart behind the ribs, with 18 clips matched to the fight's hit frames. Stage 5 has its hero: a 1.5 m, five-heads-tall adventurer built, rigged and animated in Blender from code, dressed from the room avatar, with 34 clips matched to the sim. Stage 5 also has its pets: the room's cat, dog, bunny, fox and panda, and the Wilds wolf, built, rigged and animated in Blender from one script with 24 clips each. The active room pet comes along, wearing its bond ribbon in the bond level's colour. Stage 6 (life, weather, sound and polish) is next.
+All six stages are done and pushed. Stage 3 is the valley: a long green valley with the camp clearing, the lake under a two-step fall, layered cliffs, the far ranges with a ruined observatory, the landmarks, eight secrets, the merchant, herbs, levels, swimming, the whistle, and three campfires that are rest points and respawns. Stage 4 is the Mossheart Stag built and animated in Blender: driftwood strips over a stone frame, flowering mossy antlers and an amber heart behind the ribs, with 18 clips matched to the fight's hit frames. Stage 5 has its hero: a 1.5 m, five-heads-tall adventurer built, rigged and animated in Blender from code, dressed from the room avatar, with 34 clips matched to the sim. Stage 5 also has its pets: the room's cat, dog, bunny, fox and panda, and the Wilds wolf, built, rigged and animated in Blender from one script with 24 clips each. The active room pet comes along, wearing its bond ribbon in the bond level's colour. Stage 6 adds life, weather, sound and polish. A shower passes every afternoon and leaves a rainbow. The night sky has a galaxy band and a cratered moon. Deer graze and bolt, leaves fall and float, and butterflies, birds, fish, sunbeam motes, fireflies and lake mist follow the hour. Grass streams in chunks round the player, parts at the feet and shows gusts as waves of sheen. A synthesized soundscape needs no audio files. Every shader, post passes included, compiles before the first frame.
 
 ## Verified, and how
 
@@ -78,17 +78,37 @@ Stages 1 to 4 are done and pushed. Stage 3 is the valley: a long green valley wi
 - `PET_GAITS` gained the animated stride of each gait. The run cycle went from 0.26 to 0.22 s and the dash from 0.22 to 0.2 s with shorter stances, because the longer strides left the front paws 4 to 6 cm short of the ground.
 - `WOLF.size` (1.9) sets the wolf's model scale. The pet bond is read for the ribbon colour and never written.
 - `kit.py`'s `reset()` takes a frame rate and `bake()` reads it from the scene, so the pets bake at 60 fps while the hero and stag stay at 30.
+- The weather runs on the day clock instead of chance, so every visit and every test sees the same day. A shower gathers at 15.6, rains from 16.1 to 17.35 and leaves wet ground and a rainbow until 18.7. Rain greys the sky, dims the sun, lifts the fill and thickens the haze. The painterly material darkens and sheens when wet. The lake gets ripple rings in the rain.
+- The scene renders into a 4x MSAA half-float target. One quarter-size bright pass feeds a restrained bloom and screen-space sun shafts drawn only from sky pixels, so leaves cut the rays. A final pass applies an ACES fit, a lift toward the haze colour, a slight warm gain, saturation by weather and a vignette.
+- Every life amount (motes, fireflies, butterflies, birds, mist) comes from `lifeAt(hour)` and the weather. The herd and the falling leaves are pure state machines in core. Motes sample the sun's shadow map, so they show only in sunbeams.
+- Sound is synthesized from one noise buffer and a few oscillators, so it ships no audio files. The AudioContext starts on the first key or click inside the Wilds, suspends with the pause card or a hidden tab, and M mutes it.
+- Every shader compiles before the first frame. `compileAll` shows hidden objects, compiles the scene into the post target (its programs differ from the screen's), and compiles each post pass into the target it draws to. The light-shaft pass only draws when the sun is on screen, so before this it compiled mid-game the first time you faced the sun.
+- Grass streams in 16 m chunks within two chunks of the player, full in the middle and 45% on the outer ring, shrinking to nothing at the edge so the edge never pops. Each chunk is one `InstancedMesh`. Two chunks fill a frame while you walk, and a teleport or a shot fills them all. The same chunk always grows the same tufts. Tufts within a metre or so of the camera shrink away, so a low camera never looks through giant blades.
+- The glide-chest pillar wears a sea-stack sheath of stone courses, crag blocks, a moss lip and roots over the heightfield wall, so the climb and the chest on top did not change.
+- The stag's warnings are drawn as soft-edged decals draped over the ring floor each frame they show. As flat planes, half of each sank into the slope.
+- Lake mist fades out over its last 1.2 m above the ground, so it thins into the shore. Fireflies fade in from 1.2 to 3 m from the eye and their size is capped.
+- `lh` gained the `wilds-shore`, `wilds-golden` and `wilds-swing` views. `wilds-swing` walks into the ring with real keys, wakes the stag, locks on and swings, so the fight can be shot mid-swing at any hour.
+- Stage 6 touched nothing outside the Wilds folders and `scripts/lh/`.
 
 ## What remains
 
-Stage 6: life, weather, sound and polish. Then the shower screenshots and the judge rounds.
+Nothing from the six stages. The lists below are what to tweak first.
+
+## Graphics loop
+
+The owner judged the look "Fortnite with simple graphics" and asked for a loop toward the Breath of the Wild bar. Each round changes one look mechanism and shoots the same views before and after. A fresh blind judge then sees each pair in random order next to the four reference stills, picks the side closer to the bar and scores both from 1 to 10. A round is kept only if it wins blind and the frame checks still pass.
+
+| Round | Change | Blind result | Score | Kept |
+| --- | --- | --- | --- | --- |
+| 0 | Night grade: dark, cool pixels shift toward moonlit blue, warm firelight stays warm, campfires reach further | 5 of 5 pairs (2 clear) | night 3 to 4 | yes, 5aec304 |
+| 1 | Grass: 12-blade knee-high patches, 0.42 m apart, combed one way, tinted from the painted ground, taller in drifts | 6 of 6 pairs (5 clear) | 3 to 4 | yes |
+
+After round 1 the judge named the cheapest-looking thing as the stacked-cone pines with grey undersides and bare red trunks in even rows. The biggest gap it named was faceted primitive trees, rock and distant terrain with no leaf clusters and no blue-grey depth haze.
 
 ## What looks or plays wrong
 
 - The far ranges are streaky and washed out. Their banding reads as stretched texture, not rock.
-- The glide-chest pillar is a plain box of rock.
 - Flowers are small at the whole-valley scale and only read up close.
-- Grass tufts are fixed meadow scatter. Grass that follows the player is stage 6.
 - The waterfall recess is an open crevice rather than a cave behind the water.
 - Morning at 6.8 is a dull brown dawn. Morning shots use 8.5.
 - At gallop and dash speed a planted front paw dips up to 4 cm below the ground between keyframes. The dash moves 18 cm a frame, so the dip shows for one frame.

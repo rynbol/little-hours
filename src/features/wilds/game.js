@@ -85,7 +85,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   const tilt = [0, 0], near = (x, z, list, radius) => list.some(spot => Math.hypot(spot.x - x, spot.z - z) < radius);
   const busy = [sim.dummy, ...sim.posts, ...sim.campfires, ...sim.stones, sim.merchant, ...sim.secrets];
   scene.add(buildGround(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { paint: valleyPaint }));
-  const grass = buildGrass(ground, painterly.material('#ffffff', { vertexColors: true, rim: false }), { wind, keep: (tx, tz) => !near(tx, tz, busy, 1.1) && trailDistance(tx, tz) > 1.5 && waterAt(tx, tz) < ground(tx, tz) - 0.05 && Math.hypot(...slopeAt(ground, tx, tz, tilt)) < 0.6 });
+  const grass = buildGrass(ground, painterly.material('#ffffff', { vertexColors: true, rim: false }), { wind, keep: (tx, tz) => !near(tx, tz, busy, 1.1) && trailDistance(tx, tz) > 1.5 && waterAt(tx, tz) < ground(tx, tz) - 0.05 && Math.hypot(...slopeAt(ground, tx, tz, tilt)) < 0.6, paint: (tx, tz, out) => valleyPaint(tx, tz, ground(tx, tz), Math.hypot(...slopeAt(ground, tx, tz, tilt)), out) });
   scene.add(grass.root);
   const { bounds } = VALLEY;
   scene.add(buildTrees(sim.trees, painterly, { wind, ground, near: tree => tree.hero || Math.hypot((tree.x - bounds.x) / bounds.rx, (tree.z - bounds.z) / bounds.rz) < 1 }));

@@ -2,20 +2,21 @@ import { Color, Group, InstancedMesh, Matrix4, Quaternion, Sphere, Vector3, Vect
 import { fbm, noise2, smooth } from '../../core/world-terrain.js';
 import { groundColour, swayTufts, tuftGeometry } from './terrain.js';
 
-export const GRASS = Object.freeze({ chunk: 16, reach: 2, spacing: 0.55, outer: 0.45, fills: 2 });
+export const GRASS = Object.freeze({ chunk: 16, reach: 2, spacing: 0.42, outer: 0.4, fills: 2, comb: 0.6 });
 
+const GRASS_SUN = new Color('#b8c65c');
 const rank = (x, z) => ((Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1 + 1) % 1;
 
 export function grassSpots(cx, cz, keep) {
   const { chunk, spacing } = GRASS, x0 = cx * chunk, z0 = cz * chunk, spots = [];
   for (let x = x0; x < x0 + chunk; x += spacing) for (let z = z0; z < z0 + chunk; z += spacing) {
     const jx = x + (noise2(x * 3.1, z * 3.1, 81) - 0.5) * spacing * 1.6, jz = z + (noise2(x * 2.7, z * 2.9, 82) - 0.5) * spacing * 1.6;
-    if (noise2(jx * 1.7, jz * 1.7, 83) < 0.5 + 0.45 * smooth(-0.2, 0.3, fbm(jx / 9, jz / 9, 2, 84)) && keep(jx, jz)) spots.push([jx, jz, rank(jx, jz)]);
+    if (noise2(jx * 0.9, jz * 0.9, 83) < 0.86 && keep(jx, jz)) spots.push([jx, jz, rank(jx, jz)]);
   }
   return Float32Array.from(spots.sort((a, b) => a[2] - b[2]).flatMap(([x, z]) => [x, z]));
 }
 
-export function buildGrass(ground, material, { keep, wind }) {
+export function buildGrass(ground, material, { keep, wind, paint = (x, z, out) => groundColour(x, z, 0, 0, out) }) {
   const { chunk, reach } = GRASS, side = reach * 2 + 1, capacity = Math.ceil(chunk / GRASS.spacing) ** 2;
   const feet = { value: new Vector4(1e5, 1e5, 1e5, 1e5) };
   swayTufts(material, wind, (reach + 0.5) * chunk, feet);
@@ -37,10 +38,10 @@ export function buildGrass(ground, material, { keep, wind }) {
     cache.set(key, spots);
     const { mesh } = slot, count = spots.length / 2;
     for (let i = 0; i < count; i++) {
-      const x = spots[i * 2], z = spots[i * 2 + 1], s = 0.75 + noise2(x * 5.3, z * 5.3, 85) * 0.7;
-      turn.setFromAxisAngle(up, noise2(x * 4.1, z * 4.7, 86) * Math.PI * 2);
-      mesh.setMatrixAt(i, matrix.compose(at.set(x, ground(x, z) - 0.02, z), turn, size.set(s, s * (0.8 + noise2(x * 6.1, z * 6.3, 87) * 0.6), s)));
-      mesh.setColorAt(i, groundColour(x, z, 0, 0, colour));
+      const x = spots[i * 2], z = spots[i * 2 + 1], s = 0.8 + noise2(x * 5.3, z * 5.3, 85) * 0.5, tall = 0.6 + smooth(0.3, 0.7, fbm(x / 13, z / 13, 2, 89)) * 0.8;
+      turn.setFromAxisAngle(up, GRASS.comb + (noise2(x * 4.1, z * 4.7, 86) - 0.5) * 1.1);
+      mesh.setMatrixAt(i, matrix.compose(at.set(x, ground(x, z) - 0.02, z), turn, size.set(s, s * tall * (0.8 + noise2(x * 6.1, z * 6.3, 87) * 0.4), s)));
+      mesh.setColorAt(i, paint(x, z, colour).lerp(GRASS_SUN, noise2(x / 3.7, z / 3.7, 88) * 0.18).multiplyScalar(0.92 + noise2(x * 2.3, z * 2.3, 90) * 0.16));
     }
     mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
     const mx = (cx + 0.5) * chunk, mz = (cz + 0.5) * chunk;
