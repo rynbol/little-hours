@@ -1,4 +1,4 @@
-import { Color, DataTexture, LinearFilter, MeshToonMaterial, RedFormat, Vector3 } from 'three';
+import { Color, DataTexture, LinearFilter, MeshToonMaterial, RedFormat, Vector2, Vector3 } from 'three';
 
 export const BANDS = Object.freeze([[0, 0.3], [0.43, 0.3], [0.49, 0.66], [0.67, 0.66], [0.73, 1], [1, 1]]);
 
@@ -10,12 +10,15 @@ export function bandAt(coord) {
   return 1;
 }
 
+export const SHADE = Object.freeze({ fill: 0.55, tint: '#6f9be8', cool: 0.75, low: 1.05, high: 0.55 });
+const COOL = new Color(SHADE.tint);
+
 export function createPainterly({ rim = '#fff0d2', rimStrength = 0.55, rimPower = 2.8 } = {}) {
   const width = 128, data = new Uint8Array(width);
   for (let i = 0; i < width; i++) data[i] = Math.round(bandAt(i / (width - 1)) * 255);
   const gradient = new DataTexture(data, width, 1, RedFormat);
   gradient.magFilter = LinearFilter; gradient.minFilter = LinearFilter; gradient.generateMipmaps = false; gradient.needsUpdate = true;
-  const shared = { rimColor: { value: new Color(rim) }, rimStrength: { value: rimStrength }, rimPower: { value: rimPower }, sunView: { value: new Vector3(0, 1, 0) }, wet: { value: 0 } };
+  const shared = { rimColor: { value: new Color(rim) }, rimStrength: { value: rimStrength }, rimPower: { value: rimPower }, sunView: { value: new Vector3(0, 1, 0) }, wet: { value: 0 }, shadowFill: { value: new Color(0, 0, 0) }, shadowBand: { value: new Vector2(1, 2) } };
   const materials = new Set();
 
   function crumble(shader, dissolve) {
@@ -36,8 +39,10 @@ if (grain < dissolve) discard;`)
     Object.assign(shader.uniforms, shared, { glow: glow ?? { value: 0 }, rimOn: { value: rim ? 1 : 0 } });
     if (dissolve) crumble(shader, dissolve);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 rimColor;\nuniform float rimStrength;\nuniform float rimPower;\nuniform vec3 sunView;\nuniform float glow;\nuniform float rimOn;\nuniform float wet;')
-      .replace('#include <opaque_fragment>', `float facing = 1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
+      .replace('#include <common>', '#include <common>\nuniform vec3 rimColor;\nuniform float rimStrength;\nuniform float rimPower;\nuniform vec3 sunView;\nuniform float glow;\nuniform float rimOn;\nuniform float wet;\nuniform vec3 shadowFill;\nuniform vec2 shadowBand;')
+      .replace('#include <opaque_fragment>', `float lightLevel = dot(outgoingLight / max(diffuseColor.rgb, vec3(0.03)), vec3(0.3333));
+outgoingLight += diffuseColor.rgb * shadowFill * (1.0 - smoothstep(shadowBand.x, shadowBand.y, lightLevel));
+float facing = 1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
 float toward = clamp(dot(normalize(normal), sunView) * 0.5 + 0.6, 0.0, 1.0);
 outgoingLight += rimColor * pow(facing, rimPower) * rimStrength * toward * rimOn;
 outgoingLight += diffuseColor.rgb * glow;
@@ -55,6 +60,10 @@ outgoingLight = outgoingLight * (1.0 - wet * 0.26) + rimColor * wet * upward * p
       material.customProgramCacheKey = () => dissolve ? 'wilds-painterly-dissolve' : 'wilds-painterly';
       materials.add(material);
       return material;
+    },
+    shade(light) {
+      shared.shadowFill.value.copy(light.sky).lerp(COOL, SHADE.cool).multiplyScalar(SHADE.fill * (1 - light.night));
+      shared.shadowBand.value.set(light.fill * SHADE.low, light.fill + light.strength * SHADE.high);
     },
     setSun(direction, camera) { shared.sunView.value.copy(direction).transformDirection(camera.matrixWorldInverse); },
     dispose() { for (const material of materials) material.dispose(); materials.clear(); gradient.dispose(); },

@@ -141,6 +141,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     renderer.toneMappingExposure = light.exposure;
     sun.shadow.intensity = 1 - light.cloud * 0.7;
     painterly.shared.wet.value = light.wet;
+    painterly.shade(light);
     const { uniforms } = sky.material;
     uniforms.zenith.value.copy(light.zenith); uniforms.middle.value.copy(light.middle); uniforms.horizon.value.copy(light.horizon);
     uniforms.sunColor.value.copy(light.glow); uniforms.sunDirection.value.copy(light.sun); uniforms.moonDirection.value.copy(light.moon); uniforms.night.value = light.night; uniforms.cloud.value = light.cloud; uniforms.rainbow.value = light.rainbow;

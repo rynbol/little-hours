@@ -102,9 +102,10 @@ The owner judged the look "Fortnite with simple graphics" and asked for a loop t
 | --- | --- | --- | --- | --- |
 | 0 | Night grade: dark, cool pixels shift toward moonlit blue, warm firelight stays warm, campfires reach further | 5 of 5 pairs (2 clear) | night 3 to 4 | yes, 5aec304 |
 | 1 | Grass: 12-blade knee-high patches, 0.42 m apart, combed one way, tinted from the painted ground, taller in drifts | 6 of 6 pairs (5 clear) | 3.0 to 4.0 | yes, 6b698b6 |
-| 2 | Trees: canopies of camera-facing leaf-fan cards over darker cores with soft sphere normals, pines of drooping star-shaped tiers, and the great oak's crown in the same leaves | 6 of 6 pairs (4 clear) | 3.0 to 4.0 | yes |
+| 2 | Trees: canopies of camera-facing leaf-fan cards over darker cores with soft sphere normals, pines of drooping star-shaped tiers, and the great oak's crown in the same leaves | 6 of 6 pairs (4 clear) | 3.0 to 4.0 | yes, 613c603 |
+| 3 | Shadows: every painted surface gains a cool sky fill in proportion to how far it falls short of full sun, so cast shadows lift and turn blue while sunlit faces stay warm | 5 of 6 pairs (2 clear); the vista lost slightly to paler grass | 4.2 to 4.8 | yes |
 
-After round 1 the judge named the cheapest-looking thing as the stacked-cone pines with grey undersides and bare red trunks in even rows. The biggest gap it named was faceted primitive trees, rock and distant terrain with no leaf clusters and no blue-grey depth haze. After round 2 it named the flat clay-orange cliffs and rock pillars as the cheapest thing, with the doll-faced hero second, and the biggest gap as light and materials: single-hue fills, crushed dark shadows instead of lifted blue ones, no painterly colour variation and no sun through the leaves.
+After round 1 the judge named the cheapest-looking thing as the stacked-cone pines with grey undersides and bare red trunks in even rows. The biggest gap it named was faceted primitive trees, rock and distant terrain with no leaf clusters and no blue-grey depth haze. After round 2 it named the flat clay-orange cliffs and rock pillars as the cheapest thing, with the doll-faced hero second, and the biggest gap as light and materials: single-hue fills, crushed dark shadows instead of lifted blue ones, no painterly colour variation and no sun through the leaves. After round 3 it named the far pines, still cone-like and in rows, and the streaky terraced cliffs, and the biggest gap as a white veil of haze on the far mountains only, with no blue-grey depth in the mid-ground forest.
 
 ## What looks or plays wrong
 
