@@ -384,3 +384,88 @@ test('capped-frame partner dash and pounce avoid tunneling through stones and co
     assert.ok(Math.hypot(pet.x - boss.x, pet.z - boss.z) <= 1.3, kind);
   }
 });
+
+test('defeat wakes both actors at the last checkpoint with current level health', () => {
+  const stats={health:180},checkpoint={x:-72,z:-180};
+  const encounter=createEncounter({stats,checkpoint:()=>checkpoint}),simulation=createFeelSimulation();
+  Object.assign(simulation.state.player,{x:0,z:-20,y:heightAt(0,-20)});encounter.step(.016,simulation.state);
+  encounter.state.player.health=0;encounter.step(.016,simulation.state);
+  for(let i=0;i<240 && !encounter.state.respawn;i++)encounter.step(1/120,simulation.state);
+  assert.equal(encounter.state.status,'dormant');assert.equal(encounter.state.respawn.x,checkpoint.x);assert.equal(encounter.state.respawn.z,checkpoint.z);
+  assert.equal(encounter.state.player.health,180);assert.equal(encounter.state.pet.health,100);
+  assert.ok(Math.hypot(encounter.state.pet.x-checkpoint.x,encounter.state.pet.z-checkpoint.z)<2);
+});
+test('level health increases preserve damage, herbs heal partly and camp heals partner',()=>{
+  const stats={health:120},encounter=createEncounter({stats}),simulation=createFeelSimulation();
+  encounter.state.player.health=60;stats.health=140;encounter.step(.016,simulation.state);assert.equal(encounter.state.player.health,80);
+  encounter.heal(18);assert.equal(encounter.state.player.health,98);
+  encounter.state.pet.health=0;encounter.heal();assert.equal(encounter.state.player.health,140);assert.equal(encounter.state.pet.health,100);
+});
+
+test('the exploring partner follows onto the same climbable ledge and keeps its paws supported',async()=>{
+  const {createValleyWorld,SOLIDS}=await import('./world.js');const world=createValleyWorld(),ledge=SOLIDS.find(s=>s.id==='practice-ledge');
+  const encounter=createEncounter({world}),simulation=createFeelSimulation({world,bounds:null,posts:[]});
+  Object.assign(simulation.state.player,{x:ledge.x,z:ledge.z,y:ledge.top});
+  Object.assign(encounter.state.pet,{x:ledge.x,z:ledge.z+ledge.halfZ+.33,y:heightAt(ledge.x,ledge.z+ledge.halfZ+.33)});
+  let climbing=false;
+  for(let i=0;i<600;i++){encounter.step(1/120,simulation.state);climbing ||= encounter.state.pet.climbing;}
+  assert.equal(climbing,true);assert.ok(Math.abs(encounter.state.pet.y-ledge.top)<.01);assert.ok(Math.hypot(encounter.state.pet.x-simulation.state.player.x,encounter.state.pet.z-simulation.state.player.z)<2);
+});
+test('leaving the ring ends combat without taking possessions or sending the player back',async()=>{
+  const {createValleyWorld}=await import('./world.js');const encounter=createEncounter({world:createValleyWorld()}),simulation=createFeelSimulation();
+  Object.assign(simulation.state.player,{x:0,z:-20,y:heightAt(0,-20)});encounter.step(.016,simulation.state);assert.equal(encounter.state.status,'fighting');
+  encounter.state.player.health=80;Object.assign(simulation.state.player,{x:-20,z:-65,y:heightAt(-20,-65)});encounter.step(.016,simulation.state);
+  assert.equal(encounter.state.status,'dormant');assert.equal(encounter.state.player.health,80);assert.equal(encounter.state.respawn,null);assert.equal(encounter.state.boss.health,360);
+});
+
+
+test('the exploring pet wades through shallow lake water, paddles at the deep surface and walks back ashore continuously',async()=>{
+  const {createValleyWorld,LAKE}=await import('./world.js'),world=createValleyWorld();
+  const bond=Object.freeze({level:4}),encounter=createEncounter({world,bond:bond.level}),simulation=createFeelSimulation({world,bounds:null,posts:[],target:()=>null});
+  simulation.reset({x:-160,z:-374});
+  Object.assign(encounter.state.pet,{x:-160.9,z:-373.2,y:world.floorAt(-160.9,-373.2)});
+  const pet=encounter.state.pet,initialHealth=pet.health;
+  let shallow=false,deep=false;
+  const frame=input=>{
+    const previous={x:pet.x,y:pet.y,z:pet.z};
+    simulation.step(1/120,input);encounter.step(1/120,simulation.state);
+    const water=world.waterAt(pet.x,pet.z),floor=world.floorAt(pet.x,pet.z,pet.y+.5);
+    assert.ok(pet.y>=floor-1e-8);
+    assert.ok(Math.abs(pet.y-previous.y)<.03,'entering and leaving the water does not snap vertically');
+    assert.ok(Math.hypot(pet.x-previous.x,pet.z-previous.z)<=5.5/120+1e-8,'following uses physical movement');
+    if(water && water.depth>0 && water.depth<=.22 && !pet.swimming){shallow=true;assert.equal(pet.y,floor);}
+    if(water && water.depth>1 && pet.swimming){deep=true;assert.equal(pet.action.kind,'swim');assert.ok(Math.abs(pet.y-(LAKE.height-.22))<1e-8);assert.equal(pet.ground,pet.y);}
+  };
+  for(let i=0;i<3000&&simulation.state.player.z>-390;i++)frame({moveZ:-1});
+  for(let i=0;i<600;i++)frame({});
+  assert.equal(shallow,true);assert.equal(deep,true);assert.equal(pet.swimming,true);
+  assert.ok(Math.hypot(pet.x-(simulation.state.player.x-.9),pet.z-(simulation.state.player.z+.8))<=.2);
+  for(let i=0;i<3000&&simulation.state.player.z<-374;i++)frame({moveZ:1});
+  for(let i=0;i<600;i++)frame({});
+  assert.equal(pet.swimming,false);assert.equal(world.waterAt(pet.x,pet.z),null);
+  assert.equal(pet.y,world.floorAt(pet.x,pet.z,pet.y+.5));assert.notEqual(pet.action.kind,'swim');
+  assert.equal(encounter.state.status,'dormant');assert.equal(pet.health,initialHealth);
+  assert.equal(encounter.state.counts.petHits,0);assert.deepEqual(bond,{level:4});
+});
+
+test('a supported bridge over water keeps the pet walking above it rather than pulling it down to swim',()=>{
+  const world={floorAt:()=>2,climbContact:()=>null,resolve:()=>{},waterAt:()=>({id:'lake',height:1,depth:4}),solids:[],trees:[]};
+  const encounter=createEncounter({world}),simulation=createFeelSimulation();
+  Object.assign(simulation.state.player,{x:60,z:2,y:2});Object.assign(encounter.state.pet,{x:57,z:2,y:2});
+  advance(encounter,simulation,1);
+  assert.equal(encounter.state.pet.swimming,false);assert.equal(encounter.state.pet.y,2);assert.notEqual(encounter.state.pet.action.kind,'swim');
+});
+
+
+test('initialization and reset place the partner on the checkpoint support before the first tick',async()=>{
+  const {createValleyWorld,CAMPS}=await import('./world.js'),world=createValleyWorld();
+  let checkpoint=CAMPS.find(camp=>camp.id==='meadow');
+  const encounter=createEncounter({world,checkpoint:()=>checkpoint});
+  for(const camp of [checkpoint,CAMPS.find(camp=>camp.id==='shore')]) {
+    checkpoint=camp;if(camp.id==='shore')encounter.reset();
+    const pet=encounter.state.pet;
+    assert.equal(pet.x,camp.x-.9);assert.equal(pet.z,camp.z+.8);
+    assert.equal(pet.y,world.floorAt(pet.x,pet.z));assert.equal(pet.ground,pet.y);
+    assert.equal(pet.swimming,false);assert.equal(pet.health,pet.maxHealth);
+  }
+});

@@ -2,7 +2,7 @@ export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom, onInt
   const events = new AbortController(), keys = new Set(), pulses = {};
   let pointer = null, mouseHeld = false, previousButtons = [], padActive = false, disposed = false;
   const pulse = name => { pulses[name] = true; };
-  const buttons = { Space: 'jump', ControlLeft: 'dodge', ControlRight: 'dodge', KeyQ: 'petSkill', KeyE: 'interact' };
+  const buttons = { Space: 'jump', ControlLeft: 'dodge', ControlRight: 'dodge', KeyQ: 'petSkill', KeyE: 'interact', KeyR: 'whistle' };
   const release = () => {
     keys.clear();
     if (pointer && canvas.hasPointerCapture(pointer.id)) canvas.releasePointerCapture(pointer.id);
@@ -13,7 +13,7 @@ export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom, onInt
   document.addEventListener('keydown', event => {
     if (event.isComposing || event.target.closest('input, textarea, select')) return;
     if (event.target.closest('#wilds-menu, button') && event.code !== 'Escape') return;
-    if (!['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'Space', 'ControlLeft', 'ControlRight', 'KeyF', 'KeyM', 'Escape', 'KeyE', 'KeyQ'].includes(event.code)) return;
+    if (!['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'Space', 'ControlLeft', 'ControlRight', 'KeyF', 'KeyM', 'Escape', 'KeyE', 'KeyQ', 'KeyR'].includes(event.code)) return;
     if (!event.repeat) onInteraction();
     event.preventDefault(); event.stopImmediatePropagation();
     keys.add(event.code);
@@ -78,6 +78,7 @@ export function createWildsInput(canvas, { pause, lock, mute, orbit, zoom, onInt
         if (pressed(1)) pulse('dodge');
         if (pressed(3)) pulse('interact');
         if (pressed(6)) pulse('petSkill');
+        if (pressed(12)) pulse('whistle');
         if (pressed(4) || pressed(11)) lock();
         if (pressed(9)) { release(); pause(); }
         if (pressed(2) || pressed(7)) pulse('attackPressed');

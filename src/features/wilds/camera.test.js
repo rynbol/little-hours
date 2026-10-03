@@ -3,6 +3,7 @@ import test from 'node:test';
 import { PerspectiveCamera, Vector3 } from 'three';
 import { heightAt } from '../../core/world-terrain.js';
 import { createWildsCamera } from './camera.js';
+import { createValleyWorld, SOLIDS } from '../../core/wilds/world.js';
 import { STONES } from '../../core/wilds/encounter.js';
 
 test('camera stays in front of a post when the player touches its padded volume', () => {
@@ -209,4 +210,66 @@ test('reset discards arena tracking and snaps the next update to camp with the d
   assert.equal(rig.diagnostics().pitch, .3);
   assert.equal(rig.diagnostics().distance, 6.6);
   assert.deepEqual(rig.diagnostics().target, [0, 1.05, 2]);
+});
+
+test('ordinary valley freeview avoids a physical climbing wall before any lock and keeps the player framed', () => {
+  const world = createValleyWorld(), rock = SOLIDS.find(solid => solid.id === 'practice-ledge');
+  const player = { x: rock.x, z: rock.z + rock.halfZ + .45 };
+  player.y = world.floorAt(player.x, player.z);
+  const camera = new PerspectiveCamera(58, 920 / 640, .15, 130);
+  const rig = createWildsCamera(camera, { world, obstacles: [] });
+  rig.orbit(-Math.PI / .006, 0);
+  rig.update(player, false, 1);
+  assert.equal(rig.diagnostics().clipped, false);
+  camera.updateMatrixWorld();
+  for (const point of [new Vector3(player.x, player.y, player.z), new Vector3(player.x, player.y + 1.65, player.z)]) {
+    point.project(camera);
+    assert.ok(Math.abs(point.x) < .9 && Math.abs(point.y) < .9);
+  }
+  assert.ok(Math.abs(camera.position.x - rock.x) > rock.halfX + .3 || camera.position.z > rock.z + rock.halfZ + .3 || camera.position.y > rock.top + .3);
+  const [x, , z] = rig.diagnostics().target;
+  const actualYaw = Math.atan2(x - camera.position.x, camera.position.z - z);
+  assert.ok(Math.abs(Math.atan2(Math.sin(rig.yaw - actualYaw), Math.cos(rig.yaw - actualYaw))) < 1e-6);
+});
+
+test('camera passes through air below an overhang without treating its top as an infinite wall', () => {
+  const world = { solids: [{ x: 0, z: 4, halfX: 2, halfZ: 1, bottom: 5, top: 7 }], trees: [], cameraFloorAt: (x, z, ceiling) => Math.abs(x) <= 2 && z >= 3 && z <= 5 && ceiling >= 7 ? 7 : 0 };
+  const player = { x: 0, y: 0, z: 0 };
+  const camera = new PerspectiveCamera(58, 920 / 640, .15, 130);
+  const rig = createWildsCamera(camera, { world, obstacles: [] });
+  rig.update(player, false, 1);
+  assert.equal(rig.diagnostics().clipped, false);
+  assert.equal(rig.diagnostics().orbitOffset, 0);
+  assert.ok(camera.position.z > 6);
+  assert.ok(camera.position.y < 5);
+});
+
+test('temporary world avoidance eases back to the user orbit so the next vista retains its horizon', () => {
+  const camera = new PerspectiveCamera(58, 920 / 640, .15, 130);
+  const world = { solids: [], trees: [{ x: .54, z: 2.95, y: 0, radius: .8, height: 2.1 }], cameraFloorAt: () => 0 };
+  const player = { x: 0, y: 0, z: 0 };
+  const rig = createWildsCamera(camera, { world, obstacles: [] });
+  rig.orbit(30, 20);
+  const userYaw = -.18, userPitch = .38;
+  rig.update(player, false, 1);
+  assert.ok(Math.abs(rig.diagnostics().orbitOffset) > .1 || rig.diagnostics().elevatedPitch > .1);
+  assert.equal(rig.diagnostics().pitch, userPitch);
+  player.x = 20;
+  for (let frame = 0; frame < 150; frame++) rig.update(player, false, 1 / 60);
+  const state = rig.diagnostics(), dx = state.position[0] - state.target[0], dz = state.position[2] - state.target[2];
+  const actualPitch = Math.atan2(state.position[1] - state.target[1], Math.hypot(dx, dz));
+  assert.ok(Math.abs(actualPitch - userPitch) < .001);
+  assert.ok(Math.abs(Math.atan2(Math.sin(rig.yaw - userYaw), Math.cos(rig.yaw - userYaw))) < .001);
+  assert.ok(Math.abs(state.orbitOffset) < .001 && state.elevatedPitch < .001);
+  assert.equal(state.clipped, false);
+});
+
+test('an authored valley heading frames the lake and survives a camp reset',()=>{
+  const camera=new PerspectiveCamera(60,1.44,.15,9500),rig=createWildsCamera(camera,{obstacles:[],heading:-.33});
+  const player={x:-18,z:-65,y:heightAt(-18,-65)};
+  rig.update(player,false,1);camera.updateMatrixWorld();
+  const lake=new Vector3(-160,-44,-400).project(camera);
+  assert.ok(Math.abs(lake.x)<.15 && Math.abs(lake.y)<.9);
+  rig.orbit(110,40);rig.update(player,false,1);rig.reset();rig.update(player,false,1);
+  assert.equal(rig.yaw,-.33);
 });

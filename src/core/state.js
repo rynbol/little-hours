@@ -11,6 +11,7 @@ import { archivePetFriendships } from './pet-legacy.js';
 import { petGifts } from './pet-gifts.js';
 import { emptyBuddy, normalizeBuddy, recordAdventure, waitingFind, BUDDY_COLORS } from './buddy.js';
 import { emptyGarden, normalizeGarden, focusGardenPlantId, plantGardenSeed, placeGardenPlant, growGarden, gardenGrowth } from './garden-plants.js';
+import { normalizeWilds } from './wilds/save.js';
 
 export const storageKey = 'little-hours-v1';
 // The save as it was just before a backup replaced it.
@@ -39,6 +40,7 @@ export function restoreState(raw) {
   if (['dusk', 'rain', 'day'].includes(saved.theme)) initial.theme = saved.theme;
   if (typeof saved.task === 'string') initial.task = saved.task.slice(0, 180);
   initial.avatar = normalizeAvatarAppearance(saved.avatar);
+  if(saved.wilds)initial.wilds=normalizeWilds(saved.wilds);
   initial.pets = normalizeOwnedPets(saved.pets);
   initial.petBonds = normalizePetBonds(saved.petBonds, initial.pets);
   initial.petWish = normalizePetWish(saved.petWish, initial.pets);

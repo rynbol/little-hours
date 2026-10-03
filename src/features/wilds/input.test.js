@@ -193,3 +193,9 @@ test('gamepad connection and stick drift remain silent until an active button or
   f.input.dispose(); f.input.read(0, 1 / 60);
   assert.equal(count, 2);
 });
+
+test('whistle uses a single keyboard or gamepad pulse and clears on blur', t => {
+  const f=fixture(t);f.key('KeyR');assert.equal(f.input.read(0,.016).whistle,true);assert.equal(f.input.read(0,.016).whistle,undefined);
+  f.pads([pad(12)]);assert.equal(f.input.read(0,.016).whistle,true);assert.equal(f.input.read(0,.016).whistle,undefined);
+  f.pads([pad()]);f.input.read(0,.016);f.key('KeyR');f.send(f.window,'blur');assert.equal(f.input.read(0,.016).whistle,undefined);
+});

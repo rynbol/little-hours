@@ -5,11 +5,10 @@ import { DUMMY, POSTS } from '../../core/wilds/feel.js';
 const clamp = (n, low, high) => Math.min(high, Math.max(low, n));
 const angleDifference = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
-export function createWildsCamera(camera, { target: getTarget = () => DUMMY, obstacles = POSTS } = {}) {
+export function createWildsCamera(camera, { target: getTarget = () => DUMMY, obstacles = POSTS, world = null, heading = 0 } = {}) {
   const target = new Vector3(), desired = new Vector3(), follow = new Vector3();
-  let yaw = 0, pitch = .3, distance = 6.6, initialized = false, clipped = false, effectiveYaw = 0, orbitOffset = 0, elevatedPitch = 0, lockFraming = false;
+  let yaw = heading, pitch = .3, distance = 6.6, initialized = false, clipped = false, effectiveYaw = heading, orbitOffset = 0, elevatedPitch = 0, lockFraming = false;
   function update(player, locked, dt, impact = 0) {
-    if (!locked && (orbitOffset || elevatedPitch)) { yaw = effectiveYaw; pitch = clamp(pitch + elevatedPitch, .09, 1.05); }
     if (locked) lockFraming = true;
     target.set(player.x, player.y + 1.05, player.z);
     let reach = distance;
@@ -30,23 +29,32 @@ export function createWildsCamera(camera, { target: getTarget = () => DUMMY, obs
     }
     if (!initialized) { follow.copy(target); initialized = true; }
     follow.lerp(target, 1 - Math.exp(-dt * 18));
+    const collisionPosts = world ? [...obstacles, ...(world.trees || []).filter(tree => Math.hypot(tree.x - follow.x, tree.z - follow.z) < reach + tree.radius + 1)] : obstacles;
     const setDesired = (candidateYaw, candidatePitch) => desired.set(follow.x - Math.sin(candidateYaw) * Math.cos(candidatePitch) * reach, follow.y + Math.sin(candidatePitch) * reach, follow.z + Math.cos(candidateYaw) * Math.cos(candidatePitch) * reach);
     const clearFraction = () => {
       let fraction = 1;
       const dx = desired.x - follow.x, dy = desired.y - follow.y, dz = desired.z - follow.z;
-      for (const post of obstacles) {
+      for (const box of world?.solids || []) {
+        let enter = 0, exit = 1;
+        for (const [origin, delta, low, high] of [[follow.x, dx, box.x - box.halfX - .3, box.x + box.halfX + .3], [follow.y, dy, box.bottom - .3, box.top + .3], [follow.z, dz, box.z - box.halfZ - .3, box.z + box.halfZ + .3]]) {
+          if (Math.abs(delta) < 1e-8) { if (origin < low || origin > high) { enter = 2; break; } }
+          else { const a = (low - origin) / delta, b = (high - origin) / delta; enter = Math.max(enter, Math.min(a, b)); exit = Math.min(exit, Math.max(a, b)); }
+        }
+        if (enter <= exit && exit > 0 && enter < fraction) fraction = Math.max(.01, enter - .04);
+      }
+      for (const post of collisionPosts) {
         const x = follow.x - post.x, z = follow.z - post.z, radius = post.radius + .38;
         const a = dx * dx + dz * dz, b = 2 * (x * dx + z * dz), c = x * x + z * z - radius * radius;
         const discriminant = b * b - 4 * a * c;
         if (discriminant < 0 || a < .001) continue;
         const t = (-b - Math.sqrt(discriminant)) / (2 * a);
-        const ground = heightAt(post.x, post.z);
+        const ground = post.y ?? heightAt(post.x, post.z);
         if (c <= 0 && b < 0 && follow.y < ground + post.height + .3) { fraction = Math.min(fraction, .01); continue; }
         if (t > 0 && t < fraction && follow.y + dy * t < ground + post.height + .3) fraction = Math.max(.08, t - .04);
       }
       for (let i = 1; i <= 20; i++) {
         const t = fraction * i / 20, x = follow.x + dx * t, z = follow.z + dz * t;
-        if (follow.y + dy * t < heightAt(x, z) + .3) { fraction = Math.max(.08, fraction * (i - 1) / 20); break; }
+        if (follow.y + dy * t < (world ? world.cameraFloorAt(x, z, follow.y + dy * t) : heightAt(x, z)) + .3) { fraction = Math.max(.08, fraction * (i - 1) / 20); break; }
       }
       return fraction;
     };
@@ -64,9 +72,16 @@ export function createWildsCamera(camera, { target: getTarget = () => DUMMY, obs
     let selectedYaw = yaw, selectedPitch = pitch;
     setDesired(selectedYaw, selectedPitch);
     let fraction = clearFraction();
-    if (lockFraming && (fraction < .98 || orbitOffset || elevatedPitch)) {
+    if ((lockFraming || world) && (fraction < .98 || orbitOffset || elevatedPitch)) {
       let found = false;
-      for (const offset of [orbitOffset, 0, -.22, .22, -.4, .4, -.65, .65, -.9, .9, -1.2, 1.2]) {
+      if (fraction >= .98 && fitsActors(yaw, pitch, fraction)) {
+        const recovery = Math.exp(-dt * 4), candidateYaw = yaw + orbitOffset * recovery, candidatePitch = clamp(pitch + elevatedPitch * recovery, .09, 1.05);
+        setDesired(candidateYaw, candidatePitch);
+        const candidateFraction = clearFraction();
+        if (candidateFraction >= .98 && fitsActors(candidateYaw, candidatePitch, candidateFraction)) { selectedYaw = candidateYaw; selectedPitch = candidatePitch; fraction = candidateFraction; found = true; }
+      }
+      for (const offset of [orbitOffset, 0, -.22, .22, -.4, .4, -.65, .65, -.9, .9, -1.2, 1.2, ...(world && !locked ? [-1.57, 1.57, -1.9, 1.9, -2.3, 2.3, Math.PI] : [])]) {
+        if (found) break;
         for (const lift of [elevatedPitch, 0, .18, .35]) {
           const candidateYaw = yaw + offset, candidatePitch = clamp(pitch + lift, .09, 1.05);
           setDesired(candidateYaw, candidatePitch);
@@ -78,19 +93,19 @@ export function createWildsCamera(camera, { target: getTarget = () => DUMMY, obs
         if (found) break;
       }
     }
-    orbitOffset = lockFraming ? angleDifference(selectedYaw, yaw) : 0;
-    elevatedPitch = lockFraming ? selectedPitch - pitch : 0;
+    orbitOffset = lockFraming || world ? angleDifference(selectedYaw, yaw) : 0;
+    elevatedPitch = lockFraming || world ? selectedPitch - pitch : 0;
     effectiveYaw = selectedYaw;
     setDesired(selectedYaw, selectedPitch);
     clipped = fraction < .99;
     camera.position.copy(follow).lerp(desired, fraction);
-    camera.position.y = Math.max(camera.position.y, heightAt(camera.position.x, camera.position.z) + .35);
+    camera.position.y = Math.max(camera.position.y, (world ? world.cameraFloorAt(camera.position.x, camera.position.z, camera.position.y) : heightAt(camera.position.x, camera.position.z)) + .35);
     camera.position.x += impact * .055;
     camera.lookAt(follow);
   }
   return {
     update,
-    reset() { yaw = 0; pitch = .3; distance = 6.6; initialized = false; clipped = false; effectiveYaw = 0; orbitOffset = 0; elevatedPitch = 0; lockFraming = false; },
+    reset() { yaw = heading; pitch = .3; distance = 6.6; initialized = false; clipped = false; effectiveYaw = heading; orbitOffset = 0; elevatedPitch = 0; lockFraming = false; },
     orbit(dx, dy) { yaw -= dx * .006; pitch = clamp(pitch + dy * .004, .09, 1.05); },
     zoom(delta) { distance = clamp(distance + delta, 3, 11); },
     get yaw() { return initialized ? effectiveYaw : yaw; },

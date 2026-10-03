@@ -162,7 +162,8 @@ export function createEncounterShapes(scene) {
     });
     legs.instanceMatrix.needsUpdate = true; hooves.instanceMatrix.needsUpdate = true;
     const catAction = p.action.kind, catProgress = p.action.progress ?? p.action.elapsed / Math.max(.001, p.action.duration);
-    const catGround = heightAt(p.x, p.z), leap = catAction === 'pounce' ? Math.sin(catProgress * Math.PI) * .65 : catAction === 'dash' ? .12 : 0;
+    const leap = catAction === 'pounce' ? Math.sin(catProgress * Math.PI) * .65 : catAction === 'dash' ? .12 : 0;
+    const catGround = Number.isFinite(p.ground) ? p.ground : heightAt(p.x,p.z);
     pet.position.set(p.x, catGround, p.z); pet.rotation.y = -p.heading;
     catBody.position.y = catAction === 'knockedOut' ? -.15 : leap;
     catBody.rotation.set(catAction === 'pounce' ? -.25 * Math.sin(catProgress * Math.PI * 2) : 0, catAction === 'spin' ? catProgress * Math.PI * 2 : catAction === 'swipe' ? Math.sin(catProgress * Math.PI * 2) * .6 : 0, catAction === 'knockedOut' ? Math.PI / 2 : 0);
@@ -173,7 +174,7 @@ export function createEncounterShapes(scene) {
     catFeet.forEach(([lx, lz], i) => {
       const stride = catStride * (i === 0 || i === 3 ? 1 : -1), x = p.x + lx * catCos - (lz + stride) * catSin, z = p.z + lx * catSin + (lz + stride) * catCos;
       const lift = leap + Math.max(0, stride) * .6;
-      instance(paws, i, x, heightAt(x, z) + .125 + lift, z, 1, 1, 1, p.heading);
+      instance(paws, i, x, catGround + .125 + lift, z, 1, 1, 1, p.heading);
     });
     paws.instanceMatrix.needsUpdate = true;
     const originX = action.originX ?? b.x, originZ = action.originZ ?? b.z;

@@ -20,7 +20,7 @@ function paint(color, options = {}) {
   return material;
 }
 
-export function createFeelBox(scene) {
+export function createFeelBox(scene, { training = true, world = null } = {}) {
   const terrain = new PlaneGeometry(128, 128, 128, 128);
   terrain.rotateX(-Math.PI / 2);
   const positions = terrain.attributes.position, normals = terrain.attributes.normal, colors = new Float32Array(positions.count * 3);
@@ -34,9 +34,9 @@ export function createFeelBox(scene) {
   }
   terrain.setAttribute('color', new BufferAttribute(colors, 3));
   const ground = new Mesh(terrain, paint('#ffffff', { vertexColors: true }));
-  ground.receiveShadow = true; scene.add(ground);
+  ground.receiveShadow = true; ground.visible = training; scene.add(ground);
   const postMaterial = paint('#d2cbb6'), capMaterial = paint('#7e8a85');
-  for (const post of POSTS) {
+  for (const post of training ? POSTS : []) {
     const mesh = new Mesh(new CylinderGeometry(post.radius * .92, post.radius, post.height, 12), postMaterial);
     mesh.position.set(post.x, heightAt(post.x, post.z) + post.height / 2, post.z);
     mesh.castShadow = true; mesh.receiveShadow = true; scene.add(mesh);
@@ -51,7 +51,7 @@ export function createFeelBox(scene) {
     const x = ringPosition.getX(i), z = ringPosition.getY(i) - 4;
     ringPosition.setXYZ(i, x, heightAt(x, z) + .018, z);
   }
-  scene.add(boundary);
+  boundary.visible = training; scene.add(boundary);
   const dummy = new Group(); dummy.position.set(DUMMY.x, heightAt(DUMMY.x, DUMMY.z), DUMMY.z);
   const dummyMaterial = paint('#bb9371'), dummyPale = paint('#e8d7ac');
   const stem = new Mesh(new CylinderGeometry(.11, .17, 1.7, 10), capMaterial); stem.position.y = .85;
@@ -129,9 +129,10 @@ export function createFeelBox(scene) {
         spark.rotation.set(angle, 0, angle); spark.scale.setScalar(reducedMotion ? .5 : 1);
       });
     }
-    shadow.position.set(p.x, heightAt(p.x, p.z) + .016, p.z);
-    shadow.scale.setScalar(1 + (p.y - heightAt(p.x, p.z)) * .14);
-    shadowMaterial.opacity = .16 / (1 + p.y - heightAt(p.x, p.z));
+    const support = world ? world.floorAt(p.x, p.z, p.y + .1) : heightAt(p.x, p.z);
+    shadow.position.set(p.x, support + .016, p.z);
+    shadow.scale.setScalar(1 + (p.y - support) * .14);
+    shadowMaterial.opacity = .16 / (1 + p.y - support);
   }
 
   return { update, dummyPosition: [DUMMY.x, heightAt(DUMMY.x, DUMMY.z), DUMMY.z] };

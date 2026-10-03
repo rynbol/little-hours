@@ -166,3 +166,13 @@ test('new and absent room pet bonds enter with zero strength bonus without creat
     assert.deepEqual(f.app.state, saved);
   }
 });
+
+test('Wilds transactions use the live state store and notify the app without copying stale gold',async()=>{
+  const f=fixture();let saved={...f.app.state,house:{coins:50}};let notified=0;
+  f.app.store={get state(){return saved;},update(fn){const draft=structuredClone(saved);fn(draft);saved=draft;return{state:saved,persisted:true};}};
+  f.app.acceptUpdate=()=>{notified++;};await f.forest.open();
+  const options=f.calls.find(item=>item[0]==='create')[1];
+  await options.updateSave(draft=>{draft.house.coins-=35;draft.wilds={xp:45};});
+  assert.equal(options.readSave().house.coins,15);assert.equal(options.readSave().wilds.xp,45);assert.equal(notified,1);
+  assert.equal(f.app.state.house,undefined);
+});

@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { steps } from '../steps.mjs';
 import { enterWilds, leaveWilds, holdKeys, resourceSample, wildsState, wildsFrameSample } from '../wilds.mjs';
+import { walkTo } from '../encounter.mjs';
 
 const distance = (a,b) => Math.hypot(a.x-b.x, a.z-b.z);
 const game = async app => (await wildsState(app)).game;
@@ -47,6 +48,9 @@ export default {
     await t.sleep(100);
     t.check('right click also dodges', (await game(app)).counters.dodges > beforeRightDodge.counters.dodges);
     await t.sleep(850);
+    const dummy=(await game(app)).dummyPosition;
+    await walkTo(app,dummy.x,dummy.z+1.7);
+    await app.key('f','KeyF');
     for (let i = 0; i < 3; i++) { await app.click(canvas.x,canvas.y); await t.sleep(250); }
     await t.sleep(650);
     const combo = await game(app);
@@ -54,6 +58,7 @@ export default {
     await app.press(canvas.x,canvas.y); await t.sleep(850); await app.release(canvas.x,canvas.y); await t.sleep(700);
     const heavy = await game(app);
     t.check('holding left click releases a charged heavy that connects', heavy.counters.heavyAttacks > start.counters.heavyAttacks && heavy.counters.hits > combo.counters.hits && heavy.state.lastHit?.kind === 'heavy', heavy);
+    await app.key('f','KeyF');
     await app.key('f','KeyF'); await t.sleep(100);
     const locked = await game(app);
     t.check('F locks onto the training dummy', locked.locked, locked);

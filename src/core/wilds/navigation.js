@@ -40,7 +40,7 @@ export function createWildsNavigation(app, container, loadWilds) {
       container.innerHTML = '<p role="status">Opening the Wilds…</p>';
       const module = await loadWilds();
       if (!current()) return false;
-      const created = await module.createWildsGame({ container, appearance: structuredClone(app.state.avatar), pet: app.state.pet || 'cat', bond: bondLevel(app.state.petBonds?.[app.state.pet]).index, onLeave: close });
+      const created = await module.createWildsGame({ container, appearance: structuredClone(app.state.avatar), pet: app.state.pet || 'cat', bond: bondLevel(app.state.petBonds?.[app.state.pet]).index, readSave:()=>app.store?.state||app.state, updateSave:async mutate=>{const result=await app.store.update(mutate);await app.acceptUpdate(result);return result.state;}, onLeave: close });
       if (!current()) { release(created); return false; }
       game = created;
       return true;

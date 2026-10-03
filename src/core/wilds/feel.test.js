@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ATTACKS, DUMMY, POSTS, FEEL_BOUNDS, createFeelSimulation } from './feel.js';
 import { heightAt } from '../world-terrain.js';
+import { createValleyWorld, SOLIDS, LAKE, SECRETS } from './world.js';
+import { createAdventure } from './progression.js';
 
 const advance = (simulation, seconds, input = {}) => {
   for (let remaining = seconds; remaining > 1e-8; remaining -= 1 / 120) simulation.step(Math.min(remaining, 1 / 120), input);
@@ -272,4 +274,259 @@ test('additional world obstacles block player travel while a null target release
   click(simulation);
   advance(simulation, 0.6);
   assert.equal(simulation.state.lastHit, null);
+});
+
+function traversalWorld() {
+  return {
+    floorAt(x, z, ceiling = Infinity) { return Math.abs(x) <= 2 && z >= -6 && z <= -2 && ceiling >= 4 ? 4 : 0; },
+    climbContact(player, moveX, moveZ) {
+      if (Math.abs(player.x) > 2.32 || Math.abs(player.z + 1.68) > .65 || player.y > 4.1 || moveZ >= -.15) return null;
+      return { id: 'rock', x: player.x, z: -1.68, bottom: 0, top: 4, normal: [0, 0, 1] };
+    },
+    resolve(player, previous) { if (player.y < 3.96 && Math.abs(player.x) < 2.32 && player.z < -1.68 && previous.z >= -1.69) { player.z = -1.68; player.vz = 0; } },
+    waterAt: () => null,
+    updraftAt: () => 0,
+  };
+}
+
+test('world walking attaches to a physical face, traverses sideways, leaps and mantles onto its actual support', () => {
+  const world = traversalWorld(), simulation = createFeelSimulation({ world, posts: [], bounds: null, target: () => null });
+  simulation.reset({ x: 0, z: -1.1 });
+  simulation.step(1 / 60, { moveZ: -1 });
+  assert.equal(simulation.state.action.kind, 'climb');
+  assert.equal(simulation.state.player.mode, 'climb');
+  assert.equal(simulation.state.counts.climb, 1);
+  assert.equal(simulation.state.player.z, -1.68);
+  advance(simulation, .5, { moveZ: -1 });
+  const height = simulation.state.player.y;
+  assert.ok(height > .7 && height < 1);
+  advance(simulation, .4, { moveX: 1 });
+  assert.ok(simulation.state.player.x > .5);
+  assert.equal(simulation.state.player.y, height);
+  const stamina = simulation.state.player.stamina;
+  simulation.step(1 / 60, { jump: true, moveZ: -1 });
+  assert.equal(simulation.state.action.kind, 'climbLeap');
+  assert.ok(simulation.state.player.vy > 5);
+  assert.ok(simulation.state.player.stamina < stamina - 14);
+  advance(simulation, 2.1, { moveZ: -1 });
+  assert.equal(simulation.state.player.grounded, true);
+  assert.equal(simulation.state.player.y, 4);
+  assert.ok(simulation.state.player.z <= -2);
+});
+
+test('climbing exhaustion releases the face, cannot instantly regrab, and lands safely without stamina regeneration in air', () => {
+  const simulation = createFeelSimulation({ world: traversalWorld(), posts: [], bounds: null, target: () => null });
+  simulation.reset({ x: 0, z: -1.1 });
+  advance(simulation, .5, { moveZ: -1 });
+  simulation.state.player.stamina = .01;
+  simulation.step(1 / 60, { moveZ: -1 });
+  assert.equal(simulation.state.player.mode, 'air');
+  assert.equal(simulation.state.counts.climb, 1);
+  advance(simulation, .2, { moveZ: -1 });
+  assert.equal(simulation.state.counts.climb, 1);
+  assert.equal(simulation.state.player.grounded, false);
+  advance(simulation, .5);
+  assert.equal(simulation.state.player.grounded, true);
+  assert.equal(simulation.state.player.y, 0);
+});
+
+test('walking off a supported ledge falls rather than snapping down, while valley travel has no training radius', () => {
+  const world = traversalWorld(), simulation = createFeelSimulation({ world, posts: [], bounds: null, target: () => null });
+  simulation.reset({ x: 1.9, z: -4 });
+  assert.equal(simulation.state.player.y, 4);
+  advance(simulation, .2, { moveX: 1 });
+  assert.equal(simulation.state.player.grounded, false);
+  assert.ok(simulation.state.player.y > 3);
+  advance(simulation, 1);
+  assert.equal(simulation.state.player.y, 0);
+  simulation.reset({ x: 55, z: 2 });
+  advance(simulation, .5, { moveX: 1 });
+  assert.ok(simulation.state.player.x > 56.5);
+});
+
+test('airborne Space opens a steerable glider immediately, updrafts lift and exhaustion folds it', () => {
+  const world = traversalWorld(), simulation = createFeelSimulation({ world, posts: [], bounds: null, target: () => null });
+  simulation.reset({ x: 5, z: 0, y: 15 });
+  simulation.step(1 / 60);
+  assert.equal(simulation.state.player.grounded, false);
+  simulation.step(1 / 60, { jump: true, moveX: 1 });
+  assert.equal(simulation.state.action.kind, 'glide');
+  assert.equal(simulation.state.counts.glide, 1);
+  const start = simulation.state.player.y;
+  advance(simulation, 2, { moveX: 1 });
+  assert.ok(simulation.state.player.x > 16);
+  assert.ok(simulation.state.player.y > start - 3.3);
+  assert.ok(simulation.state.player.stamina < 90);
+  world.updraftAt = () => 3.8;
+  const low = simulation.state.player.y;
+  advance(simulation, 2, { moveZ: -1 });
+  assert.ok(simulation.state.player.y > low);
+  simulation.state.player.stamina = .01;
+  simulation.step(1 / 60);
+  assert.equal(simulation.state.player.mode, 'air');
+  assert.equal(simulation.state.action.kind, 'jump');
+});
+
+test('deep water swims at a stamina cost, allows exhausted movement and rest, then grounds on the shore', () => {
+  const world = traversalWorld();
+  world.waterAt = (x, z) => x >= 10 && x < 15 ? { id: 'lake', height: 3, depth: 3 } : null;
+  const simulation = createFeelSimulation({ world, posts: [], bounds: null, target: () => null });
+  simulation.reset({ x: 11, z: 0 });
+  simulation.step(1 / 60, { moveX: 1 });
+  assert.equal(simulation.state.action.kind, 'swim');
+  assert.equal(simulation.state.player.y, 2.55);
+  assert.equal(simulation.state.counts.swim, 1);
+  advance(simulation, .5, { moveX: 1 });
+  assert.ok(simulation.state.player.stamina < 96);
+  simulation.state.player.stamina = 0;
+  const x = simulation.state.player.x;
+  advance(simulation, .3, { moveX: 1 });
+  assert.ok(simulation.state.player.x > x + .15);
+  advance(simulation, .3);
+  assert.ok(simulation.state.player.stamina > 1.5);
+  advance(simulation, 3, { moveX: 1 });
+  assert.equal(simulation.state.player.mode, 'ground');
+  assert.equal(simulation.state.player.y, 0);
+});
+
+test('mutable progression stats change stamina cap and damage without changing attack timing or checkpoint height', () => {
+  const stats = { stamina: 140, attack: 1.5 }, simulation = createFeelSimulation({ stats });
+  assert.equal(simulation.state.player.stamina, 140);
+  nearDummy(simulation); click(simulation); advance(simulation, .4);
+  assert.equal(simulation.state.lastHit.damage, ATTACKS.light1.damage * 1.5);
+  assert.equal(simulation.state.dummy.health, 82);
+  stats.stamina = 160; stats.attack = 2;
+  simulation.reset({ x: 0, z: -3.1, y: heightAt(0, -3.1) });
+  assert.equal(simulation.state.player.maxStamina, 160);
+  click(simulation); advance(simulation, .4);
+  assert.equal(simulation.state.lastHit.damage, 24);
+  assert.equal(simulation.state.action.duration, ATTACKS.light1.duration);
+});
+
+test('real valley practice rock and lake share collision, climbing support and swimming elevations', () => {
+  const world = createValleyWorld(), rock = SOLIDS.find(solid => solid.id === 'practice-ledge');
+  const simulation = createFeelSimulation({ world, posts: [], bounds: null, target: () => null });
+  simulation.reset({ x: rock.x, z: rock.z + rock.halfZ + .45 });
+  advance(simulation, .1, { moveZ: -1 });
+  assert.equal(simulation.state.player.mode, 'climb');
+  for (let frame = 0; frame < 600 && !simulation.state.player.grounded; frame++) simulation.step(1 / 120, { moveZ: -1 });
+  assert.equal(simulation.state.player.y, rock.top);
+  assert.equal(simulation.state.player.grounded, true);
+  simulation.reset({ x: -160, z: -400 });
+  simulation.step(1 / 60, { moveX: -1 });
+  assert.equal(simulation.state.player.mode, 'swim');
+  assert.equal(simulation.state.player.y, LAKE.height - .45);
+});
+
+test('base stamina can reach the real stamina-seed cliff and glider lands on a supported surface', () => {
+  const world = createValleyWorld(), cliff = SOLIDS.find(solid => solid.id === 'cliff');
+  const simulation = createFeelSimulation({ world, posts: [], bounds: null, target: () => null });
+  simulation.reset({ x: cliff.x, z: cliff.z + cliff.halfZ + .45 });
+  advance(simulation, .1, { moveZ: -1 });
+  for (let frame = 0; frame < 1800 && !simulation.state.player.grounded; frame++) simulation.step(1 / 120, { moveZ: -1 });
+  assert.equal(simulation.state.player.y, cliff.top);
+  assert.equal(simulation.state.player.grounded, true);
+  assert.ok(simulation.state.player.stamina > 10);
+  const ledge = traversalWorld(), flying = createFeelSimulation({ world: ledge, posts: [], bounds: null, target: () => null });
+  flying.reset({ x: 0, z: -4, y: 7 });
+  flying.step(1 / 60);
+  flying.step(1 / 60, { jump: true });
+  flying.state.player.heading = 0;
+  for (let frame = 0; frame < 900 && !flying.state.player.grounded; frame++) flying.step(1 / 120, { moveX: 0, moveZ: 0 });
+  assert.equal(flying.state.player.mode, 'ground');
+  assert.equal(flying.state.player.y, ledge.floorAt(flying.state.player.x, flying.state.player.z));
+});
+
+test('a tired approach can recover at the real cliff foot before a complete climb', () => {
+  const world = createValleyWorld(), cliff = SOLIDS.find(solid => solid.id === 'cliff');
+  const simulation = createFeelSimulation({ world, posts: [], bounds: null, target: () => null });
+  simulation.reset({ x: cliff.x, z: cliff.z + cliff.halfZ + .45 });
+  simulation.state.player.stamina = 6;
+  advance(simulation, 1.4, { moveZ: -1 });
+  assert.ok(simulation.state.player.y < cliff.top - 10);
+  advance(simulation, 5);
+  assert.equal(simulation.state.player.grounded, true);
+  assert.equal(simulation.state.player.stamina, simulation.state.player.maxStamina);
+  simulation.step(1 / 60, { moveZ: -1 });
+  for (let frame = 0; frame < 1800 && !simulation.state.player.grounded; frame++) simulation.step(1 / 120, { moveZ: -1 });
+  assert.equal(simulation.state.player.y, cliff.top);
+  assert.ok(simulation.state.player.stamina > 10);
+});
+
+
+const walkTo = (simulation, x, z, seconds = 20) => {
+  for (let frame = 0; frame < seconds * 120; frame++) {
+    const player = simulation.state.player, dx = x - player.x, dz = z - player.z, distance = Math.hypot(dx, dz);
+    if (distance < .3) return true;
+    simulation.step(1 / 120, { moveX: dx / distance, moveZ: dz / distance });
+  }
+  return false;
+};
+
+test('base stamina climbs the actual oak and jumps, glides and lands on the wind chest ledge', () => {
+  const world = createValleyWorld(), simulation = createFeelSimulation({ world, posts: [], bounds: null, target: () => null, stats: { stamina: 100, attack: 1 } });
+  const ledge = SOLIDS.find(solid => solid.id === 'glide-ledge'), adventure = createAdventure();
+  simulation.reset({ x: 37, z: -220 });
+  assert.equal(adventure.claim('wind-chest', simulation.state.player), false);
+  simulation.step(1 / 120, { moveX: -1 });
+  for (let frame = 0; frame < 1800 && !simulation.state.player.grounded; frame++) simulation.step(1 / 120, { moveX: -1 });
+  assert.equal(simulation.state.player.grounded, true);
+  assert.equal(simulation.state.player.y, world.floorAt(simulation.state.player.x, simulation.state.player.z));
+  assert.ok(simulation.state.player.stamina > 20);
+  advance(simulation, 5);
+  assert.equal(simulation.state.player.stamina, 100);
+  assert.equal(walkTo(simulation, 24, -220), true);
+  const player = simulation.state.player, dx = ledge.x - player.x, dz = ledge.z - player.z, distance = Math.hypot(dx, dz);
+  assert.ok(distance > 50);
+  const input = { moveX: dx / distance, moveZ: dz / distance };
+  simulation.step(1 / 120, { ...input, jump: true });
+  advance(simulation, .15, input);
+  simulation.step(1 / 120, { ...input, jump: true });
+  assert.equal(simulation.state.player.mode, 'glide');
+  assert.equal(walkTo(simulation, ledge.x, ledge.z, 12), true);
+  assert.ok(simulation.state.player.y > ledge.top + 10);
+  assert.equal(adventure.claim('wind-chest', simulation.state.player), false);
+  simulation.step(1 / 120, { jump: true });
+  for (let frame = 0; frame < 600 && !simulation.state.player.grounded; frame++) simulation.step(1 / 120);
+  assert.equal(simulation.state.player.grounded, true);
+  assert.equal(simulation.state.player.y, ledge.top);
+  assert.ok(Math.hypot(simulation.state.player.x - ledge.x, simulation.state.player.z - ledge.z) < .5);
+  assert.ok(simulation.state.player.stamina > 40);
+  assert.equal(simulation.state.counts.climb, 1);
+  assert.equal(simulation.state.counts.jump, 1);
+  assert.equal(simulation.state.counts.glide, 1);
+  assert.equal(adventure.claim('wind-chest', simulation.state.player), true);
+  assert.equal(adventure.claim('wind-chest', simulation.state.player), false);
+  assert.equal(adventure.save.xp, 55);
+});
+
+test('the actual falls secret has a walkable passage below its overhang and the ruin secret has a climbable roof route', () => {
+  const world = createValleyWorld(), simulation = createFeelSimulation({ world, posts: [], bounds: null, target: () => null });
+  const adventure = createAdventure(), overhang = SOLIDS.find(solid => solid.id === 'secret-overhang');
+  simulation.reset({ x: -119, z: -354 });
+  assert.equal(walkTo(simulation, -119, -350), true);
+  assert.equal(simulation.state.player.grounded, true);
+  assert.ok(simulation.state.player.y + 1.45 < overhang.bottom);
+  assert.equal(simulation.state.counts.climb, 0);
+  assert.equal(adventure.claim('falls-heart', simulation.state.player), true);
+  simulation.reset({ x: -91.1, z: -305 });
+  simulation.step(1 / 120, { moveX: 1 });
+  for (let frame = 0; frame < 1440 && !simulation.state.player.grounded; frame++) simulation.step(1 / 120, { moveX: 1 });
+  assert.equal(simulation.state.counts.climb, 1);
+  assert.equal(walkTo(simulation, -87, -305), true);
+  assert.equal(simulation.state.player.grounded, true);
+  assert.equal(adventure.claim('ruin-cape', simulation.state.player), true);
+});
+
+test('all eight secret positions have collectible-height support outside physical solid bodies', () => {
+  const world = createValleyWorld();
+  for (const secret of SECRETS) {
+    const floor = world.floorAt(secret.x, secret.z, secret.y + .4);
+    assert.ok(Math.abs(floor - secret.y) <= .65 + 1e-8, secret.id);
+    assert.equal(world.waterAt(secret.x, secret.z), null, secret.id);
+    for (const solid of SOLIDS) {
+      const inside = Math.abs(secret.x - solid.x) < solid.halfX && Math.abs(secret.z - solid.z) < solid.halfZ;
+      assert.ok(!inside || floor >= solid.top - .04 || floor + 1.45 < solid.bottom, `${secret.id} intersects ${solid.id}`);
+    }
+  }
 });

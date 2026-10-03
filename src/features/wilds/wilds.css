@@ -35,3 +35,19 @@
 #wilds-menu button:hover { filter: brightness(.94); }
 #wilds-page button:focus-visible { outline: 3px solid #d7a969; outline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) { #wilds-page * { transition: none !important; } }
+
+#wilds-interact { position:absolute; width:24px; height:24px; margin-left:-34px; color:#fff3cf; opacity:0; pointer-events:none; filter:drop-shadow(0 2px 4px #284733); transition:opacity .2s; }
+#wilds-interact svg { width:24px;fill:none;stroke:currentColor;stroke-width:1.3; }
+#wilds-discovery { position:absolute; inset:0; display:grid;place-items:center;pointer-events:none;opacity:0; background:radial-gradient(ellipse at 50% 65%,transparent 30%,#efdd8230 100%); transition:opacity 1s; }
+#wilds-discovery svg { position:absolute;bottom:22%;width:38px;height:38px;fill:#fff1b5;filter:drop-shadow(0 0 20px #fff2bd); }
+#wilds-menu section { max-width:560px; }
+.wilds-tabs { display:flex;gap:5px;flex-wrap:wrap;margin-bottom:26px; }
+#wilds-menu .wilds-tabs button { font-size:11px;min-height:30px;padding:3px 12px;border-radius:20px; }
+#wilds-menu h2 { font:500 15px Georgia,serif;margin:0 0 7px;color:#3c5345; }
+.wilds-shop article { display:grid;grid-template-columns:1fr 90px;gap:18px;align-items:center;padding:18px 0;border-top:1px solid #52644d22; }
+#wilds-menu .wilds-shop p { font-size:12px;margin:0;line-height:1.5; }
+#wilds-menu button:disabled { opacity:.38;cursor:default; }
+.wilds-shop { margin-bottom:24px; }
+.wilds-keepsakes { margin-bottom:24px;display:grid;gap:14px; }
+#wilds-menu .wilds-keepsakes p { margin:0;line-height:1.6; }
+.wilds-rest { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:30px 0; }

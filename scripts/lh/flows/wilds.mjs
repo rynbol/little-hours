@@ -9,6 +9,7 @@ export default {
   async run(t) {
     const app = await t.open({ seed: 'three-rooms', scale: 2 });
     await app.settle(); const saved = await app.saved();
+    const initialBonds=await app.js('structuredClone(window.__littleHours.state.petBonds)');
     await steps.openHouse(app); await enterWilds(app, { entry: 'button' });
     const latency = {};
     latency.move = await inputResponse(app, () => app.send('Input.dispatchKeyEvent', {type:'keyDown',key:'w',code:'KeyW'}), 'game.action.kind === "run"');
@@ -48,7 +49,8 @@ export default {
     const victoryCamera = await fightState(app);
     t.check('victory releases lock without collapsing the camera into the player', !victoryCamera.locked && Math.hypot(...victoryCamera.camera.position.map((value,index)=>value-victoryCamera.camera.target[index])) > 2.5, victoryCamera.camera);
     await t.shot(app, 'outcome'); await leaveWilds(app);
-    t.check('the shape fight preserves the study save', JSON.stringify(await app.saved()) === JSON.stringify(saved));
+    const afterVictory=await app.saved();
+    t.check('the guardian grants one-time XP and Wolf without study gold or bond changes',afterVictory.wilds?.guardian===true && afterVictory.wilds.xp===160 && afterVictory.house.coins===saved.house.coins && JSON.stringify(afterVictory.petBonds)===JSON.stringify(initialBonds),afterVictory.wilds);
     await enterWilds(app);
     await walkTo(app, 2.5, 2); await walkTo(app, 2.5, -12.8);
     await app.js(`(() => { window.__lhFightFrames = []; window.__lhFightMeasuring = true; let last = 0; const frame = now => { if (last) window.__lhFightFrames.push(now - last); last = now; if (window.__lhFightMeasuring) requestAnimationFrame(frame); }; requestAnimationFrame(frame); return true; })()`);
@@ -65,7 +67,7 @@ export default {
     await app.waitFor('window.__littleHours.forest.diagnostics().game.encounter.status === "dormant"', {what:'waking at camp',timeout:10000});
     const recovered = await fightState(app); await stopRecoveryRecording();
     t.check('defeat returns the player and partner to camp fully healed', Math.hypot(recovered.position.x,recovered.position.z-2)<.01 && recovered.encounter.player.health===recovered.encounter.player.maxHealth && recovered.encounter.pet.health===recovered.encounter.pet.maxHealth, recovered.encounter);
-    t.check('defeat loses no possessions or study gold', JSON.stringify(await app.saved()) === JSON.stringify(saved));
+    t.check('defeat loses no possessions or study gold', JSON.stringify(await app.saved()) === JSON.stringify(afterVictory));
     await t.sleep(500);
     const campCamera = await fightState(app);
     t.check('waking at camp restores a comfortable follow camera', Math.hypot(...campCamera.camera.position.map((value,index)=>value-campCamera.camera.target[index])) > 3, campCamera.camera);

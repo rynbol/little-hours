@@ -1,7 +1,11 @@
 import { ACESFilmicToneMapping, Color, DirectionalLight, Fog, HemisphereLight, MeshDepthMaterial, PCFShadowMap, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
 import { normalizeAvatarAppearance } from '../../core/avatar.js';
-import { createFeelSimulation, DUMMY, POSTS } from '../../core/wilds/feel.js';
+import { createFeelSimulation, DUMMY } from '../../core/wilds/feel.js';
 import { createEncounter, STONES } from '../../core/wilds/encounter.js';
+import { createAdventure } from '../../core/wilds/progression.js';
+import { createValleyWorld, CAMPS, LANDMARKS } from '../../core/wilds/world.js';
+import { createValley } from '../../models/wilds/valley.js';
+import { wildsMenu } from './menus.js';
 import { heightAt } from '../../core/world-terrain.js';
 import { clockNow } from '../../core/test-pins.js';
 import { createFeelBox } from '../../models/wilds/feel-box.js';
@@ -13,18 +17,20 @@ import './wilds.css';
 
 const pauseIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12M16 6v12"/></svg>';
 
-export async function createWildsGame({ container, appearance, pet = 'cat', bond = 0, onLeave }) {
+export async function createWildsGame({ container, appearance, pet = 'cat', bond = 0, readSave, updateSave, onLeave }) {
   const avatar = normalizeAvatarAppearance(appearance), events = new AbortController();
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   let reducedMotion = motion.matches, paused = false, disposed = false, ready = false, frame = 0, lastTime = 0, lastFrame = 0;
   let locked = false, muted = false, locks = 0, renderCount = 0, lastDisposal = null, impact = 0, lastHit = 0;
-  let renderer, scene, camera, model, shapes, rig, input, respawn = 0;
+  let renderer, scene, camera, model, shapes, valley, rig, input, respawn = 0, lastVictory = 0, menuMode = 'controls', sun, herbsHealed=0;
+  const adventure = createAdventure({read:readSave,transact:updateSave}), world=createValleyWorld();
   const frameTimes = new Float64Array(3600), workTimes = new Float64Array(3600);
   let frameSamples = 0, maxFrame = 0, over20 = 0;
-  const encounter = createEncounter({ bond }), sound = createWildsAudio();
-  const sim = createFeelSimulation({ target: encounter.target, obstacles: STONES }), projected = new Vector3();
-  container.innerHTML = `<canvas id="wilds-canvas" tabindex="0" aria-label="Wilds training ground. Escape opens controls and the return menu."></canvas>
-    <div class="wilds-hud" aria-label="Training status">
+  const encounter = createEncounter({ bond, world, stats:adventure.stats, checkpoint:()=>adventure.checkpoint, exploration:()=>adventure.state }), sound = createWildsAudio();
+  const sim = createFeelSimulation({ target: encounter.target, obstacles: STONES, world, bounds:null, posts:[], stats:adventure.stats }), projected = new Vector3();
+  sim.reset(adventure.checkpoint);
+  container.innerHTML = `<canvas id="wilds-canvas" tabindex="0" aria-label="The Wilds. Escape opens controls, your satchel and the return menu."></canvas>
+    <div class="wilds-hud" aria-label="Adventure status">
       <div id="wilds-stamina" role="meter" aria-label="Stamina" aria-valuemin="0" aria-valuemax="100"><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="wilds-ring-track" cx="22" cy="22" r="18"/><circle class="wilds-ring-fill" cx="22" cy="22" r="18"/></svg></div>
       <div id="wilds-target" aria-hidden="true"><i></i><b></b></div>
       <div id="wilds-vitals" hidden><div id="wilds-health" role="meter" aria-label="Health" aria-valuemin="0" aria-valuemax="100"><b></b></div><div id="wilds-partner" role="meter" aria-label="Partner health" aria-valuemin="0" aria-valuemax="100"><b></b></div><svg id="wilds-partner-skill" viewBox="0 0 24 24" aria-label="Partner skill ready"><path d="M8 16c-4 7 12 7 8 0l-4-5z"/><circle cx="5" cy="9" r="2"/><circle cx="10" cy="6" r="2"/><circle cx="15" cy="6" r="2"/><circle cx="20" cy="9" r="2"/></svg></div>
@@ -33,12 +39,9 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
       <button id="wilds-pause" aria-label="Pause and controls">${pauseIcon}</button>
       <div id="wilds-muted" aria-label="Sound muted" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 9 5 0 5-4v14l-5-4H3zM17 9l5 6m0-6-5 6"/></svg></div>
     </div>
-    <div id="wilds-menu" hidden><section role="dialog" aria-modal="true" aria-labelledby="wilds-menu-title">
-      <h1 id="wilds-menu-title">The Mossheart clearing</h1><p>Follow the slope to the standing stones. Dodge the guardian's wind-up, then strike while it recovers. Lure a charge into a stone to open its heart.</p>
-      <dl><dt>W A S D</dt><dd>Move · Shift to sprint</dd><dt>Space</dt><dd>Jump</dd><dt>Ctrl / right click</dt><dd>Dodge roll</dd><dt>Left click</dt><dd>Three-hit combo</dd><dt>Hold left click</dt><dd>Charge a heavy attack</dd><dt>F</dt><dd>Lock on / release</dd><dt>Drag / scroll</dt><dd>Orbit / zoom</dd><dt>Gamepad</dt><dd>Left stick move · A jump · B roll<br>X / RT attack · LB lock · L3 sprint</dd></dl>
-      <p>Q / left trigger calls your partner's dash. E / Y at camp rests and resets the encounter. Defeat returns you to camp with everything intact.</p>
-      <div class="wilds-menu-actions"><button id="wilds-resume">Keep exploring</button><button id="wilds-leave">Back to the island</button></div>
-    </section></div>`;
+    <div id="wilds-interact" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 12V5a2 2 0 0 1 4 0v5-6a2 2 0 0 1 4 0v7-4a2 2 0 0 1 4 0v8q0 7-7 7H9l-5-6q-2-4 1-4l4 3"/></svg></div>
+    <div id="wilds-discovery" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 4 29 19 44 24 29 29 24 44 19 29 4 24 19 19Z"/></svg></div>
+    <div id="wilds-menu" hidden></div>`;
   const canvas = container.querySelector('#wilds-canvas'), menu = container.querySelector('#wilds-menu');
   const stamina = container.querySelector('#wilds-stamina'), ring = stamina.querySelector('.wilds-ring-fill');
   const target = container.querySelector('#wilds-target'), health = target.querySelector('b');
@@ -50,16 +53,21 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
     paused = false; menu.hidden = true; input?.release();
     canvas.focus({ preventScroll: true }); sound.unlock(); start();
   }
-  function pause() {
+  function renderMenu() {
+    const p=sim.state.player, atMerchant=Math.hypot(p.x-LANDMARKS.merchant.x,p.z-LANDMARKS.merchant.z)<6;
+    const atCamp=CAMPS.some(c=>Math.hypot(p.x-c.x,p.z-c.z)<4 && Math.abs(p.y-c.y)<2);
+    menu.innerHTML=wildsMenu(adventure,menuMode,atMerchant,atCamp);
+  }
+  function pause(mode='controls') {
     if (disposed) return;
-    paused = true; stop(); sound.suspend(); input?.release(); menu.hidden = false;
+    paused = true; stop(); sound.suspend(); input?.release(); menuMode=typeof mode==='string'?mode:'controls';renderMenu();menu.hidden = false;
     get('#wilds-resume').focus({ preventScroll: true });
   }
   function toggleLock() {
     if (paused) return;
     const player = sim.state.player;
     const focus = encounter.target();
-    locked = !locked && Math.hypot(player.x - focus.x, player.z - focus.z) < 20;
+    locked = !locked && Boolean(focus) && Math.hypot(player.x - focus.x, player.z - focus.z) < 20;
     if (locked) locks++;
   }
   function resize() {
@@ -77,15 +85,18 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
   function updateHUD() {
     const p = sim.state.player;
     project(p.x, p.y + 1.2, p.z, stamina);
-    stamina.style.opacity = p.stamina < 99.9 ? '1' : '0';
+    stamina.style.opacity = p.stamina < p.maxStamina-.1 ? '1' : '0';
+    stamina.setAttribute('aria-valuemax',String(p.maxStamina));
     stamina.setAttribute('aria-valuenow', String(Math.round(p.stamina)));
-    ring.style.strokeDashoffset = String(113.1 * (1 - p.stamina / 100));
+    ring.style.strokeDashoffset = String(113.1 * (1 - p.stamina / p.maxStamina));
     ring.style.stroke = p.stamina < 23 ? '#e8b58b' : '#e6ecd4';
     const focus = encounter.target(), fight = encounter.state, active = fight.status === 'fighting';
     project(focus.x, heightAt(focus.x, focus.z) + (focus.height || 1.8) + .4, focus.z, target);
     target.style.opacity = locked || sim.state.dummy.flash > 0 ? '1' : '0';
     health.style.transform = `scaleX(${Math.max(.02, active ? fight.boss.health / fight.boss.maxHealth : sim.state.dummy.health / 100)})`;
-    get('#wilds-vitals').hidden = fight.status === 'dormant';
+    get('#wilds-vitals').hidden = fight.status === 'dormant' && fight.player.health===fight.player.maxHealth;
+    const interact=get('#wilds-interact');interact.style.opacity=adventure.state.near?'1':'0';project(p.x,p.y+1.7,p.z,interact);
+    get('#wilds-discovery').style.opacity=String(Math.min(1,adventure.state.glow));
     get('#wilds-health b').style.transform = `scaleX(${fight.player.health / fight.player.maxHealth})`;
     get('#wilds-health').setAttribute('aria-valuenow', String(Math.round(fight.player.health / fight.player.maxHealth * 100)));
     get('#wilds-partner b').style.transform = `scaleX(${fight.pet.health / fight.pet.maxHealth})`;
@@ -108,15 +119,25 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
     const gameDt = dt * encounter.state.slowMotion;
     sim.step(gameDt, { ...controls, locked });
     encounter.step(gameDt, sim.state, controls);
+    const exploration=adventure.step(gameDt,sim.state.player,encounter.state.pet,{...controls,fighting:encounter.state.status==='fighting'});
+    if(adventure.state.counts.herbs>herbsHealed){encounter.heal(18*(adventure.state.counts.herbs-herbsHealed));herbsHealed=adventure.state.counts.herbs;}
+    if(encounter.state.victory && encounter.state.victory!==lastVictory){lastVictory=encounter.state.victory;adventure.victory();}
+    if(exploration.menu){
+      if(exploration.menu.kind==='camp'){adventure.rest(exploration.menu.id);encounter.heal();}
+      pause(exploration.menu.kind);return;
+    }
     if (encounter.state.status === 'won' || encounter.state.status === 'recovering') locked = false;
     if (encounter.state.respawn?.serial !== respawn && encounter.state.respawn?.serial) {
-      respawn = encounter.state.respawn.serial; sim.reset(); rig.reset(); input.release(); locked = false; lastHit = 0;
+      respawn = encounter.state.respawn.serial; sim.reset(encounter.state.respawn); rig.reset(); input.release(); locked = false; lastHit = 0;
     }
     if (sim.state.lastHit?.serial !== lastHit && sim.state.lastHit) { lastHit = sim.state.lastHit.serial; impact = 1; }
     impact = Math.max(0, impact - dt * 8);
     model.update(sim.state, sim.state.hitStop ? 0 : gameDt, reducedMotion);
     shapes.update(encounter.state, sim.state, sim.state.hitStop ? 0 : gameDt, reducedMotion);
     sound.update(encounter.state, sim.state);
+    valley.update(sim.state,encounter.state,adventure.state,gameDt,reducedMotion);
+    sun.target.position.set(sim.state.player.x,sim.state.player.y,sim.state.player.z-10);
+    sun.position.set(sun.target.position.x-35,sun.target.position.y+45,sun.target.position.z+25);
     rig.update(sim.state.player, locked, dt, reducedMotion ? 0 : Math.sin(impact * 15) * impact);
     renderer.render(scene, camera); renderCount++; updateHUD();
     if (lastFrame) {
@@ -126,7 +147,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
       frameSamples++; maxFrame = Math.max(maxFrame, elapsed); if (elapsed > 20) over20++;
     }
     lastFrame = timestamp;
-    frame = requestAnimationFrame(tick);
+    if(!paused)frame = requestAnimationFrame(tick);
   }
   function start() { if (ready && !paused && !disposed && !document.hidden && !frame) { lastTime = 0; lastFrame = 0; frame = requestAnimationFrame(tick); } }
   function disposal() {
@@ -150,7 +171,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
       renderer.renderLists.dispose(); renderer.dispose(); renderer.forceContextLoss();
       lastDisposal = { ready: false, disposed: true, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, programs: renderer.info.programs?.length || 0, contextLost: renderer.getContext().isContextLost(), renderCount };
     }
-    scene?.clear(); renderer = null; scene = null; model = null; shapes = null; rig = null; input = null; camera = null;
+    valley?.dispose?.(); scene?.clear(); renderer = null; scene = null; model = null; shapes = null; valley = null; sun = null; rig = null; input = null; camera = null;
     container.replaceChildren();
   }
   const observer = new ResizeObserver(resize);
@@ -159,28 +180,42 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
     renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
     renderer.toneMapping = ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12;
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
-    scene = new Scene(); scene.background = new Color('#cadbda'); scene.fog = new Fog('#cadbda', 24, 73);
-    camera = new PerspectiveCamera(58, 1, .15, 130);
-    const ambient = new HemisphereLight('#daeaf4', '#708066', 2.1);
-    const sun = new DirectionalLight('#ffe7bd', 2.3); sun.position.set(-12, 19, 10); sun.castShadow = true;
+    scene = new Scene(); scene.background = new Color('#b8d0d6'); scene.fog = new Fog('#b8d0d6', 180, 6000);
+    camera = new PerspectiveCamera(60, 1, .15, 9500);
+    const ambient = new HemisphereLight('#d0e3f3', '#65796b', 1.5);
+    sun = new DirectionalLight('#ffe4b8', 2.7); sun.position.set(-12, 19, 10); sun.castShadow = true;
     sun.target.position.z = -16; sun.position.z -= 16;
     sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -28; sun.shadow.camera.right = 28;
-    sun.shadow.camera.top = 28; sun.shadow.camera.bottom = -28; sun.shadow.camera.near = 1; sun.shadow.camera.far = 85;
+    sun.shadow.camera.top = 28; sun.shadow.camera.bottom = -28; sun.shadow.camera.near = 1; sun.shadow.camera.far = 160;
     sun.shadow.normalBias = .035; sun.shadow.bias = -.0001;
     scene.add(ambient, sun, sun.target);
-    model = createFeelBox(scene); shapes = createEncounterShapes(scene);
-    rig = createWildsCamera(camera, { target: encounter.target, obstacles: [...POSTS, ...STONES] });
+    model = createFeelBox(scene,{training:false,world}); shapes = createEncounterShapes(scene);
+    scene.getObjectByName('restart-camp').visible=false;scene.getObjectByName('standing-stone-ring').visible=false;
+    valley=createValley(scene,{world});valley.skyUniforms.top.value.set('#4b91cc');valley.skyUniforms.horizon.value.set('#b6d4df');
+    rig = createWildsCamera(camera, { target: encounter.target, obstacles: STONES, world, heading:-.33 });
     const depthMaterial = new MeshDepthMaterial();
     scene.traverse(object => { if (object.castShadow && object.isMesh) object.customDepthMaterial = depthMaterial; });
     input = createWildsInput(canvas, { onInteraction: sound.unlock, pause: () => paused ? resume() : pause(), lock: toggleLock, mute: () => { muted = !muted; sound.setMuted(muted); muteIndicator.hidden = !muted; }, orbit: (dx, dy) => { if (!paused) rig.orbit(dx, dy); }, zoom: delta => { if (!paused) rig.zoom(delta); } });
     get('#wilds-pause').addEventListener('click', pause, { signal: events.signal });
-    get('#wilds-resume').addEventListener('click', resume, { signal: events.signal });
-    get('#wilds-leave').addEventListener('click', onLeave, { signal: events.signal });
+    menu.addEventListener('click', async event=>{
+      const command=event.target.closest('[data-wilds-action]')?.dataset.wildsAction;
+      if(!command)return;
+      if(command==='resume'){resume();return;}
+      if(command==='leave'){onLeave();return;}
+      if(command.startsWith('tab-'))menuMode=command.slice(4);
+      if(command.startsWith('buy:')){event.target.closest('button').disabled=true;await adventure.buy(command.slice(4),sim.state.player);}
+      if(command==='potion' && await adventure.drink())encounter.heal(encounter.state.player.maxHealth*.5);
+      if(command.startsWith('rest-')){
+        const p=sim.state.player,camp=CAMPS.find(c=>Math.hypot(p.x-c.x,p.z-c.z)<4 && Math.abs(p.y-c.y)<2);
+        if(camp && await adventure.rest(camp.id,command==='rest-morning'?7:21)){encounter.heal();sim.state.player.stamina=adventure.stats.stamina;}
+      }
+      if(!disposed)renderMenu();
+    },{signal:events.signal});
     menu.addEventListener('keydown', event => {
       if (event.key !== 'Tab') return;
       event.preventDefault();
-      const resumeButton = get('#wilds-resume'), leaveButton = get('#wilds-leave');
-      (document.activeElement === resumeButton ? leaveButton : resumeButton).focus();
+      const buttons=[...menu.querySelectorAll('button:not(:disabled)')],index=buttons.indexOf(document.activeElement);
+      buttons[(index+(event.shiftKey?-1:1)+buttons.length)%buttons.length]?.focus();
     }, { signal: events.signal });
     motion.addEventListener('change', event => { reducedMotion = event.matches; }, { signal: events.signal });
     document.addEventListener('visibilitychange', () => { if (document.hidden) { stop(); sound.suspend(); input.release(); } else start(); }, { signal: events.signal });
@@ -195,7 +230,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
       if (disposed) return lastDisposal;
       const samples = Array.from(frameTimes.slice(0, Math.min(frameSamples, frameTimes.length))).sort((a, b) => a - b);
       const work = Array.from(workTimes.slice(0, Math.min(frameSamples, workTimes.length))).sort((a, b) => a - b);
-      return { ready, paused, disposed, avatar, pet, encounter: structuredClone(encounter.state), position: { x: sim.state.player.x, y: sim.state.player.y, z: sim.state.player.z }, grounded: sim.state.player.grounded, stamina: sim.state.player.stamina, action: { ...sim.state.action }, state: structuredClone(sim.state), locked, muted, camera: rig.diagnostics(), counters: { ...sim.state.counts, jumps: sim.state.counts.jump, dodges: sim.state.counts.dodge, locks }, dummyPosition: { x: DUMMY.x, y: model.dummyPosition[1], z: DUMMY.z }, renderCount, frame: { samples: frameSamples, maxMs: maxFrame, p95Ms: samples[Math.floor(samples.length * .95)] || 0, over20, cpuP95Ms: work[Math.floor(work.length * .95)] || 0 }, resources: { ...renderer.info.memory, programs: renderer.info.programs.length, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, pixelRatio: renderer.getPixelRatio() } };
+      return { ready, paused, disposed, avatar, pet, landmarks:{cliff:world.solids.find(s=>s.id==='cliff'),camps:CAMPS}, exploration:{...structuredClone(adventure.state),save:adventure.save,stats:{...adventure.stats},checkpoint:adventure.checkpoint,coins:adventure.coins}, valley:valley.diagnostics?.(), encounter: structuredClone(encounter.state), position: { x: sim.state.player.x, y: sim.state.player.y, z: sim.state.player.z }, grounded: sim.state.player.grounded, stamina: sim.state.player.stamina, action: { ...sim.state.action }, state: structuredClone(sim.state), locked, muted, camera: rig.diagnostics(), counters: { ...sim.state.counts, jumps: sim.state.counts.jump, dodges: sim.state.counts.dodge, locks }, dummyPosition: { x: DUMMY.x, y: model.dummyPosition[1], z: DUMMY.z }, renderCount, frame: { samples: frameSamples, maxMs: maxFrame, p95Ms: samples[Math.floor(samples.length * .95)] || 0, over20, cpuP95Ms: work[Math.floor(work.length * .95)] || 0 }, resources: { ...renderer.info.memory, programs: renderer.info.programs.length, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, pixelRatio: renderer.getPixelRatio() } };
     },
   };
 }
