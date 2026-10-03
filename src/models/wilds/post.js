@@ -117,6 +117,14 @@ export function createPost(renderer) {
       blurPass.uniforms.source.value = blurred.texture; blurPass.uniforms.step.value.set(0, 1 / bright.height); draw(blurPass, bright);
       draw(finalPass, null);
     },
+    compile() {
+      for (const [material, output] of [[brightPass, bright], [shaftPass, rays], [blurPass, blurred], [finalPass, null]]) {
+        screen.material = material;
+        renderer.setRenderTarget(output);
+        renderer.compile(screen, camera);
+      }
+      renderer.setRenderTarget(null);
+    },
     get shafts() { return shaftsOn; },
     dispose() {
       for (const rt of [target, bright, blurred, rays]) rt.dispose();

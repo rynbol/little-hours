@@ -461,6 +461,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     renderer.setRenderTarget(post.target);
     renderer.compile(scene, camera);
     renderer.setRenderTarget(null);
+    post.compile();
     for (const object of hidden) object.visible = false;
   }
 
