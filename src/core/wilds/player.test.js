@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPlayer, invulnerable, pressPlayer, stepPlayer } from './player.js';
+import { CLIMB, GLIDE, VITALS, createPlayer, hurtPlayer, invulnerable, pressPlayer, stepPlayer } from './player.js';
+import { smooth } from '../world-terrain.js';
 
 const DT = 1 / 120;
 const still = { moveX: 0, moveZ: 0, sprint: false, attackHeld: false };
@@ -122,4 +123,128 @@ test('the player stops against posts instead of walking through them', () => {
   const world = { ...open(), solids: [{ x: 0, z: 2, radius: 0.17, bottom: 0, top: 1.35 }] };
   run(player, 2, { ...still, moveZ: 1 }, world);
   assert.ok(player.z < 2 - 0.17 - 0.3, `stopped at ${player.z}`);
+});
+
+const cliff = (rise, from = 3) => (_, z) => rise * smooth(from, from + 2, z);
+const forward = { ...still, moveZ: 1 };
+const types = events => events.map(event => event.type);
+
+test('walking into a cliff grabs it, holding forward climbs slowly, and the lip mantles you onto the top', () => {
+  const ground = cliff(4);
+  const player = createPlayer({ ground });
+  let highest = 0;
+  const events = run(player, 6, forward, open(ground), p => { if (p.state === 'climb') highest = Math.max(highest, p.y); });
+  assert.deepEqual(types(events).filter(type => ['grab', 'mantle'].includes(type)), ['grab', 'mantle']);
+  const grab = events.find(event => event.type === 'grab').at, mantle = events.find(event => event.type === 'mantle').at;
+  assert.ok(mantle - grab > 2300 && mantle - grab < 3000, `climbed four metres in ${mantle - grab} ms`);
+  assert.ok(highest > 3.4);
+  assert.equal(player.state, 'move');
+  assert.equal(player.y, 4);
+  assert.ok(player.z > 5);
+  assert.ok(player.stamina > 60, `stamina ${player.stamina}`);
+});
+
+test('a climb lets go when stamina runs out, and you cannot grab again until you have your breath back', () => {
+  const ground = (_, z) => z > 3 ? (z - 3) * 3 : 0;
+  const player = createPlayer({ ground });
+  const grabs = [];
+  const events = run(player, 16, forward, open(ground), p => { if (p.state === 'climb' && p.time === 0) grabs.push(p.tired); });
+  const slip = events.find(event => event.type === 'slip');
+  assert.ok(slip && slip.at > 9000 && slip.at < 13000, `held on for ${slip?.at} ms`);
+  assert.ok(events.some(event => event.type === 'land' && event.at > slip.at), 'fell back to the foot of the wall');
+  assert.deepEqual(grabs, grabs.map(() => false));
+  assert.ok(events.filter(event => event.type === 'grab').every(event => event.at < slip.at || event.at > slip.at + 1000));
+});
+
+test('a winded player walks into a cliff and stops at its foot instead of walking up it', () => {
+  const ground = cliff(4);
+  const player = createPlayer({ ground });
+  player.stamina = 0; player.tired = true;
+  const events = run(player, 1.1, forward, open(ground));
+  assert.ok(!types(events).includes('grab'));
+  assert.ok(player.y < 0.6, `stood at ${player.y.toFixed(2)} m`);
+  assert.ok(player.z < 3.7, `stopped at z ${player.z.toFixed(2)}`);
+});
+
+test('jump on a wall leaps upward for a chunk of stamina, and dodge lets go', () => {
+  const ground = (_, z) => z > 3 ? (z - 3) * 3 : 0;
+  const player = createPlayer({ ground });
+  run(player, 1.2, forward, open(ground));
+  assert.equal(player.state, 'climb');
+  const before = { y: player.y, stamina: player.stamina };
+  pressPlayer(player, 'jump');
+  const events = run(player, CLIMB.leapTime + 0.05, still, open(ground));
+  assert.ok(types(events).includes('leap'));
+  assert.equal(Math.round((player.y - before.y) * 10) / 10, CLIMB.leap);
+  assert.ok(before.stamina - player.stamina >= CLIMB.leapCost);
+  pressPlayer(player, 'dodge');
+  const drop = run(player, 1.5, still, open(ground));
+  assert.deepEqual(types(drop).filter(type => ['let-go', 'land'].includes(type)), ['let-go', 'land']);
+  assert.equal(player.state, 'move');
+});
+
+test('jump in the air high above the ground opens the glider, which sinks slowly and steers, and jump folds it', () => {
+  const ground = () => 0;
+  const player = createPlayer({ ground, y: 12 });
+  player.y = 12; player.grounded = false;
+  run(player, 0.3, still, open(ground));
+  pressPlayer(player, 'jump');
+  const start = player.z;
+  const events = run(player, 2, forward, open(ground));
+  assert.ok(types(events).includes('glide'));
+  assert.equal(player.state, 'glide');
+  assert.equal(Math.round(-player.vy * 10) / 10, GLIDE.sink);
+  assert.ok(player.z - start > 8, `drifted ${(player.z - start).toFixed(1)} m`);
+  pressPlayer(player, 'jump');
+  const fold = run(player, 1.5, still, open(ground));
+  assert.deepEqual(types(fold).filter(type => ['glide-end', 'land'].includes(type)), ['glide-end', 'land']);
+});
+
+test('a jump from flat ground never opens the glider', () => {
+  const player = createPlayer({ ground: () => 0 });
+  pressPlayer(player, 'jump');
+  let pressed = false;
+  const events = run(player, 1, still, open(), (p, t) => { if (!pressed && t > 0.25) { pressed = true; pressPlayer(p, 'jump'); } });
+  assert.ok(!types(events).includes('glide'));
+});
+
+test('warm air over the meadow lifts a glider, and the glider folds when stamina is spent', () => {
+  const ground = () => 0;
+  const world = { ...open(ground), updrafts: [{ x: 0, z: 0, radius: 6, lift: 1.6 }] };
+  const player = createPlayer({ ground });
+  player.y = 6; player.grounded = false;
+  run(player, 0.2, still, world, p => { p.x = 0; p.z = 0; });
+  pressPlayer(player, 'jump');
+  run(player, 2, still, world, p => { p.x = 0; p.z = 0; });
+  assert.ok(player.y > 6.5, `rose to ${player.y.toFixed(2)} m`);
+  player.stamina = 3;
+  const events = run(player, 1, still, world);
+  assert.ok(events.some(event => event.type === 'glide-end' && event.tired));
+});
+
+test('walking off a cliff falls instead of striding down it, and a long fall stumbles without hurting', () => {
+  const ground = (_, z) => 10 - 10 * smooth(1, 2, z);
+  const player = createPlayer({ ground });
+  player.y = 10;
+  const events = run(player, 2.2, forward, open(ground));
+  const land = events.find(event => event.type === 'land');
+  assert.ok(land && land.height > 9, `fell ${land?.height}`);
+  assert.ok(land.hard);
+  assert.equal(player.health, VITALS.health);
+  const short = createPlayer({ ground: cliff(-3, 1) });
+  const steps = run(short, 1.5, forward, open(cliff(-3, 1)));
+  assert.ok(steps.some(event => event.type === 'land' && !event.hard));
+});
+
+test('no single hit takes more than a third of your health, and a heavy one knocks you down and back up', () => {
+  const player = createPlayer({ ground: () => 0 });
+  assert.equal(Math.round(hurtPlayer(player, { damage: 80, fromX: 0, fromZ: -1 })), 33);
+  run(player, 1);
+  assert.equal(player.state, 'move');
+  hurtPlayer(player, { damage: 10, knock: VITALS.heavy, fromX: 0, fromZ: -1 });
+  assert.equal(player.state, 'knocked');
+  const states = new Set();
+  run(player, 2.5, still, open(), p => states.add(p.state));
+  assert.deepEqual([...states], ['knocked', 'rise', 'move']);
+  assert.ok(player.z > 0.5, 'thrown away from the blow');
 });

@@ -1,7 +1,7 @@
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, InstancedMesh, Matrix4, Mesh, Quaternion, Vector3 } from 'three';
 import { fbm, noise2, smooth } from '../../core/world-terrain.js';
 
-const GREENS = Object.freeze({ deep: '#4f7f36', fresh: '#7aa847', sun: '#a3bd5c', dry: '#b2b26a', worn: '#b09a6b', moss: '#3f6a34' });
+const GREENS = Object.freeze({ deep: '#4f7f36', fresh: '#7aa847', sun: '#a3bd5c', dry: '#b2b26a', worn: '#b09a6b', moss: '#3f6a34', rock: '#9a8f7e', shade: '#6f6758' });
 
 export function groundColour(x, z, slope, worn = 0, out = new Color()) {
   const tone = new Color(), patch = smooth(-0.25, 0.35, fbm(x / 11, z / 11, 3, 71)), sun = smooth(0.15, 0.55, fbm(x / 34 + 4, z / 34, 2, 72));
@@ -9,6 +9,7 @@ export function groundColour(x, z, slope, worn = 0, out = new Color()) {
   out.lerp(tone.set(GREENS.sun), sun * 0.45);
   out.lerp(tone.set(GREENS.dry), smooth(0.3, 0.7, noise2(x / 23, z / 23, 73)) * 0.22);
   out.lerp(tone.set(GREENS.moss), smooth(0.16, 0.3, slope) * 0.3);
+  out.lerp(tone.set(GREENS.rock).lerp(tone.clone().set(GREENS.shade), smooth(0.3, 0.7, noise2(x / 1.7, z / 1.7, 74))), smooth(0.7, 1.15, slope));
   return out.lerp(tone.set(GREENS.worn), worn);
 }
 

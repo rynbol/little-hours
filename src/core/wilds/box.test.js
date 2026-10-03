@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BOX, createBox, press, stepBox, toggleLock } from './box.js';
+import { createBox, press, stepBox, toggleLock } from './box.js';
+import { HILL } from './layout.js';
 
 const DT = 1 / 120;
 const still = { moveX: 0, moveZ: 0, sprint: false, attackHeld: false };
@@ -71,5 +72,5 @@ test('locked on, the player keeps facing the dummy while strafing round it', () 
   run(box, 1.5, { ...still, moveX: 1 });
   const toward = Math.atan2(dummy.x - player.x, dummy.z - player.z), off = Math.atan2(Math.sin(toward - player.facing), Math.cos(toward - player.facing));
   assert.ok(Math.abs(off) < 0.05, `off by ${off}`);
-  assert.ok(Math.abs(player.x - BOX.spawn.x) > 2, 'and moved sideways');
+  assert.ok(Math.abs(player.x - HILL.spawn.x) > 2, 'and moved sideways');
 });

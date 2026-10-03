@@ -5,9 +5,29 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function hold(app, key, code, ms) { await app.down(key, code); await sleep(ms); await app.up(key, code); }
 async function until(app, expression, what, timeout = 4000) { return app.waitFor(`(() => { const d = ${WILDS}; return (${expression}) ? d : null; })()`, { what, timeout }); }
+const DRAG_TURN = 0.006;
+async function face(app, yaw) {
+  for (let i = 0; i < 8; i++) {
+    const { camera } = await app.js(WILDS), off = Math.atan2(Math.sin(yaw - camera.yaw), Math.cos(yaw - camera.yaw));
+    if (Math.abs(off) < 0.05) return;
+    const px = Math.max(-560, Math.min(560, -off / DRAG_TURN));
+    await app.drag({ x: 720, y: 450 }, { x: 720 + px + Math.sign(px) * 7, y: 450 }, 18);
+    await sleep(120);
+  }
+}
+async function walkTo(app, x, z, near = 0.9) {
+  for (let i = 0; i < 14; i++) {
+    const d = await app.js(WILDS), dx = x - d.player.x, dz = z - d.player.z, far = Math.hypot(dx, dz);
+    if (far < near) return d;
+    await face(app, Math.atan2(dx, dz));
+    await hold(app, 'w', 'KeyW', Math.max(120, Math.min(2000, far / 4.4 * 800)));
+    await sleep(200);
+  }
+  return app.js(WILDS);
+}
 
 export default {
-  about: 'the Wilds: the island Forest pin opens a three.js feel box after freeing the island, Play starts it, and real keys and clicks run, jump, roll, swing a three-hit combo, charge a heavy, lock on and leave, each answered within 100 ms, at a capped pixel ratio, 60 fps with no long frames, then the island comes back at the trailhead, and a focus session closes it and keeps it shut',
+  about: 'the Wilds: the island Forest pin opens a three.js feel box after freeing the island, Play starts it, and real keys and clicks run, jump, roll, swing a three-hit combo, charge a heavy, lock on, climb the cliff past its ledge, glide down and leave, each answered within 100 ms, at a capped pixel ratio, 60 fps with no long frames, then the island comes back at the trailhead, and a focus session closes it and keeps it shut',
   async run(t) {
     const { check } = t;
     const app = await t.open({ seed: 'three-rooms', scale: 2 });
@@ -91,6 +111,39 @@ export default {
     await app.up('a', 'KeyA'); await app.up('Shift', 'ShiftLeft');
     const sprinted = await app.js(WILDS);
     check('Shift sprints and drains stamina', sprinted.player.stamina < 80, sprinted.player);
+
+    const foot = await walkTo(app, -11.6, -9);
+    await face(app, -Math.PI / 2);
+    await sleep(200);
+    await app.down('w', 'KeyW');
+    const grabbed = await until(app, `d.player.state === 'climb'`, 'grabbing the cliff', 4000);
+    check('walking into the cliff grabs it instead of walking up it', grabbed.reactions.grabs > foot.reactions.grabs && grabbed.player.y < foot.player.y + 0.8, { foot: foot.player, grabbed: grabbed.player });
+    await sleep(900);
+    await t.shot(app, 'climb');
+    const topped = await until(app, `d.reactions.mantles >= ${foot.reactions.mantles + 2} && d.player.state === 'move'`, 'climbing past the ledge to the top', 16000);
+    await app.up('w', 'KeyW');
+    check('holding W climbs the cliff slowly, mantles onto the ledge, climbs again and mantles onto the top', topped.player.y > foot.player.y + 7 && topped.reactions.grabs - foot.reactions.grabs === 2, { from: foot.player.y, to: topped.player.y, grabs: topped.reactions.grabs - foot.reactions.grabs });
+    check('the climb costs stamina', topped.player.stamina < 70, topped.player);
+    await sleep(500);
+    await t.shot(app, 'cliff-top');
+
+    await face(app, Math.atan2(-5 - topped.player.x, -15 - topped.player.z));
+    await app.down('w', 'KeyW');
+    await until(app, `!d.player.grounded`, 'stepping off the cliff top', 4000);
+    await sleep(250);
+    await app.key(' ', 'Space');
+    let gliding = await until(app, `d.player.state === 'glide' || d.player.grounded`, 'the glider to open', 1500);
+    if (gliding.player.state !== 'glide') { await app.key(' ', 'Space'); gliding = await until(app, `d.player.state === 'glide'`, 'the glider to open', 1000); }
+    check('Space in the air opens the glider', gliding.player.state === 'glide' && gliding.reactions.glides > topped.reactions.glides, gliding.player);
+    await sleep(700);
+    const drifting = await app.js(WILDS);
+    await t.shot(app, 'glide');
+    check('the glider sinks slowly while you steer it forward', drifting.player.state === 'glide' && drifting.player.vy > -2.6 && Math.hypot(drifting.player.vx, drifting.player.vz) > 4, drifting.player);
+    const landed = await until(app, `d.player.grounded && d.player.state === 'move'`, 'the glide to land', 12000);
+    await app.up('w', 'KeyW');
+    const flown = Math.hypot(landed.player.x - topped.player.x, landed.player.z - topped.player.z);
+    check('the glide carries you well clear of the cliff before you land', flown > 12, { flown, at: landed.player });
+    await sleep(400);
 
     const frames = (await app.js(WILDS)).frames;
     check('the Wilds holds 60 fps: median frame gap under 17.5 ms', frames.gap.p50 < 17.5, frames);

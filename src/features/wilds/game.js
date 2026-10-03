@@ -1,7 +1,9 @@
 import { ACESFilmicToneMapping, DirectionalLight, Fog, HemisphereLight, Mesh, PCFShadowMap, PerspectiveCamera, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three';
 import { heightAt, smooth } from '../../core/world-terrain.js';
 import { createGround } from '../../core/wilds/ground.js';
-import { BOX, createBox, lockTarget, press, stepBox, toggleLock } from '../../core/wilds/box.js';
+import { createBox, lockTarget, press, stepBox, toggleLock } from '../../core/wilds/box.js';
+import { HILL, shapeHill } from '../../core/wilds/layout.js';
+import { slopeAt } from '../../core/wilds/player.js';
 import { RIG, createRig, kickRig, moveFrom, orbit, stepRig, zoomRig } from '../../core/wilds/camera.js';
 import { ATTACKS, BLADE, bladeAngles, bladeSegment } from '../../core/wilds/moves.js';
 import { renderRatioCeiling } from '../../core/render-scale.js';
@@ -51,13 +53,13 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
   const painterly = createPainterly();
   const wind = { value: 0 }, skyTime = { value: 0 };
 
-  const grid = createGround(heightAt, { centre: [BOX.bounds.x, BOX.bounds.z] });
+  const grid = createGround(shapeHill(heightAt), { centre: [HILL.bounds.x, HILL.bounds.z] });
   const ground = (x, z) => grid.at(x, z);
   const box = createBox(ground), player = box.player;
-  const near = (x, z, list, radius) => list.some(spot => Math.hypot(spot.x - x, spot.z - z) < radius);
-  const worn = (x, z) => Math.max(smooth(2.4, 0.9, Math.hypot(x - box.dummy.x, z - box.dummy.z)) * 0.75, smooth(2, 0.6, Math.hypot(x - BOX.spawn.x, z - BOX.spawn.z)) * 0.5);
+  const tilt = [0, 0], near = (x, z, list, radius) => list.some(spot => Math.hypot(spot.x - x, spot.z - z) < radius);
+  const worn = (x, z) => Math.max(smooth(2.4, 0.9, Math.hypot(x - box.dummy.x, z - box.dummy.z)) * 0.75, smooth(2, 0.6, Math.hypot(x - HILL.spawn.x, z - HILL.spawn.z)) * 0.5);
   scene.add(buildGround(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { worn }));
-  scene.add(buildTufts(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { centre: [BOX.bounds.x, BOX.bounds.z], radius: BOX.bounds.radius + 6, wind, keep: (x, z) => !near(x, z, [box.dummy, ...box.posts], 0.75) && worn(x, z) < 0.3 }));
+  scene.add(buildTufts(grid, painterly.material('#ffffff', { vertexColors: true, rim: false }), { centre: [HILL.bounds.x, HILL.bounds.z], radius: HILL.bounds.radius + 6, wind, keep: (x, z) => !near(x, z, [box.dummy, ...box.posts], 0.75) && worn(x, z) < 0.3 && Math.hypot(...slopeAt(ground, x, z, tilt)) < 0.7 }));
   scene.add(buildPosts(box.posts, painterly.material('#ffffff', { vertexColors: true })));
   const dummyView = buildDummy(box.dummy, painterly);
   scene.add(dummyView.root);
@@ -79,14 +81,14 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
   const lightRight = new Vector3().crossVectors(SUN, new Vector3(0, 1, 0)).normalize(), lightUp = new Vector3().crossVectors(lightRight, SUN), focus = new Vector3();
   const texel = VIEW.shadowHalf * 2 / VIEW.shadow, snap = value => Math.round(value / texel) * texel;
 
-  const rig = createRig({ yaw: BOX.spawn.facing, at: [player.x, player.y, player.z] });
+  const rig = createRig({ yaw: HILL.spawn.facing, at: [player.x, player.y, player.z] });
   const sim = { moveX: 0, moveZ: 0, sprint: false, attackHeld: false, view: rig.yaw };
   const pose = [...BLADE.rest], shownPose = [...BLADE.rest], startPose = [...BLADE.rest], windPose = [0, 0];
   const segment = { root: [0, 0, 0], tip: [0, 0, 0], yaw: BLADE.rest[0], pitch: BLADE.rest[1] }, trailSegment = { root: [0, 0, 0], tip: [0, 0, 0] };
   const projected = new Vector3(), hudState = { stamina: { x: 0, y: 0, visible: false, value: 100, max: 100, tired: false }, lock: { visible: false, x: 0, y: 0, barVisible: false, barX: 0, barY: 0, health: 100, max: 100 } };
   const cpu = [], gaps = [], latency = { move: null, attack: null, jump: null, dodge: null, worst: 0 }, pending = [];
-  const reactions = { swings: 0, hits: 0, breaks: 0, lands: 0, dodges: 0, jumps: 0, charges: 0, kicks: 0, trail: 0, warnings: 0, frozen: 0 };
-  let frame = 0, last = 0, paused = true, disposed = false, width = 0, height = 0, trailAttack = null, trailTime = 0, dustClock = 0, muted = false, seconds = 0;
+  const reactions = { swings: 0, hits: 0, breaks: 0, lands: 0, dodges: 0, jumps: 0, charges: 0, kicks: 0, trail: 0, warnings: 0, frozen: 0, grabs: 0, mantles: 0, glides: 0, lets: 0 };
+  let frame = 0, last = 0, paused = true, disposed = false, width = 0, height = 0, trailAttack = null, trailTime = 0, dustClock = 0, driftClock = 0, muted = false, seconds = 0;
 
   const hud = createHud(hudLayer);
   const input = createInput(canvas, {
@@ -176,6 +178,11 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
     else if (event.type === 'dodge') { reactions.dodges++; effects.dust(player.x, player.y, player.z, 0.5); }
     else if (event.type === 'charge') reactions.charges++;
     else if (event.type === 'tired') hud.warn();
+    else if (event.type === 'grab') { reactions.grabs++; effects.dust(player.x, player.y + 0.6, player.z, 0.2); }
+    else if (event.type === 'mantle') { reactions.mantles++; hero.land(4); }
+    else if (event.type === 'leap') effects.dust(player.x, player.y, player.z, 0.3);
+    else if (event.type === 'glide') { reactions.glides++; hero.jump(); }
+    else if (event.type === 'let-go' || event.type === 'slip') reactions.lets++;
   }
 
   function simulate(dt, still) {
@@ -196,6 +203,7 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
       if (player.state === 'attack' && player.attack === trailAttack) { sampleTrail(trailAttack, Math.max(before, trailTime), player.time); trailTime = player.time; }
     }
     if (player.sprinting && player.grounded && (dustClock += dt) > 0.28) { dustClock = 0; effects.dust(player.x - player.vx * 0.05, player.y, player.z - player.vz * 0.05, 0.1); }
+    if (!still && (driftClock += dt) > 0.09) { driftClock = 0; for (const draft of HILL.updrafts) { const angle = clockRandom() * Math.PI * 2, r = Math.sqrt(clockRandom()) * draft.radius, x = draft.x + Math.cos(angle) * r, z = draft.z + Math.sin(angle) * r; effects.drift(x, ground(x, z) + 0.3, z); } }
     if (player.state === 'charge' && player.charge < 1 && !still && clockRandom() < dt * 30) effects.charge(segment.tip[0], segment.tip[1], segment.tip[2]);
     return frozen;
   }
@@ -287,7 +295,7 @@ export function createGame(stage, hudLayer, { reducedMotion = () => false, onPau
     diagnostics() {
       const info = renderer.info;
       return {
-        player: { x: player.x, y: player.y, z: player.z, vx: player.vx, vz: player.vz, facing: player.facing, state: player.state, attack: player.attack, charge: player.charge, stamina: player.stamina, tired: player.tired, grounded: player.grounded, sprinting: player.sprinting },
+        player: { x: player.x, y: player.y, z: player.z, vx: player.vx, vy: player.vy, vz: player.vz, facing: player.facing, state: player.state, attack: player.attack, charge: player.charge, stamina: player.stamina, tired: player.tired, grounded: player.grounded, sprinting: player.sprinting },
         dummy: { health: box.dummy.health, max: box.dummy.max, tilt: Math.hypot(box.dummy.tiltX, box.dummy.tiltZ), hurt: box.dummy.hurt, x: box.dummy.x, z: box.dummy.z },
         lock: box.lock,
         camera: { yaw: rig.yaw, pitch: rig.pitch, zoom: rig.zoom, distance: rig.distance, eye: [...rig.eye], clearance: rig.eye[1] - ground(rig.eye[0], rig.eye[2]), fov: camera.fov },

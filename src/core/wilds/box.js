@@ -1,23 +1,18 @@
 import { createPlayer, pressPlayer, stepPlayer } from './player.js';
 import { ATTACKS, hitDamage } from './moves.js';
+import { HILL } from './layout.js';
 
-export const BOX = Object.freeze({
-  spawn: Object.freeze({ x: 0, z: 4.2, facing: Math.PI }),
-  dummy: Object.freeze({ x: 0.4, z: -3.6 }),
-  posts: Object.freeze([[-5.6, -11.5], [4.8, -15], [-2.6, -21.5], [7.2, -25.5], [-8.4, -29], [1.8, -33]].map(Object.freeze)),
-  bounds: Object.freeze({ x: 0, z: -14, radius: 32 }),
-});
 export const DUMMY = Object.freeze({ radius: 0.3, height: 1.65, health: 100, mend: 2.2, refill: 1.1, stiffness: 140, damping: 8, shove: 0.24 });
 export const POST = Object.freeze({ radius: 0.17, height: 1.35 });
 export const LOCK = Object.freeze({ range: 20, keep: 25, cone: 1.25 });
 
 export function createBox(ground) {
-  const player = createPlayer({ ...BOX.spawn, ground });
-  const { x, z } = BOX.dummy, base = ground(x, z);
+  const player = createPlayer({ ...HILL.spawn, ground });
+  const { x, z } = HILL.dummy, base = ground(x, z);
   const dummy = { id: 'dummy', x, z, y: base, radius: DUMMY.radius, bottom: base, top: base + DUMMY.height, health: DUMMY.health, max: DUMMY.health, tiltX: 0, tiltZ: 0, spinX: 0, spinZ: 0, hurt: 0, quiet: 0, broken: 0 };
-  const posts = BOX.posts.map(([px, pz], i) => { const y = ground(px, pz); return { id: `post-${i}`, x: px, z: pz, y, radius: POST.radius, bottom: y, top: y + POST.height }; });
+  const posts = HILL.posts.map(([px, pz], i) => { const y = ground(px, pz); return { id: `post-${i}`, x: px, z: pz, y, radius: POST.radius, bottom: y, top: y + POST.height }; });
   const box = { player, dummy, posts, lock: null, stop: 0, events: [], world: null };
-  box.world = { ground, targets: [dummy], solids: [...posts, dummy], bounds: BOX.bounds, lock: null };
+  box.world = { ground, targets: [dummy], solids: [...posts, dummy], bounds: HILL.bounds, updrafts: HILL.updrafts, lock: null };
   return box;
 }
 

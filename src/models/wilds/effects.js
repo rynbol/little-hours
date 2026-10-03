@@ -6,6 +6,7 @@ export const KINDS = Object.freeze({
   flash: Object.freeze({ colour: '#fff6dc', size: 1.1, life: [0.09, 0.09], speed: [0, 0], gravity: 0, drag: 0, glow: 1 }),
   dust: Object.freeze({ colour: '#d8c9a4', size: 0.34, life: [0.45, 0.75], speed: [0.6, 1.5], gravity: -0.6, drag: 3.5, glow: 0 }),
   charge: Object.freeze({ colour: '#ffd27a', size: 0.08, life: [0.25, 0.4], speed: [0.4, 1.2], gravity: -1.5, drag: 1, glow: 1 }),
+  seed: Object.freeze({ colour: '#fff3c9', size: 0.09, life: [3.2, 4.4], speed: [1.6, 2.4], gravity: -0.15, drag: 0.15, glow: 0 }),
 });
 
 const POOL = 160, TRAIL = 48;
@@ -143,6 +144,7 @@ export function buildEffects(random) {
     },
     dust(x, y, z, amount) { emit(soft, KINDS.dust, Math.round(4 + amount * 6), x, y + 0.05, z, null, 0.3, 0.15); },
     charge(x, y, z) { emit(bright, KINDS.charge, 1, x, y, z, null, 1.5, 0.3); },
+    drift(x, y, z) { emit(soft, KINDS.seed, 1, x, y, z, null, 0.1, 0.95); },
     step(dt, trailDt = dt) { bright.step(dt); soft.step(dt); swish.step(trailDt); },
     resize(height, fov) { const scale = height / (2 * Math.tan(fov * Math.PI / 360)); bright.points.material.uniforms.scale.value = scale; soft.points.material.uniforms.scale.value = scale; },
     get live() { return bright.count + soft.count; },
