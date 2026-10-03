@@ -351,20 +351,18 @@ def surface_strip(table, path, width, lift, thick=0.006, steps=16, power=2.5):
     return verts, faces, attrs
 
 
-def surface_patch(table, a0, a1, z0, z1, lift, thick=0.008, sides=8, rings=6, power=2.5, round_corners=0.0):
-    rows = []
+def surface_patch(table, a0, a1, z0, z1, lift, thick=0.008, sides=8, rings=6, power=2.5, round_corners=0.0, span=None):
+    rows, angles = [], []
     for i in range(rings + 1):
         z = z0 + (z1 - z0) * i / rings
-        row = []
-        for j in range(sides + 1):
-            angle = a0 + (a1 - a0) * j / sides
-            row.append(ring_point(table, angle, z, lift, power))
-        rows.append(row)
+        lo, hi = (-span(z), span(z)) if span else (a0, a1)
+        angles.append([lo + (hi - lo) * j / sides for j in range(sides + 1)])
+        rows.append([ring_point(table, angle, z, lift, power) for angle in angles[-1]])
     verts, faces, attrs = [], [], []
     for layer, extra in ((0, 0.0), (1, thick)):
         for i, row in enumerate(rows):
             for j, p in enumerate(row):
-                angle = a0 + (a1 - a0) * j / sides
+                angle = angles[i][j]
                 n = Vector((math.sin(angle), -math.cos(angle), 0.0))
                 verts.append(p + n * extra)
                 attrs.append((n, i / rings, j / sides))
@@ -383,6 +381,7 @@ def surface_patch(table, a0, a1, z0, z1, lift, thick=0.008, sides=8, rings=6, po
     return verts, faces, attrs
 
 
+SHIRT = [(1.0, 0.012), (1.06, 0.135), (1.11, 0.335), (1.165, 0.46)]
 TORSO_WEIGHTS = blend(['hips', 'spine', 'chest', 'neck'], 4.0, 2)
 
 
@@ -505,9 +504,6 @@ def outfit_torso(model, outfit):
         front = math.cos(angle)
         hem = p.z < 0.80
         if outfit == 'cardigan':
-            v_neck = p.z > 1.03 + 0.5 * abs(math.sin(angle)) and front > 0.6
-            if v_neck:
-                return (*TONE['cream'], 0.0)
             if hem:
                 rib = 0.9 + 0.06 * math.cos(angle * 60)
                 return (rib, rib, rib, SLOT['topShade'] / 16)
@@ -523,6 +519,7 @@ def outfit_torso(model, outfit):
     for side in ('L', 'R'):
         sleeve(model, side, slot('top'), outfit in ('cardigan', 'hoodie', 'sailor'), grey('topShade', 0.95) if outfit != 'sailor' else slot('topTrim'))
     if outfit == 'cardigan':
+        model.add(refine(surface_patch(TORSO, 0, 0, 1.0, 1.165, 0.0015, 0.002, 8, 10, span=lambda z: track(z, SHIRT)), 1), fixed('cream'), torso_weight)
         model.add(refine(surface_strip(TORSO, [(0.0, 0.775), (0.0, 0.9), (0.0, 1.0), (0.12, 1.06), (0.32, 1.11)], 0.018, 0.002, 0.005), 1), slot('topTrim'), torso_weight)
         model.add(refine(surface_strip(TORSO, [(0.0, 0.9), (0.0, 1.0), (-0.12, 1.06), (-0.32, 1.11)], 0.018, 0.002, 0.005), 1), slot('topTrim'), torso_weight)
         for z in (0.83, 0.9, 0.97):
