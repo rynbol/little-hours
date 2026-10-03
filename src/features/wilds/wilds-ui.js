@@ -97,7 +97,7 @@ export function createWildsUI(app) {
     root.hidden = false; root.dataset.phase = 'loading'; delete root.dataset.started;
     document.body.classList.add('is-wilds'); document.getElementById('app').inert = true;
     app.houseUI?.release();
-    module.then(({ createGame, loadModels }) => loadModels().then(models => {
+    module.then(({ createGame, loadModels }) => loadModels(app.state.pet).then(models => {
       if (disposed || !isOpen() || game) return;
       const { state } = app;
       game = createGame($('.wilds-stage'), $('.wilds-hud'), {

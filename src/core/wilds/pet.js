@@ -16,6 +16,19 @@ export const PET_ATTACKS = Object.freeze({
 
 export const PET_SKILL = Object.freeze({ cooldown: 12, speed: 11, longest: 0.9, reach: 0.6, damage: 5, taunt: 3.2 });
 
+export const PET_GAITS = Object.freeze({
+  walk: Object.freeze({ speed: 0.9, cycle: 0.42, stance: 0.62 }),
+  trot: Object.freeze({ speed: PET.trot, cycle: 0.22, stance: 0.4 }),
+  run: Object.freeze({ speed: PET.run, cycle: 0.22, stance: 0.16 }),
+  dash: Object.freeze({ speed: PET_SKILL.speed, cycle: 0.2, stance: 0.11 }),
+  track: Object.freeze({ speed: PET.trot * 1.2, cycle: 0.24, stance: 0.32 }),
+  side: Object.freeze({ speed: PET.trot, cycle: 0.3, stance: 0.3 }),
+  limp: Object.freeze({ speed: PET.trot * PET.limp, cycle: 0.3, stance: 0.45 }),
+  swim: Object.freeze({ speed: PET.trot * PET.paddle, cycle: 0.42, stance: 0.5 }),
+});
+
+export const gaitFor = (name, size = 1) => ({ ...PET_GAITS[name], speed: PET_GAITS[name].speed * Math.sqrt(size), cycle: PET_GAITS[name].cycle * Math.sqrt(size) });
+
 const angleTo = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
 const between = (rng, [lo, hi]) => lo + (hi - lo) * rng();
 const FIGHTING = Object.freeze(['fight', 'attack', 'dash', 'evade']);

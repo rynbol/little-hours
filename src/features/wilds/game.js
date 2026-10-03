@@ -26,7 +26,7 @@ import { buildScatter } from '../../models/wilds/scatter.js';
 import { buildEffects } from '../../models/wilds/effects.js';
 import { buildRing } from '../../models/wilds/ring.js';
 import { buildStag, loadStag } from '../../models/wilds/stag.js';
-import { buildPet, buildWolf } from '../../models/wilds/critters.js';
+import { buildPet, loadPet } from '../../models/wilds/pet.js';
 import { buildCamp } from '../../models/wilds/camp.js';
 import { createInput } from './input.js';
 import { createHud } from './hud.js';
@@ -51,7 +51,7 @@ function quantiles(values) {
   return { p50: at(0.5), p95: at(0.95), max: sorted[sorted.length - 1], count: sorted.length };
 }
 
-export const loadModels = () => Promise.all([loadStag(), loadHero()]).then(([stag, hero]) => ({ stag, hero }));
+export const loadModels = kind => Promise.all([loadStag(), loadHero(), loadPet(kind), loadPet('wolf')]).then(([stag, hero, pet, wolf]) => ({ stag, hero, pet, wolf }));
 
 export function createGame(stage, hudLayer, { models, reducedMotion = () => false, onPause = () => {}, onShop = () => {}, wilds = {}, onSave = () => {} } = {}) {
   const canvas = document.createElement('canvas');
@@ -96,7 +96,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   const hero = buildHero(models.hero, painterly);
   const dress = () => hero.dress({ avatar: wilds.avatar, wear: progress.wear, owned: progress.owned });
   dress();
-  const ring = buildRing(sim, painterly), petView = buildPet(painterly, sim.pet.kind), wolfView = buildWolf(painterly), camp = buildCamp(sim.campfires, painterly);
+  const ring = buildRing(sim, painterly), petView = buildPet(models.pet, painterly, { kind: sim.pet.kind, bond: wilds.bond }), wolfView = buildPet(models.wolf, painterly, { kind: 'wolf', name: 'wilds-wolf' }), camp = buildCamp(sim.campfires, painterly);
   scene.add(ring.root, petView.root, wolfView.root, camp.root);
   let wolf = progress.companions.includes('wolf') ? createWolf({ x: player.x + 1.3, z: player.z + 1.7, facing: player.facing, ground: sim.floor }) : null;
   scene.add(hero.root);
@@ -491,7 +491,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
       if (disposed) return;
       disposed = true; stop();
       document.removeEventListener('visibilitychange', onVisibility);
-      observer.disconnect(); input.dispose(); hud.dispose(); stagView.dispose(); hero.dispose();
+      observer.disconnect(); input.dispose(); hud.dispose(); stagView.dispose(); hero.dispose(); petView.dispose(); wolfView.dispose();
       scene.traverse(object => {
         if (object instanceof Mesh || object.isPoints) {
           object.geometry?.dispose();

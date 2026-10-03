@@ -1,4 +1,4 @@
-export const WOLF = Object.freeze({ notice: 1.4, sight: 26, bow: 2.2, heel: Object.freeze([-1.3, -1.7]), arrive: 0.6, walk: 3.4, run: 8, accel: 18, turn: 7, leash: 34 });
+export const WOLF = Object.freeze({ size: 1.9, notice: 1.4, sight: 26, bow: 2.2, heel: Object.freeze([-1.3, -1.7]), arrive: 0.6, walk: 3.4, run: 8, accel: 18, turn: 7, leash: 34 });
 
 const angleTo = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
 

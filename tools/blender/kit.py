@@ -265,10 +265,10 @@ def track(t, keys):
     return out[0] if scalar else out
 
 
-def reset():
+def reset(rate=FPS):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
-    scene.render.fps = FPS
+    scene.render.fps = rate
     return scene
 
 
@@ -361,19 +361,20 @@ class Poser:
 
 def bake(rig, poser, clips, located=('hips',), scaled=()):
     rig.animation_data_create()
+    rate = bpy.context.scene.render.fps
     report = {}
     for name, fn, length in clips:
         action = bpy.data.actions.new(name)
         action.use_fake_user = True
         rig.animation_data.action = action
-        frames = max(2, round(length * FPS))
+        frames = max(2, round(length * rate))
         last = {}
         poser.miss = (0.0, '', 0.0)
         prepare = getattr(poser, 'prepare', None)
         if prepare:
             prepare(fn, length)
         for frame in range(frames + 1):
-            poser.time = round(frame / FPS, 2)
+            poser.time = round(frame / rate, 2)
             basis = poser.evaluate(fn(frame / frames * length))
             for bone, matrix in basis.items():
                 pb = rig.pose.bones[bone]
@@ -396,7 +397,7 @@ def bake(rig, poser, clips, located=('hips',), scaled=()):
         track.strips.new(name, 0, action)
         track.mute = True
         rig.animation_data.action = None
-        report[name] = {'seconds': round(frames / FPS, 3), 'short': [round(poser.miss[0], 3), poser.miss[1], poser.miss[2]]}
+        report[name] = {'seconds': round(frames / rate, 3), 'short': [round(poser.miss[0], 3), poser.miss[1], poser.miss[2]]}
         if getattr(poser, 'report', None):
             report[name].update({key: round(value, 3) for key, value in poser.report.items()})
     return report
