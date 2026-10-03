@@ -79,8 +79,8 @@ export function createWildsHud(container, { petName: companionName } = {}) {
       petHealth.max = pet.maxHealth;
       petHealth.value = pet.health;
       const cooldown = Math.max(0, Math.ceil((pet.skillReadyAt - elapsedMs) / 1000));
-      setText(skill, pet.mode === 'knockout' ? `Resting · ${Math.max(0, Math.ceil((pet.recoverAt - elapsedMs) / 1000))}s` : cooldown ? `Pet skill · ${cooldown}s` : 'Q · Pet skill ready');
-      companion.dataset.ready = String(!cooldown && pet.mode !== 'knockout');
+      setText(skill, pet.mode === 'knockout' ? `Resting · ${Math.max(0, Math.ceil((pet.recoverAt - elapsedMs) / 1000))}s` : pet.skillQueued ? 'Pet skill · Closing in' : cooldown ? `Pet skill · ${cooldown}s` : 'Q · Pet skill ready');
+      companion.dataset.ready = String(!cooldown && !pet.skillQueued && pet.mode !== 'knockout');
       bossPanel.hidden = !boss.engaged || boss.mode === 'defeated';
       setText(bossName, boss.name);
       bossHealth.max = boss.maxHealth;

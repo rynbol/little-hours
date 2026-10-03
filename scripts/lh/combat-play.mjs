@@ -14,8 +14,8 @@ async function tap(app, code) {
 
 export default {
   about: 'Recorded real-time walk from Enter Wilds to a complete Warden fight, without placement or clock control',
-  async run(t, style = 'balanced') {
-    const app = await t.open({ ...views.wilds.settings, seed: 'one-room', theme: process.env.LH_COMBAT_THEME || 'day', width: 960, height: 640 });
+  async run(t, style = 'balanced', theme = process.env.LH_COMBAT_THEME || 'day') {
+    const app = await t.open({ ...views.wilds.settings, seed: 'one-room', theme, width: 960, height: 640 });
     const folder = join(repoRoot, '..', 'wilds-assets', 'progress-shots', basename(t.out), `wilds-combat-${style}`);
     mkdirSync(folder, { recursive: true });
     await app.clickSel('#wilds-leave');
@@ -65,7 +65,7 @@ export default {
             if (style === 'back-off' && styleMs < 8000) input.keys = ['KeyS'];
             if (style === 'circle' && styleMs < 12000) input.keys = ['KeyD'];
             if (style === 'idle' && styleMs < 14000) { input.keys = []; input.actions = styleMs < 200 ? ['KeyR'] : []; }
-            if (style === 'pet-alone') { input.actions = input.actions.filter(code => code !== 'KeyF'); if (gap > 9 && boss.mode !== 'charge') input.keys = []; }
+            if (style === 'pet-alone') { input.actions = input.actions.filter(code => code !== 'KeyF'); if (gap > 9 && !['charge', 'telegraph'].includes(boss.mode)) input.keys = []; }
             if (style === 'death-retry' && !retried) { input.keys = steeringKeys(player.position, boss.position, state.cameraYaw, 2); input.actions = ['KeyR']; }
             if (style === 'pointer' && input.actions.includes('KeyF')) {
               input.actions = input.actions.filter(code => code !== 'KeyF');
@@ -83,7 +83,7 @@ export default {
       samples.push({ realMs: performance.now() - began, ...end });
       for (const event of end.events) events.set(JSON.stringify(event), event);
     } });
-    writeFileSync(join(folder, 'combat.json'), JSON.stringify({ style, entered, end, walked: firstWalked, retried, returned, resetClean, events: [...events.values()], samples }, null, 2));
+    writeFileSync(join(folder, 'combat.json'), JSON.stringify({ style, theme, entered, end, walked: firstWalked, retried, returned, resetClean, events: [...events.values()], samples }, null, 2));
     const damage = source => [...events.values()].filter(event => event.type === 'damage' && event.targetId === end.combat.boss.id && event.sourceId === source).reduce((sum, event) => sum + event.amount, 0);
     t.check('Enter Wilds begins at camp and real keys reach the arena', Math.hypot(entered.player.position.x + 106.5, entered.player.position.z + 180) < .1 && firstWalked);
     t.check('the advancing-clock fight is captured from entry through the result', capture.frames.length > 100 && end.elapsedMs > entered.elapsedMs + 5000 && capture.recording?.events.some(event => event.code === 'KeyW'));

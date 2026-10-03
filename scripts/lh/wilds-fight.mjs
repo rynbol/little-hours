@@ -1,17 +1,52 @@
-import { dispatchSequenceInput } from './sequence.mjs';
-import { fightInput, movementInput } from './flows/wilds.mjs';
+import { join } from 'node:path';
+import { captureSequence, dispatchSequenceInput } from './sequence.mjs';
+import { repoRoot } from './state.mjs';
+import { fightInput, movementInput, steeringKeys } from './flows/wilds.mjs';
 
 const D = 'window.__littleHours.wilds.diagnostics()';
 const KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyT', 'KeyQ', 'ControlLeft', 'Tab'];
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const snapshot = app => app.js(`(() => { const d = ${D}; return { player: d.player, combat: d.combat, events: d.eventHistory, cameraYaw: d.cameraYaw, elapsedMs: d.elapsedMs, phase: d.phase, frozen: window.__lhFrozenAt != null }; })()`);
+const recordings = new WeakMap();
 
 async function tap(app, code) {
   try { await dispatchSequenceInput(app, { type: 'keyDown', code }); }
   finally { await dispatchSequenceInput(app, { type: 'keyUp', code }); }
 }
 
+export async function enterFight(app) {
+  await app.clickSel('#wilds-leave');
+  await app.clickSel('#wilds-enter');
+  await app.waitFor('window.__littleHours.wilds.ready()');
+  const move = movementInput(app), began = performance.now();
+  try {
+    while (performance.now() - began < 15000) {
+      const state = await snapshot(app);
+      if (state.frozen) throw new Error('Walking to the fight requires real time');
+      const keys = steeringKeys(state.player.position, { x: -120, z: -200 }, state.cameraYaw);
+      await move(keys);
+      if (!keys.length) {
+        await tap(app, 'Tab');
+        await app.waitFor(`${D}.combat.targetId === 'mossback-warden'`);
+        return snapshot(app);
+      }
+      await sleep(80);
+    }
+    throw new Error('Real movement did not reach the Warden in fifteen seconds');
+  } finally { await move([]); }
+}
+
 export async function prepareFight(app) {
+  if (process.env.LH_REAL_FIGHT === '1') {
+    const started = Promise.withResolvers(), finished = Promise.withResolvers();
+    const folder = join(repoRoot, '..', 'wilds-assets', 'progress-shots', `perf-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+    const recording = captureSequence(app, { durationMs: 120000, events: [] }, folder, { drive: async () => { started.resolve(); await finished.promise; } });
+    recording.catch(error => started.reject(error));
+    const finish = async () => { finished.resolve(); recordings.delete(app); return recording; };
+    recordings.set(app, finish);
+    try { await started.promise; return await enterFight(app); }
+    catch (error) { await finish(); throw error; }
+  }
   await app.waitFor('window.__littleHours.wilds.ready()', { what: 'the Wilds to render before the fight measurement' });
   const before = await snapshot(app);
   if (before.combat.boss.health <= 0) throw new Error('Fight measurement needs a fresh undefeated Warden encounter');
@@ -60,6 +95,8 @@ export async function driveFight(app, { durationMs = 15000 } = {}) {
   finally {
     const released = await Promise.allSettled(KEYS.map(code => dispatchSequenceInput(app, { type: 'keyUp', code })));
     const errors = released.filter(result => result.status === 'rejected').map(result => result.reason);
+    const finish = recordings.get(app);
+    if (finish) await finish();
     if (errors.length && !failed) throw new AggregateError(errors, 'Could not release every fight input');
   }
 }

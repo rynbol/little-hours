@@ -65,6 +65,9 @@ export function fightInput(state) {
     if (until <= 250 && !combat.playerAction && player.stamina >= 24) { keys = ['KeyD']; actions.push('ControlLeft'); }
   } else if (boss.mode === 'charge') {
     keys = ['KeyD'];
+  } else if (boss.mode === 'telegraph' && boss.move === 'roots') {
+    keys = ['KeyD'];
+    if (until <= 180 && !combat.playerAction && player.stamina >= 24) actions.push('ControlLeft');
   } else if (boss.mode === 'telegraph' && distance < 6.5) {
     const away = { x: player.position.x + (player.position.x - boss.position.x) * 2, z: player.position.z + (player.position.z - boss.position.z) * 2 };
     keys = steeringKeys(player.position, away, cameraYaw);
@@ -132,7 +135,8 @@ async function movementChecks(t, app) {
 export default {
   about: 'Recorded real-time entry-to-victory fight, followed by deterministic movement, rewards and lifecycle checks',
   async run(t) {
-    for (const style of (process.env.LH_COMBAT_STYLES || 'balanced').split(',')) await combatPlay.run(t, style);
+    const styles = (process.env.LH_COMBAT_STYLES || 'balanced').split(','), themes = (process.env.LH_COMBAT_THEMES || process.env.LH_COMBAT_THEME || 'day').split(',');
+    for (let index = 0; index < styles.length; index++) await combatPlay.run(t, styles[index], themes[index % themes.length]);
     const app = await t.open({ ...views.wilds.settings, seed: 'one-room', theme: 'day', width: 960, height: 640 });
     await views.wilds.go(app);
     t.check('the Wilds mounts a ready populated scene', await app.js(`window.__littleHours.wilds.ready() && ${D}.phase === 'running' && ${D}.scene.meshes.length > 0 && document.querySelectorAll('#wilds-canvas').length === 1`));
