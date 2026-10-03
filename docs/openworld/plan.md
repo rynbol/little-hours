@@ -40,3 +40,11 @@ The stag will use an original Blender-generated skinned GLB, with in-place clips
 The hero must cover every normalized avatar option using named Blender mesh variants and palette materials. Hair, cape and satchel use their own bones; the sword belongs to the hand rig. All active room pet species need a corresponding original rig, with the earned Wolf staged separately after victory. Preserve the current pet bond data and room avatar choices.
 
 Final polish must address the fourth environment judge’s failed criteria, plus near-camera leaves obscuring combat, the block-like cliffs and observatory support, and the narrow distant lake reveal. Add actual changing light, rain, water reflection and life before the four lighting evidence sets.
+
+## Stage 5 contracts prepared during the Stage 4 gate
+
+The active pet identity is already passed from the room. `panda` means red panda. The hero adapter consumes the normalized appearance and paints named skin, hair, top and bottom materials; Blender mesh groups own hairstyle, outfit, bottom and accessory variants. Its world transform follows the player, while every body pose comes from the mixer. Sideways locked movement needs baked strafe clips. The roll faces actual travel, not the held lock direction. Actual exported sword vertices must define credible attack reach before the shared table is finalized.
+
+A pet uses its support height, not its already-lifted simulation pounce height. Bake the 0.65 m arc once. Loop actions change kind without resetting serial, so local gait clocks reset on kind changes. Knockout freezes its domain clock at zero, requiring a separate local animation clock that holds the last pose until healed. Hero recovery similarly selects baked knockback and getting-up phases from the existing 1.6 s recovery. None of these visual decisions should mutate combat state or bond data.
+
+The final trophy can be an earned furniture definition rendered by the existing Babylon furniture factory. Gate its collection availability from the guardian reward, with the model in the new Wilds model directory. This avoids changing room or house rendering logic. The Wolf remains a separate noncombat follower rather than changing the selected room species or its bond.

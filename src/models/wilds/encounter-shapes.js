@@ -1,7 +1,7 @@
-import { BoxGeometry, BufferAttribute, BufferGeometry, CircleGeometry, CylinderGeometry, DoubleSide, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Quaternion, SphereGeometry, Vector3 } from 'three';
+import { BufferAttribute, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Quaternion, SphereGeometry, Vector3 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { heightAt } from '../../core/world-terrain.js';
-import { ARENA, STONES, BOSS_ATTACKS } from '../../core/wilds/encounter.js';
+import { heightAt, normalAt } from '../../core/world-terrain.js';
+import { BOSS_ATTACKS } from '../../core/wilds/encounter.js';
 
 function paint(color) {
   const material = new MeshStandardMaterial({ color, roughness: .9 });
@@ -44,40 +44,8 @@ function joined(parts, material, parent) {
 }
 
 export function createEncounterShapes(scene) {
-  const wood = paint('#766c50'), stone = paint('#9b9c86'), moss = paint('#637858'), amber = paint('#e3b96a'), ginger = paint('#c98b50'), cream = paint('#efd8ac'), dark = paint('#514d43');
-  amber.emissive.set('#a86720');
-  const boss = new Group(), torso = new Group(), neck = new Group(), head = new Group();
-  torso.rotation.order = 'YXZ';
-  boss.name = 'mossheart-blockout'; boss.add(torso); torso.add(neck); neck.add(head); scene.add(boss);
-  joined([ellipsoid(0, 2.15, .1, .67, .79, 1.12), branch([0, 2.1, -.65], [0, 2.9, -1.02], .43, .3)], wood, torso);
-  joined([ellipsoid(-.47, 2.36, -.37, .28, .43, .48), ellipsoid(.47, 2.36, -.37, .28, .43, .48), ellipsoid(0, 2.55, .57, .59, .25, .51)], stone, torso);
-  neck.position.set(0, 2.66, -.94);
-  joined([branch([0, -.15, 0], [0, .5, -.15], .32, .22)], wood, neck);
-  head.position.set(0, .49, -.15);
-  joined([ellipsoid(0, 0, -.17, .3, .35, .49), ellipsoid(0, -.15, -.55, .24, .2, .26), ellipsoid(-.37, .15, .02, .27, .1, .15), ellipsoid(.37, .15, .02, .27, .1, .15)], wood, head);
-  joined([ellipsoid(-.27, .06, -.39, .035, .055, .055), ellipsoid(.27, .06, -.39, .035, .055, .055)], amber, head);
-  const antlerParts = [], mossParts = [];
-  for (const side of [-1, 1]) {
-    const chain = [[side * .2, .25, .03], [side * .43, .65, .15], [side * .77, 1.04, .2], [side * 1.13, 1.32, .16]];
-    for (let i = 0; i < chain.length - 1; i++) antlerParts.push(branch(chain[i], chain[i + 1], .1 - i * .02));
-    antlerParts.push(branch(chain[1], [side * .43, 1.08, -.21], .07, .025), branch(chain[2], [side * .9, 1.51, .27], .055, .015), branch(chain[3], [side * 1.42, 1.35, -.08], .035, .01));
-    mossParts.push(ellipsoid(side * .67, .97, .21, .2, .08, .13));
-  }
-  const antlers = joined(antlerParts, wood, head); antlers.name = 'stag-antlers'; joined(mossParts, moss, head);
-  const heart = joined([ellipsoid(0, 0, 0, .27, .35, .13)], amber, torso); heart.name = 'exposed-heart'; heart.position.set(0, 2.22, -.87);
-  const legs = new InstancedMesh(new CylinderGeometry(.12, .16, 1, 7), wood, 4), hooves = new InstancedMesh(new BoxGeometry(.25, .2, .32), dark, 4);
-  legs.name = 'stag-legs'; hooves.name = 'stag-hooves'; legs.castShadow = true; hooves.castShadow = true; scene.add(legs, hooves);
-  const stones = new InstancedMesh(new CylinderGeometry(.47, .68, 3, 7), stone, STONES.length);
-  const stoneCaps = new InstancedMesh(new SphereGeometry(1, 7, 4), moss, STONES.length);
-  stones.name = 'standing-stone-ring'; stones.castShadow = true; stones.receiveShadow = true; stoneCaps.castShadow = true; scene.add(stones, stoneCaps);
+  const wood = paint('#766c50'), ginger = paint('#c98b50'), cream = paint('#efd8ac'), dark = paint('#514d43');
   const matrix = new Matrix4(), rotation = new Quaternion(), scale = new Vector3(), position = new Vector3();
-  STONES.forEach((s, i) => {
-    rotation.setFromAxisAngle(new Vector3(0, 1, 0), i * 1.72);
-    position.set(s.x, heightAt(s.x, s.z) + s.height / 2, s.z); scale.set(1, s.height / 3, 1);
-    stones.setMatrixAt(i, matrix.compose(position, rotation, scale));
-    position.y = heightAt(s.x, s.z) + s.height - .12; scale.set(.51, .16, .51);
-    stoneCaps.setMatrixAt(i, matrix.compose(position, rotation, scale));
-  });
   const pet = new Group(), catBody = new Group(), catTail = new Group(); pet.name = 'ginger-partner-blockout'; pet.add(catBody); scene.add(pet);
   joined([ellipsoid(0, .35, 0, .21, .23, .4), ellipsoid(0, .48, -.35, .23, .23, .22), new CylinderGeometry(0, .115, .22, 3).rotateY(Math.PI / 6).translate(-.145, .71, -.33), new CylinderGeometry(0, .115, .22, 3).rotateY(-Math.PI / 6).translate(.145, .71, -.33)], ginger, catBody);
   joined([ellipsoid(0, .42, -.52, .13, .1, .05)], cream, catBody);
@@ -86,11 +54,12 @@ export function createEncounterShapes(scene) {
   joined([branch([0, 0, 0], [.04, .26, .24], .055), branch([.04, .26, .24], [.09, .47, .2], .043)], ginger, catTail);
   const paws = new InstancedMesh(new CylinderGeometry(.065, .075, .25, 6), ginger, 4); paws.castShadow = true; scene.add(paws);
   const roots = new InstancedMesh(new CylinderGeometry(.025, .16, 1, 6), wood, 12); roots.name = 'erupting-roots'; roots.castShadow = true; roots.visible = false; scene.add(roots);
-  const camp = new Group(); camp.name = 'restart-camp'; camp.position.set(ARENA.camp.x, heightAt(ARENA.camp.x, ARENA.camp.z), ARENA.camp.z); scene.add(camp);
-  const hearth = new Group(); hearth.name = 'camp-hearth'; hearth.position.set(-1.4, heightAt(ARENA.camp.x - 1.4, ARENA.camp.z) - camp.position.y, 0); camp.add(hearth);
-  joined([branch([-.5, .1, -.25], [.5, .1, .25], .09), branch([-.5, .12, .25], [.5, .12, -.25], .09)], wood, hearth);
-  joined([ellipsoid(0, .3, 0, .15, .25, .15)], amber, hearth);
-  joined([new BoxGeometry(.62, .08, 1.35).translate(1.1, .06, 0)], moss, camp);
+  const petalGeometry=new BufferGeometry();
+  petalGeometry.setAttribute('position',new BufferAttribute(new Float32Array([0,0,0,-.075,.09,.01,0,.18,-.018,0,0,0,0,.18,-.018,.075,.09,.01]),3));petalGeometry.computeVertexNormals();
+  const petalMaterial=paint('#ffffff');petalMaterial.side=DoubleSide;
+  const blossoms=new InstancedMesh(petalGeometry,petalMaterial,80);blossoms.name='guardian-blossoms';blossoms.frustumCulled=false;blossoms.visible=false;scene.add(blossoms);
+  const petalColors=['#e9e3ce','#c9d5af','#829c68','#eddbcc'],petalAxis=new Vector3(.6,.3,.7).normalize();
+  for(let i=0;i<blossoms.count;i++)blossoms.setColorAt(i,new Color(petalColors[i%petalColors.length]));
   const shadowMaterial = new MeshBasicMaterial({ color: '#263e36', transparent: true, opacity: .18, depthWrite: false });
   const shadows = new InstancedMesh(new CircleGeometry(1, 24).rotateX(-Math.PI / 2), shadowMaterial, 2); scene.add(shadows);
   const telegraphMaterial = new MeshBasicMaterial({ color: '#e3ba77', transparent: true, opacity: .24, side: DoubleSide, depthWrite: false });
@@ -100,8 +69,7 @@ export function createEncounterShapes(scene) {
   telegraphGeometry.setAttribute('position', new BufferAttribute(telegraphPositions, 3)); effectGeometry.setAttribute('position', new BufferAttribute(effectPositions, 3));
   const telegraph = new Mesh(telegraphGeometry, telegraphMaterial), effect = new Mesh(effectGeometry, effectMaterial);
   telegraph.name = 'attack-telegraph'; effect.name = 'attack-impact'; telegraph.frustumCulled = false; effect.frustumCulled = false; scene.add(telegraph, effect);
-  const bossPosition = [ARENA.x, heightAt(ARENA.x, ARENA.z) + 2.3, ARENA.z], petPosition = [0, 0, 2];
-  let vertices = 0, previousBossX = ARENA.x, previousBossZ = ARENA.z;
+  let vertices = 0;
   function vertex(buffer, x, z, lift = .035) { buffer[vertices++] = x; buffer[vertices++] = heightAt(x, z) + lift; buffer[vertices++] = z; }
   function strip(buffer, ax, az, bx, bz, cx, cz, dx, dz) {
     vertex(buffer, ax, az); vertex(buffer, bx, bz); vertex(buffer, cx, cz); vertex(buffer, cx, cz); vertex(buffer, bx, bz); vertex(buffer, dx, dz);
@@ -125,9 +93,9 @@ export function createEncounterShapes(scene) {
     }
     geometry.setDrawRange(0, vertices / 3); geometry.attributes.position.needsUpdate = true;
   }
-  const bossFeet = [[-.43, -.58], [.43, -.58], [-.43, .8], [.43, .8]], catFeet = [[-.14, -.23], [.14, -.23], [-.14, .23], [.14, .23]];
-  const up = new Vector3(0, 1, 0);
-  legs.frustumCulled = false; hooves.frustumCulled = false; paws.frustumCulled = false; roots.frustumCulled = false; shadows.frustumCulled = false;
+  const catFeet = [[-.14, -.23], [.14, -.23], [-.14, .23], [.14, .23]];
+  const up = new Vector3(0, 1, 0), shadowNormal = new Vector3(), shadowYaw = new Quaternion();
+  paws.frustumCulled = false; roots.frustumCulled = false; shadows.frustumCulled = false;
   function instance(mesh, index, x, y, z, sx, sy, sz, heading = 0) {
     position.set(x, y, z); scale.set(sx, sy, sz); rotation.setFromAxisAngle(up, -heading); mesh.setMatrixAt(index, matrix.compose(position, rotation, scale));
   }
@@ -135,32 +103,7 @@ export function createEncounterShapes(scene) {
     const b = state.boss, p = state.pet, action = b.action, kind = action.kind, attack = BOSS_ATTACKS[kind];
     const ground = heightAt(b.x, b.z), progress = action.progress ?? action.elapsed / Math.max(.001, action.duration);
     const anticipation = Boolean(attack && action.elapsed < attack.telegraph), windup = anticipation ? Math.min(1, action.elapsed / attack.telegraph) : 0;
-    const stunned = kind === 'stunned', defeated = kind === 'defeat', phase = kind === 'phase';
-    const movingBoss = Math.hypot(b.x - previousBossX, b.z - previousBossZ) > .0001;
-    previousBossX = b.x; previousBossZ = b.z;
-    const gait = reducedMotion ? 0 : Math.sin(simState.elapsed * (kind === 'charge' && !anticipation ? 16 : 6));
-    boss.position.set(b.x, ground, b.z); boss.rotation.y = -b.heading;
-    const sweepActive = kind === 'sweep' ? Math.min(1, Math.max(0, (action.elapsed - attack.telegraph) / attack.active)) : 0;
-    const sweepFold = kind === 'sweep' ? anticipation ? windup : Math.max(0, 1 - Math.max(0, action.elapsed - attack.telegraph - attack.active) / .45) : 0;
-    const sweepTurn = kind === 'sweep' ? anticipation ? -attack.arc / 2 * windup : (sweepActive - .5) * attack.arc : 0;
-    torso.position.y = defeated ? -.65 * Math.min(1, progress * 2) : stunned ? -.32 : -.7 * sweepFold;
-    torso.rotation.set(kind === 'stomp' ? -.2 * (anticipation ? windup : Math.max(0, 1 - progress) * 2) : -.35 * sweepFold, -sweepTurn * sweepFold, reducedMotion || kind === 'sweep' ? 0 : Math.sin(simState.elapsed * 1.4) * .012);
-    neck.rotation.x = stunned ? -.58 : kind === 'charge' ? -.65 * (anticipation ? windup : 1) : kind === 'roots' ? -.4 * windup : defeated ? -.4 : -1.2 * sweepFold;
-    head.rotation.set(kind === 'stomp' ? .18 : 0, 0, 0);
-    wood.emissive.set(b.flash > 0 ? '#725939' : anticipation ? '#3c2611' : phase ? '#63411c' : '#000000');
-    amber.emissive.set(stunned ? '#ffb53c' : phase ? '#e68c25' : anticipation ? '#d48420' : '#a86720');
-    heart.scale.setScalar(stunned ? 1.7 : 1 + (reducedMotion ? 0 : Math.sin(simState.elapsed * 3) * .04));
-    heart.position.z = stunned ? -1.07 : -.87;
-    const sin = Math.sin(b.heading), cos = Math.cos(b.heading);
-    bossFeet.forEach(([lx, lz], i) => {
-      const movement = kind === 'charge' && !anticipation || kind === 'idle' && movingBoss ? gait * .2 * (i === 0 || i === 3 ? 1 : -1) : 0;
-      const x = b.x + lx * cos - (lz + movement) * sin, z = b.z + lx * sin + (lz + movement) * cos, footGround = heightAt(x, z);
-      const lift = kind === 'stomp' && anticipation && i < 2 ? windup * .8 : movement ? Math.max(0, movement) * .65 : 0;
-      const hipHeight = ground + 1.7 + torso.position.y, length = Math.max(.25, hipHeight - footGround - lift - .16);
-      instance(legs, i, x, footGround + lift + .16 + length / 2, z, 1, length, 1, b.heading);
-      instance(hooves, i, x, footGround + lift + .1, z, 1, 1, 1, b.heading);
-    });
-    legs.instanceMatrix.needsUpdate = true; hooves.instanceMatrix.needsUpdate = true;
+    const phase = kind === 'phase';
     const catAction = p.action.kind, catProgress = p.action.progress ?? p.action.elapsed / Math.max(.001, p.action.duration);
     const leap = catAction === 'pounce' ? Math.sin(catProgress * Math.PI) * .65 : catAction === 'dash' ? .12 : 0;
     const catGround = Number.isFinite(p.ground) ? p.ground : heightAt(p.x,p.z);
@@ -200,11 +143,20 @@ export function createEncounterShapes(scene) {
       const radius = kind === 'stomp' ? b.ringRadius : kind === 'roots' ? b.rootLength : attack.range;
       ribbon(effectGeometry, effectPositions, originX, originZ, b.heading, kind, radius, kind === 'roots' ? .17 : .28);
     }
-    instance(shadows, 0, b.x, ground + .022, b.z, .8, 1, 1.45, b.heading);
+    const bloomTime=Math.max(0,action.elapsed-.75),bloomFade=Math.max(0,Math.min(1,(3-action.elapsed)*2));
+    blossoms.visible=kind==='defeat' && bloomTime>0 && bloomFade>0;
+    if(blossoms.visible){
+      for(let i=0;i<blossoms.count;i++){
+        const angle=i*2.399963,spread=(.3+(i%7)*.09)*(reducedMotion?.3:bloomTime*1.8),lift=Math.sin(i*1.77)*.45;
+        const x=b.x+Math.sin(angle)*spread,z=b.z+Math.cos(angle)*spread,y=Math.max(heightAt(x,z)+.035,ground+1.4+lift+bloomTime*.65-bloomTime*bloomTime*.36);
+        position.set(x,y,z);scale.setScalar((.75+(i%5)*.19)*bloomFade);rotation.setFromAxisAngle(petalAxis,angle+(reducedMotion?0:bloomTime*(i%2?-2:2.8)));blossoms.setMatrixAt(i,matrix.compose(position,rotation,scale));
+      }
+      blossoms.instanceMatrix.needsUpdate=true;
+    }
+    const guardianShadow=kind==='defeat'?Math.max(0,1-action.elapsed/3):1;
+    position.set(b.x,ground+.022,b.z);scale.set(.8*guardianShadow,1,1.45*guardianShadow);shadowNormal.fromArray(normalAt(b.x,b.z));rotation.setFromUnitVectors(up,shadowNormal).multiply(shadowYaw.setFromAxisAngle(up,-b.heading));shadows.setMatrixAt(0,matrix.compose(position,rotation,scale));
     instance(shadows, 1, p.x, catGround + .024, p.z, .25, 1, .45, p.heading);
     shadows.instanceMatrix.needsUpdate = true;
-    bossPosition[0] = b.x; bossPosition[1] = ground + 2.3; bossPosition[2] = b.z;
-    petPosition[0] = p.x; petPosition[1] = catGround + .4; petPosition[2] = p.z;
   }
-  return { update, bossPosition, petPosition, stonePositions: STONES.map(s => [s.x, heightAt(s.x, s.z), s.z]), campPosition: [ARENA.camp.x, heightAt(ARENA.camp.x, ARENA.camp.z), ARENA.camp.z] };
+  return { update };
 }

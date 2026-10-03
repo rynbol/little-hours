@@ -57,6 +57,7 @@ export function wildsPaint(color, { wind = null, foliage = false, grass = false,
       outgoingLight += diffuseColor.rgb * vec3(.055, .075, .085) + rim * ${grass ? 'vec3(.025, .04, .016)' : 'vec3(.07, .075, .035)'};
       ${foliage ? `outgoingLight += diffuseColor.rgb * ${grass ? '.04' : '.13'} * pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 2.0);` : ''}
       ${grass ? 'outgoingLight *= .84 + smoothstep(.015, .28, vWildsBladeHeight) * .16; outgoingLight += diffuseColor.rgb * vec3(.035, .065, .026);' : ''}
+      ${foliage && !grass ? 'float wildsCameraCover = smoothstep(.8, 3.2, length(vViewPosition)); if (fract(dot(floor(gl_FragCoord.xy), vec2(.754877666, .569840296))) > wildsCameraCover) discard;' : ''}
       ${foliage && !grass ? 'vec3 wildsLeafP = vWildsSurface * 6.0; float wildsLeafMottle = sin(wildsLeafP.x + sin(wildsLeafP.z * .83)) * sin(wildsLeafP.y * 1.27 + sin(wildsLeafP.x * .71)) * sin(wildsLeafP.z * 1.11 + sin(wildsLeafP.y)); float wildsLeafFine = sin(wildsLeafP.x * 2.3 + wildsLeafP.z * .7) * sin(wildsLeafP.z * 2.6 + wildsLeafP.y); outgoingLight *= .91 + smoothstep(-.5, .5, wildsLeafMottle) * .22 + wildsLeafFine * .055; outgoingLight += diffuseColor.rgb * .055;' : ''}
       ${surface === 'bark' ? 'float grain = sin(vWildsSurface.x * 21.0 + vWildsSurface.z * 18.0 + sin(vWildsSurface.y * 1.7) * .55); float streak = pow(abs(grain), 9.0); float knots = sin(vWildsSurface.x * 9.0 + vWildsSurface.y * .37) * sin(vWildsSurface.z * 11.0 - vWildsSurface.y * .24); outgoingLight *= .87 + grain * .10 - streak * .13 + knots * .09;' : ''}
       ${surface === 'ground' ? 'float wildsPatch = sin(vWildsSurface.x * .47 + sin(vWildsSurface.z * .31) * 2.3) * sin(vWildsSurface.z * .38 + sin(vWildsSurface.x * .19)); float wildsFine = sin(vWildsSurface.x * 6.8 + sin(vWildsSurface.z * 4.1)) * sin(vWildsSurface.z * 7.2); outgoingLight *= .83 + wildsPatch * .14 + wildsFine * .035; outgoingLight = mix(outgoingLight, outgoingLight * vec3(.89, 1.03, .78), smoothstep(.1, .7, wildsPatch) * .45);' : surface === 'cloth' ? 'float weave = sin(vWildsSurface.x * 48.0) * sin((vWildsSurface.y + vWildsSurface.z) * 48.0); outgoingLight *= .97 + weave * .025;' : ''}
@@ -64,6 +65,6 @@ export function wildsPaint(color, { wind = null, foliage = false, grass = false,
       #include <opaque_fragment>
     `);
   };
-  material.customProgramCacheKey = () => `wilds-paint-3-${Boolean(wind)}-${foliage}-${grass}-${surface}-${haze}`;
+  material.customProgramCacheKey = () => `wilds-paint-4-${Boolean(wind)}-${foliage}-${grass}-${surface}-${haze}`;
   return material;
 }

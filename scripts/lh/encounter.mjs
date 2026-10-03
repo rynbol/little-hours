@@ -70,7 +70,7 @@ export async function recordFight(app, out) {
   return async () => { await app.send('Page.stopScreencast'); off(); writeFileSync(join(out, 'play-frames.json'), JSON.stringify(frames, null, 2)); return frames; };
 }
 
-export async function playFight(app, { out, limit = 110000, onState = () => {} } = {}) {
+export async function playFight(app, { out, limit = 110000, onState = () => {}, until = () => false } = {}) {
   const controls = movement(app), canvas = await app.box('#wilds-canvas'), stopRecording = out ? await recordFight(app, out) : async () => [];
   let attackHeld = false, attackAt = 0, nextClick = 0, nextDodge = 0, nextSkill = 0, actionSerial = -1, clipped = false;
   const events = [], seenKinds = new Set(), started = Date.now();
@@ -83,7 +83,7 @@ export async function playFight(app, { out, limit = 110000, onState = () => {} }
         events.push({at:now-started,event:'state',boss:structuredClone(b),player:game.position,camera:game.camera,action:game.action});
         actionSerial = a.serial; clipped = game.camera.clipped;
       }
-      if (fight.status === 'won' || fight.status === 'recovering') return { game, events, frames: await stopRecording() };
+      if (until(game) || fight.status === 'won' || fight.status === 'recovering') return { game, events, frames: await stopRecording() };
       if (!game.locked) await app.key('f', 'KeyF');
       if (!fight.pet.skillCooldown && now > nextSkill && a.kind !== 'charge') { await app.key('q', 'KeyQ'); nextSkill = now + 2000; }
       const d = Math.hypot(game.position.x - b.x, game.position.z - b.z);

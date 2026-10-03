@@ -63,6 +63,7 @@ export function createFeelSimulation({ target = () => DUMMY, obstacles = [], wor
       dummy: { hits: 0, health: 100, flash: 0 },
       counts: { attack: 0, dodge: 0, jump: 0, lightAttacks: 0, heavyAttacks: 0, hits: 0, climb: 0, glide: 0, swim: 0 },
       hitStop: 0,
+      hitStopped: false,
       lastHit: null,
       elapsed: 0,
     });
@@ -210,7 +211,7 @@ export function createFeelSimulation({ target = () => DUMMY, obstacles = [], wor
   function advance(dt, input, moveX, moveZ, moving) {
     state.elapsed += dt;
     state.dummy.flash = Math.max(0, state.dummy.flash - dt);
-    if (state.hitStop > 0) { state.hitStop = Math.max(0, state.hitStop - dt); return; }
+    if (state.hitStop > 0 || state.hitStopped) { state.hitStopped = true; state.hitStop = Math.max(0, state.hitStop - dt); return; }
     const player = state.player;
     const current = state.action;
     const previousElapsed = current.elapsed;
@@ -298,6 +299,7 @@ export function createFeelSimulation({ target = () => DUMMY, obstacles = [], wor
   function step(dt, input = {}) {
     dt = Number.isFinite(dt) ? clamp(dt, 0, 0.05) : 0;
     if (dt === 0) return state;
+    state.hitStopped = false;
     const length = Math.hypot(input.moveX || 0, input.moveZ || 0);
     const scale = Math.max(1, length);
     const moveX = (input.moveX || 0) / scale, moveZ = (input.moveZ || 0) / scale;

@@ -5,6 +5,7 @@ import { createEncounter, STONES } from '../../core/wilds/encounter.js';
 import { createAdventure } from '../../core/wilds/progression.js';
 import { createValleyWorld, CAMPS, LANDMARKS } from '../../core/wilds/world.js';
 import { createValley } from '../../models/wilds/valley.js';
+import { loadMossheart } from '../../models/wilds/mossheart.js';
 import { wildsMenu } from './menus.js';
 import { heightAt } from '../../core/world-terrain.js';
 import { clockNow } from '../../core/test-pins.js';
@@ -22,7 +23,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   let reducedMotion = motion.matches, paused = false, disposed = false, ready = false, frame = 0, lastTime = 0, lastFrame = 0;
   let locked = false, muted = false, locks = 0, renderCount = 0, lastDisposal = null, impact = 0, lastHit = 0;
-  let renderer, scene, camera, model, shapes, valley, rig, input, respawn = 0, lastVictory = 0, menuMode = 'controls', sun, herbsHealed=0;
+  let renderer, scene, camera, model, shapes, valley, stag, rig, input, respawn = 0, lastVictory = 0, menuMode = 'controls', sun, herbsHealed=0;
   const adventure = createAdventure({read:readSave,transact:updateSave}), world=createValleyWorld();
   const frameTimes = new Float64Array(3600), workTimes = new Float64Array(3600);
   let frameSamples = 0, maxFrame = 0, over20 = 0;
@@ -132,8 +133,9 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
     }
     if (sim.state.lastHit?.serial !== lastHit && sim.state.lastHit) { lastHit = sim.state.lastHit.serial; impact = 1; }
     impact = Math.max(0, impact - dt * 8);
-    model.update(sim.state, sim.state.hitStop ? 0 : gameDt, reducedMotion);
-    shapes.update(encounter.state, sim.state, sim.state.hitStop ? 0 : gameDt, reducedMotion);
+    model.update(sim.state, sim.state.hitStop || sim.state.hitStopped ? 0 : gameDt, reducedMotion);
+    shapes.update(encounter.state, sim.state, sim.state.hitStop || sim.state.hitStopped ? 0 : gameDt, reducedMotion);
+    stag.update(encounter.state, sim.state, sim.state.hitStop || sim.state.hitStopped ? 0 : gameDt, reducedMotion);
     sound.update(encounter.state, sim.state);
     valley.update(sim.state,encounter.state,adventure.state,gameDt,reducedMotion);
     sun.target.position.set(sim.state.player.x,sim.state.player.y,sim.state.player.z-10);
@@ -156,6 +158,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
     const geometries = new Set(), materials = new Set(), textures = new Set(), targets = new Set();
     scene?.traverse(object => {
       if (object.geometry) geometries.add(object.geometry);
+      if (object.skeleton?.boneTexture) textures.add(object.skeleton.boneTexture);
       if (object.material) for (const material of [].concat(object.material)) materials.add(material);
       if (object.customDepthMaterial) materials.add(object.customDepthMaterial);
       if (object.shadow?.map) targets.add(object.shadow.map);
@@ -163,6 +166,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
     });
     for (const material of materials) for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
     for (const material of materials) for (const uniforms of material.userData.wildsUniforms || []) for (const uniform of Object.values(uniforms)) if (uniform.value?.isTexture) textures.add(uniform.value);
+    stag?.dispose();
     for (const geometry of geometries) geometry.dispose();
     for (const material of materials) material.dispose();
     for (const texture of textures) texture.dispose();
@@ -171,7 +175,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
       renderer.renderLists.dispose(); renderer.dispose(); renderer.forceContextLoss();
       lastDisposal = { ready: false, disposed: true, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, programs: renderer.info.programs?.length || 0, contextLost: renderer.getContext().isContextLost(), renderCount };
     }
-    valley?.dispose?.(); scene?.clear(); renderer = null; scene = null; model = null; shapes = null; valley = null; sun = null; rig = null; input = null; camera = null;
+    valley?.dispose?.(); scene?.clear(); renderer = null; scene = null; model = null; shapes = null; valley = null; stag = null; sun = null; rig = null; input = null; camera = null;
     container.replaceChildren();
   }
   const observer = new ResizeObserver(resize);
@@ -190,7 +194,8 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
     sun.shadow.normalBias = .035; sun.shadow.bias = -.0001;
     scene.add(ambient, sun, sun.target);
     model = createFeelBox(scene,{training:false,world}); shapes = createEncounterShapes(scene);
-    scene.getObjectByName('restart-camp').visible=false;scene.getObjectByName('standing-stone-ring').visible=false;
+    stag=await loadMossheart(scene,{world});
+    stag.update(encounter.state,sim.state,0,reducedMotion);
     valley=createValley(scene,{world});valley.skyUniforms.top.value.set('#4b91cc');valley.skyUniforms.horizon.value.set('#b6d4df');
     rig = createWildsCamera(camera, { target: encounter.target, obstacles: STONES, world, heading:-.33 });
     const depthMaterial = new MeshDepthMaterial();
@@ -230,7 +235,7 @@ export async function createWildsGame({ container, appearance, pet = 'cat', bond
       if (disposed) return lastDisposal;
       const samples = Array.from(frameTimes.slice(0, Math.min(frameSamples, frameTimes.length))).sort((a, b) => a - b);
       const work = Array.from(workTimes.slice(0, Math.min(frameSamples, workTimes.length))).sort((a, b) => a - b);
-      return { ready, paused, disposed, avatar, pet, landmarks:{cliff:world.solids.find(s=>s.id==='cliff'),camps:CAMPS}, exploration:{...structuredClone(adventure.state),save:adventure.save,stats:{...adventure.stats},checkpoint:adventure.checkpoint,coins:adventure.coins}, valley:valley.diagnostics?.(), encounter: structuredClone(encounter.state), position: { x: sim.state.player.x, y: sim.state.player.y, z: sim.state.player.z }, grounded: sim.state.player.grounded, stamina: sim.state.player.stamina, action: { ...sim.state.action }, state: structuredClone(sim.state), locked, muted, camera: rig.diagnostics(), counters: { ...sim.state.counts, jumps: sim.state.counts.jump, dodges: sim.state.counts.dodge, locks }, dummyPosition: { x: DUMMY.x, y: model.dummyPosition[1], z: DUMMY.z }, renderCount, frame: { samples: frameSamples, maxMs: maxFrame, p95Ms: samples[Math.floor(samples.length * .95)] || 0, over20, cpuP95Ms: work[Math.floor(work.length * .95)] || 0 }, resources: { ...renderer.info.memory, programs: renderer.info.programs.length, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, pixelRatio: renderer.getPixelRatio() } };
+      return { ready, paused, disposed, avatar, pet, landmarks:{cliff:world.solids.find(s=>s.id==='cliff'),camps:CAMPS}, exploration:{...structuredClone(adventure.state),save:adventure.save,stats:{...adventure.stats},checkpoint:adventure.checkpoint,coins:adventure.coins}, valley:valley.diagnostics?.(), actors:{stag:stag.diagnostics()}, encounter: structuredClone(encounter.state), position: { x: sim.state.player.x, y: sim.state.player.y, z: sim.state.player.z }, grounded: sim.state.player.grounded, stamina: sim.state.player.stamina, action: { ...sim.state.action }, state: structuredClone(sim.state), locked, muted, camera: rig.diagnostics(), counters: { ...sim.state.counts, jumps: sim.state.counts.jump, dodges: sim.state.counts.dodge, locks }, dummyPosition: { x: DUMMY.x, y: model.dummyPosition[1], z: DUMMY.z }, renderCount, frame: { samples: frameSamples, maxMs: maxFrame, p95Ms: samples[Math.floor(samples.length * .95)] || 0, over20, cpuP95Ms: work[Math.floor(work.length * .95)] || 0 }, resources: { ...renderer.info.memory, programs: renderer.info.programs.length, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, pixelRatio: renderer.getPixelRatio() } };
     },
   };
 }

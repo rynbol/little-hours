@@ -201,7 +201,7 @@ export function createEncounter({ bond = 0, checkpoint = () => ARENA.camp, stats
     const maxHealth = stats.health || 120;
     if (maxHealth>state.player.maxHealth)state.player.health+=maxHealth-state.player.maxHealth;
     state.player.maxHealth=maxHealth;
-    const frozen = sim.hitStop > 0;
+    const frozen = sim.hitStop > 0 || sim.hitStopped;
     const realDt = dt / state.slowMotion;
     state.elapsed += dt; state.flurry = Math.max(0, state.flurry - realDt); slowTime = Math.max(0, slowTime - realDt); state.slowMotion = slowTime > 0 ? 0.32 : 1; tauntTime = Math.max(0, tauntTime - (frozen ? 0 : dt));
     state.boss.flash = Math.max(0, state.boss.flash - dt); state.pet.flash = Math.max(0, state.pet.flash - dt); state.player.damageFlash = Math.max(0, state.player.damageFlash - dt);

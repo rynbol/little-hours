@@ -469,3 +469,22 @@ test('initialization and reset place the partner on the checkpoint support befor
     assert.equal(pet.swimming,false);assert.equal(pet.health,pet.maxHealth);
   }
 });
+
+
+test('the final hit-stop frame freezes player, guardian and pet together before the next frame resumes', () => {
+  const {encounter,simulation}=setup();
+  bossAction(encounter,'charge',1.1);
+  simulation.state.hitStop=.01;
+  const before={player:simulation.state.player.z,boss:encounter.state.boss.z,pet:encounter.state.pet.z,time:encounter.state.boss.action.elapsed};
+  simulation.step(1/60,{moveZ:1}); encounter.step(1/60,simulation.state);
+  assert.equal(simulation.state.hitStop,0);
+  assert.equal(simulation.state.hitStopped,true);
+  assert.equal(simulation.state.player.z,before.player);
+  assert.equal(encounter.state.boss.z,before.boss);
+  assert.equal(encounter.state.pet.z,before.pet);
+  assert.equal(encounter.state.boss.action.elapsed,before.time);
+  simulation.step(1/60,{moveZ:1}); encounter.step(1/60,simulation.state);
+  assert.equal(simulation.state.hitStopped,false);
+  assert.notEqual(simulation.state.player.z,before.player);
+  assert.ok(encounter.state.boss.action.elapsed>before.time);
+});

@@ -73,7 +73,7 @@ export default {
     await t.shot(app,'feel-box');
     const beforeFrameRun = await game(app);
     const frames = await wildsFrameSample(app,5);
-    t.check('orbit drag cancels its press and movement remains responsive', frames.game.action.kind === 'run' && distance(beforeFrameRun.position, frames.game.position) > 2, {before:beforeFrameRun.action,after:frames.game.action,distance:distance(beforeFrameRun.position,frames.game.position)});
+    t.check('orbit drag cancels its press and movement remains responsive', ['run','jump','land'].includes(frames.game.action.kind) && Math.hypot(frames.game.state.player.vx,frames.game.state.player.vz)>.5 && distance(beforeFrameRun.position, frames.game.position) > 2, {before:beforeFrameRun.action,after:frames.game.action,distance:distance(beforeFrameRun.position,frames.game.position)});
     t.check('gameplay holds 60fps with no frame over 20ms', frames.fps >= 59 && frames.over20 === 0, frames);
     await app.key('Escape');
     const paused = await game(app);

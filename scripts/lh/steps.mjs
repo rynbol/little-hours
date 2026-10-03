@@ -28,6 +28,19 @@ export const cycles = {
   'house-toggle': { about: 'on the house page, close the house and open it again', async setup(app) { await steps.openHouse(app); }, async run(app) { await steps.toggleHouse(app); await steps.toggleHouse(app); } },
 };
 
+async function guardianView(app, kind) {
+  const { enterWilds } = await import('./wilds.mjs');
+  const { walkTo, playFight } = await import('./encounter.mjs');
+  await steps.openHouse(app); await enterWilds(app);
+  await walkTo(app,2.5,2); await walkTo(app,2.5,-12.8);
+  const result=await playFight(app,{until:game=>{
+    const boss=game.encounter.boss,action=boss.action;
+    return action.kind===kind && Math.hypot(game.position.x-boss.x,game.position.z-boss.z)<6 && (kind==='idle' || kind==='stunned'?action.elapsed>.25:action.stage==='active');
+  }});
+  if(result.game.encounter.boss.action.kind!==kind)throw new Error(`Real combat did not reach the ${kind} portrait`);
+  await app.js('window.__lhFrozenAt = window.__littleHoursTest.now()');
+}
+
 export const views = {
   garden: { about: 'the personal garden, or the whole house on older refs', async go(app) { await steps.openHouse(app); if (await app.visible('#house-open-garden')) await app.clickSel('#house-open-garden'); await app.settle(); } },
   focus: { about: 'the seated Focus view, or the room on older refs', async go(app) {
@@ -45,6 +58,9 @@ export const views = {
   decorate: { about: 'Decorate mode', async go(app) { await steps.openDecorate(app); } },
   avatar: { about: 'the avatar editor', async go(app) { await steps.openAvatar(app); } },
   lake: { about: 'fishing at Willow Pond, idle', async go(app) { await steps.openLake(app); } },
+  'wilds-stag': { about:'the guardian approached with real movement', go:app=>guardianView(app,'idle') },
+  'wilds-stag-sweep': { about:'the guardian frozen during its real antler sweep', go:app=>guardianView(app,'sweep') },
+  'wilds-stag-stun': { about:'the guardian heart exposed after a real charge into stone', go:app=>guardianView(app,'stunned') },
   'wilds-roll': { about: 'a real dodge, frozen near its first fifth', async go(app) { const { enterWilds } = await import('./wilds.mjs'); await steps.openHouse(app); await enterWilds(app); await app.key('Control', 'ControlLeft'); let state; for (let i = 0; i < 100; i++) { state = await app.js('window.__littleHours.forest.diagnostics().game.action'); if (state.kind === 'dodge' && state.progress >= .18) break; await new Promise(resolve => setTimeout(resolve, 8)); } if (state?.kind !== 'dodge' || state.progress >= .5) throw new Error('The early real dodge was not captured'); await app.js('window.__lhFrozenAt = window.__littleHoursTest.now()'); } },
   'wilds-vista': { about: 'the first valley reveal reached along the western trail', async go(app) { const { enterWilds } = await import('./wilds.mjs'); const { followTrail } = await import('./valley.mjs'); await steps.openHouse(app); await enterWilds(app); await followTrail(app,[[-19,2],[-21,-28],[-18,-65]]); await app.settle(); } },
   wilds: { about: 'the forest clearing camp', async go(app) { await steps.openHouse(app); await app.clickSel('[data-room="forest"]'); await app.waitFor(`Boolean(window.__littleHours.forest.isOpen && window.__littleHours.forest.diagnostics()?.ready)`, { what: 'the Wilds', timeout: 90000 }); await app.settle(); } },

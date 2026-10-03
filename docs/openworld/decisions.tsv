@@ -19,3 +19,4 @@ Keep exploration recordings separate	The all-flow run let the later fight overwr
 Keep grass stable under movement	Moving-camera shots exposed bare foreground patches during a whole-pool refresh	Recycle only newly entered world cells at the field edges; preserve overlapping instance positions
 
 2026-10-03	Pet swim catch-up check	Measure water support immediately, then wait at most eight seconds for physical following after the long glide	The pet approaches at 2.8 m/s; sampling proximity at the player's first arrival conflated a normal travel gap with failure
+2026-10-03	Combat camera foliage	Dither nearby leaf cards away within 3.2 metres of the camera	Recorded Stage 3 combat showed foreground crowns obscuring the guardian; the camera keeps solid trunk collision while leaves yield the view

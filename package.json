@@ -13,7 +13,8 @@
     "lh": "node scripts/lh.mjs",
     "guard": "node scripts/guard.mjs",
     "assets": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup --python scripts/assets.py --",
-    "detail": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup --python scripts/detail/run.py --"
+    "detail": "${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender} -b --factory-startup --python scripts/detail/run.py --",
+    "wilds:assets": "${BLENDER:-blender} -b --factory-startup --python tools/blender/mossheart.py"
   },
   "dependencies": {
     "@babylonjs/core": "9.27.1",
