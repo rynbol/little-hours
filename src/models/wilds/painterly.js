@@ -12,7 +12,8 @@ export function bandAt(coord) {
 
 export const SHADE = Object.freeze({ fill: 0.55, tint: '#6f9be8', cool: 0.75, low: 1.05, high: 0.55 });
 const COOL = new Color(SHADE.tint);
-export const EYES = Object.freeze({ glint: 1.25 });
+export const FIGURE = Object.freeze({ glint: 1.25, warm: [1.2, 0.98, 0.86], glow: [0.16, 0.05, 0.0], cloth: 0.5, lift: 1.15 });
+const vec = list => `vec3(${list.map(v => v.toFixed(3)).join(', ')})`;
 
 export function createPainterly({ rim = '#fff0d2', rimStrength = 0.55, rimPower = 2.8 } = {}) {
   const width = 128, data = new Uint8Array(width);
@@ -36,17 +37,19 @@ if (grain < dissolve) discard;`)
 #include <opaque_fragment>`);
   }
 
-  function eyeParts(shader) {
+  function figureParts(shader) {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float part;\nvarying float vPart;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPart = part;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vPart;')
-      .replace('#include <opaque_fragment>', `outgoingLight = mix(outgoingLight, diffuseColor.rgb * max(lightLevel, shadowBand.y) * mix(1.0, ${EYES.glint.toFixed(2)}, step(1.5, vPart)), step(0.5, vPart));
+      .replace('#include <opaque_fragment>', `float figureShade = 1.0 - smoothstep(shadowBand.x, shadowBand.y, lightLevel), skinPart = step(2.5, vPart), fillLevel = dot(shadowFill, vec3(0.3333));
+outgoingLight += diffuseColor.rgb * (mix(mix(shadowFill, vec3(fillLevel), ${FIGURE.cloth.toFixed(2)}), fillLevel * ${vec(FIGURE.warm)}, skinPart) * ${FIGURE.lift.toFixed(2)} - shadowFill + fillLevel * ${vec(FIGURE.glow)} * skinPart) * figureShade;
+outgoingLight = mix(outgoingLight, diffuseColor.rgb * max(lightLevel, shadowBand.y) * mix(1.0, ${FIGURE.glint.toFixed(2)}, step(1.5, vPart)), step(0.5, vPart) * (1.0 - skinPart));
 #include <opaque_fragment>`);
   }
 
-  function patch(shader, { glow, rim, dissolve, eyes }) {
+  function patch(shader, { glow, rim, dissolve, figure }) {
     Object.assign(shader.uniforms, shared, { glow: glow ?? { value: 0 }, rimOn: { value: rim ? 1 : 0 } });
     if (dissolve) crumble(shader, dissolve);
     shader.fragmentShader = shader.fragmentShader
@@ -60,16 +63,16 @@ outgoingLight += diffuseColor.rgb * glow;
 float upward = clamp(dot(normalize(normal), normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz)), 0.0, 1.0);
 outgoingLight = outgoingLight * (1.0 - wet * 0.26) + rimColor * wet * upward * pow(facing, 2.0) * 0.1;
 #include <opaque_fragment>`);
-    if (eyes) eyeParts(shader);
+    if (figure) figureParts(shader);
   }
 
   return {
     shared, gradient,
-    material(color, { vertexColors = false, glow, rim = true, side, transparent = false, opacity = 1, dissolve, eyes = false } = {}) {
+    material(color, { vertexColors = false, glow, rim = true, side, transparent = false, opacity = 1, dissolve, figure = false } = {}) {
       const material = new MeshToonMaterial({ color, gradientMap: gradient, vertexColors, transparent, opacity });
       if (side !== undefined) material.side = side;
-      material.onBeforeCompile = shader => patch(shader, { glow, rim, dissolve, eyes });
-      material.customProgramCacheKey = () => `${dissolve ? 'wilds-painterly-dissolve' : 'wilds-painterly'}${eyes ? '-eyes' : ''}`;
+      material.onBeforeCompile = shader => patch(shader, { glow, rim, dissolve, figure });
+      material.customProgramCacheKey = () => `${dissolve ? 'wilds-painterly-dissolve' : 'wilds-painterly'}${figure ? '-figure' : ''}`;
       materials.add(material);
       return material;
     },

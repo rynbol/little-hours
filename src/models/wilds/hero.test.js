@@ -94,7 +94,7 @@ async function viewOf() {
   return { model, body, view, settle };
 }
 
-test('the mouth and eyes face out of the head, so back-face culling never hides them, and the eyes are marked for their own shading', async () => {
+test('the mouth and eyes face out of the head, so back-face culling never hides them, and the eyes and skin are marked for their own shading', async () => {
   const { model } = await viewOf(), body = model.scene.getObjectByName('body'), { geometry } = body;
   const position = geometry.getAttribute('position'), joints = geometry.getAttribute('skinIndex'), index = geometry.index, area = {};
   const corners = [new Vector3(), new Vector3(), new Vector3()], normal = new Vector3(), side = new Vector3();
@@ -108,7 +108,7 @@ test('the mouth and eyes face out of the head, so back-face culling never hides 
   }
   for (const bone of ['mouth', 'eyeL', 'eyeR']) assert.ok(area[bone]?.out > area[bone].in, `${bone} shows ${area[bone]?.out} m² outward and ${area[bone]?.in} m² inward`);
   const parts = new Set(geometry.getAttribute('part').array);
-  assert.deepEqual([...parts].sort(), [0, 1, 2]);
+  assert.deepEqual([...parts].sort(), [0, 1, 2, 3]);
 });
 
 test('the sword sits in the hand where the sim swings it at every hit frame', async () => {
