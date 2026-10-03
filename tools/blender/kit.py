@@ -6,7 +6,7 @@ import sys
 
 import bmesh
 import bpy
-from mathutils import Euler, Matrix, Vector, noise
+from mathutils import Euler, Matrix, Vector, kdtree, noise
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 FPS = 30
@@ -144,6 +144,69 @@ def blob(centre, radii, subdiv=1, rotation=None, rough=0.0, seed=0.0, flat_botto
         verts.append(Vector(centre) + rotation @ local)
         attrs.append((rotation @ n, 0.5 + 0.5 * n.z, 0.5 + 0.5 * math.atan2(n.y, n.x) / math.pi))
     return verts, faces, attrs
+
+
+def orb(shape, rings=18, segments=28):
+    verts, attrs, faces = [], [], []
+    for i in range(1, rings):
+        theta = math.pi * i / rings
+        for j in range(segments):
+            phi = math.tau * j / segments
+            n = Vector((math.sin(theta) * math.cos(phi), math.sin(theta) * math.sin(phi), math.cos(theta)))
+            verts.append(shape(n))
+            attrs.append((n, i / rings, j / segments))
+    top, bottom = len(verts), len(verts) + 1
+    verts += [shape(Vector((0, 0, 1))), shape(Vector((0, 0, -1)))]
+    attrs += [(Vector((0, 0, 1)), 0.0, 0.0), (Vector((0, 0, -1)), 1.0, 0.0)]
+    for i in range(rings - 2):
+        for j in range(segments):
+            a, b = i * segments + j, i * segments + (j + 1) % segments
+            faces.append((a, a + segments, b + segments, b))
+    for j in range(segments):
+        faces.append((top, j, (j + 1) % segments))
+        last = (rings - 2) * segments
+        faces.append((bottom, last + (j + 1) % segments, last + j))
+    return verts, faces, attrs
+
+
+def keep_faces(piece, test):
+    verts, faces, attrs = piece
+    kept = [f for f in faces if test(sum((Vector(verts[i]) for i in f), Vector()) / len(f), [attrs[i] for i in f])]
+    used = sorted({i for f in kept for i in f})
+    remap = {old: new for new, old in enumerate(used)}
+    return [verts[i] for i in used], [tuple(remap[i] for i in f) for f in kept], [attrs[i] for i in used]
+
+
+def refine(piece, levels=1, thickness=0.0, offset=-1.0, crease=False):
+    verts, faces, attrs = piece
+    mesh = bpy.data.meshes.new('refine')
+    mesh.from_pydata([tuple(v) for v in verts], [], faces)
+    obj = bpy.data.objects.new('refine', mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    if thickness:
+        solid = obj.modifiers.new('solid', 'SOLIDIFY')
+        solid.thickness, solid.offset, solid.use_rim, solid.use_even_offset = thickness, offset, True, True
+    if levels:
+        sub = obj.modifiers.new('sub', 'SUBSURF')
+        sub.levels = sub.render_levels = levels
+        sub.boundary_smooth = 'PRESERVE_CORNERS' if crease else 'ALL'
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    evaluated = obj.evaluated_get(depsgraph).to_mesh()
+    out_verts = [v.co.copy() for v in evaluated.vertices]
+    out_faces = [tuple(p.vertices) for p in evaluated.polygons]
+    obj.evaluated_get(depsgraph).to_mesh_clear()
+    bpy.data.objects.remove(obj)
+    bpy.data.meshes.remove(mesh)
+    tree = kdtree.KDTree(len(verts))
+    for i, v in enumerate(verts):
+        tree.insert(Vector(v), i)
+    tree.balance()
+    return out_verts, out_faces, [attrs[tree.find(v)[1]] for v in out_verts]
+
+
+def transform(piece, matrix):
+    verts, faces, attrs = piece
+    return [matrix @ Vector(v) for v in verts], faces, attrs
 
 
 def facing(normal, along=None):
@@ -306,6 +369,9 @@ def bake(rig, poser, clips, located=('hips',), scaled=()):
         frames = max(2, round(length * FPS))
         last = {}
         poser.miss = (0.0, '', 0.0)
+        prepare = getattr(poser, 'prepare', None)
+        if prepare:
+            prepare(fn, length)
         for frame in range(frames + 1):
             poser.time = round(frame / FPS, 2)
             basis = poser.evaluate(fn(frame / frames * length))
@@ -331,6 +397,8 @@ def bake(rig, poser, clips, located=('hips',), scaled=()):
         track.mute = True
         rig.animation_data.action = None
         report[name] = {'seconds': round(frames / FPS, 3), 'short': [round(poser.miss[0], 3), poser.miss[1], poser.miss[2]]}
+        if getattr(poser, 'report', None):
+            report[name].update({key: round(value, 3) for key, value in poser.report.items()})
     return report
 
 

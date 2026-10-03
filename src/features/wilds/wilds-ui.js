@@ -102,7 +102,7 @@ export function createWildsUI(app) {
       const { state } = app;
       game = createGame($('.wilds-stage'), $('.wilds-hud'), {
         models, reducedMotion, onPause: pause, onShop: shop,
-        wilds: { bond: bondLevel(state.petBonds[state.pet]).index, kind: state.pet, progress: state.wilds },
+        wilds: { bond: bondLevel(state.petBonds[state.pet]).index, kind: state.pet, progress: state.wilds, avatar: state.avatar },
         onSave: mutate => app.acceptUpdate(app.store.update(draft => { mutate(draft.wilds, draft); })),
       });
       menu(false);

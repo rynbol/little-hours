@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ATTACKS, bladeAngles, hitDamage, sweepHits } from './moves.js';
+import { ATTACKS, BLADE, bladeAngles, bladeSegment, hitDamage, sweepHits } from './moves.js';
 
 const body = { x: 0, y: 0, z: 0, facing: 0 };
 const dummyAt = (bearing, distance) => { const a = bearing * Math.PI / 180; return { id: 'dummy', x: Math.sin(a) * distance, z: Math.cos(a) * distance, radius: 0.3, bottom: 0, top: 1.65 }; };
@@ -37,7 +37,7 @@ test('the blade winds up, sweeps and comes home to rest without jumping', () => 
       last = now;
     }
     const home = bladeAngles(attack, attack.end, [0, 0]);
-    assert.deepEqual([((Math.round(home[0]) % 360) + 360) % 360, Math.round(home[1])], [38, -52]);
+    assert.deepEqual([((Math.round(home[0]) % 360) + 360) % 360, Math.round(home[1])], [40, -35]);
   }
 });
 
@@ -48,4 +48,18 @@ test('the heavy grows with its charge, and no hit takes more than a third of ful
   assert.equal(hitDamage(ATTACKS.light1, 0, 100), 10);
   assert.equal(hitDamage(ATTACKS.heavy, 1, 60), 20);
   for (const attack of Object.values(ATTACKS)) assert.ok(hitDamage(attack, 1, 100) <= 100 / 3);
+});
+
+test('the hand holds the blade low and ahead at rest, and lifts it in front of the face when raised, never into the head', () => {
+  const at = (yaw, pitch) => bladeSegment({ x: 0, y: 0, z: 0, facing: 0 }, yaw, pitch);
+  const rest = at(...BLADE.rest), raised = at(...BLADE.raised);
+  assert.ok(rest.grip[1] < 0.85 && rest.grip[2] > 0.2 && rest.grip[0] < -0.1, `rest grip ${rest.grip}`);
+  assert.ok(rest.tip[1] > 0.15, `the resting tip stays off the ground at ${rest.tip[1]}`);
+  assert.ok(raised.grip[1] > 1.35 && raised.grip[2] > 0.3, `raised grip ${raised.grip}`);
+  for (const attack of Object.values(ATTACKS)) for (let t = 0; t <= attack.end; t += 1 / 30) {
+    const { grip } = at(...bladeAngles(attack, t, [0, 0]));
+    const head = Math.hypot(grip[0], (grip[1] - 1.34) / 1.1, grip[2] - 0.02);
+    assert.ok(head > 0.2, `the grip at ${t.toFixed(2)} s of an attack passes ${head.toFixed(2)} m from the head centre`);
+  }
+  assert.ok(Math.abs(Math.hypot(...rest.tip.map((v, i) => v - rest.grip[i])) - (BLADE.reach - BLADE.grip)) < 1e-9);
 });

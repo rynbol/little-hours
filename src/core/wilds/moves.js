@@ -1,4 +1,4 @@
-export const BLADE = Object.freeze({ pivot: Object.freeze([0, 1.0, 0.05]), inner: 0.3, reach: 1.3, rest: Object.freeze([38, -52]), raised: Object.freeze([12, 74]) });
+export const BLADE = Object.freeze({ pivot: Object.freeze([0, 1.0, 0.05]), grip: 0.38, guard: 0.06, reach: 1.18, raise: Object.freeze([0.18, 0.06]), rest: Object.freeze([40, -35]), raised: Object.freeze([12, 74]) });
 
 export const ATTACKS = Object.freeze({
   light1: Object.freeze({ strike: Object.freeze([0.09, 0.17]), end: 0.4, chain: 0.17, lunge: 0.55, damage: 10, hitStop: 0.05, nudge: 0.05, from: Object.freeze([72, 6]), to: Object.freeze([-78, -14]), next: 'light2' }),
@@ -33,16 +33,21 @@ export function bladeAngles(attack, t, out = [0, 0]) {
   return out;
 }
 
-export function bladeSegment(body, yaw, pitch, out = { root: [0, 0, 0], tip: [0, 0, 0] }) {
+export function bladeSegment(body, yaw, pitch, out = { grip: [0, 0, 0], root: [0, 0, 0], tip: [0, 0, 0] }) {
   const a = yaw * Math.PI / 180, p = pitch * Math.PI / 180, face = body.facing;
   const lx = Math.sin(a) * Math.cos(p), ly = Math.sin(p), lz = Math.cos(a) * Math.cos(p);
   const fx = Math.sin(face), fz = Math.cos(face), rx = -fz, rz = fx;
-  const [px, py, pz] = BLADE.pivot;
-  const ox = body.x + rx * px + fx * pz, oy = body.y + py, oz = body.z + rz * px + fz * pz;
+  const [px, py, pz] = BLADE.pivot, overhead = clamp01((pitch - 30) / 50), lift = overhead * overhead * (3 - 2 * overhead), ahead = pz + lift * (BLADE.raise[0] - Math.min(0, lz) * BLADE.grip);
+  const ox = body.x + rx * px + fx * ahead, oy = body.y + py + BLADE.raise[1] * lift, oz = body.z + rz * px + fz * ahead;
   const dx = rx * lx + fx * lz, dz = rz * lx + fz * lz;
-  out.root[0] = ox + dx * BLADE.inner; out.root[1] = oy + ly * BLADE.inner; out.root[2] = oz + dz * BLADE.inner;
-  out.tip[0] = ox + dx * BLADE.reach; out.tip[1] = oy + ly * BLADE.reach; out.tip[2] = oz + dz * BLADE.reach;
+  along(out.grip, ox, oy, oz, dx, ly, dz, BLADE.grip);
+  along(out.root, ox, oy, oz, dx, ly, dz, BLADE.grip + BLADE.guard);
+  along(out.tip, ox, oy, oz, dx, ly, dz, BLADE.reach);
   return out;
+}
+
+function along(point, ox, oy, oz, dx, dy, dz, length) {
+  point[0] = ox + dx * length; point[1] = oy + dy * length; point[2] = oz + dz * length;
 }
 
 export function segmentMeetsCylinder(a, b, cylinder) {
@@ -61,7 +66,7 @@ export function segmentMeetsCylinder(a, b, cylinder) {
   return Math.max(y0, y1) >= bottom && Math.min(y0, y1) <= top;
 }
 
-const swing = [0, 0], blade = { root: [0, 0, 0], tip: [0, 0, 0] };
+const swing = [0, 0], blade = { grip: [0, 0, 0], root: [0, 0, 0], tip: [0, 0, 0] };
 
 export function sweepHits(body, attack, t0, t1, targets, already = new Set()) {
   const [start, stop] = attack.strike, from = Math.max(t0, start), to = Math.min(t1, stop), hits = [];

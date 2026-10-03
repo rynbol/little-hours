@@ -15,7 +15,7 @@ import { clockNow, clockRandom } from '../../core/test-pins.js';
 import { createPainterly } from '../../models/wilds/painterly.js';
 import { buildGround, buildTufts } from '../../models/wilds/terrain.js';
 import { buildDummy, buildPosts } from '../../models/wilds/props.js';
-import { buildStandin } from '../../models/wilds/standin.js';
+import { buildHero, loadHero } from '../../models/wilds/hero.js';
 import { SKY, buildSky } from '../../models/wilds/sky.js';
 import { createDaylight, daylight } from '../../models/wilds/daylight.js';
 import { streamWater, valleyFlow, valleyPaint } from '../../models/wilds/valley-ground.js';
@@ -51,7 +51,7 @@ function quantiles(values) {
   return { p50: at(0.5), p95: at(0.95), max: sorted[sorted.length - 1], count: sorted.length };
 }
 
-export const loadModels = () => loadStag().then(stag => ({ stag }));
+export const loadModels = () => Promise.all([loadStag(), loadHero()]).then(([stag, hero]) => ({ stag, hero }));
 
 export function createGame(stage, hudLayer, { models, reducedMotion = () => false, onPause = () => {}, onShop = () => {}, wilds = {}, onSave = () => {} } = {}) {
   const canvas = document.createElement('canvas');
@@ -93,11 +93,13 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   scene.add(buildPosts(sim.posts, painterly.material('#ffffff', { vertexColors: true })));
   const dummyView = buildDummy(sim.dummy, painterly);
   scene.add(dummyView.root);
-  const hero = buildStandin(painterly);
+  const hero = buildHero(models.hero, painterly);
+  const dress = () => hero.dress({ avatar: wilds.avatar, wear: progress.wear, owned: progress.owned });
+  dress();
   const ring = buildRing(sim, painterly), petView = buildPet(painterly, sim.pet.kind), wolfView = buildWolf(painterly), camp = buildCamp(sim.campfires, painterly);
   scene.add(ring.root, petView.root, wolfView.root, camp.root);
   let wolf = progress.companions.includes('wolf') ? createWolf({ x: player.x + 1.3, z: player.z + 1.7, facing: player.facing, ground: sim.floor }) : null;
-  scene.add(hero.root, hero.blade, hero.hand);
+  scene.add(hero.root);
   daylight(sim.hour, light);
   const sky = buildSky(light.sun, { time: skyTime });
   scene.add(sky);
@@ -134,7 +136,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
   const rig = createRig({ yaw: VALLEY.spawn.facing, at: [player.x, player.y, player.z] });
   const steer = { moveX: 0, moveZ: 0, sprint: false, attackHeld: false, view: rig.yaw };
   const pose = [...BLADE.rest], shownPose = [...BLADE.rest], startPose = [...BLADE.rest], windPose = [0, 0];
-  const segment = { root: [0, 0, 0], tip: [0, 0, 0], yaw: BLADE.rest[0], pitch: BLADE.rest[1] }, trailSegment = { root: [0, 0, 0], tip: [0, 0, 0] };
+  const segment = { grip: [0, 0, 0], root: [0, 0, 0], tip: [0, 0, 0], yaw: BLADE.rest[0], pitch: BLADE.rest[1] }, trailSegment = { grip: [0, 0, 0], root: [0, 0, 0], tip: [0, 0, 0] };
   const projected = new Vector3(), hudState = { stamina: { x: 0, y: 0, visible: false, value: 100, max: 100, tired: false }, lock: { visible: false, x: 0, y: 0, barVisible: false, barX: 0, barY: 0, health: 100, max: 100 }, vitals: { health: 100, max: 100, level: 1, xp: 0, potions: 0, carry: POTION.carry }, pet: { health: 1, max: 1, out: false }, skill: { left: 0, ready: true, useful: false }, boss: { health: 1, max: 1 } };
   const cpu = [], gaps = [], latency = { move: null, attack: null, jump: null, dodge: null, worst: 0 }, pending = [];
   const reactions = { swings: 0, hits: 0, breaks: 0, lands: 0, dodges: 0, jumps: 0, charges: 0, kicks: 0, trail: 0, warnings: 0, frozen: 0, grabs: 0, mantles: 0, glides: 0, lets: 0, hurts: 0, perfects: 0, evades: 0, telegraphs: 0, stuns: 0, heartHits: 0, petHits: 0, petSkills: 0, pats: 0, retreats: 0, rests: 0, respawns: 0, kindles: 0, victories: 0, secrets: 0, herbs: 0, shops: 0, levels: 0, digs: 0, scents: 0, whistles: 0, potions: 0 };
@@ -221,7 +223,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     const spot = sim.secrets.find(entry => entry.id === id);
     effects.hit(spot.x, spot.y + 0.6, spot.z, null, true);
     hud.toast('secret', { icon: 'star', tone: 'glow', seconds: 2.6 });
-    if (award) equip(sim, wildsStats(progress));
+    if (award) { equip(sim, wildsStats(progress)); dress(); }
   }
 
   function react(event, still) {
@@ -240,21 +242,21 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
       if (!still) { const push = attack.nudge * 26; kickRig(rig, toward[0] * push, -push * (event.attack === 'heavy' ? 0.9 : 0.35), toward[2] * push); reactions.kicks++; }
     }
     else if (type === 'jump') { reactions.jumps++; hero.jump(); effects.dust(player.x, player.y, player.z, 0.3); }
-    else if (type === 'land') { reactions.lands++; hero.land(event.speed); if (event.speed > 4) effects.dust(player.x, player.y, player.z, Math.min(1, event.speed / 14)); }
+    else if (type === 'land') { reactions.lands++; hero.land(event); if (event.speed > 4) effects.dust(player.x, player.y, player.z, Math.min(1, event.speed / 14)); }
     else if (type === 'dodge') { reactions.dodges++; effects.dust(player.x, player.y, player.z, 0.5); }
     else if (type === 'charge') reactions.charges++;
     else if (type === 'tired') hud.warn();
     else if (type === 'grab') { reactions.grabs++; effects.dust(player.x, player.y + 0.6, player.z, 0.2); }
-    else if (type === 'mantle') { reactions.mantles++; hero.land(4); }
+    else if (type === 'mantle') { reactions.mantles++; hero.mantle(); }
     else if (type === 'leap') effects.dust(player.x, player.y, player.z, 0.3);
-    else if (type === 'glide') { reactions.glides++; hero.jump(); }
+    else if (type === 'glide') reactions.glides++;
     else if (type === 'let-go' || type === 'slip') reactions.lets++;
     else if (type === 'hurt' || type === 'down') {
       reactions.hurts++; hud.hurt();
       if (!still) kickRig(rig, 0, -0.5 - event.damage * 0.03, 0);
       if (type === 'down') hud.toast('down', { icon: 'dizzy', tone: 'danger', seconds: 2.4 });
     }
-    else if (type === 'perfect') { reactions.perfects++; hud.flash(); }
+    else if (type === 'perfect') { reactions.perfects++; hud.flash(); hero.perfect(); }
     else if (type === 'evade') reactions.evades++;
     else if (type === 'awaken') hud.toast('awaken', { icon: 'wake', tone: 'danger', seconds: 2.4 });
     else if (type === 'telegraph') reactions.telegraphs++;
@@ -269,7 +271,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     }
     else if (type === 'phase') hud.toast('phase', { icon: 'roots', tone: 'danger', seconds: 2.4 });
     else if (type === 'pet-hit') { reactions.petHits++; effects.hit(sim.pet.x, sim.pet.y + 0.6, sim.pet.z, null, false); }
-    else if (type === 'pat') { reactions.pats++; effects.charge(sim.pet.x, sim.pet.y + 0.8, sim.pet.z); effects.charge(sim.pet.x, sim.pet.y + 0.9, sim.pet.z); }
+    else if (type === 'pat') { reactions.pats++; hero.emote('pet', Math.atan2(sim.pet.x - player.x, sim.pet.z - player.z)); effects.charge(sim.pet.x, sim.pet.y + 0.8, sim.pet.z); effects.charge(sim.pet.x, sim.pet.y + 0.9, sim.pet.z); }
     else if (type === 'rest') { reactions.rests++; shine(); hud.toast('rest', { icon: event.hour < 12 ? 'sun' : 'moon', tone: event.hour < 12 ? 'warm' : 'cool', seconds: 2.4 }); }
     else if (type === 'respawn') { reactions.respawns++; hud.toast('respawn', { icon: 'fire', seconds: 2.4 }); }
     else if (type === 'kindle') {
@@ -301,6 +303,8 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     onSave(saved => recordVictory(saved, 'stag'));
     hud.toast('victory', { icon: 'antler', tone: 'glow', seconds: 4 });
     equip(sim, wildsStats(progress));
+    dress();
+    hero.emote('victory');
     if (award.companion && !wolf) {
       const { x, z } = VALLEY.lookout;
       wolf = createWolf({ x, z, facing: Math.atan2(sim.arena.x - x, sim.arena.z - z), ground: sim.floor, waiting: true });
@@ -347,7 +351,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     const pivot = displayedPose(dt);
     bladeSegment(player, pivot[0], pivot[1], segment);
     segment.yaw = pivot[0]; segment.pitch = pivot[1];
-    hero.update(player, segment, dt, still);
+    hero.update(player, dt, still);
     dummyView.update(sim.dummy, still);
     ring.update(dt, still);
     stagView.update(dt, still);
@@ -440,6 +444,7 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
       const info = renderer.info;
       return {
         player: { x: player.x, y: player.y, z: player.z, vx: player.vx, vy: player.vy, vz: player.vz, facing: player.facing, state: player.state, attack: player.attack, charge: player.charge, stamina: player.stamina, tired: player.tired, grounded: player.grounded, sprinting: player.sprinting, health: player.health, max: player.max },
+        hero: { clip: hero.clip, parts: hero.parts },
         stag: { clip: stagView.clip, dissolve: stagView.dissolve, state: sim.stag.state, attack: sim.stag.attack, time: sim.stag.time, health: sim.stag.health, max: sim.stag.max, phase: sim.stag.phase, prefer: sim.stag.prefer, heartOpen: sim.stag.heartOpen, x: sim.stag.x, z: sim.stag.z, facing: sim.stag.facing, roots: sim.stag.roots.length },
         pet: { kind: sim.pet.kind, state: sim.pet.state, health: sim.pet.health, max: sim.pet.max, cooldown: sim.pet.cooldown, x: sim.pet.x, z: sim.pet.z },
         wolf: wolf && { state: wolf.state, x: wolf.x, z: wolf.z },
@@ -480,12 +485,13 @@ export function createGame(stage, hudLayer, { models, reducedMotion = () => fals
     restock(saved) {
       progress = structuredClone(saved);
       equip(sim, wildsStats(progress), progress.potions);
+      dress();
     },
     dispose() {
       if (disposed) return;
       disposed = true; stop();
       document.removeEventListener('visibilitychange', onVisibility);
-      observer.disconnect(); input.dispose(); hud.dispose(); stagView.dispose();
+      observer.disconnect(); input.dispose(); hud.dispose(); stagView.dispose(); hero.dispose();
       scene.traverse(object => {
         if (object instanceof Mesh || object.isPoints) {
           object.geometry?.dispose();

@@ -7,6 +7,7 @@ export const VITALS = Object.freeze({ health: 100, mercy: 0.9, hurt: 0.4, knocke
 export const CLIMB = Object.freeze({ steep: 1.25, speed: 1.3, side: 1.15, cost: 9, hold: 2.5, leap: 1.7, leapTime: 0.32, leapCost: 20, lip: 0.55, reach: 0.6 });
 export const GLIDE = Object.freeze({ speed: 6.4, idle: 0.55, accel: 5, turn: 3.4, sink: 1.9, rise: 1.4, settle: 7, cost: 6, height: 1.2, fade: 6 });
 export const SWIM = Object.freeze({ depth: 1.15, float: 1.05, speed: 2.1, fast: 3.3, accel: 7, cost: 5, fastCost: 13, tread: 1.5, wade: 0.65, shallow: 0.35 });
+export const HERO_GAITS = Object.freeze({ walk: Object.freeze({ speed: 1.3, cycle: 0.56 }), jog: Object.freeze({ speed: MOVE.jog, cycle: 0.48 }), sprint: Object.freeze({ speed: MOVE.sprint, cycle: 0.4 }), stalk: Object.freeze({ speed: MOVE.charging, cycle: 0.5 }), swim: Object.freeze({ speed: SWIM.speed, cycle: 1.1 }), climb: Object.freeze({ speed: CLIMB.speed, cycle: 0.5 }) });
 export const PLAIN = Object.freeze({ power: 1, guard: 0, glide: 1, sink: 1, swim: 1 });
 
 const BUFFERED = Object.freeze(['attack', 'jump', 'dodge']);
