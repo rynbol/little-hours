@@ -12,7 +12,7 @@ export function bandAt(coord) {
 
 export const SHADE = Object.freeze({ fill: 0.55, tint: '#6f9be8', cool: 0.75, low: 1.05, high: 0.55 });
 const COOL = new Color(SHADE.tint);
-export const FIGURE = Object.freeze({ glint: 1.25, warm: [1.2, 0.98, 0.86], glow: [0.16, 0.05, 0.0], cloth: 0.5, lift: 1.15 });
+export const FIGURE = Object.freeze({ glint: 1.25, warm: [1.2, 0.98, 0.86], glow: [0.16, 0.05, 0.0], cloth: 0.5, lift: 1.15, rim: [0.62, 0.74, 0.32], back: 0.18 });
 const vec = list => `vec3(${list.map(v => v.toFixed(3)).join(', ')})`;
 
 export function createPainterly({ rim = '#fff0d2', rimStrength = 0.55, rimPower = 2.8 } = {}) {
@@ -45,6 +45,8 @@ if (grain < dissolve) discard;`)
       .replace('#include <common>', '#include <common>\nvarying float vPart;')
       .replace('#include <opaque_fragment>', `float figureShade = 1.0 - smoothstep(shadowBand.x, shadowBand.y, lightLevel), skinPart = step(2.5, vPart), fillLevel = dot(shadowFill, vec3(0.3333));
 outgoingLight += diffuseColor.rgb * (mix(mix(shadowFill, vec3(fillLevel), ${FIGURE.cloth.toFixed(2)}), fillLevel * ${vec(FIGURE.warm)}, skinPart) * ${FIGURE.lift.toFixed(2)} - shadowFill + fillLevel * ${vec(FIGURE.glow)} * skinPart) * figureShade;
+float daylight = clamp(fillLevel * 4.0, 0.0, 1.0), sunSide = dot(normalize(normal), sunView);
+outgoingLight += rimColor * smoothstep(${FIGURE.rim[0].toFixed(2)}, ${FIGURE.rim[1].toFixed(2)}, facing) * (clamp(sunSide + 0.3, 0.0, 1.0) * ${FIGURE.rim[2].toFixed(2)} + ${FIGURE.back.toFixed(2)}) * daylight * rimOn;
 outgoingLight = mix(outgoingLight, diffuseColor.rgb * max(lightLevel, shadowBand.y) * mix(1.0, ${FIGURE.glint.toFixed(2)}, step(1.5, vPart)), step(0.5, vPart) * (1.0 - skinPart));
 #include <opaque_fragment>`);
   }
