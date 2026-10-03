@@ -18,6 +18,7 @@ import { createRig, frameRig, orbitRig, zoomRig } from '../../core/wilds/camera-
 import { createWalkWorld } from '../../core/wilds/world.js';
 import { walkDecks, siteColliders } from '../../core/wilds/sites.js';
 import { createSky } from '../../models/wilds/sky.js';
+import { createAir } from '../../models/wilds/air.js';
 import { surveyValley, createTerrain } from '../../models/wilds/terrain.js';
 import { createStandIn } from '../../models/wilds/stand-in.js';
 import { createGrass } from '../../models/wilds/grass.js';
@@ -32,8 +33,6 @@ export function createWildsGame(canvas, options) {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(.05, .06, .1, 1);
   scene.skipPointerMovePicking = true;
-  scene.fogMode = Scene.FOGMODE_EXP2;
-  scene.fogDensity = .00042;
 
   const camera = new TargetCamera('wilds-camera', new Vector3(VALLEY.vista.x, 34, VALLEY.vista.z - 6), scene);
   camera.minZ = .12; camera.maxZ = 9000; camera.fov = 1.02;
@@ -44,7 +43,8 @@ export function createWildsGame(canvas, options) {
   const ambient = new HemisphericLight('wilds-ambient', new Vector3(0, 1, 0), scene);
   const painterly = createPainterly(scene, 'day');
   painterly.state.look = .62;
-  painterly.setDepth(260, 2600, -20, 40);
+  painterly.setDepth(1e6, 2e6, -1e6, -1e6 + 1);
+  const air = createAir(scene);
 
   const pipeline = new DefaultRenderingPipeline('wilds-post', true, scene, [camera]);
   pipeline.fxaaEnabled = true;
@@ -83,9 +83,8 @@ export function createWildsGame(canvas, options) {
     key.direction.set(-state.key.direction[0], -state.key.direction[1], -state.key.direction[2]);
     key.diffuse.set(...state.key.color); key.intensity = state.key.intensity; key.specular.set(...state.key.color.map(value => value * .4));
     ambient.diffuse.set(...state.ambient.sky); ambient.groundColor.set(...state.ambient.ground); ambient.intensity = state.ambient.intensity;
-    scene.fogColor.set(...state.fog);
-    scene.fogDensity = .00026 + state.haze * .00034 + state.shower * .0012;
-    painterly.state.haze = state.fog; painterly.state.shadow = state.shadow; painterly.state.rim = state.rim.map(value => value * .5);
+    air.update(state, gameMs() / 1000);
+    painterly.state.shadow = state.shadow; painterly.state.rim = state.rim.map(value => value * .5);
     grade.exposure = state.exposure;
     sky.update(state, gameMs() / 1000);
   }
@@ -149,6 +148,7 @@ export function createWildsGame(canvas, options) {
       grass?.dispose();
       terrain?.dispose();
       painterly.dispose();
+      air.dispose();
       scene.dispose(); engine.dispose();
     },
   };

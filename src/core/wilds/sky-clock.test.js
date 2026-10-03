@@ -56,3 +56,10 @@ test('golden hour is warm: the key light is more red than blue', () => {
   assert.ok(golden.golden > .9);
   assert.ok(golden.key.color[0] > golden.key.color[2] * 1.8);
 });
+
+test('distant air stays cool blue at golden hour while the sun is warm', () => {
+  const golden = skyAt(NAMED_HOURS.golden), night = skyAt(NAMED_HOURS.night);
+  assert.ok(golden.far[2] > golden.far[0], `far ${golden.far}`);
+  assert.ok(golden.key.color[0] > golden.far[0]);
+  assert.ok(night.far.every((value, i) => value < golden.far[i] / 2), 'night air is dark');
+});

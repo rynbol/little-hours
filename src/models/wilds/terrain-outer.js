@@ -52,7 +52,7 @@ export function outerGeometry({ around = 384, rings = 70, reach = 7000 } = {}) {
   let k = 0;
   for (let i = 0; i < around; i++) for (let j = 0; j < rings - 1; j++) {
     const a = i * rings + j, b = ((i + 1) % around) * rings + j;
-    indices.set([a, a + 1, b, b, a + 1, b + 1], k); k += 6;
+    indices.set([a, b, a + 1, b, b + 1, a + 1], k); k += 6;
   }
   return { positions, normals, colors, indices };
 }

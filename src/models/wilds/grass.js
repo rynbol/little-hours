@@ -14,8 +14,8 @@ import { WIND_GLSL } from './wind.js';
 
 export const GRASS_TIERS = Object.freeze([
   Object.freeze({ size: 8, blades: 6400, segments: 3, width: .034, tall: .64, face: .3, shade: .42, normal: .3, near: -8, far: 22 }),
-  Object.freeze({ size: 8, blades: 1900, segments: 2, width: .075, tall: .66, face: .6, shade: .58, normal: .2, near: 18, far: 56 }),
-  Object.freeze({ size: 16, blades: 2600, segments: 1, width: .16, tall: .68, face: .9, shade: .76, normal: .1, near: 50, far: 120 }),
+  Object.freeze({ size: 8, blades: 1900, segments: 2, width: .075, tall: .66, face: .6, shade: .66, normal: .2, near: 18, far: 56 }),
+  Object.freeze({ size: 16, blades: 2600, segments: 1, width: .16, tall: .68, face: .9, shade: .92, normal: .1, near: 50, far: 120 }),
 ]);
 
 export function bladeGeometry({ size, blades, segments }, seed = 17) {

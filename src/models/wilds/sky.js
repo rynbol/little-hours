@@ -12,7 +12,7 @@ void main() { vDir = position; vec4 p = worldViewProjection * vec4(position, 1.0
 const FRAGMENT = `precision highp float;
 varying vec3 vDir;
 uniform sampler2D noise;
-uniform vec3 zenith, horizon, glow, sunDir, moonDir, sunColor, fogColor, galaxyAxis;
+uniform vec3 zenith, horizon, glow, sunDir, moonDir, sunColor, farColor, galaxyAxis;
 uniform float time, stars, cover, rainbow, night, shower, haze;
 float n1(vec2 p) { return texture2D(noise, p).r; }
 float n2(vec2 p) { return texture2D(noise, p).g; }
@@ -71,8 +71,9 @@ void main() {
   color += spectrum(1.0 - clamp((bow - 40.0) / 3.0, 0.0, 1.0)) * arc * rainbow * 0.32 * smoothstep(0.0, 0.18, h);
   color += vec3(0.07) * smoothstep(40.0, 30.0, bow) * rainbow * smoothstep(0.0, 0.2, h);
 
-  color = mix(color, fogColor, (1.0 - smoothstep(-0.02, 0.09 + haze * 0.08, h)) * (0.85 + haze * 0.15));
-  gl_FragColor = vec4(color, 1.0);
+  vec3 air = farColor + sunColor * (pow(sd, 12.0) * 0.7 + pow(sd, 3.0) * 0.22) * (1.0 - shower * 0.7) * (1.0 - night * 0.75);
+  color = mix(color, air, (1.0 - smoothstep(-0.02, 0.06 + haze * 0.06, h)) * (0.8 + haze * 0.2));
+  gl_FragColor = vec4(pow(color, vec3(2.2)), 1.0);
 }`;
 
 const vec = value => new Vector3(value[0], value[1], value[2]);
@@ -80,7 +81,7 @@ const vec = value => new Vector3(value[0], value[1], value[2]);
 export function createSky(scene) {
   const material = new ShaderMaterial('wilds-sky', scene, { vertexSource: VERTEX, fragmentSource: FRAGMENT }, {
     attributes: ['position'],
-    uniforms: ['worldViewProjection', 'zenith', 'horizon', 'glow', 'sunDir', 'moonDir', 'sunColor', 'fogColor', 'galaxyAxis', 'time', 'stars', 'cover', 'rainbow', 'night', 'shower', 'haze'],
+    uniforms: ['worldViewProjection', 'zenith', 'horizon', 'glow', 'sunDir', 'moonDir', 'sunColor', 'farColor', 'galaxyAxis', 'time', 'stars', 'cover', 'rainbow', 'night', 'shower', 'haze'],
     samplers: ['noise'],
   });
   material.backFaceCulling = false;
@@ -97,7 +98,7 @@ export function createSky(scene) {
       material.setColor3('zenith', Color3.FromArray(sky.zenith));
       material.setColor3('horizon', Color3.FromArray(sky.horizon));
       material.setColor3('glow', Color3.FromArray(sky.glow));
-      material.setColor3('fogColor', Color3.FromArray(sky.fog));
+      material.setColor3('farColor', Color3.FromArray(sky.far));
       material.setColor3('sunColor', Color3.FromArray(sky.keyFrom === 'sun' ? sky.key.color : [1, .7, .5]));
       material.setVector3('sunDir', vec(sky.sun));
       material.setVector3('moonDir', vec(sky.moon));

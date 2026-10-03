@@ -72,18 +72,18 @@ export function rainbowAt(hour) {
 }
 
 const KEYS = [
-  { hour: 5, sky: ['#141a33', '#2a3156'], horizon: '#4a4a6e', key: ['#9fb4e6', .3], ambient: ['#2e3a62', '#191c2a', .55], fog: '#3b4166', haze: .55, stars: .8, mist: .7, exposure: 1.1, shadow: '#5a5e8c', rim: '#8aa0d6' },
-  { hour: 5.9, sky: ['#3a4479', '#d8a39c'], horizon: '#f2b38d', key: ['#ffb184', .55], ambient: ['#7a7fae', '#3d3438', .6], fog: '#c9a6a8', haze: .7, stars: .25, mist: 1, exposure: 1.08, shadow: '#7c6f9c', rim: '#ffbf9a' },
-  { hour: 6.8, sky: ['#5b86c4', '#f3d0ae'], horizon: '#f8dcbb', key: ['#ffd2a1', 1.35], ambient: ['#a7bce0', '#6e6448', .72], fog: '#e3d2c0', haze: .55, stars: 0, mist: .55, exposure: 1.04, shadow: '#8a86ad', rim: '#ffe0b4' },
-  { hour: 9, sky: ['#4f8fd6', '#cfe2ef'], horizon: '#e4eef0', key: ['#fff1d8', 2.1], ambient: ['#b7d0ef', '#7d7a58', .74], fog: '#d6e3e8', haze: .4, stars: 0, mist: 0, exposure: 1, shadow: '#8e9ac2', rim: '#fff6df' },
-  { hour: 13, sky: ['#4a8ad6', '#d3e5ef'], horizon: '#e6eef0', key: ['#fff6e6', 2.25], ambient: ['#bad3f0', '#7d7c5c', .72], fog: '#d8e4e8', haze: .38, stars: 0, mist: 0, exposure: .98, shadow: '#8e9bc4', rim: '#fff8e8' },
-  { hour: 16.6, sky: ['#5390d2', '#e4dcc4'], horizon: '#f0e2c6', key: ['#ffe2b0', 2.05], ambient: ['#b3c6e4', '#806e50', .76], fog: '#e2d8c4', haze: .45, stars: 0, mist: 0, exposure: 1, shadow: '#8c8ab4', rim: '#ffe6bc' },
-  { hour: 18.4, sky: ['#5f86c4', '#f6c88e'], horizon: '#ffcf8f', key: ['#ffb866', 2.3], ambient: ['#b0b8dc', '#9a7650', .95], fog: '#f1c99a', haze: .6, stars: 0, mist: .05, exposure: 1.04, shadow: '#7d6fa6', rim: '#ffc27a' },
-  { hour: 19.25, sky: ['#4b5d9e', '#ff9d6b'], horizon: '#ff9a62', key: ['#ff8a4c', 1.5], ambient: ['#958fbe', '#6e4a3e', .88], fog: '#e09a86', haze: .75, stars: .05, mist: .2, exposure: 1.08, shadow: '#6c5a98', rim: '#ff9f6a' },
-  { hour: 19.8, sky: ['#2c3a78', '#8d7ab0'], horizon: '#b98bb0', key: ['#9fb2ee', .5], ambient: ['#5a6aa6', '#2a2636', .62], fog: '#6d6a9a', haze: .7, stars: .35, mist: .45, exposure: 1.12, shadow: '#5a5c9a', rim: '#a8b8f0' },
-  { hour: 21, sky: ['#0e1430', '#253158'], horizon: '#33406a', key: ['#b4c8ff', .62], ambient: ['#2c3a6a', '#141826', .55], fog: '#262e52', haze: .5, stars: 1, mist: .8, exposure: 1.18, shadow: '#4a5490', rim: '#a9bff5' },
-  { hour: 27, sky: ['#0d1330', '#232d54'], horizon: '#2d3762', key: ['#b4c8ff', .6], ambient: ['#2a3866', '#121622', .55], fog: '#242c50', haze: .5, stars: 1, mist: .9, exposure: 1.18, shadow: '#4a5490', rim: '#a9bff5' },
-  { hour: 29, sky: ['#141a33', '#2a3156'], horizon: '#4a4a6e', key: ['#9fb4e6', .3], ambient: ['#2e3a62', '#191c2a', .55], fog: '#3b4166', haze: .55, stars: .8, mist: .7, exposure: 1.1, shadow: '#5a5e8c', rim: '#8aa0d6' },
+  { hour: 5, sky: ['#141a33', '#2a3156'], horizon: '#4a4a6e', key: ['#9fb4e6', .3], ambient: ['#2e3a62', '#191c2a', .55], far: '#3a426c', fog: '#3b4166', haze: .55, stars: .8, mist: .7, exposure: 1.1, shadow: '#7e81a5', rim: '#8aa0d6' },
+  { hour: 5.9, sky: ['#3a4479', '#d8a39c'], horizon: '#f2b38d', key: ['#ffb184', .55], ambient: ['#7a7fae', '#3d3438', .6], far: '#8a88b2', fog: '#c9a6a8', haze: .7, stars: .25, mist: 1, exposure: 1.08, shadow: '#998fb2', rim: '#ffbf9a' },
+  { hour: 6.8, sky: ['#5b86c4', '#f3d0ae'], horizon: '#f8dcbb', key: ['#ffd2a1', 1.35], ambient: ['#a7bce0', '#6e6448', .72], far: '#a6b4d4', fog: '#e3d2c0', haze: .55, stars: 0, mist: .55, exposure: 1.04, shadow: '#a4a1bf', rim: '#ffe0b4' },
+  { hour: 9, sky: ['#4f8fd6', '#cfe2ef'], horizon: '#e4eef0', key: ['#fff1d8', 2.1], ambient: ['#b7d0ef', '#7d7a58', .74], far: '#a4bcda', fog: '#d6e3e8', haze: .4, stars: 0, mist: 0, exposure: 1, shadow: '#a7b0cf', rim: '#fff6df' },
+  { hour: 13, sky: ['#4a8ad6', '#d3e5ef'], horizon: '#e6eef0', key: ['#fff6e6', 2.25], ambient: ['#bad3f0', '#7d7c5c', .72], far: '#a2bad8', fog: '#d8e4e8', haze: .38, stars: 0, mist: 0, exposure: .98, shadow: '#a7b1d1', rim: '#fff8e8' },
+  { hour: 16.6, sky: ['#5390d2', '#e4dcc4'], horizon: '#f0e2c6', key: ['#ffe2b0', 2.05], ambient: ['#b3c6e4', '#806e50', .76], far: '#a6b4d2', fog: '#e2d8c4', haze: .45, stars: 0, mist: 0, exposure: 1, shadow: '#a5a4c4', rim: '#ffe6bc' },
+  { hour: 18.4, sky: ['#5f86c4', '#f6c88e'], horizon: '#ffcf8f', key: ['#ffb866', 2.3], ambient: ['#b0b8dc', '#9a7650', .95], far: '#98a2ca', fog: '#f1c99a', haze: .6, stars: 0, mist: .05, exposure: 1.04, shadow: '#9a8fba', rim: '#ffc27a' },
+  { hour: 19.25, sky: ['#4b5d9e', '#ff9d6b'], horizon: '#ff9a62', key: ['#ff8a4c', 1.5], ambient: ['#958fbe', '#6e4a3e', .88], far: '#8a7eae', fog: '#e09a86', haze: .75, stars: .05, mist: .2, exposure: 1.08, shadow: '#8c7eaf', rim: '#ff9f6a' },
+  { hour: 19.8, sky: ['#2c3a78', '#8d7ab0'], horizon: '#b98bb0', key: ['#9fb2ee', .5], ambient: ['#5a6aa6', '#2a2636', .62], far: '#4c5488', fog: '#6d6a9a', haze: .7, stars: .35, mist: .45, exposure: 1.12, shadow: '#7e80b0', rim: '#a8b8f0' },
+  { hour: 21, sky: ['#0e1430', '#253158'], horizon: '#33406a', key: ['#b4c8ff', .62], ambient: ['#2c3a6a', '#141826', .55], far: '#1f2748', fog: '#262e52', haze: .5, stars: 1, mist: .8, exposure: 1.18, shadow: '#727aa8', rim: '#a9bff5' },
+  { hour: 27, sky: ['#0d1330', '#232d54'], horizon: '#2d3762', key: ['#b4c8ff', .6], ambient: ['#2a3866', '#121622', .55], far: '#1d2546', fog: '#242c50', haze: .5, stars: 1, mist: .9, exposure: 1.18, shadow: '#727aa8', rim: '#a9bff5' },
+  { hour: 29, sky: ['#141a33', '#2a3156'], horizon: '#4a4a6e', key: ['#9fb4e6', .3], ambient: ['#2e3a62', '#191c2a', .55], far: '#3a426c', fog: '#3b4166', haze: .55, stars: .8, mist: .7, exposure: 1.1, shadow: '#7e81a5', rim: '#8aa0d6' },
 ];
 
 const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
@@ -108,6 +108,7 @@ export function skyAt(hour) {
     glow: grey(mix(rgb(a.sky[1]), rgb(b.sky[1]), t), shower * .6),
     ambient: { sky: grey(mix(rgb(a.ambient[0]), rgb(b.ambient[0]), t), shower * .4), ground: mix(rgb(a.ambient[1]), rgb(b.ambient[1]), t), intensity: lerp(a.ambient[2], b.ambient[2]) * (1 + shower * .25) },
     fog: grey(mix(rgb(a.fog), rgb(b.fog), t), shower * .5, 1 - shower * .12),
+    far: grey(mix(rgb(a.far), rgb(b.far), t), shower * .45, 1 - shower * .08),
     haze: Math.min(1, lerp(a.haze, b.haze) + shower * .35),
     shadow: mix(rgb(a.shadow), rgb(b.shadow), t),
     rim: mix(rgb(a.rim), rgb(b.rim), t),

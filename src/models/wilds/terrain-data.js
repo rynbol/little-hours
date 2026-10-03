@@ -55,7 +55,7 @@ function paintAndMask(x, z, height, slope, out, mask, tint, i) {
   tall *= .5 + .5 * smooth(1, 6, shore);
   tall *= 1 - woods * .3 - rock * .3;
   tall += .25 * smooth(40, 10, Math.hypot(x - VALLEY.meadow.x, z - VALLEY.meadow.z)) + .12 * smooth(.2, .6, patch);
-  color = blend(color, grass.map(value => value * .8), Math.max(0, Math.min(1, cover)) * .6);
+  color = blend(color, grass, Math.max(0, Math.min(1, cover)) * .75);
 
   out[i] = color[0] * 255; out[i + 1] = color[1] * 255; out[i + 2] = color[2] * 255; out[i + 3] = 255;
   mask[i] = Math.max(0, Math.min(1, cover)) * 255;
@@ -81,11 +81,17 @@ export function chunkGeometry(grid, colors, originX, originZ, step, size = CHUNK
   const vertices = count * count + edges;
   const positions = new Float32Array(vertices * 3), normals = new Float32Array(vertices * 3), paint = new Float32Array(vertices * 4);
   const lastColumn = grid.columns - 1, lastRow = grid.rows - 1;
+  const cell = (x, z) => Math.min(lastRow, Math.max(0, Math.round((z - grid.minZ) / grid.step))) * grid.columns + Math.min(lastColumn, Math.max(0, Math.round((x - grid.minX) / grid.step)));
+  const reach = LOD_STEPS[LOD_STEPS.length - 1] + step;
+  const seamFloor = (x, z) => {
+    let low = Infinity;
+    for (let d = -reach; d <= reach; d += grid.step) low = Math.min(low, grid.heights[cell(x + d, z)], grid.heights[cell(x, z + d)]);
+    return low - 1;
+  };
   for (let r = 0; r < count; r++) for (let c = 0; c < count; c++) {
-    const x = originX + c * step, z = originZ + r * step, v = r * count + c;
-    const gc = Math.min(lastColumn, Math.max(0, Math.round((x - grid.minX) / grid.step))), gr = Math.min(lastRow, Math.max(0, Math.round((z - grid.minZ) / grid.step)));
-    const n = grid.normalAt(x, z), ci = (gr * grid.columns + gc) * 4;
-    positions[v * 3] = x; positions[v * 3 + 1] = grid.heights[gr * grid.columns + gc]; positions[v * 3 + 2] = z;
+    const x = originX + c * step, z = originZ + r * step, v = r * count + c, g = cell(x, z);
+    const n = grid.normalAt(x, z), ci = g * 4;
+    positions[v * 3] = x; positions[v * 3 + 1] = grid.heights[g]; positions[v * 3 + 2] = z;
     normals[v * 3] = n.x; normals[v * 3 + 1] = n.y; normals[v * 3 + 2] = n.z;
     paint[v * 4] = colors[ci] / 255; paint[v * 4 + 1] = colors[ci + 1] / 255; paint[v * 4 + 2] = colors[ci + 2] / 255; paint[v * 4 + 3] = 1;
   }
@@ -96,7 +102,7 @@ export function chunkGeometry(grid, colors, originX, originZ, step, size = CHUNK
   for (let r = count - 1; r > 0; r--) edge.push(r * count);
   edge.forEach((source, k) => {
     const v = count * count + k;
-    positions[v * 3] = positions[source * 3]; positions[v * 3 + 1] = positions[source * 3 + 1] - step * 1.5; positions[v * 3 + 2] = positions[source * 3 + 2];
+    positions[v * 3] = positions[source * 3]; positions[v * 3 + 1] = seamFloor(positions[source * 3], positions[source * 3 + 2]); positions[v * 3 + 2] = positions[source * 3 + 2];
     normals.copyWithin(v * 3, source * 3, source * 3 + 3);
     paint.copyWithin(v * 4, source * 4, source * 4 + 4);
   });
