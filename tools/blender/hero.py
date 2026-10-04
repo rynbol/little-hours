@@ -381,7 +381,8 @@ def surface_patch(table, a0, a1, z0, z1, lift, thick=0.008, sides=8, rings=6, po
     return verts, faces, attrs
 
 
-SLEEVE = {'at': (0.05, 0.13, 0.215, 0.27, 0.33, 0.38), 'end': (-0.03, 0.0), 'radii': (0.063, 0.061, 0.055, 0.049, 0.053, 0.058, 0.06, 0.055, 0.047), 'ridges': 5, 'cuff': (0.049, 0.046, 0.045), 'rib': 12}
+SLEEVE = {'at': (0.05, 0.13, 0.215, 0.27, 0.33, 0.38), 'end': (-0.03, 0.0), 'radii': (0.063, 0.061, 0.055, 0.049, 0.053, 0.058, 0.06, 0.055, 0.047), 'ridges': 5, 'cuff': (0.049, 0.046, 0.045), 'rib': 12, 'rings': 30}
+FOLDS = {'wave': 0.055, 'depth': 0.22, 'twist': 1.0, 'gather': ((0.45, 0.2), (0.88, 0.14))}
 TROUSER = {'radii': (0.09, 0.085, 0.07, 0.069, 0.054, 0.044), 'ridges': 4}
 PIPING = {'top': 0.08, 'edge': 18, 'hem': 64, 'radius': 0.0062}
 SHIRT = [(1.0, 0.012), (1.06, 0.135), (1.11, 0.335), (1.165, 0.46)]
@@ -402,13 +403,25 @@ def arm_weights(side):
     return blend(['chest', f'clavicle.{side}', f'upperarm.{side}', f'forearm.{side}', f'hand.{side}'], 5.0, 2)
 
 
+def folds(length):
+    def shape(u, angle):
+        gather = sum(math.exp(-((u - at) / width) ** 2) for at, width in FOLDS['gather'])
+        wave = u * length / FOLDS['wave']
+        turn = angle / math.tau * FOLDS['twist']
+        ridge = max(0.5 + 0.5 * math.sin(math.tau * (wave + turn)), 0.5 + 0.5 * math.sin(math.tau * (wave - turn)))
+        return 1.0 + FOLDS['depth'] * gather * (ridge * ridge - 0.4)
+    return shape
+
+
 def sleeve(model, side, colour, cuff, cuff_colour):
     shoulder, elbow, wrist, knuckle, tip, down = arm_points(side)
     x = side_x(side)
     start = shoulder - down * 0.035 + Vector((-0.014 * x, 0, -0.006))
     points = [start] + [shoulder + down * t for t in SLEEVE['at']] + [wrist + down * t for t in SLEEVE['end']]
-    radii = SLEEVE['radii']
-    model.add(refine(tube(points, radii, 16, ridges=SLEEVE['ridges']), 1), colour, arm_weights(side))
+    along = [k / (SLEEVE['rings'] - 1) for k in range(SLEEVE['rings'])]
+    dense = [Vector(catmull(points, s)) for s in along]
+    radii = [catmull([(r,) for r in SLEEVE['radii']], s)[0] for s in along]
+    model.add(refine(tube(dense, radii, 16, ridges=SLEEVE['ridges'], shape=folds((points[-1] - points[0]).length)), 1), colour, arm_weights(side))
     if cuff:
         end = points[-1]
         band = tube([end - down * 0.03, end - down * 0.012, end + down * 0.012], SLEEVE['cuff'], 16, ridges=SLEEVE['rib'])

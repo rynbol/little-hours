@@ -105,7 +105,7 @@ def loft(rings, attrs, cap_start=True, cap_end=True):
     return verts, faces, flat_attrs
 
 
-def tube(points, radii, sides=8, rough=0.0, seed=0.0, ridges=0):
+def tube(points, radii, sides=8, rough=0.0, seed=0.0, ridges=0, shape=None):
     points = [Vector(p) for p in points]
     tangents = []
     for i in range(len(points)):
@@ -121,7 +121,7 @@ def tube(points, radii, sides=8, rough=0.0, seed=0.0, ridges=0):
         for j in range(sides):
             angle = j / sides * math.tau
             out = normal * math.cos(angle) + binormal * math.sin(angle)
-            radius = radii[i] * (1.0 + rough * wobble(p + out * 0.3, 7.0, seed) + (0.07 * math.cos(angle * ridges + u * 3.0) if ridges else 0.0))
+            radius = radii[i] * (1.0 + rough * wobble(p + out * 0.3, 7.0, seed) + (0.07 * math.cos(angle * ridges + u * 3.0) if ridges else 0.0)) * (shape(u, angle) if shape else 1.0)
             ring.append(p + out * radius)
             ring_attrs.append((out, u, j / sides))
         rings.append(ring)
